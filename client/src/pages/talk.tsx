@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Save, ArrowLeft, Volume2, Trash2, Lock, Square, PlayCircle, Radio, Scan, Layers, BookOpen, X } from 'lucide-react';
+import { Mic, Save, ArrowLeft, Volume2, Trash2, Lock, Square, PlayCircle, Radio, Scan, Layers, BookOpen, X, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { twMerge } from 'tailwind-merge';
 import { toast } from 'sonner';
@@ -11,11 +11,12 @@ interface Card {
 }
 
 export default function Talk({ onBack }: { onBack: () => void }) {
-  const [view, setView] = useState<'setup' | 'list' | 'active'>('setup');
+  // GÖRÜNÜM: 'permissions' (Başlangıç), 'setup' (Kurulum), 'list' (Liste), 'active' (Eğitim)
+  const [view, setView] = useState<'permissions' | 'setup' | 'list' | 'active'>('permissions');
   const [cards, setCards] = useState<Card[]>([]);
   const [lastReadCard, setLastReadCard] = useState<Card | null>(null);
 
-  // Geçici Durumlar
+  // Kayıt Durumları
   const [isRecording, setIsRecording] = useState(false);
   const [tempAudio, setTempAudio] = useState<string | null>(null);
   const [tempName, setTempName] = useState("");
@@ -24,23 +25,42 @@ export default function Talk({ onBack }: { onBack: () => void }) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // --- NFC MANTIĞI ---
+  // --- 1. SİSTEM İZİNLERİNİ BAŞTA ALMA ---
+  const requestAllPermissions = async () => {
+    try {
+      // Mikrofon İzni
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop()); // İzni aldık, şimdilik kapatalım
+
+      // NFC Kontrolü (Destekleniyorsa)
+      if ('NDEFReader' in window) {
+        const ndef = new (window as any).NDEFReader();
+        await ndef.scan();
+      }
+
+      toast.success("Tüm izinler onaylandı!");
+      setView('setup'); // İzinler tamamsa kuruluma geç
+    } catch (err: any) {
+      console.error("İzin Hatası:", err);
+      toast.error("Lütfen mikrofon ve NFC izinlerini onaylayın.");
+    }
+  };
+
+  // --- 2. NFC OKUMA SİSTEMİ ---
   useEffect(() => {
-    if ('NDEFReader' in window) {
+    if (view !== 'permissions' && 'NDEFReader' in window) {
       const reader = new (window as any).NDEFReader();
       const startNFC = async () => {
         try {
           await reader.scan();
           reader.onreading = ({ serialNumber }: any) => {
             if (isWaitingNFC && tempAudio) {
-              // KAYIT: Kartı sesle eşleştir
               const newCard: Card = { nfcId: serialNumber, text: tempName || "Yeni Kart", audio: tempAudio };
               setCards(prev => [...prev, newCard]);
               resetSetup();
-              toast.success("Kart Başarıyla Tanımlandı!");
-              if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+              toast.success("Kart Tanımlandı!");
+              if (navigator.vibrate) navigator.vibrate(200);
             } else if (view === 'active') {
-              // EĞİTİM: Sesi çal
               const matched = cards.find(c => c.nfcId === serialNumber);
               if (matched) {
                 setLastReadCard(matched);
@@ -49,19 +69,13 @@ export default function Talk({ onBack }: { onBack: () => void }) {
               }
             }
           };
-        } catch (e) { console.error("NFC Hatası"); }
+        } catch (e) { console.error("NFC Aktif Edilemedi"); }
       };
       startNFC();
     }
   }, [view, isWaitingNFC, tempAudio, tempName, cards]);
 
-  const resetSetup = () => {
-    setTempAudio(null);
-    setTempName("");
-    setIsWaitingNFC(false);
-    setIsRecording(false);
-  };
-
+  // --- 3. SES KAYIT SİSTEMİ ---
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -70,109 +84,102 @@ export default function Talk({ onBack }: { onBack: () => void }) {
       audioChunksRef.current = [];
       media.ondataavailable = (e) => audioChunksRef.current.push(e.data);
       media.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/mp4' });
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         setTempAudio(URL.createObjectURL(blob));
+        stream.getTracks().forEach(t => t.stop());
       };
       media.start();
       setIsRecording(true);
-    } catch (err) { toast.error("Mikrofon izni gerekli!"); }
+    } catch (err) { toast.error("Kayıt başlatılamadı!"); }
   };
 
-  const handleScreenTouch = () => {
-    if (view === 'active' && cards.length > 0) {
-      const randomCard = cards[Math.floor(Math.random() * cards.length)];
-      setLastReadCard(randomCard);
-      new Audio(randomCard.audio).play();
-    }
+  const resetSetup = () => {
+    setTempAudio(null);
+    setTempName("");
+    setIsWaitingNFC(false);
+    setIsRecording(false);
   };
 
-  // --- GÖRÜNÜM: KURULUM ---
+  // --- A. İZİN EKRANI (İLK AÇILIŞ) ---
+  if (view === 'permissions') {
+    return (
+      <div className="min-h-screen bg-[#020617] text-white p-8 flex flex-col items-center justify-center text-center">
+        <div className="w-24 h-24 bg-blue-600/20 rounded-full flex items-center justify-center mb-6 border-2 border-blue-500/30">
+          <ShieldCheck size={48} className="text-blue-500" />
+        </div>
+        <h1 className="text-3xl font-black mb-4">Sistem Kontrolü</h1>
+        <p className="text-slate-400 mb-10 max-w-xs leading-relaxed">
+          Tolkido modunun çalışabilmesi için <span className="text-white">Mikrofon</span> ve <span className="text-white">NFC</span> erişimine ihtiyaç duyuyoruz.
+        </p>
+        <button 
+          onClick={requestAllPermissions}
+          className="w-full max-w-sm h-16 bg-blue-600 rounded-2xl font-black text-lg shadow-xl shadow-blue-900/20 active:scale-95 transition-all"
+        >
+          İZİNLERİ ONAYLA VE BAŞLA
+        </button>
+        <button onClick={onBack} className="mt-6 text-slate-500 font-bold uppercase text-xs">Vazgeç</button>
+      </div>
+    );
+  }
+
+  // --- B. KURULUM EKRANI (ÖĞRETMEN) ---
   if (view === 'setup') {
     return (
-      <div className="min-h-screen bg-[#020617] text-white p-6 flex flex-col font-sans relative">
+      <div className="min-h-screen bg-[#020617] text-white p-6 flex flex-col">
         <header className="flex items-center gap-4 mb-8">
           <Button variant="ghost" size="icon" onClick={onBack} className="text-slate-500"><ArrowLeft /></Button>
           <h1 className="text-2xl font-black tracking-tighter uppercase">TOLKİDO PANEL</h1>
         </header>
 
-        {/* Üst Kısım: Yeni Kart Tanımlama Kartı */}
-        <div className="bg-slate-900/60 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1 bg-blue-500 h-full"></div>
-          
+        <div className="bg-slate-900/60 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl relative">
           <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-6">YENİ KART TANIMLA</h2>
-          
-          <div className="space-y-5">
-            <input 
-              value={tempName}
-              onChange={(e) => setTempName(e.target.value)}
-              placeholder="Kart İsmi (Örn: Elma)" 
-              className="w-full bg-slate-950 border border-slate-800 h-14 rounded-2xl px-6 text-white outline-none focus:border-blue-500 transition-all"
-            />
+          <input 
+            value={tempName}
+            onChange={(e) => setTempName(e.target.value)}
+            placeholder="Kart İsmi (Örn: Elma)" 
+            className="w-full bg-slate-950 border border-slate-800 h-14 rounded-2xl px-6 text-white mb-5 outline-none"
+          />
 
-            {!tempAudio ? (
-              <button 
-                onClick={isRecording ? () => mediaRecorderRef.current?.stop() : startRecording}
-                className={twMerge(
-                  "w-full h-16 rounded-2xl flex items-center justify-center gap-3 font-bold text-lg transition-all",
-                  isRecording ? "bg-red-500 animate-pulse" : "bg-blue-600 shadow-lg shadow-blue-900/20"
-                )}
-              >
-                {isRecording ? <><Square size={20} /> KAYDI DURDUR</> : <><Mic size={20} /> SES KAYDI BAŞLAT</>}
+          {!tempAudio ? (
+            <button 
+              onClick={isRecording ? () => mediaRecorderRef.current?.stop() : startRecording}
+              className={twMerge("w-full h-16 rounded-2xl flex items-center justify-center gap-3 font-bold text-lg", isRecording ? "bg-red-500 animate-pulse" : "bg-blue-600")}
+            >
+              {isRecording ? <><Square size={20} /> DURDUR</> : <><Mic size={20} /> SES KAYDI BAŞLAT</>}
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <button onClick={() => new Audio(tempAudio).play()} className="w-full h-14 bg-slate-800 rounded-2xl flex items-center justify-center gap-2 font-bold text-green-400">
+                <PlayCircle size={20} /> SESİ KONTROL ET
               </button>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 animate-in fade-in slide-in-from-top-2">
-                <button 
-                  onClick={() => new Audio(tempAudio).play()}
-                  className="h-14 bg-slate-800 border border-slate-700 rounded-2xl flex items-center justify-center gap-2 font-bold text-green-400 active:scale-95 transition-all"
-                >
-                  <PlayCircle size={20} /> SESİ KONTROL ET
-                </button>
-                
-                <button 
-                  onClick={() => setIsWaitingNFC(true)}
-                  className="h-20 bg-green-600 rounded-2xl flex items-center justify-center gap-3 font-black text-xl shadow-lg shadow-green-900/20 active:scale-95 transition-all"
-                >
-                  <Save size={24} /> KARTA YÜKLE
-                </button>
-
-                <button onClick={resetSetup} className="text-slate-500 text-xs font-bold uppercase py-2">İptal Et ve Sil</button>
-              </div>
-            )}
-          </div>
+              <button onClick={() => setIsWaitingNFC(true)} className="w-full h-20 bg-green-600 rounded-2xl flex items-center justify-center gap-3 font-black text-xl shadow-lg shadow-green-900/20">
+                <Save size={24} /> KARTA YÜKLE
+              </button>
+              <button onClick={resetSetup} className="w-full text-slate-500 text-xs font-bold py-2">İPTAL VE SİL</button>
+            </div>
+          )}
         </div>
 
-        {/* Alt Kısım: İki Büyük Buton */}
         <div className="mt-auto grid grid-cols-2 gap-4">
-          <button 
-            onClick={() => setView('list')}
-            className="h-32 bg-slate-900 border border-slate-800 rounded-[2rem] flex flex-col items-center justify-center gap-3 active:scale-95 transition-all"
-          >
-            <div className="p-3 bg-blue-500/10 rounded-xl"><Layers className="text-blue-400" size={28} /></div>
+          <button onClick={() => setView('list')} className="h-28 bg-slate-900 border border-slate-800 rounded-[2rem] flex flex-col items-center justify-center gap-3 active:scale-95">
+            <Layers className="text-blue-400" size={24} />
             <span className="text-[10px] font-bold uppercase tracking-widest">Yüklü Kartlar</span>
           </button>
-          
-          <button 
-            onClick={() => setView('active')}
-            disabled={cards.length === 0}
-            className="h-32 bg-blue-600 rounded-[2rem] flex flex-col items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-20"
-          >
-            <div className="p-3 bg-white/10 rounded-xl"><BookOpen className="text-white" size={28} /></div>
+          <button onClick={() => setView('active')} disabled={cards.length === 0} className="h-28 bg-blue-600 rounded-[2rem] flex flex-col items-center justify-center gap-3 active:scale-95 disabled:opacity-20">
+            <BookOpen className="text-white" size={24} />
             <span className="text-[10px] font-bold uppercase tracking-widest text-white">Eğitimi Başlat</span>
           </button>
         </div>
 
-        {/* NFC BEKLEME EKRANI (OVERLAY) */}
         {isWaitingNFC && (
-          <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[200] flex items-center justify-center p-8 text-center">
+          <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-[200] flex items-center justify-center p-8 text-center">
             <div className="animate-in zoom-in duration-300">
-              <div className="w-40 h-40 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-8 border-2 border-blue-500/50 animate-pulse">
-                <Scan size={80} className="text-blue-400" />
+              <div className="w-32 h-32 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-blue-500/50 animate-pulse">
+                <Scan size={60} className="text-blue-400" />
               </div>
-              <h2 className="text-2xl font-black text-white mb-2">KART OKUTUN</h2>
-              <p className="text-slate-400 text-sm mb-10">"{tempName}" sesini yüklemek için kartı telefonun arkasına dokundurun.</p>
-              <Button variant="outline" onClick={() => setIsWaitingNFC(false)} className="border-slate-800 text-slate-400 rounded-full px-8">
-                <X size={18} className="mr-2" /> Vazgeç
-              </Button>
+              <h2 className="text-xl font-black text-white mb-2 uppercase">Kart Okutun</h2>
+              <p className="text-slate-400 text-sm mb-10">"{tempName}" sesini yüklemek için kartı yaklaştırın.</p>
+              <button onClick={() => setIsWaitingNFC(false)} className="text-slate-500 font-bold uppercase text-sm border-b border-slate-800 pb-1">Vazgeç</button>
             </div>
           </div>
         )}
@@ -180,62 +187,47 @@ export default function Talk({ onBack }: { onBack: () => void }) {
     );
   }
 
-  // --- GÖRÜNÜM: KART LİSTESİ ---
+  // --- C. LİSTE EKRANI ---
   if (view === 'list') {
     return (
-      <div className="min-h-screen bg-[#020617] text-white p-6 flex flex-col font-sans">
+      <div className="min-h-screen bg-[#020617] text-white p-6 flex flex-col">
         <header className="flex items-center gap-4 mb-8">
           <Button variant="ghost" size="icon" onClick={() => setView('setup')}><ArrowLeft /></Button>
-          <h1 className="text-xl font-bold">Kayıtlı Kartlar ({cards.length})</h1>
+          <h1 className="text-xl font-bold uppercase">Kayıtlı Kartlar</h1>
         </header>
-        <div className="flex-1 overflow-y-auto space-y-3">
+        <div className="flex-1 space-y-3 overflow-y-auto">
           {cards.map((card, i) => (
-            <div key={i} className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex items-center justify-between shadow-lg">
+            <div key={i} className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <button onClick={() => new Audio(card.audio).play()} className="w-10 h-10 bg-green-500/10 rounded-full flex items-center justify-center text-green-400">
-                  <PlayCircle size={24} />
-                </button>
+                <button onClick={() => new Audio(card.audio).play()} className="text-green-400"><PlayCircle size={28} /></button>
                 <span className="font-black text-lg">{card.text}</span>
               </div>
-              <button onClick={() => setCards(cards.filter((_, idx) => idx !== i))} className="text-red-500 p-2 hover:bg-red-500/10 rounded-xl transition-colors">
-                <Trash2 size={20} />
-              </button>
+              <button onClick={() => setCards(cards.filter((_, idx) => idx !== i))} className="text-red-500"><Trash2 size={20} /></button>
             </div>
           ))}
-          {cards.length === 0 && (
-            <div className="text-center py-20 opacity-20">
-              <Layers size={64} className="mx-auto mb-4" />
-              <p className="font-bold">Henüz kart eklenmedi.</p>
-            </div>
-          )}
         </div>
       </div>
     );
   }
 
-  // --- GÖRÜNÜM: EĞİTİM MODU (ÖĞRENCİ) ---
+  // --- D. EĞİTİM MODU ---
   return (
-    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-8" onClick={handleScreenTouch}>
-      <button onDoubleClick={() => { setView('setup'); setLastReadCard(null); }} className="absolute top-8 left-8 text-slate-900/20">
-        <Lock size={32} />
-      </button>
-      
-      <div className="w-full max-w-sm aspect-square bg-slate-900/10 border-2 border-slate-800/50 rounded-[5rem] flex flex-col items-center justify-center p-10 relative overflow-hidden">
+    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-8 text-center" onClick={() => cards.length > 0 && new Audio(cards[Math.floor(Math.random()*cards.length)].audio).play()}>
+      <button onDoubleClick={() => setView('setup')} className="absolute top-8 left-8 text-slate-900/40"><Lock size={32} /></button>
+      <div className="w-full max-w-sm aspect-square bg-slate-900/10 border-2 border-slate-800/50 rounded-[4rem] flex flex-col items-center justify-center">
         {lastReadCard ? (
-          <div className="animate-in zoom-in duration-300">
-            <div className="relative">
-                <Volume2 size={120} className="text-blue-500 mx-auto mb-10 animate-pulse relative z-10" />
-                <div className="absolute inset-0 bg-blue-500/20 blur-[60px] rounded-full"></div>
-            </div>
-            <h2 className="text-6xl font-black text-white uppercase tracking-tighter leading-none">{lastReadCard.text}</h2>
+          <div className="animate-in zoom-in">
+            <Volume2 size={100} className="text-blue-500 mx-auto mb-6 animate-pulse" />
+            <h2 className="text-5xl font-black text-white uppercase">{lastReadCard.text}</h2>
           </div>
         ) : (
-          <div className="opacity-5 flex flex-col items-center gap-8">
-            <Radio size={120} className="animate-pulse" />
-            <p className="text-2xl font-black tracking-[0.5em]">BEKLENİYOR</p>
+          <div className="opacity-5 flex flex-col items-center gap-6 text-white">
+            <Radio size={80} className="animate-pulse" />
+            <p className="text-xl font-black tracking-widest uppercase">Bekleniyor</p>
           </div>
         )}
       </div>
     </div>
   );
-            }
+}
+  
