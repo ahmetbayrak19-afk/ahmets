@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "838766806928",
+    "project_id": "ogrencitakip-2a775",
+    "storage_bucket": "ogrencitakip-2a775.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:838766806928:android:04107a765f3240434e5515",
+        "android_client_info": {
+          "package_name": "com.kazanimtakip.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCu_0slVMjGSkEGQfpCc-_GXxTgPmGq7Hw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:838766806928:android:9003f975bbbe7ff64e5515",
+        "android_client_info": {
+          "package_name": "com.ogrenim.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCu_0slVMjGSkEGQfpCc-_GXxTgPmGq7Hw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
