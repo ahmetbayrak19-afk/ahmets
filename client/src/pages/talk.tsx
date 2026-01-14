@@ -94,8 +94,6 @@ export default function Talk({ onBack }: { onBack: () => void }) {
       
       // 2. Durum: Eğitim Modundayız (Kart Okutup Ses Çalma)
       else if (view === 'active') {
-        // State içindeki kartları anlık okumak için setCards callback'ini kullanıyoruz
-        // ya da cards dependency'e ekli olduğu için direkt 'cards' kullanabiliriz.
         const matched = cards.find(c => c.nfcId === serialNumber);
         
         if (matched) {
@@ -116,7 +114,7 @@ export default function Talk({ onBack }: { onBack: () => void }) {
       // @ts-ignore
       window.handleNfcScan = null;
     };
-  }, [isWaitingNFC, tempAudio, tempName, view, cards]); // Bu değişkenler değiştiğinde fonksiyon yenilenmeli
+  }, [isWaitingNFC, tempAudio, tempName, view, cards]);
 
   const startRecording = async () => {
     try {
@@ -179,7 +177,7 @@ export default function Talk({ onBack }: { onBack: () => void }) {
     );
   }
 
-  // 2. KURULUM (KAYIT) EKRANI
+  // 2. KURULUM (KAYIT) EKRANI - DÜZENLENDİ
   if (view === 'setup') {
     return (
       <div className="min-h-screen bg-[#020617] text-white p-6 flex flex-col font-sans">
@@ -191,7 +189,8 @@ export default function Talk({ onBack }: { onBack: () => void }) {
           </div>
         </header>
 
-        <div className="bg-slate-900/40 border border-slate-800 rounded-[3rem] p-8 mb-8 shadow-2xl relative">
+        {/* ANA KUTU */}
+        <div className="bg-slate-900/40 border border-slate-800 rounded-[3rem] p-8 mb-4 shadow-2xl relative">
           <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6 text-center italic">YENİ KART EKLE</h2>
           
           <div className="space-y-4">
@@ -227,7 +226,8 @@ export default function Talk({ onBack }: { onBack: () => void }) {
           </div>
         </div>
 
-        <div className="mt-auto grid grid-cols-2 gap-4">
+        {/* ALT BUTONLAR - BURAYI DÜZENLEDİM (mt-auto yerine mt-6) */}
+        <div className="mt-6 grid grid-cols-2 gap-4">
           <button onClick={() => setView('list')} className="h-28 bg-slate-900 border border-slate-800 rounded-[2.2rem] flex flex-col items-center justify-center gap-2 active:scale-95">
             <Layers className="text-slate-500" size={28} />
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">KARTLARIM</span>
@@ -305,4 +305,5 @@ export default function Talk({ onBack }: { onBack: () => void }) {
       <p className="text-slate-600 mt-12 font-bold uppercase tracking-widest text-xs">Kartı Okutun</p>
     </div>
   );
-    }
+        }
+    
