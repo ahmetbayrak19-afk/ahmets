@@ -26,12 +26,19 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
 
   useEffect(() => {
     const load = async () => {
-      if (!studentId) return;
+      // studentId yoksa hiç deneme yapma
+      if (!studentId) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const instId = localStorage.getItem("kazanim-takip-institution-id");
-        const docSnap = await getDoc(doc(db, "institutions", instId!, "students", studentId, "assessments", "aba"));
-        if (docSnap.exists()) {
-            setFormData(docSnap.data());
+        if(instId) {
+            const docSnap = await getDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"));
+            if (docSnap.exists()) {
+                setFormData(docSnap.data());
+            }
         }
       } catch (error) {
         console.error("Veri çekme hatası:", error);
@@ -71,9 +78,15 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
   // 1. ÖNCE LOADING KONTROLÜ
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
 
-  // 2. SONRA TALK MODU KONTROLÜ (Eğer butona basıldıysa liste yerine bu görünür)
+  // 2. SONRA TALK MODU KONTROLÜ
+  // 🔥 DÜZELTME BURADA YAPILDI: studentId EKLENDİ 🔥
   if (showTolkido) {
-    return <Talk onBack={() => setShowTolkido(false)} />;
+    return (
+        <Talk 
+            onBack={() => setShowTolkido(false)} 
+            studentId={studentId} 
+        />
+    );
   }
 
   // 3. ANA LİSTE GÖRÜNÜMÜ
@@ -119,7 +132,7 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
                         "group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4",
                         isCompleted 
                             ? "bg-green-950/10 border-green-500/20" 
-                            : "bg-slate-900/40 border-slate-800 hover:bg-slate-800 hover:border-slate-700"
+                            : "bg-slate-950 border-slate-800 hover:bg-slate-800 hover:border-slate-700"
                     )}
                 >
                     <div className="flex items-start gap-4">
@@ -177,4 +190,4 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
       </div>
     </div>
   );
-        }
+    }
