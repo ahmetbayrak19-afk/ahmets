@@ -7,7 +7,7 @@ import { twMerge } from 'tailwind-merge';
 interface TaklitSessionProps {
   itemCode: string;
   itemText: string;
-  videoUrl: string; // Dışarıdan gelen video linki
+  videoUrl: string;
   currentStatus: boolean | null;
   onClose: () => void;
   onSaveStatus: (status: boolean) => void;
@@ -18,15 +18,13 @@ export default function TaklitSession({ itemCode, itemText, videoUrl, currentSta
   const videoRef = useRef<HTMLVideoElement>(null);
   const sampleVideoRef = useRef<HTMLVideoElement>(null);
 
-  // Kamera Açılışı
+  // 1. KAMERAYI BAŞLAT
   useEffect(() => {
     let stream: MediaStream;
     const startCamera = async () => {
       try {
-        // Ön kamerayı (user) aç
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
         setCameraStream(stream);
-        if (videoRef.current) videoRef.current.srcObject = stream;
       } catch (err) {
         console.error(err);
         toast.error("Kamera açılamadı. İzinleri kontrol edin.");
@@ -34,11 +32,20 @@ export default function TaklitSession({ itemCode, itemText, videoUrl, currentSta
     };
     startCamera();
 
-    // Temizlik: Sayfa kapanınca kamerayı kapat
     return () => {
       if (stream) stream.getTracks().forEach(t => t.stop());
     };
   }, []);
+
+  // 2. KAMERA GÖRÜNTÜSÜNÜ VİDEOYA BAĞLA (Düzeltme Burada)
+  useEffect(() => {
+    // Eğer stream geldiyse VE video etiketi ekranda oluştuysa
+    if (cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+      // Bazı android cihazlar için play() komutunu zorluyoruz
+      videoRef.current.play().catch(e => console.log("Otomatik oynatma hatası:", e));
+    }
+  }, [cameraStream]); // Bu kod cameraStream her değiştiğinde çalışır
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col animate-in slide-in-from-bottom duration-300">
@@ -57,7 +64,7 @@ export default function TaklitSession({ itemCode, itemText, videoUrl, currentSta
       {/* ORTA ALAN (VİDEO + AYNA) */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-black">
         
-        {/* 1. SOL/ÜST: MODEL VİDEOSU */}
+        {/* SOL: MODEL VİDEOSU */}
         <div className="flex-1 relative border-b md:border-b-0 md:border-r border-slate-800 bg-slate-900">
           <video 
             ref={sampleVideoRef} 
@@ -65,22 +72,12 @@ export default function TaklitSession({ itemCode, itemText, videoUrl, currentSta
             className="w-full h-full object-contain" 
             playsInline 
             loop 
-            // controls // İstersen standart kontrolleri açabilirsin
+            controls // Öğretmen müdahale edebilsin diye kontrolleri açtım
           />
-          
           <div className="absolute top-2 left-2 bg-blue-600/80 text-white px-2 py-1 rounded text-[10px] font-bold uppercase z-10">MODEL</div>
-          
-          {/* Özel Video Kontrolleri */}
-          <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-4 z-10 pointer-events-none">
-            <div className="pointer-events-auto flex gap-4 bg-black/50 p-2 rounded-full backdrop-blur-sm">
-                <button onClick={() => sampleVideoRef.current?.play()} className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center text-white shadow-lg active:scale-95"><Play size={20} fill="currentColor" /></button>
-                <button onClick={() => sampleVideoRef.current?.pause()} className="w-10 h-10 bg-yellow-600 rounded-full flex items-center justify-center text-white shadow-lg active:scale-95"><Pause size={20} fill="currentColor" /></button>
-                <button onClick={() => {if(sampleVideoRef.current) sampleVideoRef.current.currentTime = 0;}} className="w-10 h-10 bg-slate-600 rounded-full flex items-center justify-center text-white shadow-lg active:scale-95"><RotateCcw size={20} /></button>
-            </div>
-          </div>
         </div>
 
-        {/* 2. SAĞ/ALT: ÖĞRENCİ KAMERASI (AYNA) */}
+        {/* SAĞ: ÖĞRENCİ KAMERASI (AYNA) */}
         <div className="flex-1 relative bg-black">
             {cameraStream ? (
                 <video 
@@ -88,7 +85,7 @@ export default function TaklitSession({ itemCode, itemText, videoUrl, currentSta
                     autoPlay 
                     playsInline 
                     muted 
-                    className="w-full h-full object-cover transform -scale-x-100" // AYNA ETKİSİ İÇİN TERS ÇEVİRİYORUZ
+                    className="w-full h-full object-cover transform -scale-x-100" // Ayna etkisi
                 />
             ) : (
                 <div className="flex h-full items-center justify-center text-slate-500 gap-2">
@@ -125,4 +122,4 @@ export default function TaklitSession({ itemCode, itemText, videoUrl, currentSta
       </div>
     </div>
   );
-        }
+      }
