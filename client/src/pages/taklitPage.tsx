@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Video } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
-import TaklitSession from '@/components/TaklitSession'; // Senin oluşturduğun Session bileşeni
+import TaklitSession from '@/components/TaklitSession';
 
-// --- VİDEO LİNKLERİ ---
+// --- VİDEO LİNKLERİ (Örnekler) ---
 const VIDEOS = {
     NESNELI: "https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4",
     NESNESIZ: "https://www.w3schools.com/html/mov_bbb.mp4",
@@ -25,7 +25,7 @@ export default function TaklitPage({ studentId, onBack }: TaklitPageProps) {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   
-  // Hangi kazanım için Session açılacak? (Null ise liste görünür)
+  // Hangi kazanım değerlendiriliyor? (Null ise liste görünür)
   const [activeItem, setActiveItem] = useState<string | null>(null);
 
   const moduleData = ABA_MODULES.find(m => m.name.includes("TAKLİT BECERİLERİ"));
@@ -58,22 +58,23 @@ export default function TaklitPage({ studentId, onBack }: TaklitPageProps) {
     setFormData(prev => ({ ...prev, [itemCode]: prev[itemCode] === status ? null : status }));
   };
 
-  // Session kapandığında gelen veriyi işle
+  // Session ekranından gelen sonucu kaydet
   const handleSessionSave = (status: boolean) => {
     if (activeItem) setStatus(activeItem, status);
   };
 
-  // Video URL Seçici
+  // Video Seçici
   const getVideoUrl = (itemString: string) => {
-    if (itemString.includes("NESNELİ")) return VIDEOS.NESNELI;
-    if (itemString.includes("NESNESİZ")) return VIDEOS.NESNESIZ;
-    if (itemString.includes("AYNA")) return VIDEOS.AYNA;
+    const upper = itemString.toUpperCase();
+    if (upper.includes("NESNELİ")) return VIDEOS.NESNELI;
+    if (upper.includes("NESNESİZ")) return VIDEOS.NESNESIZ;
+    if (upper.includes("AYNA")) return VIDEOS.AYNA;
     return VIDEOS.DEFAULT;
   };
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
 
-  // --- 1. SESSION MODU (Eğer butona basıldıysa burası çalışır) ---
+  // --- 1. DEĞERLENDİRME MODU (KAMERA AÇIK) ---
   if (activeItem) {
     const firstSpaceIndex = activeItem.indexOf(' ');
     const textOnly = activeItem.substring(firstSpaceIndex + 1);
@@ -84,7 +85,7 @@ export default function TaklitPage({ studentId, onBack }: TaklitPageProps) {
         itemText={textOnly}
         videoUrl={getVideoUrl(activeItem)}
         currentStatus={formData[activeItem]}
-        onClose={() => setActiveItem(null)} // Kapatınca listeye döner
+        onClose={() => setActiveItem(null)}
         onSaveStatus={handleSessionSave}
       />
     );
@@ -95,7 +96,9 @@ export default function TaklitPage({ studentId, onBack }: TaklitPageProps) {
     <div className="space-y-6">
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex items-center justify-between sticky top-0 backdrop-blur-md z-10 shadow-lg">
         <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={onBack} className="text-slate-400"><ArrowLeft size={20} /></Button>
+            <Button variant="ghost" size="sm" onClick={onBack} className="text-slate-400 hover:text-white">
+                <ArrowLeft size={20} />
+            </Button>
             <h2 className="text-lg font-bold text-white">Taklit Becerileri</h2>
         </div>
         <Button onClick={handleSave} className="bg-green-600 h-8 text-xs"><Save className="mr-2 h-3.5 w-3.5" /> Kaydet</Button>
@@ -109,9 +112,9 @@ export default function TaklitPage({ studentId, onBack }: TaklitPageProps) {
             const text = item.substring(firstSpaceIndex + 1);
             const isCompleted = status === true;
 
-            // --- FİLTRELEME MANTIĞI BURADA ---
-            // Sadece içinde "NESNELİ", "NESNESİZ" veya "AYNA" geçen (İlk 3) maddelerde buton görünsün.
-            const showCameraBtn = item.includes("NESNELİ") || item.includes("NESNESİZ") || item.includes("AYNA");
+            // İlk 3 madde için Değerlendir butonu görünsün (İstersen filtreyi kaldırıp hepsine açabilirsin)
+            // Şu an hepsinde açık bıraktım ki test edebilesin.
+            const showEvaluateButton = true; 
 
             return (
                 <div key={item} className={twMerge("group p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4", isCompleted ? "bg-green-950/10 border-green-500/20" : "bg-slate-900/40 border-slate-800")}>
@@ -124,22 +127,30 @@ export default function TaklitPage({ studentId, onBack }: TaklitPageProps) {
 
                     <div className="flex items-center gap-2 self-end sm:self-center">
                         
-                        {/* --- SADECE İLGİLİ MADDELERDE GÖRÜNEN BUTON --- */}
-                        {showCameraBtn && (
+                        {/* --- 🔥 YENİ DEĞERLENDİR BUTONU 🔥 --- */}
+                        {showEvaluateButton && (
                             <Button 
                                 onClick={() => setActiveItem(item)}
-                                className="bg-blue-600 hover:bg-blue-500 w-9 h-9 p-0 rounded-lg mr-2 animate-pulse shadow-lg shadow-blue-900/20"
-                                title="Video ile Çalış"
+                                className="bg-indigo-600 hover:bg-indigo-500 text-white h-9 px-3 rounded-lg mr-2 shadow-lg shadow-indigo-500/20 flex items-center gap-2 active:scale-95 transition-all"
                             >
-                                <Video size={18} />
+                                <Camera size={16} />
+                                <span className="text-[10px] font-bold tracking-wider hidden sm:inline">DEĞERLENDİR</span>
+                                {/* Mobilde sadece ikon, tablette yazı da görünür */}
                             </Button>
                         )}
-                        {/* ----------------------------------------------- */}
+                        {/* ------------------------------------------- */}
 
-                        <button onClick={() => setStatus(item, false)} className={twMerge("w-9 h-9 rounded-lg border flex items-center justify-center", status === false ? "bg-red-500/20 border-red-500 text-red-400" : "bg-slate-950 border-slate-800 text-slate-500")}>
+                        <button 
+                            onClick={() => setStatus(item, false)} 
+                            className={twMerge("w-9 h-9 rounded-lg border flex items-center justify-center transition-all active:scale-95", status === false ? "bg-red-500/20 border-red-500 text-red-400" : "bg-slate-950 border-slate-800 text-slate-500 hover:text-red-400")}
+                        >
                             <XCircle size={18} />
                         </button>
-                        <button onClick={() => setStatus(item, true)} className={twMerge("w-9 h-9 rounded-lg border flex items-center justify-center", status === true ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-800 text-slate-500")}>
+                        
+                        <button 
+                            onClick={() => setStatus(item, true)} 
+                            className={twMerge("w-9 h-9 rounded-lg border flex items-center justify-center transition-all active:scale-95", status === true ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-800 text-slate-500 hover:text-green-400")}
+                        >
                             <CheckCircle2 size={18} />
                         </button>
                     </div>
@@ -149,5 +160,4 @@ export default function TaklitPage({ studentId, onBack }: TaklitPageProps) {
       </div>
     </div>
   );
-    }
-
+}
