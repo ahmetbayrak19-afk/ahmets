@@ -17,8 +17,14 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   
+  // Hangi Oyun Modu? (Öğretim / Test)
   const [activeGameMode, setActiveGameMode] = useState<'assessment' | 'instruction' | null>(null);
+  
+  // Hangi Kazanım Maddesi? (EB.1.1.1 vb.)
   const [activeGameItem, setActiveGameItem] = useState<string | null>(null);
+
+  // Hangi Oyun Türü? (nesne-nesne, nesne-resim, eylem) - 🔥 YENİ EKLENDİ
+  const [activeGameType, setActiveGameType] = useState<'nesne-nesne' | 'nesne-resim' | 'eylem'>('nesne-nesne');
 
   const moduleData = ABA_MODULES.find(m => m.name.includes("EŞLEME BECERİLERİ"));
   const items = moduleData ? moduleData.achievements : [];
@@ -28,8 +34,10 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       if (!studentId) return;
       try {
         const instId = localStorage.getItem("kazanim-takip-institution-id");
-        const docSnap = await getDoc(doc(db, "institutions", instId!, "students", studentId, "assessments", "aba"));
-        if (docSnap.exists()) setFormData(docSnap.data());
+        if(instId) {
+            const docSnap = await getDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"));
+            if (docSnap.exists()) setFormData(docSnap.data());
+        }
       } catch (error) {
         toast.error("Veri yüklenirken hata oluştu.");
       } finally {
@@ -55,12 +63,14 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
   };
 
   const handleGameComplete = async (success: boolean) => {
+    // Sadece 'Test' modunda ve başarılıysa kazanımı tamamlandı işaretle
     if (success && activeGameMode === 'assessment' && activeGameItem) {
         const updatedData = { ...formData, [activeGameItem]: true };
         setFormData(updatedData);
         await handleSave(updatedData);
         toast.success("Tebrikler! Kazanım tamamlandı. 🎉");
     }
+    // Oyunu Kapat
     setActiveGameMode(null);
     setActiveGameItem(null);
   };
@@ -71,14 +81,37 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
     return Math.round((completedCount / items.length) * 100);
   };
 
+  // --- OYUN TÜRÜNÜ BELİRLEYEN FONKSİYON ---
+  // Kazanım koduna bakıp hangi oyunun açılacağını söyler.
+  const getGameTypeForItem = (itemString: string): 'nesne-nesne' | 'nesne-resim' | 'eylem' | null => {
+    if (itemString.startsWith("EB.1.1")) return 'nesne-nesne'; // Nesne-Nesne Eşleme
+    if (itemString.startsWith("EB.1.2")) return 'nesne-resim'; // Nesne-Resim Eşleme
+    if (itemString.startsWith("EB.1.3")) return 'eylem';       // Eylem-Resim Eşleme
+    return null; // Diğer maddeler (EB.1.4 vb.) için oyun yok
+  };
+
+  // Oyunu Başlatma Fonksiyonu
+  const startGame = (item: string, mode: 'assessment' | 'instruction') => {
+    const type = getGameTypeForItem(item);
+    if (type) {
+        setActiveGameItem(item);
+        setActiveGameMode(mode);
+        setActiveGameType(type);
+    } else {
+        toast.info("Bu kazanım için henüz interaktif oyun hazırlanmadı.");
+    }
+  };
+
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
 
   return (
     <div className="space-y-6 relative">
       
+      {/* --- OYUN MODAL --- */}
       {activeGameMode && activeGameItem && (
          <NesneEslemeGame 
             mode={activeGameMode} 
+            gameType={activeGameType} // 🔥 DOĞRU OYUN TÜRÜNÜ GÖNDERİYORUZ
             onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} 
             onComplete={handleGameComplete} 
          />
@@ -107,7 +140,10 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             const status = formData[item];
             const isCompleted = status === true;
             
-            const hasGame = item.startsWith("EB.1.1"); 
+            // Bu madde için oyun var mı? (EB.1.1, EB.1.2 veya EB.1.3 ile başlıyorsa var)
+            const gameType = getGameTypeForItem(item);
+            const hasGame = gameType !== null;
+
             const firstSpaceIndex = item.indexOf(' ');
             
             return (
@@ -122,14 +158,14 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                         </div>
                     </div>
                     
-                    {/* BUTON GRUBU - Düzenlendi */}
+                    {/* BUTON GRUBU */}
                     <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
                         
                         {hasGame && (
                             <div className="flex items-center gap-1">
                                 {/* ÖĞRETİM BUTONU */}
                                 <button 
-                                    onClick={() => { setActiveGameItem(item); setActiveGameMode('instruction'); }}
+                                    onClick={() => startGame(item, 'instruction')}
                                     className="h-8 px-3 rounded-md bg-purple-600/90 text-white text-[10px] font-bold flex items-center gap-1 hover:bg-purple-500 border border-purple-400 shadow-sm transition-transform active:scale-95"
                                 >
                                     <GraduationCap size={14} /> Öğretim
@@ -137,7 +173,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                                 
                                 {/* DEĞERLENDİRME BUTONU */}
                                 <button 
-                                    onClick={() => { setActiveGameItem(item); setActiveGameMode('assessment'); }}
+                                    onClick={() => startGame(item, 'assessment')}
                                     className="h-8 px-3 rounded-md bg-blue-600/90 text-white text-[10px] font-bold flex items-center gap-1 hover:bg-blue-500 border border-blue-400 shadow-sm transition-transform active:scale-95"
                                 >
                                     <ClipboardCheck size={14} /> Test
@@ -145,6 +181,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                             </div>
                         )}
                         
+                        {/* MANUEL DEĞERLENDİRME (TİK/ÇARPI) */}
                         <div className="flex items-center gap-1">
                              <button onClick={() => setStatus(item, false)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center", status === false ? "bg-red-500/20 border-red-500 text-red-400" : "bg-slate-950 border-slate-800 text-slate-500")}><XCircle size={16} /></button>
                              <button onClick={() => setStatus(item, true)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center", status === true ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-800 text-slate-500")}><CheckCircle2 size={16} /></button>
