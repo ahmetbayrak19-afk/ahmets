@@ -4,69 +4,149 @@ import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, R
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
-// --- RESİMLER ---
-import anahtarImg from './anahtar.png';
-import arabaImg from './araba.png';
-import cicekImg from './cicek.png';
-import elmaImg from './elma.png';
-import gitarImg from './gitar.png';
-import kalemImg from './kalem.png';
-import kitapImg from './kitap.png';
-import saatImg from './saat.png';
-import tavukImg from './tavuk.png';
-import topImg from './top.png';
+// --- 1. NESNE RESİMLERİ (GERÇEK VE ÇİZİM) ---
+import anahtar from './anahtar.png'; import anahtar1 from './anahtar1.png'; import anahtar2 from './anahtar2.png'; import anahtar3 from './anahtar3.png';
+import araba from './araba.png'; import araba1 from './araba1.png'; import araba2 from './araba2.png'; import araba3 from './araba3.png';
+import cicek from './cicek.png'; import cicek1 from './cicek1.png'; import cicek2 from './cicek2.png'; import cicek3 from './cicek3.png';
+import elma from './elma.png'; import elma1 from './elma1.png'; import elma2 from './elma2.png'; import elma3 from './elma3.png';
+import gitar from './gitar.png'; import gitar1 from './gitar1.png'; import gitar2 from './gitar2.png'; import gitar3 from './gitar3.png';
+import kalem from './kalem.png'; import kalem1 from './kalem1.png'; import kalem2 from './kalem2.png'; import kalem3 from './kalem3.png';
+import kitap from './kitap.png'; import kitap1 from './kitap1.png'; import kitap2 from './kitap2.png'; import kitap3 from './kitap3.png';
+import saat from './saat.png'; import saat1 from './saat1.png'; import saat2 from './saat2.png'; import saat3 from './saat3.png';
+import tavuk from './tavuk.png'; import tavuk1 from './tavuk1.png'; import tavuk2 from './tavuk2.png'; import tavuk3 from './tavuk3.png';
+import top from './top.png'; import top1 from './top1.png'; import top2 from './top2.png'; import top3 from './top3.png';
 
-const OBJECTS = [
-  { id: 'anahtar', name: 'Anahtar', src: anahtarImg },
-  { id: 'araba', name: 'Araba', src: arabaImg },
-  { id: 'cicek', name: 'Çiçek', src: cicekImg },
-  { id: 'elma', name: 'Elma', src: elmaImg },
-  { id: 'gitar', name: 'Gitar', src: gitarImg },
-  { id: 'kalem', name: 'Kalem', src: kalemImg },
-  { id: 'kitap', name: 'Kitap', src: kitapImg },
-  { id: 'saat', name: 'Saat', src: saatImg },
-  { id: 'tavuk', name: 'Tavuk', src: tavukImg },
-  { id: 'top', name: 'Top', src: topImg },
+// --- 2. EYLEM RESİMLERİ ---
+import disfircala from './disfircala.png'; import disfircala1 from './disfircala1.png';
+import elmaye from './elmaye.png'; import elmaye1 from './elmaye1.png';
+import elyika from './elyika.png'; import elyika1 from './elyika1.png';
+import kitapoku from './kitapoku.png'; import kitapoku1 from './kitapoku1.png';
+import kos from './kos.png'; import kos1 from './kos1.png';
+import resimyap from './resimyap.png'; import resimyap1 from './resimyap1.png';
+import sallan from './sallan.png'; import sallan1 from './sallan1.png';
+import suic from './suic.png'; import suic1 from './suic1.png';
+import topoyna from './topoyna.png'; import topoyna1 from './topoyna1.png';
+import uyu from './uyu.png'; import uyu1 from './uyu1.png';
+
+// --- VERİ HAVUZU YAPILANDIRMASI ---
+
+// Nesneler (Gerçek ve Çizim varyasyonları ile)
+const OBJECT_DATA = [
+  { id: 'anahtar', name: 'Anahtar', real: [anahtar, anahtar1], drawing: [anahtar2, anahtar3] },
+  { id: 'araba', name: 'Araba', real: [araba, araba1], drawing: [araba2, araba3] },
+  { id: 'cicek', name: 'Çiçek', real: [cicek, cicek1], drawing: [cicek2, cicek3] },
+  { id: 'elma', name: 'Elma', real: [elma, elma1], drawing: [elma2, elma3] },
+  { id: 'gitar', name: 'Gitar', real: [gitar, gitar1], drawing: [gitar2, gitar3] },
+  { id: 'kalem', name: 'Kalem', real: [kalem, kalem1], drawing: [kalem2, kalem3] },
+  { id: 'kitap', name: 'Kitap', real: [kitap, kitap1], drawing: [kitap2, kitap3] },
+  { id: 'saat', name: 'Saat', real: [saat, saat1], drawing: [saat2, saat3] },
+  { id: 'tavuk', name: 'Tavuk', real: [tavuk, tavuk1], drawing: [tavuk2, tavuk3] },
+  { id: 'top', name: 'Top', real: [top, top1], drawing: [top2, top3] },
+];
+
+// Eylemler (Varyasyonları ile)
+const ACTION_DATA = [
+  { id: 'disfircala', name: 'Diş Fırçalama', variants: [disfircala, disfircala1] },
+  { id: 'elmaye', name: 'Elma Yeme', variants: [elmaye, elmaye1] },
+  { id: 'elyika', name: 'El Yıkama', variants: [elyika, elyika1] },
+  { id: 'kitapoku', name: 'Kitap Okuma', variants: [kitapoku, kitapoku1] },
+  { id: 'kos', name: 'Koşma', variants: [kos, kos1] },
+  { id: 'resimyap', name: 'Resim Yapma', variants: [resimyap, resimyap1] },
+  { id: 'sallan', name: 'Sallanma', variants: [sallan, sallan1] },
+  { id: 'suic', name: 'Su İçme', variants: [suic, suic1] },
+  { id: 'topoyna', name: 'Top Oynama', variants: [topoyna, topoyna1] },
+  { id: 'uyu', name: 'Uyuma', variants: [uyu, uyu1] },
 ];
 
 interface GameProps {
   mode: 'assessment' | 'instruction';
+  gameType: 'nesne-nesne' | 'nesne-resim' | 'eylem'; // 🔥 YENİ: Oyun Türü
   onClose: () => void;
   onComplete: (success: boolean) => void;
 }
 
-export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps) {
+interface GameItem {
+  id: string;
+  name: string;
+  src: string;
+}
+
+export default function NesneEslemeGame({ mode, gameType, onClose, onComplete }: GameProps) {
   const [phase, setPhase] = useState<'playing' | 'success' | 'fail'>('playing');
-  const [targetItem, setTargetItem] = useState(OBJECTS[0]);
-  const [options, setOptions] = useState<typeof OBJECTS[]>([]);
-  
+  const [targetItem, setTargetItem] = useState<GameItem | null>(null);
+  const [options, setOptions] = useState<GameItem[]>([]);
+   
   const [assessmentCount, setAssessmentCount] = useState(0); 
   const [assessmentScore, setAssessmentScore] = useState(0); 
-  
+   
   const [instructionMistakeCount, setInstructionMistakeCount] = useState(0);
   const [isModeling, setIsModeling] = useState(false);
   const [flashCorrect, setFlashCorrect] = useState(false);
   const [isMatched, setIsMatched] = useState(false);
-  
+   
   const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
-  // Scroll kilitleme (Güvenli yöntem)
+  // Scroll kilitleme
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = originalStyle; };
   }, []);
 
+  // --- SORU OLUŞTURMA MANTIĞI ---
   const generateQuestion = () => {
-    const randomTarget = OBJECTS[Math.floor(Math.random() * OBJECTS.length)];
-    const distractors = OBJECTS.filter(item => item.id !== randomTarget.id)
-                             .sort(() => 0.5 - Math.random())
-                             .slice(0, 2); 
-
-    setTargetItem(randomTarget);
-    setOptions([randomTarget, ...distractors].sort(() => 0.5 - Math.random()));
+    let pool: any[] = [];
     
+    // 1. Havuzu Belirle
+    if (gameType === 'eylem') {
+        pool = ACTION_DATA;
+    } else {
+        pool = OBJECT_DATA;
+    }
+
+    // 2. Hedef Kavramı Seç (Örn: Araba)
+    const randomTargetConcept = pool[Math.floor(Math.random() * pool.length)];
+
+    // 3. Yanıltıcı Kavramları Seç (Target olmayanlar arasından)
+    const distractorConcepts = pool
+        .filter(item => item.id !== randomTargetConcept.id)
+        .sort(() => 0.5 - Math.random())
+        .slice(0, 2);
+
+    // 4. Resim Varyasyonlarını Belirle (Rastgelelik burada devreye giriyor)
+    const getImage = (concept: any): string => {
+        let variants: string[] = [];
+        
+        if (gameType === 'eylem') {
+            variants = concept.variants;
+        } else if (gameType === 'nesne-nesne') {
+            variants = concept.real; // [araba.png, araba1.png]
+        } else if (gameType === 'nesne-resim') {
+            variants = concept.drawing; // [araba2.png, araba3.png]
+        }
+        
+        // Varyasyonlar arasından rastgele birini seç
+        return variants[Math.floor(Math.random() * variants.length)];
+    };
+
+    // 5. Oyun Objelerini Oluştur
+    const target: GameItem = {
+        id: randomTargetConcept.id,
+        name: randomTargetConcept.name,
+        src: getImage(randomTargetConcept)
+    };
+
+    const distractors: GameItem[] = distractorConcepts.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        src: getImage(c) // Yanıltıcılar da rastgele varyasyondan gelir
+    }));
+
+    setTargetItem(target);
+    setOptions([target, ...distractors].sort(() => 0.5 - Math.random()));
+    
+    // State sıfırlama
     setShowFeedback(null);
     setIsModeling(false);
     setFlashCorrect(false);
@@ -74,10 +154,10 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
     setIsMatched(false);
   };
 
-  useEffect(() => { generateQuestion(); }, []);
+  useEffect(() => { generateQuestion(); }, [gameType]); // gameType değişirse yeniden başlat
 
-  const handleDragEnd = (event: any, info: any, droppedItem: typeof OBJECTS[0]) => {
-    if (isModeling || isMatched) return;
+  const handleDragEnd = (event: any, info: any, droppedItem: GameItem) => {
+    if (isModeling || isMatched || !targetItem) return;
 
     const dropZone = dropZoneRef.current;
     if (!dropZone) return;
@@ -126,7 +206,6 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
 
   const handleMistake = () => {
     if (mode === 'assessment') {
-        // Değerlendirmede sessiz geçiş
         setTimeout(() => {
             const nextCount = assessmentCount + 1;
             setAssessmentCount(nextCount);
@@ -134,7 +213,6 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
         }, 800);
     } 
     else {
-        // Öğretimde modelleme
         const newMistake = instructionMistakeCount + 1;
         setInstructionMistakeCount(newMistake);
         setShowFeedback('wrong');
@@ -158,14 +236,10 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
     }, 4000); 
   };
 
-  // Güvenli Confetti Patlatma
   const fireConfetti = () => {
     try {
         confetti({ particleCount: 300, spread: 100, origin: { y: 0.6 } });
-    } catch (e) {
-        console.error("Confetti hatası:", e);
-        // Hata olsa bile oyun devam etsin
-    }
+    } catch (e) { console.error(e); }
   };
 
   useEffect(() => {
@@ -178,6 +252,8 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
       }
     }
   }, [assessmentCount, assessmentScore, mode]);
+
+  if (!targetItem) return null;
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800">
@@ -239,7 +315,7 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
               const canDrag = !isModeling && !isLocked && !isMatched;
 
               return (
-                <div key={item.id} className="relative flex justify-center items-center h-36">
+                <div key={item.id + item.src} className="relative flex justify-center items-center h-36">
                   <motion.div
                     drag={canDrag}
                     dragConstraints={false}
@@ -320,7 +396,7 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
         </div>
       )}
 
-      {/* FEEDBACK OVERLAY (SADECE ÖĞRETİM MODUNDA) */}
+      {/* FEEDBACK OVERLAY */}
       <AnimatePresence>
         {showFeedback && (
           <motion.div 
@@ -345,5 +421,4 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
       </AnimatePresence>
     </div>
   );
-         }
-        
+}
