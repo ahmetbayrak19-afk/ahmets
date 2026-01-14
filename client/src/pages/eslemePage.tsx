@@ -6,7 +6,7 @@ import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Gamepad2, Grad
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
-import NesneEslemeGame from '@/aba/esle/NesneEslemeGame';
+import NesneEslemeGame, { GameType } from '@/aba/esle/NesneEslemeGame';
 
 interface EslemePageProps {
   studentId: string;
@@ -17,14 +17,9 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   
-  // Hangi Oyun Modu? (Öğretim / Test)
   const [activeGameMode, setActiveGameMode] = useState<'assessment' | 'instruction' | null>(null);
-  
-  // Hangi Kazanım Maddesi? (EB.1.1.1 vb.)
   const [activeGameItem, setActiveGameItem] = useState<string | null>(null);
-
-  // Hangi Oyun Türü? (nesne-nesne, nesne-resim, eylem) - 🔥 YENİ EKLENDİ
-  const [activeGameType, setActiveGameType] = useState<'nesne-nesne' | 'nesne-resim' | 'eylem'>('nesne-nesne');
+  const [activeGameType, setActiveGameType] = useState<GameType>('nesne-nesne-farkli');
 
   const moduleData = ABA_MODULES.find(m => m.name.includes("EŞLEME BECERİLERİ"));
   const items = moduleData ? moduleData.achievements : [];
@@ -38,11 +33,8 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             const docSnap = await getDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"));
             if (docSnap.exists()) setFormData(docSnap.data());
         }
-      } catch (error) {
-        toast.error("Veri yüklenirken hata oluştu.");
-      } finally {
-        setLoading(false);
-      }
+      } catch (error) { toast.error("Veri yüklenirken hata oluştu."); } 
+      finally { setLoading(false); }
     };
     load();
   }, [studentId]);
@@ -53,9 +45,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       const dataToSave = newData || formData;
       await setDoc(doc(db, "institutions", instId!, "students", studentId, "assessments", "aba"), dataToSave, { merge: true });
       if (!newData) toast.success("Değişiklikler kaydedildi.");
-    } catch (error) {
-      toast.error("Kaydetme hatası.");
-    }
+    } catch (error) { toast.error("Hata oluştu."); }
   };
 
   const setStatus = (itemString: string, status: boolean) => {
@@ -63,14 +53,12 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
   };
 
   const handleGameComplete = async (success: boolean) => {
-    // Sadece 'Test' modunda ve başarılıysa kazanımı tamamlandı işaretle
     if (success && activeGameMode === 'assessment' && activeGameItem) {
         const updatedData = { ...formData, [activeGameItem]: true };
         setFormData(updatedData);
         await handleSave(updatedData);
-        toast.success("Tebrikler! Kazanım tamamlandı. 🎉");
+        toast.success("Kazanım tamamlandı! 🎉");
     }
-    // Oyunu Kapat
     setActiveGameMode(null);
     setActiveGameItem(null);
   };
@@ -81,16 +69,32 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
     return Math.round((completedCount / items.length) * 100);
   };
 
-  // --- OYUN TÜRÜNÜ BELİRLEYEN FONKSİYON ---
-  // Kazanım koduna bakıp hangi oyunun açılacağını söyler.
-  const getGameTypeForItem = (itemString: string): 'nesne-nesne' | 'nesne-resim' | 'eylem' | null => {
-    if (itemString.startsWith("EB.1.1")) return 'nesne-nesne'; // Nesne-Nesne Eşleme
-    if (itemString.startsWith("EB.1.2")) return 'nesne-resim'; // Nesne-Resim Eşleme
-    if (itemString.startsWith("EB.1.3")) return 'eylem';       // Eylem-Resim Eşleme
-    return null; // Diğer maddeler (EB.1.4 vb.) için oyun yok
+  // --- OYUN TÜRÜ EŞLEŞTİRME (Kritik Nokta) ---
+  const getGameTypeForItem = (itemString: string): GameType | null => {
+    // 1. Nesne-Nesne Eşleme (Farklı Nesne) - EB.1.1
+    if (itemString.startsWith("EB.1.1")) return 'nesne-nesne-farkli';
+    
+    // 2. Nesne Resimleri Eşleme (Farklı Nesne) - EB.1.2
+    if (itemString.startsWith("EB.1.2")) return 'nesne-resim-farkli';
+    
+    // 3. Eylem Resimleri Eşleme - EB.1.3
+    if (itemString.startsWith("EB.1.3")) return 'eylem-farkli';
+    
+    // 4. Resim-Nesne Eşleme - EB.1.4 (Tahmini kod, listene göre düzeltebilirsin)
+    if (itemString.startsWith("EB.1.4")) return 'resim-nesne';
+
+    // 5. Şekiller - EB.1.6 (Tahmini)
+    if (itemString.includes("ŞEKİL")) return 'sekil';
+
+    // 6. Gölge Eşleme - EB.1.7 (Tahmini)
+    if (itemString.includes("GÖLGE")) return 'golge';
+
+    // 7. Sayılar - EB.1.8 (Tahmini)
+    if (itemString.includes("SAYI") || itemString.includes("RAKAM")) return 'sayi';
+
+    return null;
   };
 
-  // Oyunu Başlatma Fonksiyonu
   const startGame = (item: string, mode: 'assessment' | 'instruction') => {
     const type = getGameTypeForItem(item);
     if (type) {
@@ -98,7 +102,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
         setActiveGameMode(mode);
         setActiveGameType(type);
     } else {
-        toast.info("Bu kazanım için henüz interaktif oyun hazırlanmadı.");
+        toast.info("Bu kazanım için oyun henüz aktif değil.");
     }
   };
 
@@ -106,27 +110,17 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
 
   return (
     <div className="space-y-6 relative">
-      
-      {/* --- OYUN MODAL --- */}
       {activeGameMode && activeGameItem && (
-         <NesneEslemeGame 
-            mode={activeGameMode} 
-            gameType={activeGameType} // 🔥 DOĞRU OYUN TÜRÜNÜ GÖNDERİYORUZ
-            onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} 
-            onComplete={handleGameComplete} 
-         />
+         <NesneEslemeGame mode={activeGameMode} gameType={activeGameType} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
       )}
 
-      {/* HEADER */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex items-center justify-between sticky top-0 backdrop-blur-md z-10 shadow-lg">
         <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={onBack} className="text-slate-400 hover:text-white"><ArrowLeft size={20} /></Button>
             <div>
                 <h2 className="text-lg font-bold text-white">Eşleme Becerileri</h2>
                 <div className="flex items-center gap-2 text-xs text-slate-400">
-                    <div className="h-1.5 w-24 bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500" style={{ width: `${calculateProgress()}%` }}></div>
-                    </div>
+                    <div className="h-1.5 w-24 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-blue-500" style={{ width: `${calculateProgress()}%` }}></div></div>
                     <span>%{calculateProgress()} Tamamlandı</span>
                 </div>
             </div>
@@ -134,16 +128,12 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
         <Button onClick={() => handleSave()} className="bg-green-600 hover:bg-green-700 h-8 text-xs"><Save className="mr-2 h-3.5 w-3.5" /> Kaydet</Button>
       </div>
 
-      {/* LİSTE */}
       <div className="grid gap-3 animate-in slide-in-from-bottom-4 duration-500 pb-20">
         {items.map((item) => {
             const status = formData[item];
             const isCompleted = status === true;
-            
-            // Bu madde için oyun var mı? (EB.1.1, EB.1.2 veya EB.1.3 ile başlıyorsa var)
             const gameType = getGameTypeForItem(item);
             const hasGame = gameType !== null;
-
             const firstSpaceIndex = item.indexOf(' ');
             
             return (
@@ -157,31 +147,13 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                             {hasGame && <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20"><Gamepad2 size={12} /> İnteraktif</span>}
                         </div>
                     </div>
-                    
-                    {/* BUTON GRUBU */}
                     <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
-                        
                         {hasGame && (
                             <div className="flex items-center gap-1">
-                                {/* ÖĞRETİM BUTONU */}
-                                <button 
-                                    onClick={() => startGame(item, 'instruction')}
-                                    className="h-8 px-3 rounded-md bg-purple-600/90 text-white text-[10px] font-bold flex items-center gap-1 hover:bg-purple-500 border border-purple-400 shadow-sm transition-transform active:scale-95"
-                                >
-                                    <GraduationCap size={14} /> Öğretim
-                                </button>
-                                
-                                {/* DEĞERLENDİRME BUTONU */}
-                                <button 
-                                    onClick={() => startGame(item, 'assessment')}
-                                    className="h-8 px-3 rounded-md bg-blue-600/90 text-white text-[10px] font-bold flex items-center gap-1 hover:bg-blue-500 border border-blue-400 shadow-sm transition-transform active:scale-95"
-                                >
-                                    <ClipboardCheck size={14} /> Test
-                                </button>
+                                <button onClick={() => startGame(item, 'instruction')} className="h-8 px-3 rounded-md bg-purple-600/90 text-white text-[10px] font-bold flex items-center gap-1 hover:bg-purple-500 border border-purple-400 shadow-sm transition-transform active:scale-95"><GraduationCap size={14} /> Öğretim</button>
+                                <button onClick={() => startGame(item, 'assessment')} className="h-8 px-3 rounded-md bg-blue-600/90 text-white text-[10px] font-bold flex items-center gap-1 hover:bg-blue-500 border border-blue-400 shadow-sm transition-transform active:scale-95"><ClipboardCheck size={14} /> Test</button>
                             </div>
                         )}
-                        
-                        {/* MANUEL DEĞERLENDİRME (TİK/ÇARPI) */}
                         <div className="flex items-center gap-1">
                              <button onClick={() => setStatus(item, false)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center", status === false ? "bg-red-500/20 border-red-500 text-red-400" : "bg-slate-950 border-slate-800 text-slate-500")}><XCircle size={16} /></button>
                              <button onClick={() => setStatus(item, true)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center", status === true ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-800 text-slate-500")}><CheckCircle2 size={16} /></button>
