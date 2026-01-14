@@ -31,13 +31,11 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        // İzinleri Kontrol Et
+        // 1. İzinleri Kontrol Et (Kamera Dahil)
         checkAndRequestPermissions();
 
-        // NFC Adaptörünü Başlat
+        // NFC Başlat
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
-        
-        // NFC Yakalama Hazırlığı (Foreground Dispatch)
         Intent intent = new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_MUTABLE);
         IntentFilter ndef = new IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED);
@@ -57,9 +55,11 @@ public class MainActivity extends AppCompatActivity {
         settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
 
+        // Web Sitesi Kamera/Mikrofon İsterse İzin Ver
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
+                // Hem SES hem VİDEO isteklerini onayla
                 request.grant(request.getResources());
             }
         });
@@ -74,7 +74,6 @@ public class MainActivity extends AppCompatActivity {
         webView.loadUrl("file:///android_asset/index.html");
     }
 
-    // --- UYGULAMA AÇIKKEN NFC DİNLENMESİNİ SAĞLA ---
     @Override
     protected void onResume() {
         super.onResume();
@@ -83,7 +82,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // --- UYGULAMA ALTA İNİNCE NFC'Yİ BIRAK ---
     @Override
     protected void onPause() {
         super.onPause();
@@ -92,7 +90,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // --- KART OKUNDUĞUNDA ÇALIŞACAK KOD ---
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
@@ -103,13 +100,11 @@ public class MainActivity extends AppCompatActivity {
             Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
             if (tag != null) {
                 String nfcId = bytesToHex(tag.getId());
-                // React tarafındaki 'window.handleNfcScan' fonksiyonunu tetikle
                 webView.evaluateJavascript("window.handleNfcScan('" + nfcId + "')", null);
             }
         }
     }
 
-    // ID'yi okunabilir formata çeviren yardımcı fonksiyon
     private String bytesToHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {
@@ -124,7 +119,8 @@ public class MainActivity extends AppCompatActivity {
                 Manifest.permission.RECORD_AUDIO,
                 Manifest.permission.MODIFY_AUDIO_SETTINGS,
                 Manifest.permission.VIBRATE,
-                Manifest.permission.NFC
+                Manifest.permission.NFC,
+                Manifest.permission.CAMERA // 🔥 BU SATIRI EKLEDİK 🔥
             };
 
             boolean permissionsNeeded = false;
@@ -150,3 +146,4 @@ public class MainActivity extends AppCompatActivity {
         }
     }
             }
+            
