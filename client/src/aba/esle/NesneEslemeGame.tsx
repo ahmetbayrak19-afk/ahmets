@@ -4,7 +4,7 @@ import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, R
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
-// --- GÖRSELLERİ IMPORT (LİSTE AYNI) ---
+// --- GÖRSELLERİ IMPORT ---
 import anahtar from './anahtar.png'; import anahtar1 from './anahtar1.png'; import anahtar2 from './anahtar2.png'; import anahtar3 from './anahtar3.png';
 import araba from './araba.png'; import araba1 from './araba1.png'; import araba2 from './araba2.png'; import araba3 from './araba3.png';
 import cicek from './cicek.png'; import cicek1 from './cicek1.png'; import cicek2 from './cicek2.png'; import cicek3 from './cicek3.png';
@@ -46,6 +46,7 @@ import yildiz from './yildiz.png'; import yildiz1 from './yildiz1.png';
 import bir from './bir.png'; import iki from './iki.png'; import uc from './uc.png'; import dort from './dort.png';
 import bes from './bes.png'; import yedi from './yedi.png'; import sekiz from './sekiz.png'; import dokuz from './dokuz.png'; import sifir from './sifir.png';
 
+// --- VERİ YAPILARI (Garanti olması için boş array kontrolü yapıldı) ---
 const OBJECT_DATA = [
   { id: 'anahtar', name: 'Anahtar', real: [anahtar, anahtar1], drawing: [anahtar2, anahtar3], shadow: golgeanahtar },
   { id: 'araba', name: 'Araba', real: [araba, araba1], drawing: [araba2, araba3], shadow: golgearaba },
@@ -122,137 +123,142 @@ export default function NesneEslemeGame({ mode, gameType, onClose, onComplete }:
     let correctOption: GameItem | null = null;
     let distractors: GameItem[] = [];
 
-    // --- SENARYOLAR (Mantık Düzeltmeleri Yapıldı) ---
+    // Veri güvenliği için rastgele seçim yardımcı fonksiyonu
+    const getRandom = (arr: any[]) => arr[Math.floor(Math.random() * arr.length)];
+    const getOthers = (arr: any[], currentId: string) => arr.filter(i => i.id !== currentId).sort(() => 0.5 - Math.random()).slice(0, 2);
 
-    // 1. GÖLGE EŞLEME (Hedef: Gölge, Seçenek: Gerçek)
-    if (gameType === 'golge') {
-        const concept = OBJECT_DATA[Math.floor(Math.random() * OBJECT_DATA.length)];
-        const others = OBJECT_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
-        target = { id: concept.id, name: concept.name, src: concept.shadow };
-        correctOption = { id: concept.id, name: concept.name, src: concept.real[0] };
-        distractors = others.map(o => ({ id: o.id, name: o.name, src: o.real[0] }));
-    }
-    // 2. RESİM-NESNE (Hedef: Çizim, Seçenek: Gerçek)
-    else if (gameType === 'resim-nesne') {
-        const concept = OBJECT_DATA[Math.floor(Math.random() * OBJECT_DATA.length)];
-        const others = OBJECT_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
-        target = { id: concept.id, name: concept.name, src: concept.drawing[0] };
-        correctOption = { id: concept.id, name: concept.name, src: concept.real[0] };
-        distractors = others.map(o => ({ id: o.id, name: o.name, src: o.real[0] }));
-    }
-    // 3. EYLEM FARKLI
-    else if (gameType === 'eylem-farkli') {
-        const concept = ACTION_DATA[Math.floor(Math.random() * ACTION_DATA.length)];
-        const others = ACTION_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
-        const targetIdx = Math.floor(Math.random() * concept.variants.length);
-        target = { id: concept.id, name: concept.name, src: concept.variants[targetIdx] };
-        const correctIdx = (targetIdx + 1) % concept.variants.length;
-        correctOption = { id: concept.id, name: concept.name, src: concept.variants[correctIdx] };
-        distractors = others.map(o => ({ id: o.id, name: o.name, src: o.variants[0] }));
-    }
-    // 4. SAYI EŞLEME (Birebir)
-    else if (gameType === 'sayi') {
-        const concept = NUMBER_DATA[Math.floor(Math.random() * NUMBER_DATA.length)];
-        const others = NUMBER_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
-        target = { id: concept.id, name: concept.name, src: concept.src };
-        correctOption = { id: concept.id, name: concept.name, src: concept.src };
-        distractors = others.map(o => ({ id: o.id, name: o.name, src: o.src }));
-    }
-    // 5. ŞEKİL KUTUSU
-    else if (gameType === 'sekil-kutu') {
-        const concept = SHAPE_DATA[Math.floor(Math.random() * SHAPE_DATA.length)];
-        const others = SHAPE_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
-        target = { id: concept.id, name: concept.name, src: concept.box };
-        correctOption = { id: concept.id, name: concept.name, src: concept.shape };
-        distractors = others.map(o => ({ id: o.id, name: o.name, src: o.shape }));
-    }
-    // 6. NESNE-NESNE AYNI
-    else if (gameType === 'nesne-nesne-ayni') {
-        const concept = OBJECT_DATA[Math.floor(Math.random() * OBJECT_DATA.length)];
-        const others = OBJECT_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
-        const img = concept.real[0];
-        target = { id: concept.id, name: concept.name, src: img };
-        correctOption = { id: concept.id, name: concept.name, src: img };
-        distractors = others.map(o => ({ id: o.id, name: o.name, src: o.real[0] }));
-    }
-    // 7. NESNE RESİMLERİ AYNI
-    else if (gameType === 'nesne-resim-ayni') {
-        const concept = OBJECT_DATA[Math.floor(Math.random() * OBJECT_DATA.length)];
-        const others = OBJECT_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
-        const img = concept.drawing[0];
-        target = { id: concept.id, name: concept.name, src: img };
-        correctOption = { id: concept.id, name: concept.name, src: img };
-        distractors = others.map(o => ({ id: o.id, name: o.name, src: o.drawing[0] }));
-    }
-    // 8. EYLEM AYNI
-    else if (gameType === 'eylem-ayni') {
-        const concept = ACTION_DATA[Math.floor(Math.random() * ACTION_DATA.length)];
-        const others = ACTION_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
-        const img = concept.variants[0];
-        target = { id: concept.id, name: concept.name, src: img };
-        correctOption = { id: concept.id, name: concept.name, src: img };
-        distractors = others.map(o => ({ id: o.id, name: o.name, src: o.variants[0] }));
-    }
-    // 9. NESNE-NESNE FARKLI
-    else if (gameType === 'nesne-nesne-farkli') {
-        const concept = OBJECT_DATA[Math.floor(Math.random() * OBJECT_DATA.length)];
-        const others = OBJECT_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
-        const targetIdx = Math.floor(Math.random() * concept.real.length);
-        target = { id: concept.id, name: concept.name, src: concept.real[targetIdx] };
-        const correctIdx = (targetIdx + 1) % concept.real.length;
-        correctOption = { id: concept.id, name: concept.name, src: concept.real[correctIdx] };
-        distractors = others.map(o => ({ id: o.id, name: o.name, src: o.real[0] }));
-    }
-    // 10. NESNE RESİMLERİ FARKLI
-    else if (gameType === 'nesne-resim-farkli') {
-        const concept = OBJECT_DATA[Math.floor(Math.random() * OBJECT_DATA.length)];
-        const others = OBJECT_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
-        const targetIdx = Math.floor(Math.random() * concept.drawing.length);
-        target = { id: concept.id, name: concept.name, src: concept.drawing[targetIdx] };
-        const correctIdx = (targetIdx + 1) % concept.drawing.length;
-        correctOption = { id: concept.id, name: concept.name, src: concept.drawing[correctIdx] };
-        distractors = others.map(o => ({ id: o.id, name: o.name, src: o.drawing[0] }));
+    switch (gameType) {
+        // --- 1. GRUP: AYNI OLANLAR ---
+        case 'nesne-nesne-ayni': {
+            const concept = getRandom(OBJECT_DATA);
+            const img = concept.real[0]; // Sadece ilk resmi kullan ki karışmasın
+            target = { id: concept.id, name: concept.name, src: img };
+            correctOption = { id: concept.id, name: concept.name, src: img };
+            distractors = getOthers(OBJECT_DATA, concept.id).map(o => ({ id: o.id, name: o.name, src: o.real[0] }));
+            break;
+        }
+        case 'nesne-resim-ayni': {
+            const concept = getRandom(OBJECT_DATA);
+            const img = concept.drawing[0];
+            target = { id: concept.id, name: concept.name, src: img };
+            correctOption = { id: concept.id, name: concept.name, src: img };
+            distractors = getOthers(OBJECT_DATA, concept.id).map(o => ({ id: o.id, name: o.name, src: o.drawing[0] }));
+            break;
+        }
+        case 'eylem-ayni': {
+            const concept = getRandom(ACTION_DATA);
+            const img = concept.variants[0];
+            target = { id: concept.id, name: concept.name, src: img };
+            correctOption = { id: concept.id, name: concept.name, src: img };
+            distractors = getOthers(ACTION_DATA, concept.id).map(o => ({ id: o.id, name: o.name, src: o.variants[0] }));
+            break;
+        }
+
+        // --- 2. GRUP: ŞEKİL KUTUSU (Kutu -> Şekil) ---
+        case 'sekil-kutu': {
+            const concept = getRandom(SHAPE_DATA);
+            target = { id: concept.id, name: concept.name, src: concept.box };
+            correctOption = { id: concept.id, name: concept.name, src: concept.shape };
+            distractors = getOthers(SHAPE_DATA, concept.id).map(o => ({ id: o.id, name: o.name, src: o.shape }));
+            break;
+        }
+
+        // --- 3. GRUP: FARKLI OLANLAR (Kritik Nokta: Döngüsel Seçim) ---
+        case 'nesne-nesne-farkli': {
+            const concept = getRandom(OBJECT_DATA);
+            // Eğer 2. resim yoksa patlamaması için modülo (%) kullanıyoruz
+            const targetIdx = 0;
+            const correctIdx = (targetIdx + 1) % concept.real.length; 
+            
+            target = { id: concept.id, name: concept.name, src: concept.real[targetIdx] };
+            correctOption = { id: concept.id, name: concept.name, src: concept.real[correctIdx] };
+            distractors = getOthers(OBJECT_DATA, concept.id).map(o => ({ id: o.id, name: o.name, src: o.real[0] }));
+            break;
+        }
+        case 'nesne-resim-farkli': {
+            const concept = getRandom(OBJECT_DATA);
+            const targetIdx = 0;
+            const correctIdx = (targetIdx + 1) % concept.drawing.length;
+
+            target = { id: concept.id, name: concept.name, src: concept.drawing[targetIdx] };
+            correctOption = { id: concept.id, name: concept.name, src: concept.drawing[correctIdx] };
+            distractors = getOthers(OBJECT_DATA, concept.id).map(o => ({ id: o.id, name: o.name, src: o.drawing[0] }));
+            break;
+        }
+        case 'eylem-farkli': {
+            const concept = getRandom(ACTION_DATA);
+            const targetIdx = 0;
+            const correctIdx = (targetIdx + 1) % concept.variants.length;
+
+            target = { id: concept.id, name: concept.name, src: concept.variants[targetIdx] };
+            correctOption = { id: concept.id, name: concept.name, src: concept.variants[correctIdx] };
+            distractors = getOthers(ACTION_DATA, concept.id).map(o => ({ id: o.id, name: o.name, src: o.variants[0] }));
+            break;
+        }
+
+        // --- 4. GRUP: RESİM-NESNE (Gerçek -> Çizim) ---
+        case 'resim-nesne': {
+            const concept = getRandom(OBJECT_DATA);
+            // Hedef: Çizim (Kutuda)
+            target = { id: concept.id, name: concept.name, src: concept.drawing[0] };
+            // Cevap: Gerçek (Seçenekte)
+            correctOption = { id: concept.id, name: concept.name, src: concept.real[0] };
+            distractors = getOthers(OBJECT_DATA, concept.id).map(o => ({ id: o.id, name: o.name, src: o.real[0] }));
+            break;
+        }
+
+        // --- 5. GRUP: ÖZEL DURUMLAR ---
+        case 'golge': {
+            const concept = getRandom(OBJECT_DATA);
+            target = { id: concept.id, name: concept.name, src: concept.shadow };
+            correctOption = { id: concept.id, name: concept.name, src: concept.real[0] };
+            distractors = getOthers(OBJECT_DATA, concept.id).map(o => ({ id: o.id, name: o.name, src: o.real[0] }));
+            break;
+        }
+        case 'sayi': {
+            const concept = getRandom(NUMBER_DATA);
+            target = { id: concept.id, name: concept.name, src: concept.src };
+            correctOption = { id: concept.id, name: concept.name, src: concept.src };
+            distractors = getOthers(NUMBER_DATA, concept.id).map(o => ({ id: o.id, name: o.name, src: o.src }));
+            break;
+        }
+        default:
+            console.error("Bilinmeyen oyun türü:", gameType);
+            break;
     }
 
     if (target && correctOption) {
         setTargetItem(target);
         setOptions([correctOption, ...distractors].sort(() => 0.5 - Math.random()));
+        
+        // State Sıfırlama
         setShowFeedback(null); setIsModeling(false); setFlashCorrect(false); setInstructionMistakeCount(0); setIsMatched(false);
     }
   };
 
   useEffect(() => { generateQuestion(); }, [gameType]);
 
-  // --- 🔥 YENİ SÜRÜKLE BIRAK MANTIĞI (Manyetik Alan) 🔥 ---
+  // --- SÜRÜKLE BIRAK (MANYETİK ALAN) ---
   const handleDragEnd = (event: any, info: any, droppedItem: GameItem) => {
     if (isModeling || isMatched || !targetItem) return;
     const dropZone = dropZoneRef.current; if (!dropZone) return;
     
     const rect = dropZone.getBoundingClientRect();
-    
-    // Kutunun Merkezi
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    
-    // Bırakılan noktanın koordinatları
     const dropX = info.point.x;
     const dropY = info.point.y;
 
-    // Merkezden merkeze mesafe (Pisagor)
+    // 170px tolerans (Dokunmatik ekran dostu)
     const distance = Math.sqrt(Math.pow(dropX - centerX, 2) + Math.pow(dropY - centerY, 2));
 
-    // Yarıçap 144px civarı (w-72 = 288px). Toleransla 170px yapıyoruz.
-    // Yani kutunun azıcık dışına bile bıraksa kabul edecek.
     if (distance < 170) {
-        // --- ID KONTROLÜ ---
-        // Burada console.log ile kontrol edebilirsin: console.log(droppedItem.id, targetItem.id);
         if (droppedItem.id === targetItem.id) {
             handleSuccess();
         } else {
             handleMistake();
         }
     }
-    // Mesafe fazlaysa hiçbir şey yapma (geri döner)
   };
 
   const handleSuccess = () => {
