@@ -6,7 +6,7 @@ import { twMerge } from 'tailwind-merge';
 
 // --- RESİMLERİ IMPORT ETME ---
 
-// 1. NESNELER (Gerçek ve Çizimler)
+// 1. NESNELER
 import anahtar from './anahtar.png'; import anahtar1 from './anahtar1.png'; import anahtar2 from './anahtar2.png'; import anahtar3 from './anahtar3.png';
 import araba from './araba.png'; import araba1 from './araba1.png'; import araba2 from './araba2.png'; import araba3 from './araba3.png';
 import cicek from './cicek.png'; import cicek1 from './cicek1.png'; import cicek2 from './cicek2.png'; import cicek3 from './cicek3.png';
@@ -30,7 +30,7 @@ import suic from './suic.png'; import suic1 from './suic1.png';
 import topoyna from './topoyna.png'; import topoyna1 from './topoyna1.png';
 import uyu from './uyu.png'; import uyu1 from './uyu1.png';
 
-// 3. GÖLGELER (Nesne ile eşleşecek gölge)
+// 3. GÖLGELER
 import golgeanahtar from './golgeanahtar.png';
 import golgearaba from './golgearaba.png';
 import golgecicek from './golgecicek.png';
@@ -59,6 +59,7 @@ import sekiz from './sekiz.png'; import dokuz from './dokuz.png'; import sifir f
 
 // --- VERİ HAVUZLARI ---
 
+// Nesnelerde: real[0]=anahtar, real[1]=anahtar1, drawing[0]=anahtar2, drawing[1]=anahtar3
 const OBJECT_DATA = [
   { id: 'anahtar', name: 'Anahtar', real: [anahtar, anahtar1], drawing: [anahtar2, anahtar3], shadow: golgeanahtar },
   { id: 'araba', name: 'Araba', real: [araba, araba1], drawing: [araba2, araba3], shadow: golgearaba },
@@ -107,15 +108,14 @@ const NUMBER_DATA = [
     { id: 'sifir', name: '0', src: sifir },
 ];
 
-// --- TİP TANIMLARI ---
 export type GameType = 
-    | 'nesne-nesne-farkli' 
-    | 'nesne-resim-farkli' 
-    | 'eylem-farkli' 
-    | 'resim-nesne'
-    | 'sekil'
-    | 'golge'
-    | 'sayi';
+    | 'nesne-nesne-farkli' // anahtar <-> anahtar1
+    | 'nesne-resim-farkli' // anahtar2 <-> anahtar3
+    | 'eylem-farkli'       // suic <-> suic1
+    | 'resim-nesne'        // (anahtar/anahtar1) <-> (anahtar2/anahtar3)
+    | 'sekil'              // besgen (Kutu) <-> besgen1 (Şekil)
+    | 'golge'              // anahtar (Real 0) <-> golgeanahtar (Real 1 YASAK)
+    | 'sayi';              // bir <-> bir
 
 interface GameProps {
   mode: 'assessment' | 'instruction';
@@ -151,39 +151,36 @@ export default function NesneEslemeGame({ mode, gameType, onClose, onComplete }:
     return () => { document.body.style.overflow = ''; };
   }, []);
 
-  // --- SORU ÜRETME MOTORU (TÜM MANTIK BURADA) ---
   const generateQuestion = () => {
     let target: GameItem | null = null;
-    let distractors: GameItem[] = [];
     let correctOption: GameItem | null = null;
+    let distractors: GameItem[] = [];
 
-    // --- 1. SENARYO: ŞEKİLLER (Kutu -> Şekil) ---
+    // --- 1. SENARYO: ŞEKİLLER (KUTU - ŞEKİL İLİŞKİSİ) ---
+    // KURAL: Merkezde KUTU (besgen), Seçeneklerde ŞEKİL (besgen1) olacak.
     if (gameType === 'sekil') {
         const concept = SHAPE_DATA[Math.floor(Math.random() * SHAPE_DATA.length)];
         const others = SHAPE_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
         
-        // HEDEF: Kutu (besgen)
-        target = { id: concept.id, name: concept.name, src: concept.box };
-        // DOĞRU CEVAP: Şekil (besgen1)
-        correctOption = { id: concept.id, name: concept.name, src: concept.shape };
-        // YANLIŞLAR: Diğer şekiller (kare1, ucgen1)
-        distractors = others.map(o => ({ id: o.id, name: o.name, src: o.shape }));
+        target = { id: concept.id, name: concept.name, src: concept.box }; // Kutu
+        correctOption = { id: concept.id, name: concept.name, src: concept.shape }; // Şekil
+        distractors = others.map(o => ({ id: o.id, name: o.name, src: o.shape })); // Yanlış Şekiller
     }
 
-    // --- 2. SENARYO: GÖLGE (Nesne -> Gölge) ---
+    // --- 2. SENARYO: GÖLGE EŞLEME ---
+    // KURAL: Merkezde ANAHTAR (anahtar.png) olacak. ANAHTAR1 YASAK. Seçenekte GÖLGE olacak.
     else if (gameType === 'golge') {
         const concept = OBJECT_DATA[Math.floor(Math.random() * OBJECT_DATA.length)];
         const others = OBJECT_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
 
-        // HEDEF: Gerçek Nesne (anahtar) - SADECE İLK VARYASYON (anahtar.png) çünkü gölge ona ait
-        target = { id: concept.id, name: concept.name, src: concept.real[0] };
-        // DOĞRU CEVAP: Gölge (golgeanahtar)
+        // real[0] -> anahtar.png (Zorunlu, anahtar1 olamaz)
+        target = { id: concept.id, name: concept.name, src: concept.real[0] }; 
         correctOption = { id: concept.id, name: concept.name, src: concept.shadow };
-        // YANLIŞLAR: Diğer gölgeler
         distractors = others.map(o => ({ id: o.id, name: o.name, src: o.shadow }));
     }
 
-    // --- 3. SENARYO: SAYILAR (Birebir Eşleme) ---
+    // --- 3. SENARYO: SAYILAR (BİREBİR EŞLEME) ---
+    // KURAL: bir <-> bir
     else if (gameType === 'sayi') {
         const concept = NUMBER_DATA[Math.floor(Math.random() * NUMBER_DATA.length)];
         const others = NUMBER_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
@@ -193,37 +190,38 @@ export default function NesneEslemeGame({ mode, gameType, onClose, onComplete }:
         distractors = others.map(o => ({ id: o.id, name: o.name, src: o.src }));
     }
 
-    // --- 4. SENARYO: NESNE-NESNE FARKLI (Gerçek A -> Gerçek B) ---
+    // --- 4. SENARYO: NESNE-NESNE FARKLI ---
+    // KURAL: anahtar <-> anahtar1 (Çizimler yasak)
     else if (gameType === 'nesne-nesne-farkli') {
         const concept = OBJECT_DATA[Math.floor(Math.random() * OBJECT_DATA.length)];
         const others = OBJECT_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
 
-        // HEDEF: Gerçek varyasyonlardan biri (Rastgele)
-        const targetIdx = Math.floor(Math.random() * concept.real.length); // örn: 0 (anahtar)
+        // real[0] veya real[1] rastgele seçilir
+        const targetIdx = Math.floor(Math.random() * concept.real.length);
         target = { id: concept.id, name: concept.name, src: concept.real[targetIdx] };
 
-        // DOĞRU CEVAP: Diğer varyasyon (anahtar1)
-        // Eğer 2 varyasyon varsa ve 0. seçildiyse 1.'yi, 1. seçildiyse 0.'yı seç
-        const correctIdx = (targetIdx + 1) % concept.real.length; 
+        // Diğeri doğru cevap olur
+        const correctIdx = (targetIdx === 0) ? 1 : 0;
         correctOption = { id: concept.id, name: concept.name, src: concept.real[correctIdx] };
 
-        // YANLIŞLAR: Diğer nesnelerin rastgele gerçek halleri
+        // Yanlışlar: Diğerlerinin gerçek fotoğrafları
         distractors = others.map(o => ({ 
             id: o.id, name: o.name, 
             src: o.real[Math.floor(Math.random() * o.real.length)] 
         }));
     }
 
-    // --- 5. SENARYO: NESNE-RESİM FARKLI (Çizim A -> Çizim B) ---
+    // --- 5. SENARYO: NESNE RESİMLERİ FARKLI (ÇİZİM-ÇİZİM) ---
+    // KURAL: anahtar2 <-> anahtar3 (Gerçekler yasak)
     else if (gameType === 'nesne-resim-farkli') {
         const concept = OBJECT_DATA[Math.floor(Math.random() * OBJECT_DATA.length)];
         const others = OBJECT_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
 
-        // Mantık Nesne-Nesne ile aynı ama 'drawing' dizisini kullanıyoruz
-        const targetIdx = Math.floor(Math.random() * concept.drawing.length); 
+        // drawing[0] (anahtar2) veya drawing[1] (anahtar3)
+        const targetIdx = Math.floor(Math.random() * concept.drawing.length);
         target = { id: concept.id, name: concept.name, src: concept.drawing[targetIdx] };
 
-        const correctIdx = (targetIdx + 1) % concept.drawing.length;
+        const correctIdx = (targetIdx === 0) ? 1 : 0;
         correctOption = { id: concept.id, name: concept.name, src: concept.drawing[correctIdx] };
 
         distractors = others.map(o => ({ 
@@ -232,31 +230,33 @@ export default function NesneEslemeGame({ mode, gameType, onClose, onComplete }:
         }));
     }
 
-    // --- 6. SENARYO: RESİM-NESNE (Gerçek -> Çizim) ---
+    // --- 6. SENARYO: RESİM-NESNE (ÇAPRAZ EŞLEME) ---
+    // KURAL: (anahtar/anahtar1) <-> (anahtar2/anahtar3)
     else if (gameType === 'resim-nesne') {
         const concept = OBJECT_DATA[Math.floor(Math.random() * OBJECT_DATA.length)];
         const others = OBJECT_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
 
-        // HEDEF: Herhangi bir gerçek fotoğraf (anahtar veya anahtar1)
+        // Hedef: Gerçeklerden biri
         target = { 
             id: concept.id, name: concept.name, 
             src: concept.real[Math.floor(Math.random() * concept.real.length)] 
         };
 
-        // DOĞRU CEVAP: Herhangi bir çizim (anahtar2 veya anahtar3)
+        // Cevap: Çizimlerden biri
         correctOption = { 
             id: concept.id, name: concept.name, 
             src: concept.drawing[Math.floor(Math.random() * concept.drawing.length)] 
         };
 
-        // YANLIŞLAR: Diğerlerinin çizimleri
+        // Yanlışlar: Diğerlerinin çizimleri
         distractors = others.map(o => ({ 
             id: o.id, name: o.name, 
             src: o.drawing[Math.floor(Math.random() * o.drawing.length)] 
         }));
     }
 
-    // --- 7. SENARYO: EYLEM FARKLI (Eylem A -> Eylem B) ---
+    // --- 7. SENARYO: EYLEM RESİMLERİ FARKLI ---
+    // KURAL: suic <-> suic1
     else if (gameType === 'eylem-farkli') {
         const concept = ACTION_DATA[Math.floor(Math.random() * ACTION_DATA.length)];
         const others = ACTION_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
@@ -264,7 +264,7 @@ export default function NesneEslemeGame({ mode, gameType, onClose, onComplete }:
         const targetIdx = Math.floor(Math.random() * concept.variants.length);
         target = { id: concept.id, name: concept.name, src: concept.variants[targetIdx] };
 
-        const correctIdx = (targetIdx + 1) % concept.variants.length;
+        const correctIdx = (targetIdx === 0) ? 1 : 0;
         correctOption = { id: concept.id, name: concept.name, src: concept.variants[correctIdx] };
 
         distractors = others.map(o => ({ 
@@ -287,7 +287,6 @@ export default function NesneEslemeGame({ mode, gameType, onClose, onComplete }:
 
   useEffect(() => { generateQuestion(); }, [gameType]);
 
-  // --- DRAG DROP ve SONUÇ MANTIĞI (Aynı) ---
   const handleDragEnd = (event: any, info: any, droppedItem: GameItem) => {
     if (isModeling || isMatched || !targetItem) return;
     const dropZone = dropZoneRef.current;
