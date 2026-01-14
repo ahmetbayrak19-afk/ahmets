@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, RefreshCcw } from 'lucide-react';
+import { Check, XCircle, Trophy, MousePointer2, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
@@ -55,11 +55,11 @@ const ACTION_DATA = [
   { id: 'uyu', name: 'Uyuma', variants: [uyu, uyu1] },
 ];
 
-// SADECE İLK 3 KAZANIM İÇİN TİPLER
+// SADECE İLK 3 KAZANIM
 export type GameType = 
-    | 'nesne-nesne-ayni' // EB.1.1
-    | 'nesne-resim-ayni' // EB.1.2
-    | 'eylem-ayni';      // EB.1.3
+    | 'nesne-nesne-ayni' 
+    | 'nesne-resim-ayni' 
+    | 'eylem-ayni';
 
 interface GameProps {
   mode: 'assessment' | 'instruction';
@@ -74,106 +74,88 @@ export default function NesneEslemeGame({ mode, gameType, onClose, onComplete }:
   const [phase, setPhase] = useState<'playing' | 'success' | 'fail'>('playing');
   const [targetItem, setTargetItem] = useState<GameItem | null>(null);
   const [options, setOptions] = useState<GameItem[]>([]);
+  
   const [assessmentScore, setAssessmentScore] = useState(0); 
   const [assessmentCount, setAssessmentCount] = useState(0); 
+  
+  // ÖĞRETİM MODU STATE'LERİ
   const [instructionMistakeCount, setInstructionMistakeCount] = useState(0);
   const [isModeling, setIsModeling] = useState(false);
   const [isMatched, setIsMatched] = useState(false);
   const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
+  
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
   // Scroll kilitleme
   useEffect(() => { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = ''; }; }, []);
 
-  // --- SORU ÜRETME MOTORU (SADECE AYNI OLANLAR) ---
+  // --- SORU OLUŞTURMA ---
   const generateQuestion = () => {
-    let target: GameItem | null = null;
-    let correctOption: GameItem | null = null;
-    let distractors: GameItem[] = [];
-
-    // Yardımcı: Rastgele Eleman Seç
+    let concept, others, selectedImg, distractors = [];
     const getRandom = (arr: any[]) => arr[Math.floor(Math.random() * arr.length)];
-    // Yardımcı: Kendisi Hariç 2 Tane Rastgele Seç
-    const getOthers = (arr: any[], currentId: string) => arr.filter(i => i.id !== currentId).sort(() => 0.5 - Math.random()).slice(0, 2);
+    const getOthers = (arr: any[], id: string) => arr.filter(i => i.id !== id).sort(() => 0.5 - Math.random()).slice(0, 2);
 
-    // --- SENARYO 1: NESNE-NESNE (AYNI) ---
+    // 1. Havuzu Seç
+    const DATA = gameType.includes('eylem') ? ACTION_DATA : OBJECT_DATA;
+    concept = getRandom(DATA);
+    others = getOthers(DATA, concept.id);
+
+    // 2. Resmi Seç (Aynı Olan)
     if (gameType === 'nesne-nesne-ayni') {
-        const concept = getRandom(OBJECT_DATA);
-        const others = getOthers(OBJECT_DATA, concept.id);
-        
-        // Hangi fotoğrafı kullanacağız? (Araba1 mi Araba2 mi? Rastgele)
-        const selectedImg = concept.real[Math.floor(Math.random() * concept.real.length)];
-        
-        target = { id: concept.id, name: concept.name, src: selectedImg };
-        correctOption = { id: concept.id, name: concept.name, src: selectedImg }; // BİREBİR AYNI
-        
-        // Şaşırtmacalar da GERÇEK fotoğraf olmalı
-        distractors = others.map(o => ({ 
-            id: o.id, name: o.name, src: o.real[Math.floor(Math.random() * o.real.length)] 
-        }));
+        selectedImg = concept.real[Math.floor(Math.random() * concept.real.length)];
+        distractors = others.map(o => o.real[Math.floor(Math.random() * o.real.length)]);
+    } else if (gameType === 'nesne-resim-ayni') {
+        selectedImg = concept.drawing[Math.floor(Math.random() * concept.drawing.length)];
+        distractors = others.map(o => o.drawing[Math.floor(Math.random() * o.drawing.length)]);
+    } else { // Eylem
+        selectedImg = concept.variants[Math.floor(Math.random() * concept.variants.length)];
+        distractors = others.map(o => o.variants[Math.floor(Math.random() * o.variants.length)]);
     }
 
-    // --- SENARYO 2: NESNE RESİMLERİ (AYNI - ÇİZİM) ---
-    else if (gameType === 'nesne-resim-ayni') {
-        const concept = getRandom(OBJECT_DATA);
-        const others = getOthers(OBJECT_DATA, concept.id);
-        
-        const selectedImg = concept.drawing[Math.floor(Math.random() * concept.drawing.length)];
-        
-        target = { id: concept.id, name: concept.name, src: selectedImg };
-        correctOption = { id: concept.id, name: concept.name, src: selectedImg }; // BİREBİR AYNI
-        
-        // Şaşırtmacalar da ÇİZİM olmalı
-        distractors = others.map(o => ({ 
-            id: o.id, name: o.name, src: o.drawing[Math.floor(Math.random() * o.drawing.length)] 
-        }));
-    }
-
-    // --- SENARYO 3: EYLEM RESİMLERİ (AYNI) ---
-    else if (gameType === 'eylem-ayni') {
-        const concept = getRandom(ACTION_DATA);
-        const others = getOthers(ACTION_DATA, concept.id);
-        
-        const selectedImg = concept.variants[Math.floor(Math.random() * concept.variants.length)];
-        
-        target = { id: concept.id, name: concept.name, src: selectedImg };
-        correctOption = { id: concept.id, name: concept.name, src: selectedImg }; // BİREBİR AYNI
-        
-        distractors = others.map(o => ({ 
-            id: o.id, name: o.name, src: o.variants[Math.floor(Math.random() * o.variants.length)] 
-        }));
-    }
-
-    if (target && correctOption) {
-        setTargetItem(target);
-        setOptions([correctOption, ...distractors].sort(() => 0.5 - Math.random()));
-        
-        // Sıfırlama
-        setShowFeedback(null); setIsModeling(false); setInstructionMistakeCount(0); setIsMatched(false);
-    }
+    setTargetItem({ id: concept.id, name: concept.name, src: selectedImg });
+    const correctOpt = { id: concept.id, name: concept.name, src: selectedImg };
+    const wrongOpts = others.map((o, i) => ({ id: o.id, name: o.name, src: distractors[i] }));
+    
+    setOptions([correctOpt, ...wrongOpts].sort(() => 0.5 - Math.random()));
+    
+    // Reset
+    setIsMatched(false); setShowFeedback(null); setIsModeling(false); setInstructionMistakeCount(0);
   };
 
   useEffect(() => { generateQuestion(); }, [gameType]);
 
-  // --- MANYETİK SÜRÜKLE BIRAK ---
-  const handleDragEnd = (event: any, info: any, droppedItem: GameItem) => {
-    if (isModeling || isMatched || !targetItem) return;
-    const dropZone = dropZoneRef.current; if (!dropZone) return;
-    
-    const rect = dropZone.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    
-    // Parmağın kalktığı nokta ile kutu merkezi arasındaki mesafe
-    const distance = Math.sqrt(Math.pow(info.point.x - centerX, 2) + Math.pow(info.point.y - centerY, 2));
+  // --- MODELLEME ANİMASYONU ---
+  const runModelingDemo = () => {
+    setIsModeling(true);
+    // 4 saniye sonra modelleme biter
+    setTimeout(() => { setIsModeling(false); }, 4000); 
+  };
 
-    // 170px Tolerans (Kutuya yakın bırakırsa kabul et)
-    if (distance < 170) {
-        if (droppedItem.id === targetItem.id) {
-            handleSuccess();
-        } else {
-            handleMistake();
-        }
+  // --- HATA YÖNETİMİ ---
+  const handleMistake = () => {
+    if (mode === 'assessment') {
+        // Test modunda hata: Hemen diğer soruya geç
+        setTimeout(() => { 
+            const next = assessmentCount + 1; setAssessmentCount(next); 
+            if(next < 10) generateQuestion(); else setPhase('fail');
+        }, 800);
+    } 
+    else {
+        // Öğretim Modunda Hata
+        const newCount = instructionMistakeCount + 1;
+        setInstructionMistakeCount(newCount);
+        
+        setShowFeedback('wrong'); // Kırmızı Çarpı Göster
+
+        setTimeout(() => { 
+            setShowFeedback(null); // Çarpıyı Gizle
+
+            // 1. Yanlışsa -> Modelleme Yap (Doğruyu Göster)
+            if (newCount === 1) {
+                runModelingDemo();
+            }
+            // 2. Yanlışsa -> Zaten render kısmında butonlar kilitlenecek (Otomatik)
+        }, 1000);
     }
   };
 
@@ -184,27 +166,28 @@ export default function NesneEslemeGame({ mode, gameType, onClose, onComplete }:
     
     setTimeout(() => {
       if (mode === 'assessment') {
-        const nextCount = assessmentCount + 1; setAssessmentCount(nextCount);
-        if (nextCount < 10) generateQuestion();
+        const next = assessmentCount + 1; setAssessmentCount(next);
+        if (next < 10) generateQuestion(); else { setPhase(assessmentScore >= 8 ? 'success' : 'fail'); if(assessmentScore>=8) confetti(); }
       } else generateQuestion();
     }, 1500);
   };
 
-  const handleMistake = () => {
-    if (mode === 'assessment') {
-        setTimeout(() => { const nextCount = assessmentCount + 1; setAssessmentCount(nextCount); if (nextCount < 10) generateQuestion(); }, 800);
-    } else {
-        const newMistake = instructionMistakeCount + 1; setInstructionMistakeCount(newMistake);
-        setShowFeedback('wrong');
-        // Hata durumunda modelleme (ipucu) gösterme eklenebilir
-        setTimeout(() => setShowFeedback(null), 1000);
+  const handleDragEnd = (e: any, info: any, item: GameItem) => {
+    if (isModeling || isMatched || !targetItem) return;
+    
+    const dropZone = dropZoneRef.current; if(!dropZone) return;
+    const rect = dropZone.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dist = Math.sqrt(Math.pow(info.point.x - centerX, 2) + Math.pow(info.point.y - centerY, 2));
+
+    if (dist < 170) {
+        if (item.id === targetItem.id) handleSuccess();
+        else handleMistake();
     }
   };
 
-  // BİTİŞ EKRANLARI
-  useEffect(() => { if (mode === 'assessment' && assessmentCount === 10) { if (assessmentScore >= 9) { setPhase('success'); try { confetti(); } catch {} } else { setPhase('fail'); } } }, [assessmentCount, assessmentScore]);
-
-  if (!targetItem) return null;
+  if(!targetItem) return null;
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800">
@@ -221,29 +204,66 @@ export default function NesneEslemeGame({ mode, gameType, onClose, onComplete }:
         </div>
       </div>
 
-      {/* OYUN ALANI */}
       {phase === 'playing' && (
         <div className="flex-1 flex flex-col justify-around w-full max-w-md h-full">
-          <div className="flex flex-col items-center">
-            {/* HEDEF KUTU */}
-            <div ref={dropZoneRef} className={twMerge("w-72 h-72 bg-white rounded-[3rem] border-4 border-dashed flex items-center justify-center shadow-inner relative z-0 transition-all duration-300", isMatched ? "border-green-500 bg-green-50 border-solid" : "border-slate-300")}>
-               <img src={targetItem.src} alt={targetItem.name} className={twMerge("object-contain transition-all duration-500", isMatched ? "w-56 h-56 opacity-100 scale-110 drop-shadow-2xl" : "w-48 h-48 opacity-90")} />
+          
+          {/* HEDEF KUTU */}
+          <div className="flex justify-center">
+            <div ref={dropZoneRef} className={twMerge("w-72 h-72 bg-white rounded-[3rem] border-4 border-dashed flex items-center justify-center transition-all", isMatched ? "border-green-500 bg-green-50 border-solid" : "border-slate-300")}>
+               <img src={targetItem.src} className="w-48 h-48 object-contain" />
             </div>
-            {!isMatched && <p className="mt-4 text-slate-400 font-bold text-xs tracking-widest uppercase animate-pulse">Eşini Üzerine Bırak</p>}
           </div>
 
+          {/* SEÇENEKLER */}
           <div className="grid grid-cols-3 gap-2 w-full px-1">
             {options.map((item, index) => {
-              const canDrag = !isMatched;
+              const isCorrectItem = item.id === targetItem.id;
+              
+              // KİLİTLEME MANTIĞI (2. Yanlışta devreye girer)
+              const isLocked = mode === 'instruction' && instructionMistakeCount >= 2 && !isCorrectItem;
+              
+              // Sürüklenebilir mi? (Modelleme yoksa, eşleşmediyse ve kilitli değilse)
+              const canDrag = !isModeling && !isMatched && !isLocked;
+
               return (
                 <div key={index} className="relative flex justify-center items-center h-36">
                   <motion.div
-                    drag={canDrag} dragConstraints={false} dragSnapToOrigin={true} dragElastic={0.1} dragMomentum={false}
+                    drag={canDrag} 
+                    dragConstraints={false} 
+                    dragSnapToOrigin 
                     onDragEnd={(e, info) => handleDragEnd(e, info, item)}
                     whileDrag={{ scale: 1.1, zIndex: 100 }}
-                    className={twMerge("w-32 h-32 bg-white rounded-3xl shadow-lg flex items-center justify-center border-2 touch-none relative z-10", canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed", "border-slate-100")}
+                    
+                    // --- ANİMASYONLAR ---
+                    animate={
+                        (isModeling && isCorrectItem) 
+                        ? { y: [0, -350, -350, 0], scale: [1, 1.2, 1.2, 1], x: 0 } // Modelleme Hareketi
+                        : { scale: 1, opacity: isLocked ? 0.3 : 1 } // Kilitli ise silik yap
+                    }
+                    transition={
+                        (isModeling && isCorrectItem)
+                        ? { duration: 3, times: [0, 0.4, 0.7, 1], ease: "easeInOut" }
+                        : { duration: 0.3 }
+                    }
+
+                    className={twMerge(
+                        "w-32 h-32 bg-white rounded-3xl shadow-lg flex items-center justify-center border-2 touch-none relative z-10", 
+                        canDrag ? "cursor-grab active:cursor-grabbing border-slate-100" : "cursor-not-allowed border-slate-200 bg-slate-50",
+                        (isModeling && isCorrectItem) ? "border-blue-500 shadow-blue-200 z-50" : ""
+                    )}
                   >
-                    <img src={item.src} alt={item.name} className="w-24 h-24 object-contain pointer-events-none" />
+                    <img src={item.src} className="w-24 h-24 object-contain pointer-events-none" />
+                    
+                    {/* Modelleme sırasında parmak ikonu */}
+                    {isModeling && isCorrectItem && (
+                        <motion.div 
+                           animate={{ opacity: [0, 1, 1, 0] }}
+                           transition={{ times: [0, 0.1, 0.9, 1], duration: 3 }}
+                           className="absolute -bottom-4 -right-4 bg-white p-2 rounded-full shadow-xl border z-50"
+                        >
+                            <MousePointer2 className="text-blue-500 w-8 h-8 fill-current" />
+                        </motion.div>
+                    )}
                   </motion.div>
                 </div>
               );
@@ -253,11 +273,27 @@ export default function NesneEslemeGame({ mode, gameType, onClose, onComplete }:
       )}
 
       {/* SONUÇ EKRANLARI */}
-      {phase === 'success' && (<div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center p-8"><Trophy size={100} className="text-yellow-500 mb-6 animate-bounce" /><h1 className="text-3xl font-black text-slate-800 mb-2 uppercase">Tamamlandı!</h1><p className="text-slate-500 mb-8 font-medium text-lg">Başarı Oranı: {assessmentScore * 10}%</p><button onClick={() => onComplete(true)} className="bg-green-600 text-white px-12 py-5 rounded-2xl font-bold text-xl shadow-xl active:scale-95 transition-all">KAYDET VE ÇIK</button></div>)}
-      {phase === 'fail' && (<div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center p-8"><div className="text-8xl mb-6 italic font-black text-slate-200">!</div><h1 className="text-2xl font-black text-slate-800 mb-2 uppercase">Tekrar Deneyelim</h1><p className="text-slate-500 mb-10 font-medium">Skor: {assessmentScore} / 10</p><div className="flex gap-4"><button onClick={onClose} className="bg-slate-100 text-slate-600 px-8 py-4 rounded-xl font-bold text-lg">KAPAT</button><button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg flex items-center gap-2"><RefreshCcw size={20}/> YENİDEN BAŞLA</button></div></div>)}
+      {phase === 'success' && (<div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center"><Trophy size={100} className="text-yellow-500 mb-6 animate-bounce" /><h1 className="text-3xl font-bold mb-2">Harika!</h1><button onClick={() => onComplete(true)} className="bg-green-600 text-white px-10 py-4 rounded-2xl font-bold text-xl shadow-xl">Kaydet</button></div>)}
+      {phase === 'fail' && (<div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center"><h1 className="text-3xl font-bold mb-4">Tekrar Dene</h1><button onClick={onClose} className="bg-slate-200 text-slate-700 px-10 py-4 rounded-2xl font-bold text-xl">Kapat</button></div>)}
       
-      {/* FEEDBACK (Yeşil Tik / Kırmızı Çarpı) */}
-      <AnimatePresence>{showFeedback && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[110] flex flex-col items-center justify-start pt-32 pointer-events-none"><div className={`px-10 py-5 rounded-full shadow-2xl flex items-center gap-4 ${showFeedback === 'correct' ? 'bg-green-500' : 'bg-red-500'}`}>{showFeedback === 'correct' ? (<Check size={48} className="text-white"/>) : (<><XCircle size={36} className="text-white"/><span className="text-white text-3xl font-black tracking-widest">HAYIR</span></>)}</div></motion.div>)}</AnimatePresence>
+      {/* GERİ BİLDİRİM (KIRMIZI ÇARPI - YUKARIDA) */}
+      <AnimatePresence>
+        {showFeedback && (
+            <motion.div 
+                initial={{ opacity: 0, scale: 0.5 }} 
+                animate={{ opacity: 1, scale: 1 }} 
+                exit={{ opacity: 0, scale: 0.5 }} 
+                className="absolute top-1/4 left-0 right-0 flex justify-center pointer-events-none z-[110]"
+            >
+                <div className={twMerge(
+                    "p-6 rounded-full shadow-2xl border-4",
+                    showFeedback === 'correct' ? "bg-green-100 border-green-500" : "bg-red-100 border-red-500"
+                )}>
+                    {showFeedback === 'correct' ? <Check size={80} className="text-green-600" /> : <X size={80} className="text-red-600" />}
+                </div>
+            </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
