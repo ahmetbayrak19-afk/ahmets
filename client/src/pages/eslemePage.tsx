@@ -9,7 +9,9 @@ import { ABA_MODULES } from '@/shared/abaData';
 
 // --- OYUN DOSYALARI ---
 import NesneEslemeGame from '@/aba/esle/NesneEslemeGame';   // 1. Oyun (EB.1.1)
-import NesneEslemeGame1 from '@/aba/esle/NesneEslemeGame1'; // 2. Oyun (EB.1.2) - İsim düzeltildi
+import NesneEslemeGame1 from '@/aba/esle/NesneEslemeGame1'; // 2. Oyun (EB.1.2)
+import NesneEslemeGame3 from '@/aba/esle/NesneEslemeGame3'; // 3. Oyun (EB.1.3 - Eylem)
+import NesneEslemeGame4 from '@/aba/esle/NesneEslemeGame4'; // 4. Oyun (EB.1.4 - Şekil Kutusu)
 
 interface EslemePageProps {
   studentId: string;
@@ -101,6 +103,24 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                     onComplete={handleGameComplete} 
                 />
             )}
+
+            {/* 3. KAZANIM: Eylem Resimleri Eşleme (Aynı eylem) */}
+            {activeGameItem.startsWith("EB.1.3") && (
+                <NesneEslemeGame3 
+                    mode={activeGameMode} 
+                    onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} 
+                    onComplete={handleGameComplete} 
+                />
+            )}
+
+            {/* 4. KAZANIM: Şekil Kutusu Eşleme */}
+            {activeGameItem.startsWith("EB.1.4") && (
+                <NesneEslemeGame4 
+                    mode={activeGameMode} 
+                    onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} 
+                    onComplete={handleGameComplete} 
+                />
+            )}
          </>
       )}
 
@@ -127,8 +147,11 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             const status = formData[item];
             const isCompleted = status === true;
             
-            // Oyun butonu hangi maddelerde çıkacak? (EB.1.1 ve EB.1.2)
-            const hasGame = item.startsWith("EB.1.1") || item.startsWith("EB.1.2"); 
+            // Oyun butonu hangi maddelerde çıkacak? (EB.1.1, 1.2, 1.3, 1.4)
+            const hasGame = item.startsWith("EB.1.1") || 
+                          item.startsWith("EB.1.2") || 
+                          item.startsWith("EB.1.3") || 
+                          item.startsWith("EB.1.4"); 
             
             const firstSpaceIndex = item.indexOf(' ');
             
