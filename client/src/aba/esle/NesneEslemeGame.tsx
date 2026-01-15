@@ -28,6 +28,21 @@ import saat1Img from './saat1.png';
 import tavuk1Img from './tavuk1.png';
 import top1Img from './top1.png';
 
+// --- SES DOSYALARI ---
+import arkaplanMusic from './ses/arkaplanmusic.mp3';
+import aferin1 from './ses/aferin1.mp3';
+import aferin2 from './ses/aferin2.mp3';
+import bravo from './ses/bravo.mp3';
+import esledinbravo from './ses/esledinbravo.mp3';
+import harika1 from './ses/harika1.mp3';
+import harika2 from './ses/harika2.mp3';
+import tekrardene1 from './ses/tekrardene1.mp3';
+import tekrardene2 from './ses/tekrardene2.mp3';
+
+// --- SES HAVUZLARI ---
+const POSITIVE_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
+const NEGATIVE_SOUNDS = [tekrardene1, tekrardene2];
+
 const OBJECTS = [
   // 1. Set
   { id: 'anahtar', name: 'Anahtar', src: anahtarImg },
@@ -75,6 +90,52 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
   
   const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  
+  // Ses referansı (Arkaplan müziği için)
+  const bgMusicRef = useRef<HTMLAudioElement | null>(null);
+
+  // Arkaplan Müziği Başlatma
+  useEffect(() => {
+    // Audio nesnesi oluştur
+    bgMusicRef.current = new Audio(arkaplanMusic);
+    bgMusicRef.current.loop = true; // Döngüye al
+    bgMusicRef.current.volume = 0.15; // Ses seviyesi düşük (0.0 - 1.0 arası)
+    
+    // Oynatmayı dene (Tarayıcı izin verirse)
+    const playPromise = bgMusicRef.current.play();
+    if (playPromise !== undefined) {
+        playPromise.catch(error => {
+            console.log("Otomatik oynatma engellendi, kullanıcı etkileşimi bekleniyor.", error);
+        });
+    }
+
+    // Component kapanırken müziği durdur
+    return () => {
+        if (bgMusicRef.current) {
+            bgMusicRef.current.pause();
+            bgMusicRef.current.currentTime = 0;
+        }
+    };
+  }, []);
+
+  // Efekt Sesi Çalma Fonksiyonu
+  const playSoundEffect = (type: 'success' | 'fail') => {
+    let soundSrc;
+    
+    if (type === 'success') {
+        // Pozitif seslerden rastgele seç
+        const randomIndex = Math.floor(Math.random() * POSITIVE_SOUNDS.length);
+        soundSrc = POSITIVE_SOUNDS[randomIndex];
+    } else {
+        // Negatif seslerden rastgele seç
+        const randomIndex = Math.floor(Math.random() * NEGATIVE_SOUNDS.length);
+        soundSrc = NEGATIVE_SOUNDS[randomIndex];
+    }
+
+    const audio = new Audio(soundSrc);
+    audio.volume = 1.0; // Efekt sesi yüksek olsun
+    audio.play().catch(e => console.log("Ses oynatılamadı", e));
+  };
 
   // Scroll kilitleme
   useEffect(() => {
@@ -130,6 +191,7 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
 
   const handleSuccess = () => {
     setIsMatched(true); 
+    playSoundEffect('success'); // SES ÇAL
 
     if (mode === 'instruction') {
         setShowFeedback('correct');
@@ -151,6 +213,8 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
   };
 
   const handleMistake = () => {
+    playSoundEffect('fail'); // SES ÇAL
+
     if (mode === 'assessment') {
         // Değerlendirmede sessiz geçiş
         setTimeout(() => {
