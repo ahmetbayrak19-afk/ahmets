@@ -8,8 +8,8 @@ import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 
 // --- OYUN DOSYALARI ---
-import NesneEslemeGame from '@/aba/esle/NesneEslemeGame';   // 1. Kazanım Oyunu
-import NesneEslemeGame2 from '@/aba/esle/NesneEslemeGame2'; // 2. Kazanım Oyunu (Yeni Eklediğimiz)
+import NesneEslemeGame from '@/aba/esle/NesneEslemeGame';   // 1. Oyun (EB.1.1)
+import NesneEslemeGame1 from '@/aba/esle/NesneEslemeGame1'; // 2. Oyun (EB.1.2) - İsim düzeltildi
 
 interface EslemePageProps {
   studentId: string;
@@ -95,7 +95,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
 
             {/* 2. KAZANIM: Nesne Resimleri Eşleme (Aynı nesne) */}
             {activeGameItem.startsWith("EB.1.2") && (
-                <NesneEslemeGame2 
+                <NesneEslemeGame1 
                     mode={activeGameMode} 
                     onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} 
                     onComplete={handleGameComplete} 
