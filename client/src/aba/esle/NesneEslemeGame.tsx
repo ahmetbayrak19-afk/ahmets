@@ -1,33 +1,57 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, XCircle, Trophy, MousePointer2, RefreshCcw, Loader2 } from 'lucide-react';
+import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, RefreshCcw } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
-// --- SADECE GERÇEK RESİMLER (Varyasyonlu: 0 ve 1) ---
-import anahtar from './anahtar.png'; import anahtar1 from './anahtar1.png';
-import araba from './araba.png'; import araba1 from './araba1.png';
-import cicek from './cicek.png'; import cicek1 from './cicek1.png';
-import elma from './elma.png'; import elma1 from './elma1.png';
-import gitar from './gitar.png'; import gitar1 from './gitar1.png';
-import kalem from './kalem.png'; import kalem1 from './kalem1.png';
-import kitap from './kitap.png'; import kitap1 from './kitap1.png';
-import saat from './saat.png'; import saat1 from './saat1.png';
-import tavuk from './tavuk.png'; import tavuk1 from './tavuk1.png';
-import top from './top.png'; import top1 from './top1.png';
+// --- 1. SET RESİMLER ---
+import anahtarImg from './anahtar.png';
+import arabaImg from './araba.png';
+import cicekImg from './cicek.png';
+import elmaImg from './elma.png';
+import gitarImg from './gitar.png';
+import kalemImg from './kalem.png';
+import kitapImg from './kitap.png';
+import saatImg from './saat.png';
+import tavukImg from './tavuk.png';
+import topImg from './top.png';
 
-// --- VERİ HAVUZU (Sadece Gerçekler) ---
-const OBJECT_DATA = [
-  { id: 'anahtar', name: 'Anahtar', images: [anahtar, anahtar1] },
-  { id: 'araba', name: 'Araba', images: [araba, araba1] },
-  { id: 'cicek', name: 'Çiçek', images: [cicek, cicek1] },
-  { id: 'elma', name: 'Elma', images: [elma, elma1] },
-  { id: 'gitar', name: 'Gitar', images: [gitar, gitar1] },
-  { id: 'kalem', name: 'Kalem', images: [kalem, kalem1] },
-  { id: 'kitap', name: 'Kitap', images: [kitap, kitap1] },
-  { id: 'saat', name: 'Saat', images: [saat, saat1] },
-  { id: 'tavuk', name: 'Tavuk', images: [tavuk, tavuk1] },
-  { id: 'top', name: 'Top', images: [top, top1] },
+// --- 2. SET RESİMLER (YENİ EKLENENLER) ---
+import anahtar1Img from './anahtar1.png';
+import araba1Img from './araba1.png';
+import cicek1Img from './cicek1.png';
+import elma1Img from './elma1.png';
+import gitar1Img from './gitar1.png';
+import kalem1Img from './kalem1.png';
+import kitap1Img from './kitap1.png';
+import saat1Img from './saat1.png';
+import tavuk1Img from './tavuk1.png';
+import top1Img from './top1.png';
+
+const OBJECTS = [
+  // 1. Set
+  { id: 'anahtar', name: 'Anahtar', src: anahtarImg },
+  { id: 'araba', name: 'Araba', src: arabaImg },
+  { id: 'cicek', name: 'Çiçek', src: cicekImg },
+  { id: 'elma', name: 'Elma', src: elmaImg },
+  { id: 'gitar', name: 'Gitar', src: gitarImg },
+  { id: 'kalem', name: 'Kalem', src: kalemImg },
+  { id: 'kitap', name: 'Kitap', src: kitapImg },
+  { id: 'saat', name: 'Saat', src: saatImg },
+  { id: 'tavuk', name: 'Tavuk', src: tavukImg },
+  { id: 'top', name: 'Top', src: topImg },
+  
+  // 2. Set (Yeni)
+  { id: 'anahtar1', name: 'Anahtar', src: anahtar1Img },
+  { id: 'araba1', name: 'Araba', src: araba1Img },
+  { id: 'cicek1', name: 'Çiçek', src: cicek1Img },
+  { id: 'elma1', name: 'Elma', src: elma1Img },
+  { id: 'gitar1', name: 'Gitar', src: gitar1Img },
+  { id: 'kalem1', name: 'Kalem', src: kalem1Img },
+  { id: 'kitap1', name: 'Kitap', src: kitap1Img },
+  { id: 'saat1', name: 'Saat', src: saat1Img },
+  { id: 'tavuk1', name: 'Tavuk', src: tavuk1Img },
+  { id: 'top1', name: 'Top', src: top1Img },
 ];
 
 interface GameProps {
@@ -36,164 +60,259 @@ interface GameProps {
   onComplete: (success: boolean) => void;
 }
 
-interface GameItem { id: string; name: string; src: string; }
-
 export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps) {
   const [phase, setPhase] = useState<'playing' | 'success' | 'fail'>('playing');
-  const [targetItem, setTargetItem] = useState<GameItem | null>(null);
-  const [options, setOptions] = useState<GameItem[]>([]);
+  const [targetItem, setTargetItem] = useState(OBJECTS[0]);
+  const [options, setOptions] = useState<typeof OBJECTS[]>([]);
   
-  const [assessmentScore, setAssessmentScore] = useState(0); 
   const [assessmentCount, setAssessmentCount] = useState(0); 
+  const [assessmentScore, setAssessmentScore] = useState(0); 
   
   const [instructionMistakeCount, setInstructionMistakeCount] = useState(0);
   const [isModeling, setIsModeling] = useState(false);
+  const [flashCorrect, setFlashCorrect] = useState(false);
   const [isMatched, setIsMatched] = useState(false);
-  const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
   
+  const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { 
-    document.body.style.overflow = 'hidden'; 
-    return () => { document.body.style.overflow = ''; }; 
+  // Scroll kilitleme
+  useEffect(() => {
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = originalStyle; };
   }, []);
 
   const generateQuestion = () => {
-    // 1. Rastgele Nesne Seç (Örn: Araba)
-    const concept = OBJECT_DATA[Math.floor(Math.random() * OBJECT_DATA.length)];
-    
-    // 2. Bu nesnenin gerçek resimlerinden birini seç (araba.png veya araba1.png)
-    const selectedImg = concept.images[Math.floor(Math.random() * concept.images.length)];
+    const randomTarget = OBJECTS[Math.floor(Math.random() * OBJECTS.length)];
+    // Hedefle aynı ID'ye sahip olmayanları filtrele
+    const distractors = OBJECTS.filter(item => item.id !== randomTarget.id)
+                             .sort(() => 0.5 - Math.random())
+                             .slice(0, 2); 
 
-    // 3. Yanıltıcıları Seç (Diğer nesnelerden)
-    const others = OBJECT_DATA.filter(i => i.id !== concept.id).sort(() => 0.5 - Math.random()).slice(0, 2);
+    setTargetItem(randomTarget);
+    setOptions([randomTarget, ...distractors].sort(() => 0.5 - Math.random()));
     
-    // Yanıltıcıların da rastgele gerçek resimlerini al
-    const distractors = others.map(o => o.images[Math.floor(Math.random() * o.images.length)]);
-
-    // 4. Hedef ve Seçenekleri Kur (BİREBİR AYNI)
-    setTargetItem({ id: concept.id, name: concept.name, src: selectedImg });
-    const correctOpt = { id: concept.id, name: concept.name, src: selectedImg };
-    const wrongOpts = others.map((o, i) => ({ id: o.id, name: o.name, src: distractors[i] }));
-    
-    setOptions([correctOpt, ...wrongOpts].sort(() => 0.5 - Math.random()));
-    
-    // Sıfırla
-    setIsMatched(false); 
-    setShowFeedback(null); 
-    setIsModeling(false); 
+    setShowFeedback(null);
+    setIsModeling(false);
+    setFlashCorrect(false);
     setInstructionMistakeCount(0);
+    setIsMatched(false);
   };
 
   useEffect(() => { generateQuestion(); }, []);
 
-  // --- İPUCU ANİMASYONU ---
-  const runModelingDemo = () => {
-    setIsModeling(true);
-    setTimeout(() => { setIsModeling(false); }, 2500); 
-  };
+  const handleDragEnd = (event: any, info: any, droppedItem: typeof OBJECTS[0]) => {
+    if (isModeling || isMatched) return;
 
-  const handleMistake = () => {
-    if (mode === 'assessment') {
-        setTimeout(() => { 
-            const next = assessmentCount + 1; setAssessmentCount(next); 
-            if(next < 10) generateQuestion(); else setPhase('fail');
-        }, 800);
-    } 
-    else {
-        const newCount = instructionMistakeCount + 1;
-        setInstructionMistakeCount(newCount);
-        setShowFeedback('wrong');
+    const dropZone = dropZoneRef.current;
+    if (!dropZone) return;
+    const dropRect = dropZone.getBoundingClientRect();
+    const dropX = info.point.x;
+    const dropY = info.point.y;
 
-        setTimeout(() => { 
-            setShowFeedback(null); 
-            if (newCount === 1) {
-                runModelingDemo();
-            }
-        }, 1000);
+    const isInside = 
+        dropX >= dropRect.left - 40 && 
+        dropX <= dropRect.right + 40 &&
+        dropY >= dropRect.top - 40 && 
+        dropY <= dropRect.bottom + 40;
+
+    if (!isInside) return;
+
+    const isCorrect = droppedItem.id === targetItem.id;
+
+    if (isCorrect) {
+      handleSuccess();
+    } else {
+      handleMistake();
     }
   };
 
   const handleSuccess = () => {
-    setIsMatched(true);
-    if (mode === 'instruction') setShowFeedback('correct');
-    if (mode === 'assessment') setAssessmentScore(prev => prev + 1);
+    setIsMatched(true); 
+
+    if (mode === 'instruction') {
+        setShowFeedback('correct');
+    }
     
+    if (mode === 'assessment') {
+        setAssessmentScore(prev => prev + 1);
+    }
+
     setTimeout(() => {
       if (mode === 'assessment') {
-        const next = assessmentCount + 1; setAssessmentCount(next);
-        if (next < 10) generateQuestion(); else { setPhase(assessmentScore >= 8 ? 'success' : 'fail'); if(assessmentScore>=8) confetti(); }
-      } else generateQuestion();
+        const nextCount = assessmentCount + 1;
+        setAssessmentCount(nextCount);
+        if (nextCount < 10) generateQuestion();
+      } else {
+        generateQuestion();
+      }
     }, 1500);
   };
 
-  const handleDragEnd = (e: any, info: any, item: GameItem) => {
-    if (isModeling || isMatched || !targetItem) return;
-    
-    const dropZone = dropZoneRef.current; if(!dropZone) return;
-    const rect = dropZone.getBoundingClientRect();
-    const dist = Math.sqrt(Math.pow(info.point.x - (rect.left + rect.width/2), 2) + Math.pow(info.point.y - (rect.top + rect.height/2), 2));
+  const handleMistake = () => {
+    if (mode === 'assessment') {
+        // Değerlendirmede sessiz geçiş
+        setTimeout(() => {
+            const nextCount = assessmentCount + 1;
+            setAssessmentCount(nextCount);
+            if (nextCount < 10) generateQuestion();
+        }, 800);
+    } 
+    else {
+        // Öğretimde modelleme
+        const newMistake = instructionMistakeCount + 1;
+        setInstructionMistakeCount(newMistake);
+        setShowFeedback('wrong');
 
-    if (dist < 170) {
-        if (item.id === targetItem.id) handleSuccess();
-        else handleMistake();
+        if (newMistake === 1) {
+            setTimeout(() => { setShowFeedback(null); }, 1500);
+            setTimeout(() => { runModelingDemo(); }, 500);
+        } 
+        else if (newMistake >= 2) {
+            setTimeout(() => setShowFeedback(null), 1000);
+            setFlashCorrect(true);
+            setTimeout(() => setFlashCorrect(false), 2000);
+        }
     }
   };
 
-  if(!targetItem) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-blue-500 w-10 h-10"/></div>;
+  const runModelingDemo = () => {
+    setIsModeling(true);
+    // Hızlandırıldı: 4000ms -> 2000ms
+    setTimeout(() => {
+        setIsModeling(false);
+    }, 2000); 
+  };
+
+  const fireConfetti = () => {
+    try {
+        confetti({ particleCount: 300, spread: 100, origin: { y: 0.6 } });
+    } catch (e) {
+        console.error("Confetti hatası:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (mode === 'assessment' && assessmentCount === 10) {
+      if (assessmentScore >= 9) {
+        setPhase('success');
+        fireConfetti();
+      } else {
+        setPhase('fail');
+      }
+    }
+  }, [assessmentCount, assessmentScore, mode]);
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800">
       
-      {/* ÜST BAR */}
+      {/* Üst Bar */}
       <div className="w-full max-w-2xl flex justify-between items-center text-slate-500 mb-2 relative z-10">
-        <button onClick={onClose} className="p-2 bg-white border border-slate-200 rounded-full shadow-sm hover:bg-slate-100"><XCircle size={24} className="text-slate-300" /></button>
+        <button onClick={onClose} className="p-2 bg-white border border-slate-200 rounded-full shadow-sm hover:bg-slate-100">
+          <XCircle size={24} className="text-slate-300" />
+        </button>
+        
         <div className="flex items-center gap-3">
-            <div className={twMerge("px-4 py-2 rounded-full shadow-sm border flex items-center gap-2", mode === 'assessment' ? "bg-blue-50 border-blue-100" : "bg-purple-50 border-purple-100")}>
+            <div className={twMerge(
+                "px-4 py-2 rounded-full shadow-sm border flex items-center gap-2",
+                mode === 'assessment' ? "bg-blue-50 border-blue-100" : "bg-purple-50 border-purple-100"
+            )}>
                 {mode === 'assessment' ? <ClipboardCheck size={16} className="text-blue-600"/> : <GraduationCap size={16} className="text-purple-600"/>}
-                <span className={twMerge("font-bold text-xs uppercase", mode === 'assessment' ? "text-blue-600" : "text-purple-600")}>{mode === 'assessment' ? `TEST: ${Math.min(assessmentCount + 1, 10)}/10` : "ÖĞRETİM"}</span>
+                <span className={twMerge("font-bold text-xs uppercase", mode === 'assessment' ? "text-blue-600" : "text-purple-600")}>
+                    {mode === 'assessment' ? `TEST: ${Math.min(assessmentCount + 1, 10)}/10` : "ÖĞRETİM"}
+                </span>
             </div>
-            {mode === 'assessment' && <div className="bg-green-50 px-4 py-2 rounded-full shadow-sm border border-green-100 font-black text-green-600 text-xs">PUAN: {assessmentScore}</div>}
+            {mode === 'assessment' && (
+                <div className="bg-green-50 px-4 py-2 rounded-full shadow-sm border border-green-100 font-black text-green-600 text-xs">
+                    PUAN: {assessmentScore}
+                </div>
+            )}
         </div>
       </div>
 
+      {/* --- OYUN ALANI --- */}
       {phase === 'playing' && (
         <div className="flex-1 flex flex-col justify-around w-full max-w-md h-full">
           
-          {/* HEDEF */}
-          <div className="flex justify-center">
-            <div ref={dropZoneRef} className={twMerge("w-72 h-72 bg-white rounded-[3rem] border-4 border-dashed flex items-center justify-center transition-all duration-300", isMatched ? "border-green-500 bg-green-50 scale-105" : "border-slate-300")}>
-               <img src={targetItem.src} className="w-48 h-48 object-contain" />
+          <div className="flex flex-col items-center">
+            {/* HEDEF KUTU */}
+            <div 
+                ref={dropZoneRef}
+                className={twMerge(
+                    "w-72 h-72 bg-white rounded-[3rem] border-4 border-dashed flex items-center justify-center shadow-inner relative z-0 transition-all duration-300",
+                    isMatched ? "border-green-500 bg-green-50 border-solid" : "border-slate-300"
+                )}
+            >
+               <img 
+                 src={targetItem.src} 
+                 alt={targetItem.name} 
+                 className={twMerge(
+                    "object-contain transition-all duration-500",
+                    isMatched ? "w-56 h-56 opacity-100 scale-110 drop-shadow-2xl" : "w-48 h-48 opacity-90"
+                 )} 
+               />
             </div>
+            {!isMatched && <p className="mt-4 text-slate-400 font-bold text-xs tracking-widest uppercase animate-pulse">Eşini Üzerine Bırak</p>}
           </div>
 
-          {/* SEÇENEKLER */}
-          <div className="grid grid-cols-3 gap-3 w-full px-2">
-            {options.map((item, index) => {
+          <div className="grid grid-cols-3 gap-2 w-full px-1">
+            {options.map((item) => {
               const isCorrectItem = item.id === targetItem.id;
               const isLocked = mode === 'instruction' && instructionMistakeCount >= 2 && !isCorrectItem;
-              const canDrag = !isModeling && !isMatched && !isLocked;
+              const isHidden = isMatched && isCorrectItem;
+              const canDrag = !isModeling && !isLocked && !isMatched;
 
               return (
-                <div key={index} className="relative flex justify-center items-center h-32">
+                <div key={item.id} className="relative flex justify-center items-center h-36">
                   <motion.div
-                    drag={canDrag} 
-                    dragConstraints={false} 
-                    dragSnapToOrigin 
+                    drag={canDrag}
+                    dragConstraints={false}
+                    dragSnapToOrigin={true} 
+                    dragElastic={0.1}
+                    dragMomentum={false}
                     onDragEnd={(e, info) => handleDragEnd(e, info, item)}
                     whileDrag={{ scale: 1.1, zIndex: 100 }}
                     
-                    animate={(isModeling && isCorrectItem) ? { y: [0, -320, -320, 0], scale: [1, 1.2, 1.2, 1], x: 0 } : { scale: 1, opacity: isLocked ? 0.3 : 1 }}
-                    transition={(isModeling && isCorrectItem) ? { duration: 2.5, times: [0, 0.4, 0.7, 1] } : { duration: 0.3 }}
+                    animate={
+                        isHidden
+                        ? { opacity: 0, scale: 0 }
+                        : (isModeling && isCorrectItem) 
+                        ? { 
+                            y: [0, -380, -380, 0], 
+                            scale: [1, 1.2, 1.2, 1],
+                            x: 0
+                          } 
+                        : (flashCorrect && isCorrectItem)
+                        ? { scale: [1, 1.1, 1], borderColor: ["#e2e8f0", "#22c55e", "#e2e8f0"], borderWidth: [2, 4, 2] }
+                        : { scale: 1, opacity: isLocked ? 0.3 : 1 }
+                    }
+                    transition={
+                        (isModeling && isCorrectItem)
+                        // Hızlandırıldı: duration 4 -> 2
+                        ? { duration: 2, times: [0, 0.4, 0.7, 1], ease: "easeInOut" }
+                        : { duration: 0.3 }
+                    }
 
                     className={twMerge(
-                        "w-28 h-28 bg-white rounded-2xl shadow-lg flex items-center justify-center border-2 touch-none relative z-10", 
-                        canDrag ? "cursor-grab active:cursor-grabbing border-slate-100" : "cursor-not-allowed border-slate-200 bg-slate-50",
-                        (isModeling && isCorrectItem) ? "border-blue-500 ring-4 ring-blue-100 z-50" : ""
+                      "w-32 h-32 bg-white rounded-3xl shadow-[0_8px_0_0_#e2e8f0] flex items-center justify-center border-2 touch-none relative z-10",
+                      canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed",
+                      (isModeling && isCorrectItem) ? "border-blue-400 shadow-blue-100 shadow-xl" : 
+                      (flashCorrect && isCorrectItem) ? "border-green-500 shadow-green-100" : "border-slate-100"
                     )}
                   >
-                    <img src={item.src} className="w-20 h-20 object-contain pointer-events-none" />
-                    {isModeling && isCorrectItem && <motion.div animate={{ opacity: [0, 1, 1, 0] }} transition={{ duration: 2.5 }} className="absolute -bottom-4 -right-4 bg-white p-2 rounded-full shadow-xl border z-50"><MousePointer2 className="text-blue-500 w-6 h-6 fill-current" /></motion.div>}
+                    <img src={item.src} alt={item.name} className="w-24 h-24 object-contain pointer-events-none" />
+                    
+                    {isModeling && isCorrectItem && (
+                        <motion.div 
+                           animate={{ opacity: [0, 1, 1, 0] }}
+                           // Hızlandırıldı: duration 4 -> 2
+                           transition={{ times: [0, 0.1, 0.8, 1], duration: 2 }}
+                           className="absolute -bottom-2 -right-2 text-blue-600 bg-white rounded-full p-2 shadow-lg border border-blue-100"
+                        >
+                            <MousePointer2 size={32} fill="currentColor" />
+                        </motion.div>
+                    )}
                   </motion.div>
                 </div>
               );
@@ -202,12 +321,55 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
         </div>
       )}
 
-      {/* SONUÇLAR */}
-      {phase === 'success' && <div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center"><Trophy size={100} className="text-yellow-500 mb-6 animate-bounce"/><h1 className="text-3xl font-bold">Harika!</h1><button onClick={() => onComplete(true)} className="mt-8 bg-green-600 text-white px-10 py-4 rounded-2xl font-bold text-xl">Kaydet</button></div>}
-      {phase === 'fail' && <div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center"><h1 className="text-3xl font-bold mb-4">Tekrar Dene</h1><button onClick={onClose} className="bg-slate-200 text-slate-700 px-10 py-4 rounded-2xl font-bold text-xl">Kapat</button><button onClick={() => window.location.reload()} className="mt-4 flex items-center gap-2 text-blue-600 font-bold"><RefreshCcw size={20}/> Yeniden Başla</button></div>}
-      
-      {/* GERİ BİLDİRİM */}
-      <AnimatePresence>{showFeedback && <motion.div initial={{ opacity: 0, scale: 0.5, y: -50 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.5 }} className="absolute top-[20%] left-0 right-0 flex justify-center pointer-events-none z-[110]"><div className={twMerge("p-8 rounded-full shadow-2xl border-4 bg-white", showFeedback === 'correct' ? "border-green-500" : "border-red-500")}>{showFeedback === 'correct' ? <Check size={80} className="text-green-600"/> : <XCircle size={80} className="text-red-600"/>}</div></motion.div>}</AnimatePresence>
+      {/* SONUÇ EKRANLARI */}
+      {phase === 'success' && (
+        <div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center p-8">
+           <Trophy size={100} className="text-yellow-500 mb-6 animate-bounce" />
+           <h1 className="text-3xl font-black text-slate-800 mb-2 uppercase">Tamamlandı!</h1>
+           <p className="text-slate-500 mb-8 font-medium text-lg">Başarı Oranı: {assessmentScore * 10}%</p>
+           <button onClick={() => onComplete(true)} className="bg-green-600 text-white px-12 py-5 rounded-2xl font-bold text-xl shadow-xl active:scale-95 transition-all">
+             KAYDET VE ÇIK
+           </button>
+        </div>
+      )}
+
+      {phase === 'fail' && (
+        <div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center p-8">
+           <div className="text-8xl mb-6 italic font-black text-slate-200">!</div>
+           <h1 className="text-2xl font-black text-slate-800 mb-2 uppercase">Tekrar Deneyelim</h1>
+           <p className="text-slate-500 mb-10 font-medium">Skor: {assessmentScore} / 10</p>
+           <div className="flex gap-4">
+             <button onClick={onClose} className="bg-slate-100 text-slate-600 px-8 py-4 rounded-xl font-bold text-lg">KAPAT</button>
+             <button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg flex items-center gap-2">
+               <RefreshCcw size={20}/> YENİDEN BAŞLA
+             </button>
+           </div>
+        </div>
+      )}
+
+      {/* FEEDBACK OVERLAY (SADECE ÖĞRETİM MODUNDA) */}
+      <AnimatePresence>
+        {showFeedback && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[110] flex flex-col items-center justify-start pt-32 pointer-events-none"
+          >
+            <div className={`
+                px-10 py-5 rounded-full shadow-2xl flex items-center gap-4
+                ${showFeedback === 'correct' ? 'bg-green-500' : 'bg-red-500'}
+            `}>
+                {showFeedback === 'correct' ? (
+                    <Check size={48} className="text-white"/> 
+                ) : (
+                    <>
+                        <XCircle size={36} className="text-white"/>
+                        <span className="text-white text-3xl font-black tracking-widest">HAYIR</span>
+                    </>
+                )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
