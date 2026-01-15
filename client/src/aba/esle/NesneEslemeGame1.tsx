@@ -5,7 +5,6 @@ import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
 // --- 1. SET RESİMLER (2. Varyasyonlar) ---
-// Önceki dosyada 1 vardı, bunda 2 ile başlıyoruz
 import anahtar2Img from './anahtar2.png';
 import araba2Img from './araba2.png';
 import cicek2Img from './cicek2.png';
@@ -18,7 +17,6 @@ import tavuk2Img from './tavuk2.png';
 import top2Img from './top2.png';
 
 // --- 2. SET RESİMLER (3. Varyasyonlar) ---
-// Önceki dosyada 1 vardı, bunda 3 ile devam ediyoruz
 import anahtar3Img from './anahtar3.png';
 import araba3Img from './araba3.png';
 import cicek3Img from './cicek3.png';
@@ -29,6 +27,21 @@ import kitap3Img from './kitap3.png';
 import saat3Img from './saat3.png';
 import tavuk3Img from './tavuk3.png';
 import top3Img from './top3.png';
+
+// --- SES DOSYALARI ---
+import arkaplanMusic from './ses/arkaplanmusic.mp3';
+import aferin1 from './ses/aferin1.mp3';
+import aferin2 from './ses/aferin2.mp3';
+import bravo from './ses/bravo.mp3';
+import esledinbravo from './ses/esledinbravo.mp3';
+import harika1 from './ses/harika1.mp3';
+import harika2 from './ses/harika2.mp3';
+import tekrardene1 from './ses/tekrardene1.mp3';
+import tekrardene2 from './ses/tekrardene2.mp3';
+
+// --- SES HAVUZLARI ---
+const POSITIVE_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
+const NEGATIVE_SOUNDS = [tekrardene1, tekrardene2];
 
 const OBJECTS = [
   // 1. Grup (Dosya isimleri 2 olanlar)
@@ -77,6 +90,50 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
   
   const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+
+  // Ses referansı (Arkaplan müziği için)
+  const bgMusicRef = useRef<HTMLAudioElement | null>(null);
+
+  // Arkaplan Müziği Başlatma
+  useEffect(() => {
+    // Audio nesnesi oluştur
+    bgMusicRef.current = new Audio(arkaplanMusic);
+    bgMusicRef.current.loop = true; // Döngüye al
+    bgMusicRef.current.volume = 0.15; // Ses seviyesi düşük
+    
+    // Oynatmayı dene
+    const playPromise = bgMusicRef.current.play();
+    if (playPromise !== undefined) {
+        playPromise.catch(error => {
+            console.log("Otomatik oynatma engellendi.", error);
+        });
+    }
+
+    // Component kapanırken müziği durdur
+    return () => {
+        if (bgMusicRef.current) {
+            bgMusicRef.current.pause();
+            bgMusicRef.current.currentTime = 0;
+        }
+    };
+  }, []);
+
+  // Efekt Sesi Çalma Fonksiyonu
+  const playSoundEffect = (type: 'success' | 'fail') => {
+    let soundSrc;
+    
+    if (type === 'success') {
+        const randomIndex = Math.floor(Math.random() * POSITIVE_SOUNDS.length);
+        soundSrc = POSITIVE_SOUNDS[randomIndex];
+    } else {
+        const randomIndex = Math.floor(Math.random() * NEGATIVE_SOUNDS.length);
+        soundSrc = NEGATIVE_SOUNDS[randomIndex];
+    }
+
+    const audio = new Audio(soundSrc);
+    audio.volume = 1.0; 
+    audio.play().catch(e => console.log("Ses oynatılamadı", e));
+  };
 
   // Scroll kilitleme
   useEffect(() => {
@@ -132,6 +189,7 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
 
   const handleSuccess = () => {
     setIsMatched(true); 
+    playSoundEffect('success'); // SES ÇAL
 
     if (mode === 'instruction') {
         setShowFeedback('correct');
@@ -153,6 +211,8 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
   };
 
   const handleMistake = () => {
+    playSoundEffect('fail'); // SES ÇAL
+
     if (mode === 'assessment') {
         // Değerlendirmede sessiz geçiş
         setTimeout(() => {
@@ -181,7 +241,7 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
 
   const runModelingDemo = () => {
     setIsModeling(true);
-    // Hız ayarı: 2 saniye (Diğer dosya ile aynı)
+    // Hız ayarı: 2 saniye
     setTimeout(() => {
         setIsModeling(false);
     }, 2000); 
