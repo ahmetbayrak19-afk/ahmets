@@ -12,6 +12,7 @@ import NesneEslemeGame from '@/aba/esle/NesneEslemeGame';   // 1. Oyun (EB.1.1)
 import NesneEslemeGame1 from '@/aba/esle/NesneEslemeGame1'; // 2. Oyun (EB.1.2)
 import NesneEslemeGame3 from '@/aba/esle/NesneEslemeGame3'; // 3. Oyun (EB.1.3 - Eylem)
 import NesneEslemeGame4 from '@/aba/esle/NesneEslemeGame4'; // 4. Oyun (EB.1.4 - Şekil Kutusu)
+import NesneEslemeGame15 from '@/aba/esle/NesneEslemeGame15'; // 15. Oyun (EB.4.2 - Klavye Harf)
 
 interface EslemePageProps {
   studentId: string;
@@ -121,6 +122,15 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                     onComplete={handleGameComplete} 
                 />
             )}
+
+            {/* 15. KAZANIM: Klavyede Harf Eşleme (EB.4.2) */}
+            {activeGameItem.startsWith("EB.4.2") && (
+                <NesneEslemeGame15 
+                    mode={activeGameMode} 
+                    onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} 
+                    onComplete={handleGameComplete} 
+                />
+            )}
          </>
       )}
 
@@ -147,11 +157,12 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             const status = formData[item];
             const isCompleted = status === true;
             
-            // Oyun butonu hangi maddelerde çıkacak? (EB.1.1, 1.2, 1.3, 1.4)
+            // Oyun butonu hangi maddelerde çıkacak?
             const hasGame = item.startsWith("EB.1.1") || 
                           item.startsWith("EB.1.2") || 
                           item.startsWith("EB.1.3") || 
-                          item.startsWith("EB.1.4"); 
+                          item.startsWith("EB.1.4") ||
+                          item.startsWith("EB.4.2"); 
             
             const firstSpaceIndex = item.indexOf(' ');
             
