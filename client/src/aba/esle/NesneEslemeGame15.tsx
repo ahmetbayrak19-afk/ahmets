@@ -30,7 +30,7 @@ const SYLLABLES = [
 
 const WORDS = [
     "ALİ", "ELA", "ATA", "TOP", "MUZ", "KUŞ", "AYI", "EVE", "BAK", "GEL", 
-    "KOŞ", "SÜT", "ÇAY", "KEK", "BAL", "GÖZ", "EL", "EV", "AT", "SU"
+    "KOŞ", "SÜT", "ÇAY", "KEK", "BAL", "GÖZ", "GİT", "MUM", "TUZ", "PİL"
 ];
 
 // --- KLAVYE DÜZENİ ---
