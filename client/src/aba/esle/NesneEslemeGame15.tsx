@@ -52,8 +52,8 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
   const [level, setLevel] = useState<1 | 2 | 3>(1);
 
   // Oyun Durumu
-  const [targetString, setTargetString] = useState('A'); // Hedef Kelime/Harf
-  const [currentIndex, setCurrentIndex] = useState(0); // Kelimenin kaçıncı harfindeyiz?
+  const [targetString, setTargetString] = useState('A'); 
+  const [currentIndex, setCurrentIndex] = useState(0); 
   
   const [mistakeCount, setMistakeCount] = useState(0); 
   const [disabledKeys, setDisabledKeys] = useState<string[]>([]); 
@@ -73,7 +73,6 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
     bgMusicRef.current.loop = true; 
     bgMusicRef.current.volume = 0.10; 
     
-    // Mute durumuna göre başlat/durdur
     if (!isMuted) {
         const playPromise = bgMusicRef.current.play();
         if (playPromise !== undefined) playPromise.catch(() => {});
@@ -87,7 +86,6 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
     };
   }, []);
 
-  // Mute butonu tetiklendiğinde
   useEffect(() => {
       if (bgMusicRef.current) {
           bgMusicRef.current.muted = isMuted;
@@ -113,17 +111,26 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
         newTarget = WORDS[Math.floor(Math.random() * WORDS.length)];
     }
 
+    // Aynı sorunun üst üste gelmesini engelle (Opsiyonel ama iyi olur)
+    if (newTarget === targetString && LETTERS.length > 1) {
+       generateQuestion(); 
+       return;
+    }
+
     setTargetString(newTarget);
-    setCurrentIndex(0); // Başa sar
-    
-    // Durumları TAMAMEN sıfırla
+    setCurrentIndex(0);
+    resetTurn();
+  };
+
+  // Her harf geçişinde veya yeni soruda durumu temizle
+  const resetTurn = () => {
     setMistakeCount(0);
     setDisabledKeys([]);
     setIsShake(false);
     setIsSuccessAnim(false);
   };
 
-  // Seviye değişince yeni soru sor
+  // Seviye değişince
   useEffect(() => {
       generateQuestion();
       setAssessmentCount(0);
@@ -132,12 +139,9 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
 
   // --- SES EFEKTLERİ ---
   const playSoundEffect = (type: 'success' | 'fail' | 'click') => {
-    if (type === 'click') {
-        // Ara ses (harf doğru ama kelime bitmedi) - Şimdilik boş geçebiliriz veya kısa bip sesi ekleyebiliriz
-        return;
-    }
-
     let soundSrc;
+    if (type === 'click') return; // Tıklama sesi istenirse eklenebilir
+
     if (type === 'success') {
         soundSrc = POSITIVE_SOUNDS[Math.floor(Math.random() * POSITIVE_SOUNDS.length)];
     } else {
@@ -155,23 +159,23 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
     const expectedChar = targetString[currentIndex];
 
     if (letter === expectedChar) {
-        // DOĞRU HARF
+        // --- DOĞRU HARF ---
         const nextIndex = currentIndex + 1;
-        setCurrentIndex(nextIndex);
         
-        // Hata sayısını ve ipuçlarını sıfırla (Sıradaki harf için temiz sayfa)
-        setMistakeCount(0);
+        // ÖNEMLİ: Doğru basınca hemen durumu temizle (Rengi beyaza döndür)
         setDisabledKeys([]);
+        setMistakeCount(0);
+        setCurrentIndex(nextIndex);
 
         // Kelime bitti mi?
         if (nextIndex === targetString.length) {
             handleSuccess();
         } else {
-            playSoundEffect('click'); // Ara ses opsiyonel
+            playSoundEffect('click'); 
         }
 
     } else {
-        // YANLIŞ HARF
+        // --- YANLIŞ HARF ---
         handleMistake();
     }
   };
@@ -181,8 +185,6 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
     playSoundEffect('success');
     
     if (mode === 'assessment') {
-        // Test modunda hiç hata yapmadan bitirdiyse puan ver (Basit mantık)
-        // Not: Kelime modunda her harf hatası mistakeCount'u artırır.
         setAssessmentScore(prev => prev + 1);
     }
 
@@ -208,7 +210,6 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
     setMistakeCount(newMistakeCount);
 
     if (mode === 'instruction') {
-        // --- İPUCU SİSTEMİ (Sıradaki beklenen harf için) ---
         const expectedChar = targetString[currentIndex];
 
         // 2. Yanlış: Harflerin yarısını kapat
@@ -242,28 +243,42 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
   const renderKey = (letter: string) => {
     const isDisabled = disabledKeys.includes(letter);
     const expectedChar = targetString[currentIndex];
-    const isTarget = letter === expectedChar && !isSuccessAnim; // Sadece sıradaki harf hedef
     
-    // İpucu mantığı: Eğer hata yapıldıysa ve bu tuş doğru tuşsa yanıp sön
+    // Şu anki harf hedef mi?
+    const isTarget = letter === expectedChar && !isSuccessAnim;
+    
+    // İpucu Yanıp Sönmesi (Sadece Öğretim modu + Hata varsa + Hedefse)
     const shouldFlash = mode === 'instruction' && mistakeCount > 0 && isTarget;
+
+    // ÖNEMLİ: Key prop'una currentIndex ekleyerek her harf geçişinde
+    // butonun React tarafından tamamen yenilenmesini (remount) sağlıyoruz.
+    // Bu, takılı kalan animasyonları ve renkleri %100 temizler.
+    const uniqueKey = `${letter}-${currentIndex}-${targetString}`;
 
     return (
         <motion.button
-            key={letter}
+            key={uniqueKey}
             whileTap={!isDisabled ? { scale: 0.9 } : {}}
             onClick={() => handleKeyPress(letter)}
             animate={shouldFlash ? { 
                 scale: [1, 1.15, 1], 
                 backgroundColor: ["#ffffff", "#bfdbfe", "#ffffff"],
                 borderColor: ["#cbd5e1", "#3b82f6", "#cbd5e1"]
-            } : {}}
-            transition={shouldFlash ? { duration: 0.5, repeat: Infinity } : {}}
+            } : { 
+                scale: 1, 
+                backgroundColor: isDisabled ? "#e2e8f0" : "#ffffff",
+                borderColor: isDisabled ? "transparent" : "#cbd5e1"
+            }}
+            transition={shouldFlash ? { duration: 0.5, repeat: Infinity } : { duration: 0.2 }}
             className={twMerge(
-                // RESPONSIVE AYARLAR: width ve height vw (viewport width) cinsinden
-                "relative rounded-md sm:rounded-xl font-bold text-lg sm:text-2xl md:text-3xl shadow-[0_2px_0_0_#cbd5e1] sm:shadow-[0_4px_0_0_#cbd5e1] active:shadow-none active:translate-y-1 transition-all flex items-center justify-center select-none border-b-2 sm:border-b-4 border-slate-300",
-                // Genişlik ayarı: Mobilde çok daha küçük, tablet/pc'de normal
-                "w-[8vw] h-[10vw] sm:w-14 sm:h-16 max-w-[50px] max-h-[60px]", 
-                isDisabled ? "opacity-20 bg-slate-200 text-slate-300 pointer-events-none shadow-none border-none" : "bg-white text-slate-700 hover:bg-slate-50 active:bg-blue-50"
+                // Temel Tasarım
+                "relative rounded-md sm:rounded-xl font-bold text-lg sm:text-2xl md:text-3xl flex items-center justify-center select-none border-b-2 sm:border-b-4",
+                // Gölge ve Hareket
+                isDisabled ? "shadow-none" : "shadow-[0_2px_0_0_#cbd5e1] sm:shadow-[0_4px_0_0_#cbd5e1] active:shadow-none active:translate-y-1 transition-all",
+                // Boyutlar (Responsive VW kullanımı)
+                "w-[8.5vw] h-[10.5vw] sm:w-14 sm:h-16 max-w-[55px] max-h-[65px]", 
+                // Renkler
+                isDisabled ? "opacity-30 text-slate-400 pointer-events-none" : "text-slate-700 hover:bg-slate-50 active:bg-blue-50"
             )}
         >
             {letter}
@@ -283,7 +298,6 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
         {/* ORTA KISIM - SEVİYE VE BİLGİ */}
         <div className="flex items-center gap-2 sm:gap-4">
             
-            {/* SEVİYE SEÇİCİ */}
             <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
                 {[1, 2, 3].map((lvl) => (
                     <button
@@ -304,7 +318,7 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
                 mode === 'assessment' ? "bg-blue-50 border-blue-100" : "bg-purple-50 border-purple-100"
             )}>
                 {mode === 'assessment' ? <ClipboardCheck size={14} className="text-blue-600"/> : <GraduationCap size={14} className="text-purple-600"/>}
-                <span className={twMerge("font-bold text-[10px] uppercase", mode === 'assessment' ? "text-blue-600" : "text-purple-600")}>
+                <span className={twMerge("font-bold text-xs uppercase", mode === 'assessment' ? "text-blue-600" : "text-purple-600")}>
                     {mode === 'assessment' ? `${Math.min(assessmentCount + 1, 10)}/10` : "EĞİTİM"}
                 </span>
             </div>
@@ -319,12 +333,11 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
         </button>
       </div>
 
-      {/* --- OYUN ALANI (Esnek ve Ortalı) --- */}
-      {phase === 'playing' && (
-        <div className="flex-1 flex flex-col items-center justify-between w-full max-w-4xl mx-auto py-4 sm:py-8 overflow-y-auto">
+      {/* --- OYUN ALANI --- */}
+      <div className="flex-1 flex flex-col w-full max-w-4xl mx-auto overflow-hidden">
           
-          {/* HEDEF KELİME KUTUSU */}
-          <div className="flex-1 flex flex-col items-center justify-center gap-4 w-full px-4">
+          {/* HEDEF KELİME KUTUSU (Ortalanmış ve Esnek) */}
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 w-full px-4 min-h-[150px]">
               <span className="text-slate-400 text-xs sm:text-sm font-bold tracking-widest uppercase">
                   {level === 1 ? "Harfi Bul" : "Yaz"}
               </span>
@@ -333,12 +346,12 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
                 animate={isShake ? { x: [-10, 10, -10, 10, 0], color: "#ef4444" } : { x: 0, color: isSuccessAnim ? "#22c55e" : "#334155" }}
                 transition={{ duration: 0.4 }}
                 className={twMerge(
-                    "flex items-center justify-center gap-1 sm:gap-2 px-6 py-4 sm:px-10 sm:py-6 bg-white rounded-2xl sm:rounded-3xl border-4 shadow-xl transition-all",
+                    "flex items-center justify-center gap-1 sm:gap-2 px-6 py-4 sm:px-10 sm:py-6 bg-white rounded-2xl sm:rounded-3xl border-4 shadow-xl transition-all max-w-full overflow-hidden",
                     isSuccessAnim ? "border-green-500 bg-green-50 scale-105" : "border-slate-200",
                     isShake ? "border-red-400 bg-red-50" : ""
                 )}
               >
-                  {/* Harfleri tek tek render et - Yazılanlar yeşil olsun */}
+                  {/* Harfleri tek tek render et */}
                   {targetString.split('').map((char, index) => (
                       <span key={index} className={twMerge(
                           "text-4xl sm:text-6xl md:text-7xl font-black transition-colors",
@@ -352,8 +365,8 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
               </motion.div>
           </div>
 
-          {/* KLAVYE ALANI - Fixed Bottom'dan ziyade Flex ile aşağı itildi */}
-          <div className="w-full bg-slate-200/80 backdrop-blur-md p-2 sm:p-6 rounded-t-3xl border-t border-white/50 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] flex flex-col items-center gap-2 sm:gap-3 pb-8 sm:pb-8 shrink-0">
+          {/* KLAVYE ALANI (Alt kısımda, kaydırılabilir) */}
+          <div className="w-full bg-slate-200/80 backdrop-blur-md p-2 sm:p-6 rounded-t-3xl border-t border-white/50 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] flex flex-col items-center gap-2 sm:gap-3 pb-8 sm:pb-12 shrink-0 z-20 overflow-y-auto max-h-[45vh]">
              {/* 1. SATIR */}
              <div className="flex justify-center gap-[1vw] sm:gap-2 w-full">
                  {ROW_1.map(renderKey)}
@@ -368,8 +381,7 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
              </div>
           </div>
           
-        </div>
-      )}
+      </div>
 
       {/* SONUÇ EKRANLARI */}
       {phase === 'success' && (
