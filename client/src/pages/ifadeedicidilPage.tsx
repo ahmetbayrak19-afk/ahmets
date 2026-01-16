@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Gamepad2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Gamepad2, GraduationCap, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
-import Talk from './talk'; // Talk bileşenini import ediyoruz
+import Talk from './talk'; 
+
+// --- OYUN IMPORT ---
+import IfadeEdiciGame15 from '@/aba/ifade/ifadeEdiciGame15'; // İEDB 3.7 - Evet/Hayır Oyunu
 
 interface IfadeEdiciDilPageProps {
   studentId: string;
@@ -20,13 +23,16 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
   // Talk sayfasını kontrol eden state
   const [showTolkido, setShowTolkido] = useState(false);
 
+  // Oyun Durumları (Yeni Eklenen)
+  const [activeGameMode, setActiveGameMode] = useState<'assessment' | 'instruction' | null>(null);
+  const [activeGameItem, setActiveGameItem] = useState<string | null>(null);
+
   // Modül ve Kazanım verilerini çekme
   const moduleData = ABA_MODULES.find(m => m.name.includes("İFADE EDİCİ DİL"));
   const items = moduleData ? moduleData.achievements : [];
 
   useEffect(() => {
     const load = async () => {
-      // studentId yoksa hiç deneme yapma
       if (!studentId) {
         setLoading(false);
         return;
@@ -50,11 +56,12 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
     load();
   }, [studentId]);
 
-  const handleSave = async () => {
+  const handleSave = async (newData?: Record<string, any>) => {
     try {
       const instId = localStorage.getItem("kazanim-takip-institution-id");
-      await setDoc(doc(db, "institutions", instId!, "students", studentId, "assessments", "aba"), formData, { merge: true });
-      toast.success("İfade Edici Dil becerileri kaydedildi!");
+      const dataToSave = newData || formData;
+      await setDoc(doc(db, "institutions", instId!, "students", studentId, "assessments", "aba"), dataToSave, { merge: true });
+      if(!newData) toast.success("İfade Edici Dil becerileri kaydedildi!");
     } catch (error) {
       toast.error("Kaydetme hatası oluştu.");
     }
@@ -67,6 +74,18 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
     }));
   };
 
+  // Oyun Tamamlandığında Çalışacak Fonksiyon
+  const handleGameComplete = async (success: boolean) => {
+    if (success && activeGameMode === 'assessment' && activeGameItem) {
+        const updatedData = { ...formData, [activeGameItem]: true };
+        setFormData(updatedData);
+        await handleSave(updatedData);
+        toast.success("Tebrikler! Kazanım tamamlandı. 🎉");
+    }
+    setActiveGameMode(null);
+    setActiveGameItem(null);
+  };
+
   const calculateProgress = () => {
     if (items.length === 0) return 0;
     const completedCount = items.filter(item => formData[item] === true).length;
@@ -75,11 +94,9 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
 
   const progress = calculateProgress();
 
-  // 1. ÖNCE LOADING KONTROLÜ
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
 
-  // 2. SONRA TALK MODU KONTROLÜ
-  // 🔥 DÜZELTME BURADA YAPILDI: studentId EKLENDİ 🔥
+  // 1. TOLKİDO MODU KONTROLÜ
   if (showTolkido) {
     return (
         <Talk 
@@ -87,6 +104,19 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
             studentId={studentId} 
         />
     );
+  }
+
+  // 2. OYUN MODU KONTROLÜ (İEDB 3.7)
+  if (activeGameMode && activeGameItem) {
+      if (activeGameItem.startsWith("İEDB 3.7")) {
+          return (
+              <IfadeEdiciGame15
+                  mode={activeGameMode}
+                  onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }}
+                  onComplete={handleGameComplete}
+              />
+          );
+      }
   }
 
   // 3. ANA LİSTE GÖRÜNÜMÜ
@@ -108,7 +138,7 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
                 </div>
             </div>
         </div>
-        <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 h-8 text-xs shadow-lg shadow-green-900/20">
+        <Button onClick={() => handleSave()} className="bg-green-600 hover:bg-green-700 h-8 text-xs shadow-lg shadow-green-900/20">
             <Save className="mr-2 h-3.5 w-3.5" /> Kaydet
         </Button>
       </div>
@@ -122,8 +152,10 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
             const text = item.substring(firstSpaceIndex + 1);
             const isCompleted = status === true;
 
-            // Tolkido maddesi mi kontrolü
             const isTolkidoItem = item.includes("TOLKİDO");
+            
+            // OYUN VAR MI? (İEDB 3.7 maddesi için)
+            const hasGame = item.startsWith("İEDB 3.7");
 
             return (
                 <div 
@@ -135,7 +167,7 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
                             : "bg-slate-950 border-slate-800 hover:bg-slate-800 hover:border-slate-700"
                     )}
                 >
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-4 flex-1">
                         <div className={twMerge(
                             "min-w-[48px] h-10 rounded-lg flex items-center justify-center text-[10px] font-bold font-mono border mt-0.5 px-1 text-center",
                             isCompleted ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-700 text-slate-500"
@@ -146,10 +178,30 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
                             <p className={twMerge("font-medium text-sm leading-relaxed", isCompleted ? "text-green-100" : "text-slate-200")}>
                                 {text}
                             </p>
+                            {hasGame && <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20"><Gamepad2 size={12} /> İnteraktif</span>}
                         </div>
                     </div>
 
                     <div className="flex items-center gap-2 self-end sm:self-center">
+                        
+                        {/* OYUN BUTONLARI (Varsa) */}
+                        {hasGame && (
+                            <div className="flex items-center gap-1 mr-2">
+                                <button 
+                                    onClick={() => { setActiveGameItem(item); setActiveGameMode('instruction'); }}
+                                    className="h-8 px-3 rounded-md bg-purple-600/20 text-purple-400 text-[10px] font-bold flex items-center gap-1 hover:bg-purple-600/40 border border-purple-500/50 transition-all"
+                                >
+                                    <GraduationCap size={14} /> Öğretim
+                                </button>
+                                <button 
+                                    onClick={() => { setActiveGameItem(item); setActiveGameMode('assessment'); }}
+                                    className="h-8 px-3 rounded-md bg-blue-600/20 text-blue-400 text-[10px] font-bold flex items-center gap-1 hover:bg-blue-600/40 border border-blue-500/50 transition-all"
+                                >
+                                    <ClipboardCheck size={14} /> Test
+                                </button>
+                            </div>
+                        )}
+
                         {/* TOLKİDO ÖZEL BUTONU */}
                         {isTolkidoItem && (
                             <button
@@ -190,4 +242,4 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
       </div>
     </div>
   );
-    }
+}
