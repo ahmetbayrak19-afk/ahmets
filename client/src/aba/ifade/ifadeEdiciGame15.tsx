@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Check, XCircle, Trophy, Mic, MicOff, Play, Volume2, AlertCircle } from 'lucide-react';
+import { Check, XCircle, Trophy, Mic, MicOff, Play, Volume2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
-// --- RESİMLER (Dün çalışan yollar) ---
+// --- RESİMLER ---
 import anahtarImg from '../esle/anahtar.png';
 import arabaImg from '../esle/araba.png';
 import kalemImg from '../esle/kalem.png';
 import topImg from '../esle/top.png';
 
-// --- SES EFEKTLERİ (Sadece SFX) ---
+// --- SES EFEKTLERİ ---
 import aferin1 from '../esle/ses/aferin1.mp3';
 import bravo from '../esle/ses/bravo.mp3';
 import tekrardene1 from '../esle/ses/tekrardene1.mp3';
@@ -26,7 +26,6 @@ const STANDARD_YES = ['evet', 'eved', 'he', 'hıhı', 'doğru', 'tamam', 'evetev
 const STANDARD_NO = ['hayır', 'yok', 'cık', 'değil', 'olmaz', 'hayı', 'yanlış'];
 
 export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
-  // Başlangıçta 'init' (başlatılmamış) durumunda bekletiyoruz ki çökmesin
   const [phase, setPhase] = useState<'init' | 'setup' | 'playing' | 'success'>('init');
   
   const [customYesWords, setCustomYesWords] = useState<string[]>([]);
@@ -37,6 +36,8 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   const [targetItem, setTargetItem] = useState(ITEMS[0]);
   const [compareItem, setCompareItem] = useState(ITEMS[0]);
   const [isMatch, setIsMatch] = useState(true);
+  
+  // UI Durumları
   const [isListening, setIsListening] = useState(false);
   const [animState, setAnimState] = useState<'hidden' | 'sliding' | 'visible'>('hidden');
   
@@ -45,117 +46,107 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
   const recognitionRef = useRef<any>(null);
 
-  // --- 1. SES MOTORUNU GÜVENLİ BAŞLATMA ---
+  // --- 1. SES MOTORU AYARLARI ---
   useEffect(() => {
-    // Sadece 'init' aşamasını geçtikten sonra motoru tanımla
     if (phase === 'init') return;
 
-    try {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        
-        if (SpeechRecognition) {
-          const recognition = new SpeechRecognition();
-          recognition.continuous = true; 
-          recognition.interimResults = true; 
-          recognition.lang = 'tr-TR';
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-          recognition.onresult = (event: any) => {
+    if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        
+        // Setup ekranında sürekli dinle, Oyun ekranında tek seferlik (Android için daha stabil)
+        recognition.continuous = phase === 'setup'; 
+        recognition.interimResults = true; 
+        recognition.lang = 'tr-TR';
+
+        recognition.onstart = () => {
+            setIsListening(true);
+        };
+
+        recognition.onresult = (event: any) => {
             let transcript = "";
             for (let i = event.resultIndex; i < event.results.length; ++i) {
-              transcript += event.results[i][0].transcript;
+                transcript += event.results[i][0].transcript;
             }
             const lowerTranscript = transcript.trim().toLowerCase();
             setLastHeard(lowerTranscript);
+
+            // OYUN MODUNDA KRİTİK DEĞİŞİKLİK:
+            // State'i bekleme, direkt burada kontrol et ve yakalarsan ABORT et.
+            if (phase === 'playing') {
+                const YES_POOL = [...STANDARD_YES, ...customYesWords];
+                const NO_POOL = [...STANDARD_NO, ...customNoWords];
+                
+                const words = lowerTranscript.split(" ");
+                let foundAnswer: 'yes' | 'no' | null = null;
+
+                for (const word of words) {
+                    if (YES_POOL.some(w => word.includes(w) || w.includes(word))) foundAnswer = 'yes';
+                    if (NO_POOL.some(w => word.includes(w) || w.includes(word))) foundAnswer = 'no';
+                }
+
+                if (foundAnswer) {
+                    // CEVABI YAKALADIK!
+                    // 2. Click sesini beklemeden hemen motoru durduruyoruz.
+                    recognition.abort(); 
+                    checkAnswer(foundAnswer);
+                }
+            }
+        };
+
+        recognition.onend = () => {
+            setIsListening(false);
             
-            if (phase === 'playing' && isListening) {
-               handleGameSpeech(lowerTranscript);
+            // Eğer oyun oynanıyorsa, henüz cevap verilmediyse (feedback yoksa)
+            // ve motor kendiliğinden kapandıysa (sessizlik vs.) -> TEKRAR AÇ
+            if (phase === 'playing' && !feedback) {
+                // Döngüye girmemesi için ufak bir bekleme
+                setTimeout(() => {
+                    // Eğer hala cevap verilmediyse tekrar başlat
+                    // Not: React state güncellemeleri asenkron olduğu için ref kontrolü yapabiliriz ama
+                    // burada basitçe tekrar deniyoruz.
+                     try { recognition.start(); } catch(e) {}
+                }, 300);
             }
-          };
+        };
 
-          recognition.onend = () => {
-            if (isListening && phase === 'playing') {
-                try { recognition.start(); } catch(e) {}
-            }
-          };
-
-          recognitionRef.current = recognition;
-        } else {
-            console.warn("Speech API bulunamadı.");
-        }
-    } catch (error) {
-        console.error("Speech Init Error:", error);
+        recognitionRef.current = recognition;
     }
 
     return () => {
-      stopListening();
+        if(recognitionRef.current) recognitionRef.current.abort();
     };
-  }, [phase, isListening]);
+  }, [phase, feedback, customYesWords, customNoWords]); // Havuz değişirse de güncelle
 
   // --- OYUN MANTIĞI ---
-  const handleGameSpeech = (transcript: string) => {
-     const words = transcript.split(" ");
-     const YES_POOL = [...STANDARD_YES, ...customYesWords];
-     const NO_POOL = [...STANDARD_NO, ...customNoWords];
-
-     let detectedAnswer: 'yes' | 'no' | null = null;
-     
-     for (const word of words) {
-         if (YES_POOL.some(w => word.includes(w) || w.includes(word))) detectedAnswer = 'yes';
-         if (NO_POOL.some(w => word.includes(w) || w.includes(word))) detectedAnswer = 'no';
-     }
-
-     if (detectedAnswer) {
-         checkAnswer(detectedAnswer);
-     }
-  };
+  // Not: Artık handleGameSpeech'i onresult içinde direkt yapıyoruz.
 
   const checkAnswer = (userSays: 'yes' | 'no') => {
-      stopListening();
+      // Çift tetiklemeyi önlemek için
+      if (feedback) return;
+
       const expected = isMatch ? 'yes' : 'no';
-      
-      if (userSays === expected) {
-          handleSuccess();
-      } else {
-          handleFail();
-      }
+      if (userSays === expected) handleSuccess();
+      else handleFail();
   };
 
-  const initGame = () => {
-      // Kullanıcı butona bastı, artık ses motorlarını yükleyebiliriz
-      setPhase('setup');
-  };
-
-  const startGame = () => {
-      setPhase('playing');
-      generateQuestion();
-  };
+  const initGame = () => setPhase('setup');
+  const startGame = () => { setPhase('playing'); generateQuestion(); };
 
   const generateQuestion = () => {
       setFeedback(null);
       setAnimState('hidden');
-      stopListening();
+      if(recognitionRef.current) recognitionRef.current.abort(); 
       
-      // Güvenli Resim Seçimi
-      if (ITEMS.length > 0) {
-          const target = ITEMS[Math.floor(Math.random() * ITEMS.length)];
-          setTargetItem(target);
+      const target = ITEMS[Math.floor(Math.random() * ITEMS.length)];
+      setTargetItem(target);
 
-          const shouldMatch = Math.random() > 0.5;
-          setIsMatch(shouldMatch);
+      const shouldMatch = Math.random() > 0.5;
+      setIsMatch(shouldMatch);
 
-          let compare;
-          if (shouldMatch) {
-              compare = target;
-          } else {
-              const others = ITEMS.filter(i => i.id !== target.id);
-              if (others.length > 0) {
-                  compare = others[Math.floor(Math.random() * others.length)];
-              } else {
-                  compare = target; // Yedek
-              }
-          }
-          setCompareItem(compare);
-      }
+      let compare = shouldMatch ? target : ITEMS.filter(i => i.id !== target.id)[Math.floor(Math.random() * (ITEMS.length - 1))] || target;
+      setCompareItem(compare);
 
       setTimeout(() => {
           setAnimState('sliding');
@@ -167,7 +158,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   };
 
   const askQuestion = () => {
-      // Try-Catch ile sarılı TTS (Çökme önleyici)
       try {
           const utterance = new SpeechSynthesisUtterance("Doğru eşledim mi?");
           utterance.lang = 'tr-TR';
@@ -175,64 +165,54 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
           window.speechSynthesis.speak(utterance);
 
           utterance.onend = () => {
-              setTimeout(() => startListening(), 500);
+              setTimeout(() => startListening(), 600); 
           };
-      } catch (error) {
-          console.error("TTS Error:", error);
-          // TTS çalışmasa bile oyunu kitleme, dinlemeyi başlat
+      } catch (e) {
           startListening();
       }
   };
 
   const startListening = () => {
-      setIsListening(true);
       setLastHeard("");
       try { recognitionRef.current?.start(); } catch(e) {}
   };
 
   const stopListening = () => {
-      setIsListening(false);
-      try { recognitionRef.current?.stop(); } catch(e) {}
+      try { recognitionRef.current?.abort(); } catch(e) {}
   };
 
   const handleSuccess = () => {
-      // SFX Oynat
       try {
           const audio = new Audio(Math.random() > 0.5 ? aferin1 : bravo);
-          audio.play().catch(e => console.log("Audio play error", e));
+          audio.play().catch(()=>{});
       } catch (e) {}
 
       setFeedback('correct');
       setTimeout(() => {
           const nextQ = questionCount + 1;
           setQuestionCount(nextQ);
-          if (nextQ < 10) {
-              generateQuestion();
-          } else {
-              setPhase('success');
-              confetti();
-          }
-      }, 2000);
+          if (nextQ < 10) generateQuestion();
+          else { setPhase('success'); confetti(); }
+      }, 2500);
   };
 
   const handleFail = () => {
       try {
           const audio = new Audio(tekrardene1);
-          audio.play().catch(e => console.log("Audio play error", e));
+          audio.play().catch(()=>{});
       } catch (e) {}
 
       setFeedback('wrong');
       setTimeout(() => {
           setFeedback(null);
-          startListening();
-      }, 1500);
+          startListening(); 
+      }, 2000);
   };
 
-  // --- RENDER ---
   return (
     <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 min-h-screen">
       
-      {/* 0. AŞAMA: GÜVENLİ BAŞLANGIÇ (SİYAH EKRAN ÖNLEYİCİ) */}
+      {/* 0. AŞAMA: GÜVENLİ BAŞLANGIÇ */}
       {phase === 'init' && (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
               <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-6 animate-bounce">
@@ -240,12 +220,9 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
               </div>
               <h1 className="text-2xl font-black mb-4">Hazır mısın?</h1>
               <p className="text-slate-500 mb-8 max-w-xs mx-auto">
-                  Mikrofonu kullanmak için bir kez tıklaman gerekiyor.
+                  Oyuna başlamak için tıkla.
               </p>
-              <button 
-                  onClick={initGame}
-                  className="px-10 py-4 bg-blue-600 text-white rounded-2xl font-bold text-xl shadow-xl active:scale-95 transition-all"
-              >
+              <button onClick={initGame} className="px-10 py-4 bg-blue-600 text-white rounded-2xl font-bold text-xl shadow-xl active:scale-95 transition-all">
                   BAŞLA
               </button>
           </div>
@@ -323,12 +300,10 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
                   
                   {/* GÖRSEL ALANI */}
                   <div className="flex items-center gap-4 sm:gap-12 w-full justify-center h-56">
-                      {/* HEDEF */}
                       <div className="w-32 h-32 sm:w-48 sm:h-48 bg-white border-4 border-slate-200 rounded-[2rem] p-4 shadow-xl flex items-center justify-center relative">
                           <img src={targetItem.src} className="w-full h-full object-contain" alt={targetItem.label} />
                       </div>
                       
-                      {/* KIYASLANAN (Animasyonlu) */}
                       <motion.div 
                         initial={{ x: 200, opacity: 0 }}
                         animate={animState !== 'hidden' ? { x: 0, opacity: 1 } : { x: 200, opacity: 0 }}
@@ -350,7 +325,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
                                   <Mic size={32} />
                               </div>
                               <span className="text-blue-600 font-black text-xs tracking-tighter animate-pulse">DİNLİYORUM...</span>
-                              {lastHeard && <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-bold">"{lastHeard}"</span>}
+                              <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-bold h-6">{lastHeard}</span>
                           </div>
                       ) : feedback ? (
                           <div className={twMerge("text-4xl font-black animate-in zoom-in", feedback === 'correct' ? "text-green-500" : "text-red-500")}>
@@ -365,11 +340,11 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
                   </div>
               </div>
 
-              {/* GİZLİ ÖĞRETMEN BUTONLARI */}
-              <div className="absolute bottom-6 left-6 opacity-20 hover:opacity-100 transition-opacity">
+              {/* GİZLİ BUTONLAR */}
+              <div className="absolute bottom-6 left-6 opacity-20 hover:opacity-100 transition-opacity z-30">
                   <button onClick={() => checkAnswer('no')} className="w-14 h-14 bg-red-100 text-red-600 border-2 border-red-200 rounded-2xl flex items-center justify-center font-bold text-[10px]">HAYIR</button>
               </div>
-              <div className="absolute bottom-6 right-6 opacity-20 hover:opacity-100 transition-opacity">
+              <div className="absolute bottom-6 right-6 opacity-20 hover:opacity-100 transition-opacity z-30">
                   <button onClick={() => checkAnswer('yes')} className="w-14 h-14 bg-green-100 text-green-600 border-2 border-green-200 rounded-2xl flex items-center justify-center font-bold text-[10px]">EVET</button>
               </div>
           </div>
