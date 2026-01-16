@@ -70,7 +70,7 @@ export default function AbaAssessmentPage() {
             </p>
           </div>
           <div className="absolute right-6 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500">
-             ➔
+              ➔
           </div>
         </div>
       ))}
@@ -82,30 +82,34 @@ export default function AbaAssessmentPage() {
     if (activeModuleIndex === null || !studentId) return null;
     
     const module = ABA_MODULES[activeModuleIndex];
+    const moduleName = module.name; // Tam adını alıyoruz (örn: "SÖZEL TAKLİT BECERİLERİ (ST)")
+
     let content;
 
-    // DÜZELTME BURADA: İsimleri abaData.ts ile birebir aynı yaptık.
-    // Artık "Eşleme Becerileri" değil, "EŞLEME BECERİLERİ (EB)" olarak kontrol ediyoruz.
+    // ÖNEMLİ DÜZELTME: Sıralama ve Kontrol
+    // Sözel Taklit kontrolü, normal Taklit kontrolünden ÖNCE olmalı.
     
-    if (module.name.includes("EŞLEME BECERİLERİ")) {
+    if (moduleName.includes("EŞLEME BECERİLERİ")) {
         content = <EslemePage studentId={studentId} onBack={() => setActiveModuleIndex(null)} />;
     } 
-    else if (module.name.includes("ALICI DİL BECERİLERİ")) {
+    else if (moduleName.includes("ALICI DİL BECERİLERİ")) {
         content = <AliciDilPage studentId={studentId} onBack={() => setActiveModuleIndex(null)} />;
     }
-    else if (module.name.includes("YÖNERGE TAKİP BECERİLERİ")) {
+    else if (moduleName.includes("YÖNERGE TAKİP BECERİLERİ")) {
         content = <YonergeTakipPage studentId={studentId} onBack={() => setActiveModuleIndex(null)} />;
     }
-    else if (module.name.includes("TAKLİT BECERİLERİ")) {
-         content = <TaklitPage studentId={studentId} onBack={() => setActiveModuleIndex(null)} />;
-    }
-    else if (module.name.includes("SÖZEL TAKLİT BECERİLERİ")) {
+    // DİKKAT: Sözel Taklit önce kontrol ediliyor!
+    else if (moduleName.includes("SÖZEL TAKLİT BECERİLERİ")) {
          content = <SozelTaklitPage studentId={studentId} onBack={() => setActiveModuleIndex(null)} />;
     }
-    else if (module.name.includes("İFADE EDİCİ DİL BECERİLERİ")) {
+    // Sonra Motor Taklit (Normal Taklit) kontrol ediliyor
+    else if (moduleName.includes("TAKLİT BECERİLERİ")) {
+         content = <TaklitPage studentId={studentId} onBack={() => setActiveModuleIndex(null)} />;
+    }
+    else if (moduleName.includes("İFADE EDİCİ DİL BECERİLERİ")) {
          content = <IfadeEdiciDilPage studentId={studentId} onBack={() => setActiveModuleIndex(null)} />;
     }
-    else if (module.name.includes("ORTAK DİKKAT BECERİLERİ")) {
+    else if (moduleName.includes("ORTAK DİKKAT BECERİLERİ")) {
          content = <OrtakDikkatPage studentId={studentId} onBack={() => setActiveModuleIndex(null)} />;
     }
     else {
@@ -113,7 +117,7 @@ export default function AbaAssessmentPage() {
         content = (
             <div className="flex flex-col items-center justify-center py-20 text-slate-500 border border-dashed border-slate-800 rounded-xl bg-slate-900/20">
                 <Construction size={48} className="mb-4 opacity-50" />
-                <h3 className="text-xl font-bold text-slate-300">{module.name}</h3>
+                <h3 className="text-xl font-bold text-slate-300">{moduleName}</h3>
                 <p className="mt-2 text-sm">Bu modül sayfası yapım aşamasında.</p>
                 <Button variant="outline" onClick={() => setActiveModuleIndex(null)} className="mt-6 border-slate-700">
                     Geri Dön
