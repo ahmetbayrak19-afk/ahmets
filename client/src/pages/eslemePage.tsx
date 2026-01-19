@@ -7,13 +7,13 @@ import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 
-// --- OYUN DOSYALARI ---
-import NesneEslemeGame from '@/aba/esle/NesneEslemeGame';   // 1. Oyun (EB.1.1)
-import NesneEslemeGame1 from '@/aba/esle/NesneEslemeGame1'; // 2. Oyun (EB.1.2)
-import NesneEslemeGame3 from '@/aba/esle/NesneEslemeGame3'; // 3. Oyun (EB.1.3 - Eylem)
-import NesneEslemeGame4 from '@/aba/esle/NesneEslemeGame4'; // 4. Oyun (EB.1.4 - Şekil Kutusu)
-import NesneEslemeGame12 from '@/aba/esle/NesneEslemeGame12'; // 12. Oyun (EB.3.4 - Gölge Eşleme) -- GÜNCELLENDİ
-import NesneEslemeGame15 from '@/aba/esle/NesneEslemeGame15'; // 15. Oyun (EB.4.2 - Klavye Harf)
+// --- OYUN DOSYALARI (GÜNCELLENMİŞ İSİMLERLE) ---
+import NesneEslemeGame1 from '@/aba/esle/NesneEslemeGame1';   // 1. Oyun (EB.1.1 - Nesne Nesne)
+import NesneEslemeGame2 from '@/aba/esle/NesneEslemeGame2';   // 2. Oyun (EB.1.2 - Nesne Resimleri)
+import NesneEslemeGame3 from '@/aba/esle/NesneEslemeGame3';   // 3. Oyun (EB.1.3 - Eylem Resimleri)
+import NesneEslemeGame4 from '@/aba/esle/NesneEslemeGame4';   // 4. Oyun (EB.1.4 - Şekil Kutusu)
+import NesneEslemeGame13 from '@/aba/esle/NesneEslemeGame13'; // 13. Oyun (EB.3.4 - Gölge Eşleme)
+import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16'; // 16. Oyun (EB.4.2 - Klavye Harf)
 
 interface EslemePageProps {
   studentId: string;
@@ -90,7 +90,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
          <>
             {/* 1. KAZANIM: Nesne-Nesne Eşleme (Aynı nesne) */}
             {activeGameItem.startsWith("EB.1.1") && (
-                <NesneEslemeGame 
+                <NesneEslemeGame1 
                     mode={activeGameMode} 
                     onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} 
                     onComplete={handleGameComplete} 
@@ -99,7 +99,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
 
             {/* 2. KAZANIM: Nesne Resimleri Eşleme (Aynı nesne) */}
             {activeGameItem.startsWith("EB.1.2") && (
-                <NesneEslemeGame1 
+                <NesneEslemeGame2 
                     mode={activeGameMode} 
                     onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} 
                     onComplete={handleGameComplete} 
@@ -124,17 +124,18 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                 />
             )}
 
-            {/* GÖLGE EŞLEME OYUNU -> EB.3.4 */}
+            {/* 12. KAZANIM (LİSTEDE) -> GÖLGE EŞLEME (EB.3.4) */}
             {activeGameItem.startsWith("EB.3.4") && (
-                <NesneEslemeGame12 
+                <NesneEslemeGame13 
+                    mode={activeGameMode}
                     onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} 
                     onComplete={handleGameComplete} 
                 />
             )}
 
-            {/* 15. KAZANIM: Klavyede Harf Eşleme (EB.4.2) */}
+            {/* 15. KAZANIM (LİSTEDE) -> KLAVYE HARF EŞLEME (EB.4.2) */}
             {activeGameItem.startsWith("EB.4.2") && (
-                <NesneEslemeGame15 
+                <NesneEslemeGame16 
                     mode={activeGameMode} 
                     onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} 
                     onComplete={handleGameComplete} 
@@ -172,7 +173,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                           item.startsWith("EB.1.3") || 
                           item.startsWith("EB.1.4") ||
                           item.startsWith("EB.3.4") || // EB.3.4 Gölge Eşleme
-                          item.startsWith("EB.4.2"); 
+                          item.startsWith("EB.4.2"); // EB.4.2 Klavye Harf Eşleme
             
             const firstSpaceIndex = item.indexOf(' ');
             
@@ -222,5 +223,5 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       </div>
     </div>
   );
-  }
-                          
+                }
+                                  
