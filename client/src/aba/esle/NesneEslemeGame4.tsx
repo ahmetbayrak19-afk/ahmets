@@ -45,6 +45,7 @@ import tekrardene2 from './ses/tekrardene2.mp3';
 const POSITIVE_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
 const NEGATIVE_SOUNDS = [tekrardene1, tekrardene2];
 
+// NOT: shapeSrc = Hareketli, backSrc = Zemin, frontSrc = Kapak
 const OBJECTS = [
   { id: 'besgen', name: 'Beşgen', shapeSrc: besgenShape, backSrc: besgenBack, frontSrc: transBesgen },
   { id: 'daire', name: 'Daire', shapeSrc: daireShape, backSrc: daireBack, frontSrc: transDaire },
@@ -323,13 +324,13 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
             {/* --- HEDEF KUTU --- */}
             <div 
                 ref={dropZoneRef}
-                style={{ perspective: '1000px' }} // Perspektif ŞART
+                style={{ perspective: '1000px' }} // Perspektif
                 className={twMerge(
                     "relative w-72 h-72 rounded-[3rem] flex items-center justify-center transition-all duration-300",
                     isMatched ? "bg-green-50/20" : ""
                 )}
             >
-               {/* 1. ZEMİN (EN ALT) */}
+               {/* 1. KATMAN (EN ALT): ZEMİN */}
                <img 
                  key={targetItem.id + '-back'}
                  src={targetItem.backSrc} 
@@ -337,7 +338,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                  className="absolute w-72 h-72 object-contain z-0 pointer-events-none"
                />
 
-               {/* 2. DÜŞEN ŞEKİL (ORTA KATMAN) */}
+               {/* 2. KATMAN (ORTA): ŞEKİL */}
                <motion.img 
                   key={targetItem.id + '-fill'}
                   src={targetItem.shapeSrc} 
@@ -346,15 +347,15 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                   animate={{ 
                       opacity: isMatched ? 0.9 : 0, 
                       scale: isMatched ? 0.75 : 1.2, 
-                      y: isMatched ? 5 : -100, // <--- DÜZELTİLDİ: Sadece 5px düşer, kutudan çıkmaz
+                      y: isMatched ? 2 : -100,  // <--- BURASI 2 OLDU (Hafifçe yukarı aldık)
                       rotateX: isMatched ? 70 : 0    
                   }}
                   transition={{ type: "spring", stiffness: 150, damping: 20 }} 
-                  style={{ transformOrigin: "bottom" }} // Alttan pivot alarak geriye yatar
+                  style={{ transformOrigin: "bottom" }}
                   className="absolute w-56 h-56 object-contain z-10 pointer-events-none"
                />
 
-               {/* 3. KAPAK (EN ÜST) */}
+               {/* 3. KATMAN (EN ÜST): KAPAK */}
                <img 
                  key={targetItem.id + '-front'}
                  src={targetItem.frontSrc} 
