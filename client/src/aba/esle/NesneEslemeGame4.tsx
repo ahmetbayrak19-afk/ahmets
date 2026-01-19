@@ -4,8 +4,16 @@ import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, R
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
-// --- KUTU GÖRSELLERİ (HEDEF - ESKİ KUTULAR ARTIK KULLANILMAYACAK, YENİ TRANS'LAR GELECEK) ---
-// Not: Bu transparan resimlerin ortasının silinmiş (şeffaf) olması lazım.
+// --- 1. ARKA KATMAN (KUTU İÇİ - KARANLIK ZEMİN) ---
+import besgenBack from './besgen.png';
+import daireBack from './daire.png';
+import dikdortgenBack from './dikdortgen.png';
+import kareBack from './kare.png';
+import ucgenBack from './ucgen.png';
+import yildizBack from './yildiz.png';
+import kalpBack from './kalp.png';
+
+// --- 2. ÖN KATMAN (KAPAK - ORTASI DELİK TRANSPARAN) ---
 import transBesgen from './transbesgen.png';
 import transDaire from './transdaire.png';
 import transDikdortgen from './transdikdortgen.png';
@@ -14,7 +22,7 @@ import transUcgen from './transucgen.png';
 import transYildiz from './transyildiz.png';
 import transKalp from './transkalp.png';
 
-// --- ŞEKİL GÖRSELLERİ (SÜRÜKLENECEK - DOLU OLANLAR) ---
+// --- 3. ŞEKİL (SÜRÜKLENECEK VE İÇİNE DÜŞECEK PARÇA) ---
 import besgenShape from './besgen1.png';
 import daireShape from './daire1.png';
 import dikdortgenShape from './dikdortgen1.png';
@@ -23,7 +31,7 @@ import ucgenShape from './ucgen1.png';
 import yildizShape from './yildiz1.png';
 import kalpShape from './kalp1.png';
 
-// --- SES DOSYALARI ---
+// --- SESLER ---
 import arkaplanMusic from './ses/arkaplanmusic.mp3';
 import aferin1 from './ses/aferin1.mp3';
 import aferin2 from './ses/aferin2.mp3';
@@ -34,21 +42,21 @@ import harika2 from './ses/harika2.mp3';
 import tekrardene1 from './ses/tekrardene1.mp3';
 import tekrardene2 from './ses/tekrardene2.mp3';
 
-// --- SES HAVUZLARI ---
 const POSITIVE_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
 const NEGATIVE_SOUNDS = [tekrardene1, tekrardene2];
 
 // NOT: 
-// src       = Sürüklenecek DOLU parça (Altta görünecek)
-// frameSrc  = Hedef Kutu ÇERÇEVE (Ortası delik, üstte duracak)
+// shapeSrc = Sürüklenecek parça (kare1.png) -> Hem sürüklenirken hem animasyonda kullanılır.
+// backSrc  = Arka zemin (kare.png) -> En altta.
+// frontSrc = Ön kapak (transkare.png) -> En üstte.
 const OBJECTS = [
-  { id: 'besgen', name: 'Beşgen', src: besgenShape, frameSrc: transBesgen },
-  { id: 'daire', name: 'Daire', src: daireShape, frameSrc: transDaire },
-  { id: 'dikdortgen', name: 'Dikdörtgen', src: dikdortgenShape, frameSrc: transDikdortgen },
-  { id: 'kare', name: 'Kare', src: kareShape, frameSrc: transKare },
-  { id: 'ucgen', name: 'Üçgen', src: ucgenShape, frameSrc: transUcgen },
-  { id: 'yildiz', name: 'Yıldız', src: yildizShape, frameSrc: transYildiz },
-  { id: 'kalp', name: 'Kalp', src: kalpShape, frameSrc: transKalp },
+  { id: 'besgen', name: 'Beşgen', shapeSrc: besgenShape, backSrc: besgenBack, frontSrc: transBesgen },
+  { id: 'daire', name: 'Daire', shapeSrc: daireShape, backSrc: daireBack, frontSrc: transDaire },
+  { id: 'dikdortgen', name: 'Dikdörtgen', shapeSrc: dikdortgenShape, backSrc: dikdortgenBack, frontSrc: transDikdortgen },
+  { id: 'kare', name: 'Kare', shapeSrc: kareShape, backSrc: kareBack, frontSrc: transKare },
+  { id: 'ucgen', name: 'Üçgen', shapeSrc: ucgenShape, backSrc: ucgenBack, frontSrc: transUcgen },
+  { id: 'yildiz', name: 'Yıldız', shapeSrc: yildizShape, backSrc: yildizBack, frontSrc: transYildiz },
+  { id: 'kalp', name: 'Kalp', shapeSrc: kalpShape, backSrc: kalpBack, frontSrc: transKalp },
 ];
 
 interface GameProps {
@@ -58,7 +66,7 @@ interface GameProps {
 }
 
 export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProps) {
-  // GAME STATES
+  // --- STATE ---
   const [level, setLevel] = useState(1); 
   const [questionIndex, setQuestionIndex] = useState(0); 
   const [isMuted, setIsMuted] = useState(false);
@@ -77,19 +85,18 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
   
   const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
-
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
 
-  // Müzik ve Scroll
+  // --- INIT ---
   useEffect(() => {
-    window.scrollTo(0, 0);
+    window.scrollTo(0, 0); // Scroll Fix
 
     bgMusicRef.current = new Audio(arkaplanMusic);
     bgMusicRef.current.loop = true; 
     bgMusicRef.current.volume = 0.15; 
     
     if (!isMuted) {
-        bgMusicRef.current.play().catch(error => { console.log(error); });
+        bgMusicRef.current.play().catch(() => {});
     }
 
     return () => {
@@ -127,7 +134,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
     return () => { document.body.style.overflow = originalStyle; };
   }, []);
 
-  // --- SORU ÜRETME ---
+  // --- SORU OLUŞTURMA ---
   const generateQuestion = () => {
     const randomTarget = OBJECTS[Math.floor(Math.random() * OBJECTS.length)];
     
@@ -151,7 +158,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
 
   useEffect(() => { generateQuestion(); }, [level]);
 
-  // --- GARANTİLİ SÜRÜKLE BIRAK (GPS) ---
+  // --- GARANTİLİ SÜRÜKLEME (GPS) ---
   const handleDragEnd = (event: any, info: any, droppedItem: typeof OBJECTS[0]) => {
     if (isModeling || isMatched) return;
 
@@ -317,50 +324,56 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
         <div className="flex-1 flex flex-col justify-around w-full max-w-md h-full">
           
           <div className="flex flex-col items-center">
-            {/* --- HEDEF KUTU (PUZZLE MANTIĞI) --- */}
+            
+            {/* --- HEDEF KUTU --- */}
             <div 
                 ref={dropZoneRef}
                 className={twMerge(
-                    "w-72 h-72 bg-white rounded-[3rem] border-4 flex items-center justify-center shadow-inner relative z-0 transition-all duration-300 overflow-hidden",
-                    // Çerçeve rengi
-                    isMatched ? "border-green-500 bg-green-50 border-solid" : "border-dashed border-slate-300"
+                    "relative w-72 h-72 flex items-center justify-center transition-all duration-300",
+                    // Çerçeve yok, sadece resimler konuşsun
                 )}
             >
-               {/* 1. KATMAN (EN ÜST): ÇERÇEVE RESMİ (Ortası Delik)
-                  Bu resim Z-20'de duracak, yani en üstte.
-                  pointer-events-none ile tıklamayı engelliyoruz.
-               */}
+               {/* 1. KATMAN (EN ALT): ARKA PLAN (Kare.png - Ahşap Zemin) */}
+               {/* pointer-events-none ÇOK ÖNEMLİ */}
                <img 
-                 key={targetItem.id + '-frame'}
-                 src={targetItem.frameSrc} // Transparan resim (transkare.png vb.)
-                 alt="Çerçeve" 
-                 className="absolute w-56 h-56 object-contain z-20 pointer-events-none"
+                 key={targetItem.id + '-back'}
+                 src={targetItem.backSrc} 
+                 alt="Arka" 
+                 className="absolute w-72 h-72 object-contain z-0 pointer-events-none"
                />
 
-               {/* 2. KATMAN (ALT): DOLGU RESMİ (Dolu Renkli)
-                  Bu resim Z-10'da, yani çerçevenin ARKASINDA duracak.
-                  Eşleşme olunca görünür hale gelecek.
-                  Çerçevenin deliğinden görüneceği için "içine girmiş" gibi olacak.
-               */}
+               {/* 2. KATMAN (ORTA): ŞEKİL (Kare1.png - İçine Düşen) */}
                <motion.img 
-                  key={targetItem.id + '-fill'}
-                  src={targetItem.src} // Dolu resim (kare1.png vb.)
-                  alt="Dolgu"
-                  initial={{ opacity: 0, scale: 0.8 }}
+                  key={targetItem.id + '-shape'}
+                  src={targetItem.shapeSrc} 
+                  alt="Şekil"
+                  initial={{ opacity: 0, scale: 1.2, y: -80 }} 
                   animate={{ 
                       opacity: isMatched ? 1 : 0,
-                      scale: isMatched ? 1 : 0.8 
+                      scale: isMatched ? 0.9 : 1.2, // Biraz küçülerek düşsün
+                      y: isMatched ? 0 : -80 // Yukarıdan aşağı düşme
                   }}
-                  transition={{ duration: 0.5 }} 
+                  // "Bounce" efekti: Tık diye yerine oturur
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }} 
                   className="absolute w-56 h-56 object-contain z-10 pointer-events-none"
                />
 
+               {/* 3. KATMAN (EN ÜST): ÖN KAPAK (Transkare.png - Delikli) */}
+               <img 
+                 key={targetItem.id + '-front'}
+                 src={targetItem.frontSrc} 
+                 alt="Ön" 
+                 className="absolute w-72 h-72 object-contain z-20 pointer-events-none drop-shadow-2xl"
+               />
+
             </div>
-            {!isMatched && <p className="mt-4 text-slate-400 font-bold text-xs tracking-widest uppercase animate-pulse">Eşini Kutuya Bırak</p>}
+            
+            {!isMatched && <p className="mt-8 text-slate-400 font-bold text-xs tracking-widest uppercase animate-pulse">Şekli İçine Bırak</p>}
           </div>
 
+          {/* --- SEÇENEKLER (SADECE ÇIPLAK ŞEKİLLER) --- */}
           <div className={twMerge(
-              "grid gap-2 w-full px-1 justify-items-center",
+              "grid gap-4 w-full px-2 justify-items-center pb-8",
               level === 3 ? "grid-cols-3" : "grid-cols-3"
           )}>
             {options.map((item) => {
@@ -370,7 +383,8 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
               const canDrag = !isModeling && !isLocked && !isMatched;
 
               return (
-                <div key={item.id} className="relative flex justify-center items-center h-36 w-full">
+                // Beyaz kutu, border YOK. Sadece alan var.
+                <div key={item.id} className="relative flex justify-center items-center h-28 w-28">
                   <motion.div
                     drag={canDrag}
                     dragConstraints={false}
@@ -378,11 +392,11 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                     dragElastic={0.1}
                     dragMomentum={false}
                     onDragEnd={(e, info) => handleDragEnd(e, info, item)}
-                    whileDrag={{ scale: 1.1, zIndex: 100 }}
+                    whileDrag={{ scale: 1.2, zIndex: 100 }} // Sürüklerken az büyüsün
                     
                     animate={
                         isHidden
-                        ? { opacity: 0, scale: 0 }
+                        ? { opacity: 0, scale: 0 } // Doğru bilince kaybol
                         : (isModeling && isCorrectItem) 
                         ? { 
                             y: [0, -380, -380, 0], 
@@ -390,7 +404,8 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                             x: 0
                           } 
                         : (flashCorrect && isCorrectItem)
-                        ? { scale: [1, 1.1, 1], borderColor: ["#e2e8f0", "#22c55e", "#e2e8f0"], borderWidth: [2, 4, 2] }
+                        // Flash efekti olarak hafif büyüyüp küçülme (Border yok)
+                        ? { scale: [1, 1.2, 1] }
                         : { scale: 1, opacity: isLocked ? 0.3 : 1 }
                     }
                     transition={
@@ -400,13 +415,12 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                     }
 
                     className={twMerge(
-                      "w-32 h-32 bg-white rounded-3xl shadow-[0_8px_0_0_#e2e8f0] flex items-center justify-center border-2 touch-none relative z-10",
-                      canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed",
-                      (isModeling && isCorrectItem) ? "border-blue-400 shadow-blue-100 shadow-xl" : 
-                      (flashCorrect && isCorrectItem) ? "border-green-500 shadow-green-100" : "border-slate-100"
+                      "w-28 h-28 flex items-center justify-center touch-none relative z-10",
+                      canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed"
                     )}
                   >
-                    <img src={item.src} alt={item.name} className="w-24 h-24 object-contain pointer-events-none" />
+                    {/* Sadece şekil (shapeSrc) - Çerçevesiz */}
+                    <img src={item.shapeSrc} alt={item.name} className="w-24 h-24 object-contain pointer-events-none drop-shadow-md" />
                     
                     {isModeling && isCorrectItem && (
                         <motion.div 
