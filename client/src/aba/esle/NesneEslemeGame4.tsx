@@ -45,7 +45,6 @@ import tekrardene2 from './ses/tekrardene2.mp3';
 const POSITIVE_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
 const NEGATIVE_SOUNDS = [tekrardene1, tekrardene2];
 
-// NOT: shapeSrc = Hareketli, backSrc = Zemin, frontSrc = Kapak
 const OBJECTS = [
   { id: 'besgen', name: 'Beşgen', shapeSrc: besgenShape, backSrc: besgenBack, frontSrc: transBesgen },
   { id: 'daire', name: 'Daire', shapeSrc: daireShape, backSrc: daireBack, frontSrc: transDaire },
@@ -321,13 +320,14 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
           
           <div className="flex flex-col items-center">
             
-            {/* --- HEDEF KUTU --- */}
+            {/* --- HEDEF KUTU (BEYAZ ÇERÇEVELİ) --- */}
             <div 
                 ref={dropZoneRef}
-                style={{ perspective: '1000px' }} // Perspektif
+                style={{ perspective: '1000px' }}
+                // BURASI GÜNCELLENDİ: Beyaz arka plan, border ve shadow eklendi
                 className={twMerge(
-                    "relative w-72 h-72 rounded-[3rem] flex items-center justify-center transition-all duration-300",
-                    isMatched ? "bg-green-50/20" : ""
+                    "relative w-72 h-72 bg-white rounded-[3rem] border-4 flex items-center justify-center shadow-xl transition-all duration-300",
+                    isMatched ? "border-green-500 bg-green-50" : "border-slate-200"
                 )}
             >
                {/* 1. KATMAN (EN ALT): ZEMİN */}
@@ -335,7 +335,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                  key={targetItem.id + '-back'}
                  src={targetItem.backSrc} 
                  alt="Zemin" 
-                 className="absolute w-72 h-72 object-contain z-0 pointer-events-none"
+                 className="absolute w-72 h-72 object-contain z-0 pointer-events-none rounded-[2.5rem]" // Köşeleri yuvarlattık taşmasın diye
                />
 
                {/* 2. KATMAN (ORTA): ŞEKİL */}
@@ -347,7 +347,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                   animate={{ 
                       opacity: isMatched ? 0.9 : 0, 
                       scale: isMatched ? 0.75 : 1.2, 
-                      y: isMatched ? 2 : -100,  // <--- BURASI 2 OLDU (Hafifçe yukarı aldık)
+                      y: isMatched ? 2 : -100,
                       rotateX: isMatched ? 70 : 0    
                   }}
                   transition={{ type: "spring", stiffness: 150, damping: 20 }} 
@@ -360,7 +360,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                  key={targetItem.id + '-front'}
                  src={targetItem.frontSrc} 
                  alt="Kapak" 
-                 className="absolute w-72 h-72 object-contain z-20 pointer-events-none drop-shadow-xl"
+                 className="absolute w-72 h-72 object-contain z-20 pointer-events-none drop-shadow-md"
                />
 
             </div>
@@ -368,7 +368,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
             {!isMatched && <p className="mt-8 text-slate-400 font-bold text-xs tracking-widest uppercase animate-pulse">Şekli İçine Bırak</p>}
           </div>
 
-          {/* --- SEÇENEKLER --- */}
+          {/* --- SEÇENEKLER (ÇERÇEVESİZ) --- */}
           <div className={twMerge(
               "grid gap-4 w-full px-2 justify-items-center pb-8",
               level === 3 ? "grid-cols-3" : "grid-cols-3"
@@ -409,6 +409,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                         : { duration: 0.3 }
                     }
 
+                    // BURASI ÖNEMLİ: Aşağıdaki seçeneklerde border/bg yok.
                     className={twMerge(
                       "w-28 h-28 flex items-center justify-center touch-none relative z-10",
                       canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed"
