@@ -320,13 +320,13 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
           
           <div className="flex flex-col items-center">
             
-            {/* --- HEDEF KUTU (BEYAZ ÇERÇEVELİ) --- */}
+            {/* --- HEDEF KUTU --- */}
             <div 
                 ref={dropZoneRef}
                 style={{ perspective: '1000px' }}
-                // BURASI GÜNCELLENDİ: Beyaz arka plan, border ve shadow eklendi
+                // GÖLGE KALDIRILDI: shadow-xl silindi. Sadece border var.
                 className={twMerge(
-                    "relative w-72 h-72 bg-white rounded-[3rem] border-4 flex items-center justify-center shadow-xl transition-all duration-300",
+                    "relative w-72 h-72 bg-white rounded-[3rem] border-4 flex items-center justify-center transition-all duration-300",
                     isMatched ? "border-green-500 bg-green-50" : "border-slate-200"
                 )}
             >
@@ -335,10 +335,10 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                  key={targetItem.id + '-back'}
                  src={targetItem.backSrc} 
                  alt="Zemin" 
-                 className="absolute w-72 h-72 object-contain z-0 pointer-events-none rounded-[2.5rem]" // Köşeleri yuvarlattık taşmasın diye
+                 className="absolute w-72 h-72 object-contain z-0 pointer-events-none rounded-[2.5rem]"
                />
 
-               {/* 2. KATMAN (ORTA): ŞEKİL */}
+               {/* 2. KATMAN (ORTA): ŞEKİL (İçine Düşen) */}
                <motion.img 
                   key={targetItem.id + '-fill'}
                   src={targetItem.shapeSrc} 
@@ -347,7 +347,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                   animate={{ 
                       opacity: isMatched ? 0.9 : 0, 
                       scale: isMatched ? 0.75 : 1.2, 
-                      y: isMatched ? 2 : -100,
+                      y: isMatched ? 2 : -100, // 2px boşluk
                       rotateX: isMatched ? 70 : 0    
                   }}
                   transition={{ type: "spring", stiffness: 150, damping: 20 }} 
@@ -360,6 +360,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                  key={targetItem.id + '-front'}
                  src={targetItem.frontSrc} 
                  alt="Kapak" 
+                 // Kapağın gölgesini de hafiflettim (shadow-xl değil drop-shadow-md kalsın yeter)
                  className="absolute w-72 h-72 object-contain z-20 pointer-events-none drop-shadow-md"
                />
 
@@ -368,7 +369,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
             {!isMatched && <p className="mt-8 text-slate-400 font-bold text-xs tracking-widest uppercase animate-pulse">Şekli İçine Bırak</p>}
           </div>
 
-          {/* --- SEÇENEKLER (ÇERÇEVESİZ) --- */}
+          {/* --- SEÇENEKLER --- */}
           <div className={twMerge(
               "grid gap-4 w-full px-2 justify-items-center pb-8",
               level === 3 ? "grid-cols-3" : "grid-cols-3"
@@ -409,12 +410,12 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                         : { duration: 0.3 }
                     }
 
-                    // BURASI ÖNEMLİ: Aşağıdaki seçeneklerde border/bg yok.
                     className={twMerge(
                       "w-28 h-28 flex items-center justify-center touch-none relative z-10",
                       canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed"
                     )}
                   >
+                    {/* GÖLGE GERİ GELDİ: drop-shadow-md EKLENDİ */}
                     <img src={item.shapeSrc} alt={item.name} className="w-24 h-24 object-contain pointer-events-none drop-shadow-md" />
                     
                     {isModeling && isCorrectItem && (
