@@ -344,27 +344,33 @@ export default function NesneEslemeGame13({ mode, onClose, onComplete }: GamePro
                 ref={dropZoneRef}
                 className={twMerge(
                     "w-72 h-72 bg-white rounded-[3rem] border-4 flex items-center justify-center shadow-inner relative z-0 transition-all duration-300 overflow-hidden",
+                    // Eşleşince yeşil sınır yap
                     isMatched ? "border-green-500 bg-green-50 border-solid" : "border-dashed border-slate-300"
                 )}
             >
-               {/* 1. SİYAH GÖLGE (pointer-events-none İLE DÜZELTİLDİ) */}
+               {/* 1. KATMAN: SİYAH GÖLGE */}
+               {/* key ekledik ki yeni soruda sıfırlansın, flicker yapmasın */}
                <img 
+                 key={targetItem.id + '-shadow'}
                  src={targetItem.shadowSrc} 
                  alt="Gölge" 
-                 className="absolute w-56 h-56 object-contain opacity-60 pointer-events-none"
+                 // Opacity YOK (Tam siyah), pointer-events-none (Tıklanmaz)
+                 className="absolute w-56 h-56 object-contain pointer-events-none"
                />
 
-               {/* 2. RENKLİ RESİM (pointer-events-none İLE DÜZELTİLDİ) */}
+               {/* 2. KATMAN: RENKLİ RESİM (Üste Gelen) */}
+               {/* key ekledik, scale 1 yaptık (büyüme yok) */}
                <motion.img 
+                  key={targetItem.id + '-color'}
                   src={targetItem.colorSrc}
                   alt="Renkli"
-                  initial={{ opacity: 0, scale: 0.8 }}
+                  initial={{ opacity: 0 }}
                   animate={{ 
                       opacity: isMatched ? 1 : 0,
-                      scale: isMatched ? 1.1 : 0.8 
+                      scale: 1 // ARTIK BÜYÜMÜYOR, GÖLGEYLE AYNI BOY
                   }}
-                  transition={{ duration: 0.8 }} 
-                  className="absolute w-56 h-56 object-contain z-10 drop-shadow-2xl pointer-events-none"
+                  transition={{ duration: 0.5 }} // Yarım saniyede nazikçe beliriyor
+                  className="absolute w-56 h-56 object-contain z-10 pointer-events-none"
                />
 
             </div>
@@ -422,7 +428,6 @@ export default function NesneEslemeGame13({ mode, onClose, onComplete }: GamePro
                       (flashCorrect && isCorrectItem) ? "border-green-500 shadow-green-100" : "border-slate-100"
                     )}
                   >
-                    {/* Sürüklenecek resim için de pointer-events-none */}
                     <img src={item.colorSrc} alt={item.name} className="w-24 h-24 object-contain pointer-events-none" />
                     
                     {isModeling && isCorrectItem && (
