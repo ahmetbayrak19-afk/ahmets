@@ -12,6 +12,7 @@ import NesneEslemeGame from '@/aba/esle/NesneEslemeGame';   // 1. Oyun (EB.1.1)
 import NesneEslemeGame1 from '@/aba/esle/NesneEslemeGame1'; // 2. Oyun (EB.1.2)
 import NesneEslemeGame3 from '@/aba/esle/NesneEslemeGame3'; // 3. Oyun (EB.1.3 - Eylem)
 import NesneEslemeGame4 from '@/aba/esle/NesneEslemeGame4'; // 4. Oyun (EB.1.4 - Şekil Kutusu)
+import NesneEslemeGame12 from '@/aba/esle/NesneEslemeGame12'; // 12. Oyun (EB.3.4 - Gölge Eşleme) -- GÜNCELLENDİ
 import NesneEslemeGame15 from '@/aba/esle/NesneEslemeGame15'; // 15. Oyun (EB.4.2 - Klavye Harf)
 
 interface EslemePageProps {
@@ -123,6 +124,14 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                 />
             )}
 
+            {/* GÖLGE EŞLEME OYUNU -> EB.3.4 */}
+            {activeGameItem.startsWith("EB.3.4") && (
+                <NesneEslemeGame12 
+                    onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} 
+                    onComplete={handleGameComplete} 
+                />
+            )}
+
             {/* 15. KAZANIM: Klavyede Harf Eşleme (EB.4.2) */}
             {activeGameItem.startsWith("EB.4.2") && (
                 <NesneEslemeGame15 
@@ -162,6 +171,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                           item.startsWith("EB.1.2") || 
                           item.startsWith("EB.1.3") || 
                           item.startsWith("EB.1.4") ||
+                          item.startsWith("EB.3.4") || // EB.3.4 Gölge Eşleme
                           item.startsWith("EB.4.2"); 
             
             const firstSpaceIndex = item.indexOf(' ');
@@ -212,4 +222,5 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       </div>
     </div>
   );
-}
+  }
+                          
