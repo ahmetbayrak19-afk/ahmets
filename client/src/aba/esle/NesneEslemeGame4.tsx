@@ -4,7 +4,7 @@ import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, R
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
-// --- 1. ARKA KATMAN (KUTU İÇİ - KARANLIK ZEMİN) ---
+// --- 1. ARKA KATMAN (KUTU İÇİ) ---
 import besgenBack from './besgen.png';
 import daireBack from './daire.png';
 import dikdortgenBack from './dikdortgen.png';
@@ -13,7 +13,7 @@ import ucgenBack from './ucgen.png';
 import yildizBack from './yildiz.png';
 import kalpBack from './kalp.png';
 
-// --- 2. ÖN KATMAN (KAPAK - ORTASI DELİK TRANSPARAN) ---
+// --- 2. ÖN KATMAN (KAPAK - TRANSPARAN) ---
 import transBesgen from './transbesgen.png';
 import transDaire from './transdaire.png';
 import transDikdortgen from './transdikdortgen.png';
@@ -22,7 +22,7 @@ import transUcgen from './transucgen.png';
 import transYildiz from './transyildiz.png';
 import transKalp from './transkalp.png';
 
-// --- 3. ŞEKİL (SÜRÜKLENECEK PARÇA) ---
+// --- 3. ŞEKİL (HAREKETLİ PARÇA) ---
 import besgenShape from './besgen1.png';
 import daireShape from './daire1.png';
 import dikdortgenShape from './dikdortgen1.png';
@@ -45,7 +45,6 @@ import tekrardene2 from './ses/tekrardene2.mp3';
 const POSITIVE_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
 const NEGATIVE_SOUNDS = [tekrardene1, tekrardene2];
 
-// NOT: shapeSrc = Hareketli, backSrc = Zemin, frontSrc = Kapak
 const OBJECTS = [
   { id: 'besgen', name: 'Beşgen', shapeSrc: besgenShape, backSrc: besgenBack, frontSrc: transBesgen },
   { id: 'daire', name: 'Daire', shapeSrc: daireShape, backSrc: daireBack, frontSrc: transDaire },
@@ -63,7 +62,6 @@ interface GameProps {
 }
 
 export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProps) {
-  // STATE
   const [level, setLevel] = useState(1); 
   const [questionIndex, setQuestionIndex] = useState(0); 
   const [isMuted, setIsMuted] = useState(false);
@@ -155,7 +153,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
 
   useEffect(() => { generateQuestion(); }, [level]);
 
-  // DRAG & DROP (GPS - GARANTİLİ)
+  // DRAG & DROP
   const handleDragEnd = (event: any, info: any, droppedItem: typeof OBJECTS[0]) => {
     if (isModeling || isMatched) return;
 
@@ -325,14 +323,13 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
             {/* --- HEDEF KUTU --- */}
             <div 
                 ref={dropZoneRef}
-                // Perspective (Derinlik) Ayarı Çok Önemli!
-                style={{ perspective: '1000px' }}
+                style={{ perspective: '1000px' }} // Perspektif ŞART
                 className={twMerge(
                     "relative w-72 h-72 rounded-[3rem] flex items-center justify-center transition-all duration-300",
                     isMatched ? "bg-green-50/20" : ""
                 )}
             >
-               {/* 1. KATMAN (Z-0): ZEMİN (kare.png) */}
+               {/* 1. ZEMİN (EN ALT) */}
                <img 
                  key={targetItem.id + '-back'}
                  src={targetItem.backSrc} 
@@ -340,33 +337,24 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                  className="absolute w-72 h-72 object-contain z-0 pointer-events-none"
                />
 
-               {/* 2. KATMAN (Z-10): HAREKETLİ ŞEKİL (kare1.png) 
-                   rotateX(70deg): Arkaya doğru yatırır.
-                   scale(0.8): İçeri gittiği için küçülür.
-                   y(40): Yerçekimiyle dibe oturur.
-               */}
+               {/* 2. DÜŞEN ŞEKİL (ORTA KATMAN) */}
                <motion.img 
                   key={targetItem.id + '-fill'}
                   src={targetItem.shapeSrc} 
-                  alt="Parça"
-                  // Başlangıç: Yukarıda, düz duruyor
+                  alt="Düşen Parça"
                   initial={{ opacity: 0, scale: 1.2, y: -100, rotateX: 0 }} 
-                  
-                  // Bitiş (Eşleşince): İçeri girip, arkaya devriliyor
                   animate={{ 
                       opacity: isMatched ? 0.9 : 0, 
-                      scale: isMatched ? 0.75 : 1.2, // Küçülerek uzaklaşma hissi
-                      y: isMatched ? 40 : -100,      // Aşağı düşme
-                      rotateX: isMatched ? 70 : 0    // <--- İŞTE DEVRİLME BURADA
+                      scale: isMatched ? 0.75 : 1.2, 
+                      y: isMatched ? 5 : -100, // <--- DÜZELTİLDİ: Sadece 5px düşer, kutudan çıkmaz
+                      rotateX: isMatched ? 70 : 0    
                   }}
                   transition={{ type: "spring", stiffness: 150, damping: 20 }} 
-                  
-                  // Origin bottom: Alt kenarı takılıp devriliyormuş gibi
-                  style={{ transformOrigin: "bottom" }}
+                  style={{ transformOrigin: "bottom" }} // Alttan pivot alarak geriye yatar
                   className="absolute w-56 h-56 object-contain z-10 pointer-events-none"
                />
 
-               {/* 3. KATMAN (Z-20): KAPAK (transkare.png) */}
+               {/* 3. KAPAK (EN ÜST) */}
                <img 
                  key={targetItem.id + '-front'}
                  src={targetItem.frontSrc} 
