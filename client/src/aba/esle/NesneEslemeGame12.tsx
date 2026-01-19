@@ -81,7 +81,7 @@ export default function NesneEslemeGame12({ onClose, onComplete }: any) {
     bgMusicRef.current.loop = true;
     bgMusicRef.current.volume = 0.1;
     if (!isMuted) {
-        bgMusicRef.current.play().catch(() => {});
+        bgMusicRef.current.play().catch(() => console.log("Otomatik oynatma engellendi"));
     }
     return () => {
         if (bgMusicRef.current) {
@@ -98,7 +98,7 @@ export default function NesneEslemeGame12({ onClose, onComplete }: any) {
     }
   }, [isMuted]);
 
-  // SCROLL KİLİTLEME (Mobilde sayfa kaymasın diye)
+  // SCROLL KİLİTLEME
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
     document.body.style.overflow = 'hidden';
@@ -129,33 +129,35 @@ export default function NesneEslemeGame12({ onClose, onComplete }: any) {
     generateQuestion();
   }, [level]);
 
-  // SÜRÜKLE BIRAK (Referans dosyadaki gibi hızlı logic)
+  // --- SÜRÜKLE BIRAK MANTIĞI (GÜNCELLENMİŞ) ---
   const handleDragEnd = (event: any, info: any, droppedItem: typeof OBJECTS[0]) => {
     if (isMatched) return;
 
     const dropZone = dropZoneRef.current;
     if (!dropZone) return;
 
-    // Hedef alanın koordinatlarını al
+    // 1. Hedef kutunun (kesik çizgili alan) koordinatlarını al
     const dropRect = dropZone.getBoundingClientRect();
+    
+    // 2. Parmağın kaldırıldığı nokta
     const dropX = info.point.x;
     const dropY = info.point.y;
 
-    // Sürüklenen öğe hedef kutunun içinde mi? (Geniş tolerans +40px)
+    // 3. KONTROL: Nokta kutu sınırları içinde mi? (20px tolerans ile)
     const isInside = 
-        dropX >= dropRect.left - 40 && 
-        dropX <= dropRect.right + 40 &&
-        dropY >= dropRect.top - 40 && 
-        dropY <= dropRect.bottom + 40;
+        dropX >= dropRect.left - 20 && 
+        dropX <= dropRect.right + 20 &&
+        dropY >= dropRect.top - 20 && 
+        dropY <= dropRect.bottom + 20;
 
-    if (!isInside) return;
-
-    // Doğru eşleşme kontrolü
-    if (droppedItem.id === targetItem.id) {
-        handleSuccess();
-    } else {
-        handleMistake();
+    if (isInside) {
+        if (droppedItem.id === targetItem.id) {
+            handleSuccess();
+        } else {
+            handleMistake();
+        }
     }
+    // Değilse framer-motion otomatik geri götürür
   };
 
   const handleSuccess = () => {
@@ -203,7 +205,6 @@ export default function NesneEslemeGame12({ onClose, onComplete }: any) {
         <button onClick={onClose} className="p-2 bg-white border rounded-full shadow-sm"><XCircle className="text-slate-300"/></button>
         
         <div className="flex items-center gap-4">
-             {/* LEVEL INDICATOR */}
              <div className="flex gap-1">
                  {[1, 2, 3].map(l => (
                      <div key={l} className={twMerge("w-3 h-3 rounded-full transition-colors", level >= l ? "bg-orange-500" : "bg-slate-200")}></div>
@@ -229,10 +230,10 @@ export default function NesneEslemeGame12({ onClose, onComplete }: any) {
                     )}
                   >
                       {/* SİYAH GÖLGE (Altta sabit duruyor) */}
-                      {/* Grayscale vb. YOK, resim zaten siyah */}
                       <img 
                         src={targetItem.shadowSrc} 
-                        className="w-48 h-48 object-contain absolute opacity-60" 
+                        // pointer-events-none ÇOK ÖNEMLİ: Sürüklemeyi engellememesi için
+                        className="w-48 h-48 object-contain absolute opacity-60 pointer-events-none" 
                         alt="Gölge"
                       />
 
@@ -242,7 +243,8 @@ export default function NesneEslemeGame12({ onClose, onComplete }: any) {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: isMatched ? 1 : 0 }}
                         transition={{ duration: 0.8 }} 
-                        className="w-48 h-48 object-contain absolute z-10"
+                        // pointer-events-none ÇOK ÖNEMLİ
+                        className="w-48 h-48 object-contain absolute z-10 pointer-events-none"
                         alt="Renkli"
                       />
                   </div>
@@ -258,7 +260,7 @@ export default function NesneEslemeGame12({ onClose, onComplete }: any) {
               <div className="w-full px-2 mb-6">
                   <div className={twMerge(
                       "grid gap-3 w-full justify-items-center",
-                      level === 3 ? "grid-cols-3" : "grid-cols-3 sm:grid-cols-4" // Level 3'te daha sıkışık
+                      level === 3 ? "grid-cols-3" : "grid-cols-3 sm:grid-cols-4"
                   )}>
                       {options.map((item) => {
                           const isCorrect = item.id === targetItem.id;
@@ -267,11 +269,11 @@ export default function NesneEslemeGame12({ onClose, onComplete }: any) {
                           return (
                               <div key={item.id} className="relative w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center z-20">
                                   <motion.div
-                                    // SÜRÜKLEME AYARLARI (NESNEESLEMEGAME.TSX İLE AYNISI)
+                                    // SÜRÜKLEME AYARLARI (HIZLI VE AKICI)
                                     drag={!isMatched} 
-                                    dragConstraints={false} // Hız için kısıtlama YOK
-                                    dragMomentum={false}    // Kontrol için momentum YOK
-                                    dragSnapToOrigin={true} // Bırakınca yerine dönsün
+                                    dragConstraints={false} // Serbest sürükleme
+                                    dragMomentum={false}    // Momentum yok (daha kontrollü)
+                                    dragSnapToOrigin={true} // Bırakınca geri dönme
                                     dragElastic={0.1}
                                     
                                     whileDrag={{ scale: 1.2, zIndex: 100, cursor: 'grabbing' }}
@@ -303,7 +305,7 @@ export default function NesneEslemeGame12({ onClose, onComplete }: any) {
         </div>
       )}
 
-      {/* FEEDBACK (YANLIŞ CEVAP) */}
+      {/* FEEDBACK (YANLIŞ/DOĞRU İKONLARI) */}
       <AnimatePresence>
         {feedback === 'wrong' && (
           <motion.div 
@@ -330,3 +332,4 @@ export default function NesneEslemeGame12({ onClose, onComplete }: any) {
     </div>
   );
   }
+          
