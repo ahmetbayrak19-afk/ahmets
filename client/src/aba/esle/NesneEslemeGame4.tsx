@@ -4,7 +4,7 @@ import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, R
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
-// --- KUTU GÖRSELLERİ (Hedef - Yukarıda Görünecek) ---
+// --- KUTU GÖRSELLERİ (HEDEF) ---
 import besgenBox from './besgen.png';
 import daireBox from './daire.png';
 import dikdortgenBox from './dikdortgen.png';
@@ -13,7 +13,7 @@ import ucgenBox from './ucgen.png';
 import yildizBox from './yildiz.png';
 import kalpBox from './kalp.png';
 
-// --- ŞEKİL GÖRSELLERİ (Sürüklenecek - Aşağıda Görünecek - 1 ile bitenler) ---
+// --- ŞEKİL GÖRSELLERİ (SÜRÜKLENECEK) ---
 import besgenShape from './besgen1.png';
 import daireShape from './daire1.png';
 import dikdortgenShape from './dikdortgen1.png';
@@ -54,7 +54,7 @@ interface GameProps {
   onComplete: (success: boolean) => void;
 }
 
-export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps) {
+export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProps) {
   const [phase, setPhase] = useState<'playing' | 'success' | 'fail'>('playing');
   const [targetItem, setTargetItem] = useState(OBJECTS[0]);
   const [options, setOptions] = useState<typeof OBJECTS[]>([]);
@@ -70,20 +70,19 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
   const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
-  // Ses referansı
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
 
-  // Arkaplan Müziği
   useEffect(() => {
+    // 1. ÖNLEM: Sayfayı zorla en başa sar (Kaydırma sorununu çözer)
+    window.scrollTo(0, 0);
+
     bgMusicRef.current = new Audio(arkaplanMusic);
     bgMusicRef.current.loop = true; 
     bgMusicRef.current.volume = 0.15; 
     
     const playPromise = bgMusicRef.current.play();
     if (playPromise !== undefined) {
-        playPromise.catch(error => {
-            console.log("Otomatik oynatma engellendi.", error);
-        });
+        playPromise.catch(() => {});
     }
 
     return () => {
@@ -94,7 +93,6 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
     };
   }, []);
 
-  // Efekt Sesleri
   const playSoundEffect = (type: 'success' | 'fail') => {
     let soundSrc;
     if (type === 'success') {
@@ -106,10 +104,9 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
     }
     const audio = new Audio(soundSrc);
     audio.volume = 1.0; 
-    audio.play().catch(e => console.log("Ses oynatılamadı", e));
+    audio.play().catch(() => {});
   };
 
-  // Scroll kilitleme
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
     document.body.style.overflow = 'hidden';
@@ -134,20 +131,42 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
 
   useEffect(() => { generateQuestion(); }, []);
 
+  // --- GARANTİLİ SÜRÜKLEME MANTIĞI ---
   const handleDragEnd = (event: any, info: any, droppedItem: typeof OBJECTS[0]) => {
     if (isModeling || isMatched) return;
 
     const dropZone = dropZoneRef.current;
     if (!dropZone) return;
+    
+    // Hedef kutunun koordinatları
     const dropRect = dropZone.getBoundingClientRect();
-    const dropX = info.point.x;
-    const dropY = info.point.y;
+    
+    // 2. ÖNLEM: Kütüphane koordinatını boşver, GERÇEK EKRAN KOORDİNATINI AL
+    // (info.point sayfa kaydıysa sapıtır, clientX asla sapıtmaz)
+    let clientX = 0;
+    let clientY = 0;
 
+    // Mouse mu Dokunmatik mi kontrol et
+    if (event.changedTouches && event.changedTouches.length > 0) {
+        // Dokunmatik
+        clientX = event.changedTouches[0].clientX;
+        clientY = event.changedTouches[0].clientY;
+    } else if (event.clientX) {
+        // Mouse
+        clientX = event.clientX;
+        clientY = event.clientY;
+    } else {
+        // Hiçbiri yoksa son çare kütüphane
+        clientX = info.point.x;
+        clientY = info.point.y;
+    }
+
+    // Koordinat kutunun içinde mi? (+40px tolerans ile)
     const isInside = 
-        dropX >= dropRect.left - 40 && 
-        dropX <= dropRect.right + 40 &&
-        dropY >= dropRect.top - 40 && 
-        dropY <= dropRect.bottom + 40;
+        clientX >= dropRect.left - 40 && 
+        clientX <= dropRect.right + 40 &&
+        clientY >= dropRect.top - 40 && 
+        clientY <= dropRect.bottom + 40;
 
     if (!isInside) return;
 
@@ -276,12 +295,12 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
                     isMatched ? "border-green-500 bg-green-50 border-solid" : "border-slate-300"
                 )}
             >
-               {/* DİKKAT: Burada targetItem.targetSrc kullanıyoruz (Kutu Görseli) */}
+               {/* 3. ÖNLEM: pointer-events-none (Tıklama Engelleyici) */}
                <img 
                  src={targetItem.targetSrc} 
                  alt={targetItem.name} 
                  className={twMerge(
-                    "object-contain transition-all duration-500",
+                    "object-contain transition-all duration-500 pointer-events-none", 
                     isMatched ? "w-56 h-56 opacity-100 scale-110 drop-shadow-2xl" : "w-48 h-48 opacity-90"
                  )} 
                />
@@ -333,7 +352,7 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
                       (flashCorrect && isCorrectItem) ? "border-green-500 shadow-green-100" : "border-slate-100"
                     )}
                   >
-                    {/* DİKKAT: Burada item.src kullanıyoruz (Sürüklenecek Şekil) */}
+                    {/* Şeklin kendisi de tıklamayı engellemesin */}
                     <img src={item.src} alt={item.name} className="w-24 h-24 object-contain pointer-events-none" />
                     
                     {isModeling && isCorrectItem && (
@@ -404,4 +423,5 @@ export default function NesneEslemeGame({ mode, onClose, onComplete }: GameProps
       </AnimatePresence>
     </div>
   );
-}
+  }
+                   
