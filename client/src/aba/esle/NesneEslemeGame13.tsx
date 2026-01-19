@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, RefreshCcw } from 'lucide-react';
+import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, RefreshCcw, Volume2, VolumeX } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
@@ -43,7 +43,7 @@ import tekrardene2 from '../esle/ses/tekrardene2.mp3';
 const POSITIVE_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
 const NEGATIVE_SOUNDS = [tekrardene1, tekrardene2];
 
-// NESNE LİSTESİ (Hem Renkli Hem Gölge Verisini Tutar)
+// NESNE LİSTESİ
 const OBJECTS = [
   { id: 'anahtar', name: 'Anahtar', colorSrc: anahtarImg, shadowSrc: golgeAnahtarImg },
   { id: 'araba', name: 'Araba', colorSrc: arabaImg, shadowSrc: golgeArabaImg },
@@ -58,15 +58,20 @@ const OBJECTS = [
 ];
 
 interface GameProps {
-  mode?: 'assessment' | 'instruction'; // Opsiyonel yaptım hata vermesin diye
+  mode: 'assessment' | 'instruction';
   onClose: () => void;
   onComplete: (success: boolean) => void;
 }
 
-export default function NesneEslemeGame12({ mode = 'instruction', onClose, onComplete }: GameProps) {
+export default function NesneEslemeGame13({ mode, onClose, onComplete }: GameProps) {
+  // GAME STATES
+  const [level, setLevel] = useState(1);
+  const [questionIndex, setQuestionIndex] = useState(0); 
+  const [isMuted, setIsMuted] = useState(false);
+
   const [phase, setPhase] = useState<'playing' | 'success' | 'fail'>('playing');
   const [targetItem, setTargetItem] = useState(OBJECTS[0]);
-  const [options, setOptions] = useState<typeof OBJECTS>([]);
+  const [options, setOptions] = useState<typeof OBJECTS[]>([]);
   
   const [assessmentCount, setAssessmentCount] = useState(0); 
   const [assessmentScore, setAssessmentScore] = useState(0); 
@@ -82,15 +87,17 @@ export default function NesneEslemeGame12({ mode = 'instruction', onClose, onCom
   // Ses referansı
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
 
-  // Arkaplan Müziği
+  // Arkaplan Müziği ve Scroll Reset
   useEffect(() => {
+    // 1. ÖNLEM: Sayfayı en başa sar
+    window.scrollTo(0, 0);
+
     bgMusicRef.current = new Audio(arkaplanMusic);
     bgMusicRef.current.loop = true; 
     bgMusicRef.current.volume = 0.15; 
     
-    const playPromise = bgMusicRef.current.play();
-    if (playPromise !== undefined) {
-        playPromise.catch(error => {
+    if (!isMuted) {
+        bgMusicRef.current.play().catch(error => {
             console.log("Otomatik oynatma engellendi.", error);
         });
     }
@@ -103,7 +110,15 @@ export default function NesneEslemeGame12({ mode = 'instruction', onClose, onCom
     };
   }, []);
 
-  // Efekt Sesi Çalma
+  // Mute dinleyicisi
+  useEffect(() => {
+    if (bgMusicRef.current) {
+        if (isMuted) bgMusicRef.current.pause();
+        else bgMusicRef.current.play().catch(()=>{});
+    }
+  }, [isMuted]);
+
+  // Efekt Sesi
   const playSoundEffect = (type: 'success' | 'fail') => {
     let soundSrc;
     if (type === 'success') {
@@ -125,12 +140,18 @@ export default function NesneEslemeGame12({ mode = 'instruction', onClose, onCom
     return () => { document.body.style.overflow = originalStyle; };
   }, []);
 
-  // Soru Oluşturma
+  // --- SORU ÜRETME VE LEVEL MANTIĞI ---
   const generateQuestion = () => {
     const randomTarget = OBJECTS[Math.floor(Math.random() * OBJECTS.length)];
+    
+    // Level'a göre seçenek sayısı
+    let optionCount = 3; 
+    if (level === 2) optionCount = 4;
+    if (level === 3) optionCount = 6;
+
     const distractors = OBJECTS.filter(item => item.id !== randomTarget.id)
                              .sort(() => 0.5 - Math.random())
-                             .slice(0, 2); 
+                             .slice(0, optionCount - 1); 
 
     setTargetItem(randomTarget);
     setOptions([randomTarget, ...distractors].sort(() => 0.5 - Math.random()));
@@ -142,26 +163,39 @@ export default function NesneEslemeGame12({ mode = 'instruction', onClose, onCom
     setIsMatched(false);
   };
 
-  useEffect(() => { generateQuestion(); }, []);
+  useEffect(() => { generateQuestion(); }, [level]);
 
-  // --- SÜRÜKLE BIRAK MANTIĞI (SENİN KODUNUN AYNISI) ---
+  // --- GARANTİLİ SÜRÜKLE BIRAK MANTIĞI (GPS) ---
   const handleDragEnd = (event: any, info: any, droppedItem: typeof OBJECTS[0]) => {
     if (isModeling || isMatched) return;
 
     const dropZone = dropZoneRef.current;
     if (!dropZone) return;
     
-    // Kutu sınırlarını al
+    // 1. Kutunun Sınırları
     const dropRect = dropZone.getBoundingClientRect();
-    const dropX = info.point.x;
-    const dropY = info.point.y;
+    
+    // 2. Garantili Koordinat Okuma
+    let clientX = 0;
+    let clientY = 0;
 
-    // İçine bırakıldı mı kontrolü
+    if (event.changedTouches && event.changedTouches.length > 0) {
+        clientX = event.changedTouches[0].clientX;
+        clientY = event.changedTouches[0].clientY;
+    } else if (event.clientX) {
+        clientX = event.clientX;
+        clientY = event.clientY;
+    } else {
+        clientX = info.point.x;
+        clientY = info.point.y;
+    }
+
+    // 3. İçine Bırakıldı mı? (+40px Tolerans)
     const isInside = 
-        dropX >= dropRect.left - 40 && 
-        dropX <= dropRect.right + 40 &&
-        dropY >= dropRect.top - 40 && 
-        dropY <= dropRect.bottom + 40;
+        clientX >= dropRect.left - 40 && 
+        clientX <= dropRect.right + 40 &&
+        clientY >= dropRect.top - 40 && 
+        clientY <= dropRect.bottom + 40;
 
     if (!isInside) return;
 
@@ -186,16 +220,23 @@ export default function NesneEslemeGame12({ mode = 'instruction', onClose, onCom
         setAssessmentScore(prev => prev + 1);
     }
 
-    // Bekleme süresi (Animasyon izlensin diye)
+    // Bekleme süresi (Gölgenin renklenmesini izlesin diye)
     setTimeout(() => {
-      if (mode === 'assessment') {
+      // Level Sistemi (Sadece Öğretimde)
+      if (mode === 'instruction') {
+          const nextQ = questionIndex + 1;
+          setQuestionIndex(nextQ);
+
+          if (nextQ === 3) setLevel(2);
+          else if (nextQ === 6) setLevel(3);
+          
+          generateQuestion();
+      } else {
         const nextCount = assessmentCount + 1;
         setAssessmentCount(nextCount);
         if (nextCount < 10) generateQuestion();
-      } else {
-        generateQuestion();
       }
-    }, 2000); // 2 saniye bekletiyoruz ki gölge renklenmesini görsün
+    }, 2000);
   };
 
   const handleMistake = () => {
@@ -252,7 +293,13 @@ export default function NesneEslemeGame12({ mode = 'instruction', onClose, onCom
   }, [assessmentCount, assessmentScore, mode]);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800">
+    <div className={twMerge(
+        "fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
+        // LEVEL 3 ARKAPLAN
+        (level === 3 && mode === 'instruction') 
+            ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" 
+            : "bg-slate-50"
+    )}>
       
       {/* Üst Bar */}
       <div className="w-full max-w-2xl flex justify-between items-center text-slate-500 mb-2 relative z-10">
@@ -261,6 +308,15 @@ export default function NesneEslemeGame12({ mode = 'instruction', onClose, onCom
         </button>
         
         <div className="flex items-center gap-3">
+             {/* Seviye Göstergesi */}
+             {mode === 'instruction' && (
+                 <div className="flex gap-1 mr-2">
+                     {[1, 2, 3].map(l => (
+                         <div key={l} className={twMerge("w-3 h-3 rounded-full transition-colors", level >= l ? "bg-orange-500" : "bg-slate-200")}></div>
+                     ))}
+                 </div>
+            )}
+
             <div className={twMerge(
                 "px-4 py-2 rounded-full shadow-sm border flex items-center gap-2",
                 mode === 'assessment' ? "bg-blue-50 border-blue-100" : "bg-purple-50 border-purple-100"
@@ -270,11 +326,11 @@ export default function NesneEslemeGame12({ mode = 'instruction', onClose, onCom
                     {mode === 'assessment' ? `TEST: ${Math.min(assessmentCount + 1, 10)}/10` : "ÖĞRETİM"}
                 </span>
             </div>
-            {mode === 'assessment' && (
-                <div className="bg-green-50 px-4 py-2 rounded-full shadow-sm border border-green-100 font-black text-green-600 text-xs">
-                    PUAN: {assessmentScore}
-                </div>
-            )}
+
+            {/* Ses Butonu */}
+            <button onClick={() => setIsMuted(!isMuted)} className="p-2 bg-white border rounded-full shadow-sm active:scale-95">
+                 {isMuted ? <VolumeX size={20} className="text-slate-400"/> : <Volume2 size={20} className="text-blue-500"/>}
+            </button>
         </div>
       </div>
 
@@ -288,19 +344,17 @@ export default function NesneEslemeGame12({ mode = 'instruction', onClose, onCom
                 ref={dropZoneRef}
                 className={twMerge(
                     "w-72 h-72 bg-white rounded-[3rem] border-4 flex items-center justify-center shadow-inner relative z-0 transition-all duration-300 overflow-hidden",
-                    // Eşleşince yeşil sınır yap
                     isMatched ? "border-green-500 bg-green-50 border-solid" : "border-dashed border-slate-300"
                 )}
             >
-               {/* 1. KATMAN: SİYAH GÖLGE (Her zaman altta) */}
+               {/* 1. SİYAH GÖLGE (pointer-events-none İLE DÜZELTİLDİ) */}
                <img 
                  src={targetItem.shadowSrc} 
                  alt="Gölge" 
-                 // Opacity biraz düşük olsun ki gölge olduğu belli olsun
                  className="absolute w-56 h-56 object-contain opacity-60 pointer-events-none"
                />
 
-               {/* 2. KATMAN: RENKLİ RESİM (Eşleşince animasyonla belirir) */}
+               {/* 2. RENKLİ RESİM (pointer-events-none İLE DÜZELTİLDİ) */}
                <motion.img 
                   src={targetItem.colorSrc}
                   alt="Renkli"
@@ -309,7 +363,7 @@ export default function NesneEslemeGame12({ mode = 'instruction', onClose, onCom
                       opacity: isMatched ? 1 : 0,
                       scale: isMatched ? 1.1 : 0.8 
                   }}
-                  transition={{ duration: 0.8 }} // Yavaşça renklenmesi için
+                  transition={{ duration: 0.8 }} 
                   className="absolute w-56 h-56 object-contain z-10 drop-shadow-2xl pointer-events-none"
                />
 
@@ -317,21 +371,23 @@ export default function NesneEslemeGame12({ mode = 'instruction', onClose, onCom
             {!isMatched && <p className="mt-4 text-slate-400 font-bold text-xs tracking-widest uppercase animate-pulse">Gölgeyi Eşle</p>}
           </div>
 
-          {/* --- SEÇENEKLER (RENKLİ RESİMLER) --- */}
-          <div className="grid grid-cols-3 gap-2 w-full px-1">
+          {/* --- SEÇENEKLER --- */}
+          <div className={twMerge(
+              "grid gap-2 w-full px-1 justify-items-center",
+              level === 3 ? "grid-cols-3" : "grid-cols-3"
+          )}>
             {options.map((item) => {
               const isCorrectItem = item.id === targetItem.id;
               const isLocked = mode === 'instruction' && instructionMistakeCount >= 2 && !isCorrectItem;
               
-              // Eşleşme olduğunda doğru parçayı GİZLİYORUZ (Çünkü yukarıda belirdi)
+              // Eşleşme olduğunda aşağıdakini gizle
               const isHidden = isMatched && isCorrectItem;
               
               const canDrag = !isModeling && !isLocked && !isMatched;
 
               return (
-                <div key={item.id} className="relative flex justify-center items-center h-36">
+                <div key={item.id} className="relative flex justify-center items-center h-36 w-full">
                   <motion.div
-                    // DRAG AYARLARI (Senin kodunla aynı)
                     drag={canDrag}
                     dragConstraints={false}
                     dragSnapToOrigin={true} 
@@ -342,7 +398,7 @@ export default function NesneEslemeGame12({ mode = 'instruction', onClose, onCom
                     
                     animate={
                         isHidden
-                        ? { opacity: 0, scale: 0 } // Doğru bilince aşağıdan kaybol
+                        ? { opacity: 0, scale: 0 }
                         : (isModeling && isCorrectItem) 
                         ? { 
                             y: [0, -380, -380, 0], 
@@ -366,7 +422,7 @@ export default function NesneEslemeGame12({ mode = 'instruction', onClose, onCom
                       (flashCorrect && isCorrectItem) ? "border-green-500 shadow-green-100" : "border-slate-100"
                     )}
                   >
-                    {/* BURADA RENKLİ RESİM KULLANIYORUZ */}
+                    {/* Sürüklenecek resim için de pointer-events-none */}
                     <img src={item.colorSrc} alt={item.name} className="w-24 h-24 object-contain pointer-events-none" />
                     
                     {isModeling && isCorrectItem && (
@@ -437,5 +493,4 @@ export default function NesneEslemeGame12({ mode = 'instruction', onClose, onCom
       </AnimatePresence>
     </div>
   );
-   }
-        
+}
