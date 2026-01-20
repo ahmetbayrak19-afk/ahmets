@@ -286,29 +286,29 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
         <div className="flex-1 flex flex-col justify-around w-full max-w-md h-full">
           
           <div className="flex flex-col items-center">
-            {/* HEDEF KUTU (3 KATMAN) 
-               style={{ perspective: '800px' }} -> 3D efekti için şart!
-            */}
+            {/* HEDEF KUTU (3 KATMAN + KESİK ÇİZGİLİ ÇERÇEVE) */}
             <div 
                 ref={dropZoneRef}
                 style={{ perspective: '800px' }} 
-                className="w-72 h-72 flex items-center justify-center relative z-0"
+                className={twMerge(
+                    "w-72 h-72 bg-white rounded-[3rem] flex items-center justify-center relative z-0 transition-all duration-300 overflow-hidden",
+                    // --- İŞTE BU SATIR KUTUNUN KENDİ ÇERÇEVESİNİ BELİRLER ---
+                    // Eşleşince Yeşil Düz, Eşleşmeyince Gri Kesik Çizgi
+                    isMatched ? "border-4 border-green-500 bg-green-50" : "border-4 border-dashed border-slate-300"
+                )}
             >
                {/* KATMAN 3 (EN ÜST): ÇERÇEVE (transkare.png) 
-                   Tıklamaları engelliyor (pointer-events-none) 
+                   Gölge Yok, Tıklama Yok.
                */}
                <img 
                  key={targetItem.id + '-frame'}
                  src={targetItem.frameSrc} 
                  alt="Çerçeve" 
-                 className="absolute w-56 h-56 object-contain z-20 pointer-events-none drop-shadow-xl"
+                 className="absolute w-56 h-56 object-contain z-20 pointer-events-none"
                />
 
                {/* KATMAN 2 (ARA): EŞLEŞEN PARÇA (kare1.png)
-                   İşte büyü burada:
-                   rotateX(50deg) -> Arkaya doğru yatar.
-                   scale(0.9) -> Biraz küçülür (derinlik hissi).
-                   y(10) -> Biraz aşağı iner (dibine oturma hissi).
+                   Efekt: Arkaya devrilme (rotateX: 50) + İçine düşme (scale: 0.9, y: 10)
                */}
                <motion.img 
                   key={targetItem.id + '-fill'}
@@ -318,14 +318,16 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                   animate={{ 
                       opacity: isMatched ? 1 : 0,
                       scale: isMatched ? 0.9 : 1.2,  
-                      rotateX: isMatched ? 50 : 0,   // <-- ARKAYA DEVRİLME EFEKTİ
-                      y: isMatched ? 10 : -50        // <-- AŞAĞI İNME EFEKTİ
+                      rotateX: isMatched ? 50 : 0,   // <-- ARKAYA DEVRİLME
+                      y: isMatched ? 10 : -50        // <-- AŞAĞI İNME
                   }}
                   transition={{ duration: 0.5, type: "spring", bounce: 0.2 }} 
                   className="absolute w-56 h-56 object-contain z-10 pointer-events-none origin-bottom"
                />
 
-               {/* KATMAN 1 (EN ALT): ZEMİN (kare.png) */}
+               {/* KATMAN 1 (EN ALT): ZEMİN (kare.png) 
+                   Dümdüz Zemin Resmi.
+               */}
                <img 
                  key={targetItem.id + '-bg'}
                  src={targetItem.bgSrc} 
@@ -348,7 +350,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
               const canDrag = !isModeling && !isLocked && !isMatched;
 
               return (
-                <div key={item.id} className="relative flex justify-center items-center h-32 w-full">
+                <div key={item.id} className="relative flex justify-center items-center h-36 w-full">
                   <motion.div
                     drag={canDrag}
                     dragConstraints={false}
@@ -368,7 +370,6 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                             x: 0
                           } 
                         : (flashCorrect && isCorrectItem)
-                        // Yanlış cevapta sadece hafif titreme, çerçeve yok
                         ? { x: [0, -5, 5, -5, 0] } 
                         : { scale: 1, opacity: isLocked ? 0.3 : 1 }
                     }
@@ -378,13 +379,10 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                         : { duration: 0.3 }
                     }
 
-                    // --- DEĞİŞİKLİK BURADA: BORDER/BG TAMAMEN KALKTI ---
-                    // Sadece 'cursor-grab' kaldı. Resim havada duruyor.
+                    // --- SÜRÜKLENECEK PARÇADA ÇERÇEVE/GÖLGE YOK ---
                     className={twMerge(
                       "w-28 h-28 flex items-center justify-center touch-none relative z-10",
-                      canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed",
-                      // Yanlış cevapta bile border çıkmasın, sadece opacity değişsin
-                      (flashCorrect && isCorrectItem) ? "" : "" 
+                      canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed"
                     )}
                   >
                     <img src={item.src} alt={item.name} className="w-24 h-24 object-contain pointer-events-none drop-shadow-md" />
@@ -457,5 +455,4 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
       </AnimatePresence>
     </div>
   );
-  }
-    
+                         }
