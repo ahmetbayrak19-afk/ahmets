@@ -292,14 +292,11 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                 style={{ perspective: '800px' }} 
                 className={twMerge(
                     "w-72 h-72 bg-white rounded-[3rem] flex items-center justify-center relative z-0 transition-all duration-300 overflow-hidden",
-                    // --- İŞTE BU SATIR KUTUNUN KENDİ ÇERÇEVESİNİ BELİRLER ---
-                    // Eşleşince Yeşil Düz, Eşleşmeyince Gri Kesik Çizgi
-                    isMatched ? "border-4 border-green-500 bg-green-50" : "border-4 border-dashed border-slate-300"
+                    // --- DÜZELTİLEN KISIM: İÇERİSİ BEYAZ KALACAK, ÇERÇEVE KESİK YEŞİL OLACAK ---
+                    isMatched ? "border-4 border-dashed border-green-500" : "border-4 border-dashed border-slate-300"
                 )}
             >
-               {/* KATMAN 3 (EN ÜST): ÇERÇEVE (transkare.png) 
-                   Gölge Yok, Tıklama Yok.
-               */}
+               {/* KATMAN 3 (EN ÜST): ÇERÇEVE (transkare.png) */}
                <img 
                  key={targetItem.id + '-frame'}
                  src={targetItem.frameSrc} 
@@ -307,9 +304,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                  className="absolute w-56 h-56 object-contain z-20 pointer-events-none"
                />
 
-               {/* KATMAN 2 (ARA): EŞLEŞEN PARÇA (kare1.png)
-                   Efekt: Arkaya devrilme (rotateX: 50) + İçine düşme (scale: 0.9, y: 10)
-               */}
+               {/* KATMAN 2 (ARA): EŞLEŞEN PARÇA (kare1.png) */}
                <motion.img 
                   key={targetItem.id + '-fill'}
                   src={targetItem.src} 
@@ -318,16 +313,14 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                   animate={{ 
                       opacity: isMatched ? 1 : 0,
                       scale: isMatched ? 0.9 : 1.2,  
-                      rotateX: isMatched ? 50 : 0,   // <-- ARKAYA DEVRİLME
-                      y: isMatched ? 10 : -50        // <-- AŞAĞI İNME
+                      rotateX: isMatched ? 50 : 0,
+                      y: isMatched ? 10 : -50
                   }}
                   transition={{ duration: 0.5, type: "spring", bounce: 0.2 }} 
                   className="absolute w-56 h-56 object-contain z-10 pointer-events-none origin-bottom"
                />
 
-               {/* KATMAN 1 (EN ALT): ZEMİN (kare.png) 
-                   Dümdüz Zemin Resmi.
-               */}
+               {/* KATMAN 1 (EN ALT): ZEMİN (kare.png) */}
                <img 
                  key={targetItem.id + '-bg'}
                  src={targetItem.bgSrc} 
@@ -379,7 +372,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                         : { duration: 0.3 }
                     }
 
-                    // --- SÜRÜKLENECEK PARÇADA ÇERÇEVE/GÖLGE YOK ---
+                    // AŞAĞIDAKİ ŞEKİLLERDE ÇERÇEVE YOK
                     className={twMerge(
                       "w-28 h-28 flex items-center justify-center touch-none relative z-10",
                       canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed"
@@ -455,4 +448,4 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
       </AnimatePresence>
     </div>
   );
-                         }
+}
