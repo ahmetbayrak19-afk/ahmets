@@ -4,7 +4,16 @@ import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, R
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
-// --- KUTU GÖRSELLERİ (HEDEF - TRANS ÇERÇEVELER) ---
+// --- 1. EN ALT KATMAN (ZEMİN - GÖLGESİZ NORMAL RESİMLER) ---
+import besgenBg from './besgen.png';
+import daireBg from './daire.png';
+import dikdortgenBg from './dikdortgen.png';
+import kareBg from './kare.png';
+import ucgenBg from './ucgen.png';
+import yildizBg from './yildiz.png';
+import kalpBg from './kalp.png';
+
+// --- 2. EN ÜST KATMAN (ÇERÇEVE - ORTASI TRANS, KENARI OLANLAR) ---
 import transBesgen from './transbesgen.png';
 import transDaire from './transdaire.png';
 import transDikdortgen from './transdikdortgen.png';
@@ -13,7 +22,7 @@ import transUcgen from './transucgen.png';
 import transYildiz from './transyildiz.png';
 import transKalp from './transkalp.png';
 
-// --- ŞEKİL GÖRSELLERİ (SÜRÜKLENECEK - DOLU OLANLAR) ---
+// --- 3. SÜRÜKLENECEK PARÇA (İÇE GİRECEK OLAN - 1 İLE BİTENLER) ---
 import besgenShape from './besgen1.png';
 import daireShape from './daire1.png';
 import dikdortgenShape from './dikdortgen1.png';
@@ -33,18 +42,24 @@ import harika2 from './ses/harika2.mp3';
 import tekrardene1 from './ses/tekrardene1.mp3';
 import tekrardene2 from './ses/tekrardene2.mp3';
 
-// --- SES HAVUZLARI ---
 const POSITIVE_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
 const NEGATIVE_SOUNDS = [tekrardene1, tekrardene2];
 
+// VERİ YAPISI (3 KATMANLI)
 const OBJECTS = [
-  { id: 'besgen', name: 'Beşgen', src: besgenShape, frameSrc: transBesgen },
-  { id: 'daire', name: 'Daire', src: daireShape, frameSrc: transDaire },
-  { id: 'dikdortgen', name: 'Dikdörtgen', src: dikdortgenShape, frameSrc: transDikdortgen },
-  { id: 'kare', name: 'Kare', src: kareShape, frameSrc: transKare },
-  { id: 'ucgen', name: 'Üçgen', src: ucgenShape, frameSrc: transUcgen },
-  { id: 'yildiz', name: 'Yıldız', src: yildizShape, frameSrc: transYildiz },
-  { id: 'kalp', name: 'Kalp', src: kalpShape, frameSrc: transKalp },
+  { 
+    id: 'besgen', 
+    name: 'Beşgen', 
+    src: besgenShape,       // Sürüklenecek (Araya girecek)
+    frameSrc: transBesgen,  // En Üst (Çerçeve)
+    bgSrc: besgenBg         // En Alt (Zemin)
+  },
+  { id: 'daire', name: 'Daire', src: daireShape, frameSrc: transDaire, bgSrc: daireBg },
+  { id: 'dikdortgen', name: 'Dikdörtgen', src: dikdortgenShape, frameSrc: transDikdortgen, bgSrc: dikdortgenBg },
+  { id: 'kare', name: 'Kare', src: kareShape, frameSrc: transKare, bgSrc: kareBg },
+  { id: 'ucgen', name: 'Üçgen', src: ucgenShape, frameSrc: transUcgen, bgSrc: ucgenBg },
+  { id: 'yildiz', name: 'Yıldız', src: yildizShape, frameSrc: transYildiz, bgSrc: yildizBg },
+  { id: 'kalp', name: 'Kalp', src: kalpShape, frameSrc: transKalp, bgSrc: kalpBg },
 ];
 
 interface GameProps {
@@ -54,7 +69,6 @@ interface GameProps {
 }
 
 export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProps) {
-  // GAME STATES
   const [level, setLevel] = useState(1); 
   const [questionIndex, setQuestionIndex] = useState(0); 
   const [isMuted, setIsMuted] = useState(false);
@@ -65,35 +79,23 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
   
   const [assessmentCount, setAssessmentCount] = useState(0); 
   const [assessmentScore, setAssessmentScore] = useState(0); 
-  
   const [instructionMistakeCount, setInstructionMistakeCount] = useState(0);
   const [isModeling, setIsModeling] = useState(false);
   const [flashCorrect, setFlashCorrect] = useState(false);
   const [isMatched, setIsMatched] = useState(false);
-  
   const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
+  
   const dropZoneRef = useRef<HTMLDivElement>(null);
-
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
 
   // Müzik ve Scroll
   useEffect(() => {
     window.scrollTo(0, 0);
-
     bgMusicRef.current = new Audio(arkaplanMusic);
     bgMusicRef.current.loop = true; 
     bgMusicRef.current.volume = 0.15; 
-    
-    if (!isMuted) {
-        bgMusicRef.current.play().catch(error => { console.log(error); });
-    }
-
-    return () => {
-        if (bgMusicRef.current) {
-            bgMusicRef.current.pause();
-            bgMusicRef.current.currentTime = 0;
-        }
-    };
+    if (!isMuted) bgMusicRef.current.play().catch(() => {});
+    return () => { if (bgMusicRef.current) bgMusicRef.current.pause(); };
   }, []);
 
   useEffect(() => {
@@ -126,7 +128,6 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
   // --- SORU ÜRETME ---
   const generateQuestion = () => {
     const randomTarget = OBJECTS[Math.floor(Math.random() * OBJECTS.length)];
-    
     let optionCount = 3; 
     if (level === 2) optionCount = 4;
     if (level === 3) optionCount = 6;
@@ -147,7 +148,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
 
   useEffect(() => { generateQuestion(); }, [level]);
 
-  // --- GARANTİLİ SÜRÜKLE BIRAK (GPS) ---
+  // --- GPS SÜRÜKLEME MANTIĞI ---
   const handleDragEnd = (event: any, info: any, droppedItem: typeof OBJECTS[0]) => {
     if (isModeling || isMatched) return;
 
@@ -193,9 +194,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
 
     if (mode === 'instruction') {
         setShowFeedback('correct');
-    }
-    
-    if (mode === 'assessment') {
+    } else {
         setAssessmentScore(prev => prev + 1);
     }
 
@@ -203,10 +202,8 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
       if (mode === 'instruction') {
           const nextQ = questionIndex + 1;
           setQuestionIndex(nextQ);
-
           if (nextQ === 3) setLevel(2);
           else if (nextQ === 6) setLevel(3);
-          
           generateQuestion();
       } else {
         const nextCount = assessmentCount + 1;
@@ -218,24 +215,20 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
 
   const handleMistake = () => {
     playSoundEffect('fail'); 
-
     if (mode === 'assessment') {
         setTimeout(() => {
             const nextCount = assessmentCount + 1;
             setAssessmentCount(nextCount);
             if (nextCount < 10) generateQuestion();
         }, 800);
-    } 
-    else {
+    } else {
         const newMistake = instructionMistakeCount + 1;
         setInstructionMistakeCount(newMistake);
         setShowFeedback('wrong');
-
         if (newMistake === 1) {
             setTimeout(() => { setShowFeedback(null); }, 1500);
             setTimeout(() => { runModelingDemo(); }, 500);
-        } 
-        else if (newMistake >= 2) {
+        } else if (newMistake >= 2) {
             setTimeout(() => setShowFeedback(null), 1000);
             setFlashCorrect(true);
             setTimeout(() => setFlashCorrect(false), 2000);
@@ -245,36 +238,26 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
 
   const runModelingDemo = () => {
     setIsModeling(true);
-    setTimeout(() => {
-        setIsModeling(false);
-    }, 2000); 
+    setTimeout(() => { setIsModeling(false); }, 2000); 
   };
 
   const fireConfetti = () => {
     try {
         confetti({ particleCount: 300, spread: 100, origin: { y: 0.6 } });
-    } catch (e) {
-        console.error("Confetti hatası:", e);
-    }
+    } catch (e) {}
   };
 
   useEffect(() => {
     if (mode === 'assessment' && assessmentCount === 10) {
-      if (assessmentScore >= 9) {
-        setPhase('success');
-        fireConfetti();
-      } else {
-        setPhase('fail');
-      }
+      if (assessmentScore >= 9) { setPhase('success'); fireConfetti(); } 
+      else { setPhase('fail'); }
     }
   }, [assessmentCount, assessmentScore, mode]);
 
   return (
     <div className={twMerge(
-        "fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
-        (level === 3 && mode === 'instruction') 
-            ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" 
-            : "bg-slate-50"
+        "fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800",
+        (level === 3 && mode === 'instruction') ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" : "bg-slate-50"
     )}>
       
       {/* Üst Bar */}
@@ -291,17 +274,12 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                      ))}
                  </div>
             )}
-
-            <div className={twMerge(
-                "px-4 py-2 rounded-full shadow-sm border flex items-center gap-2",
-                mode === 'assessment' ? "bg-blue-50 border-blue-100" : "bg-purple-50 border-purple-100"
-            )}>
+            <div className={twMerge("px-4 py-2 rounded-full shadow-sm border flex items-center gap-2", mode === 'assessment' ? "bg-blue-50 border-blue-100" : "bg-purple-50 border-purple-100")}>
                 {mode === 'assessment' ? <ClipboardCheck size={16} className="text-blue-600"/> : <GraduationCap size={16} className="text-purple-600"/>}
                 <span className={twMerge("font-bold text-xs uppercase", mode === 'assessment' ? "text-blue-600" : "text-purple-600")}>
                     {mode === 'assessment' ? `TEST: ${Math.min(assessmentCount + 1, 10)}/10` : "ÖĞRETİM"}
                 </span>
             </div>
-
             <button onClick={() => setIsMuted(!isMuted)} className="p-2 bg-white border rounded-full shadow-sm active:scale-95">
                  {isMuted ? <VolumeX size={20} className="text-slate-400"/> : <Volume2 size={20} className="text-blue-500"/>}
             </button>
@@ -313,17 +291,20 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
         <div className="flex-1 flex flex-col justify-around w-full max-w-md h-full">
           
           <div className="flex flex-col items-center">
-            {/* --- HEDEF KUTU (GÖLGESİZ/DÜMDÜZ) --- */}
+            {/* HEDEF KUTU (3 KATMANLI SANDVİÇ SİSTEMİ) 
+                Gölge Yok, Border Var (İsteğe bağlı)
+            */}
             <div 
                 ref={dropZoneRef}
                 className={twMerge(
-                    // shadow-inner KALDIRILDI. Artık dümdüz beyaz.
                     "w-72 h-72 bg-white rounded-[3rem] border-4 flex items-center justify-center relative z-0 transition-all duration-300 overflow-hidden",
-                    // Çerçeve rengi
                     isMatched ? "border-green-500 bg-green-50 border-solid" : "border-dashed border-slate-300"
                 )}
             >
-               {/* 1. KATMAN (EN ÜST): ÇERÇEVE RESMİ (Ortası Delik) */}
+               {/* KATMAN 3 (EN ÜST): ÇERÇEVE (transkare.png)
+                  Ortası delik olduğu için altındaki parçayı gösterir.
+                  z-index: 20 (En üstte)
+               */}
                <img 
                  key={targetItem.id + '-frame'}
                  src={targetItem.frameSrc} 
@@ -331,18 +312,34 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                  className="absolute w-56 h-56 object-contain z-20 pointer-events-none"
                />
 
-               {/* 2. KATMAN (ALT): DOLGU RESMİ (Dolu Renkli) */}
+               {/* KATMAN 2 (ARA): EŞLEŞEN PARÇA (kare1.png)
+                  Animasyonla belirir. Çerçevenin altında, Zeminin üstündedir.
+                  z-index: 10
+                  Efekt: 2px aşağı kayar (y:2) ve %95 küçülür (scale:0.95) -> İçine düşme hissi
+               */}
                <motion.img 
                   key={targetItem.id + '-fill'}
                   src={targetItem.src} 
                   alt="Dolgu"
-                  initial={{ opacity: 0, scale: 0.8 }}
+                  initial={{ opacity: 0, scale: 1.1 }} // Başta biraz büyük ve görünmez
                   animate={{ 
                       opacity: isMatched ? 1 : 0,
-                      scale: isMatched ? 1 : 0.8 
+                      scale: isMatched ? 0.95 : 1.1, // Küçülerek içine düşüyor
+                      y: isMatched ? 2 : 0           // 2 piksel aşağı kayıyor
                   }}
-                  transition={{ duration: 0.5 }} 
+                  transition={{ duration: 0.4, ease: "backOut" }} // "Löp" diye oturma efekti
                   className="absolute w-56 h-56 object-contain z-10 pointer-events-none"
+               />
+
+               {/* KATMAN 1 (EN ALT): ZEMİN (kare.png)
+                  Dolu, gölgesiz zemin resmi.
+                  z-index: 0
+               */}
+               <img 
+                 key={targetItem.id + '-bg'}
+                 src={targetItem.bgSrc} 
+                 alt="Zemin" 
+                 className="absolute w-56 h-56 object-contain z-0 pointer-events-none"
                />
 
             </div>
@@ -466,4 +463,4 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
       </AnimatePresence>
     </div>
   );
-          }
+}
