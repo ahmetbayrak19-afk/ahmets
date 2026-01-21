@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Play, RotateCcw, XCircle } from 'lucide-react';
+import { Play, XCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 // --- GÖRSELLER ---
@@ -10,33 +10,35 @@ import suYuzeyiImg from './su_yuzeyi.png';
 import zeminImg from './zemin.png';
 
 export default function EslemeGame({ onClose }: { onClose: () => void }) {
-  // --- AYARLAR (Burayı güncelledik) ---
+  // --- FİZİK AYARLARI ---
   const WORLD_HEIGHT = 3000; 
   const SEA_LEVEL = 400;     
-  const GRAVITY = 0.4;       // Yerçekimini biraz azalttım
   
-  // HAREKET AYARLARI (Yavaşlatıldı)
-  const FOLLOW_STRENGTH = 0.025; // Takip hızı (Düşürüldü: 0.05 -> 0.025)
-  const WATER_DRAG = 0.12;       // Sürtünme (Artırıldı: 0.08 -> 0.12) - Daha tok durur
-  const SCROLL_SPEED = 2;        // Arka plan hızı (Düşürüldü: 4 -> 2)
+  // YENİ AYARLAR:
+  const GRAVITY = 0.8;         // Yerçekimi artırıldı (Daha tok düşüş - Cup diye girsin)
+  const FOLLOW_SPEED = 0.04;   // Takip hızı
+  const WATER_FRICTION = 0.94; // Su içi süzülme (Daha kaygan, hemen durmaz)
+  const AIR_RESISTANCE = 0.99; // Hava direnci
+  const MIN_IDLE_SPEED = 0.5;  // Balık hiç durmasın, minimal süzülsün
 
   // --- STATE'LER ---
   const [isPlaying, setIsPlaying] = useState(false);
-  const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
-  
   const [isEating, setIsEating] = useState(false); 
   const [faceDirection, setFaceDirection] = useState(1); 
 
+  // Fiziksel Referanslar
   const fishPhys = useRef({ x: 200, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 });
-  const mousePos = useRef({ x: 200, y: 500 });
+  const mousePos = useRef({ x: window.innerWidth / 2, y: 500 });
   const cameraY = useRef(0);
   const backgroundX = useRef(0);
   const requestRef = useRef<number>();
+  const [targets, setTargets] = useState<{id: number, x: number, y: number, color: string, type: 'food'}[]>([]);
 
-  const [targets, setTargets] = useState<{id: number, x: number, y: number, color: string, type: 'food'|'enemy'}[]>([]);
+  // Önceki karede suda mıydı? (Giriş/Çıkış tespiti için)
+  const wasInWater = useRef(true);
 
-  // --- INPUT (MOUSE/TOUCH) ---
+  // --- INPUT ---
   const handleInput = (e: any) => {
     if (!isPlaying) return;
     let clientX, clientY;
@@ -52,10 +54,10 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
   const startGame = () => {
     setIsPlaying(true);
-    setGameOver(false);
     setScore(0);
     fishPhys.current = { x: window.innerWidth / 2, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 };
-    mousePos.current = { x: window.innerWidth / 2, y: 500 }; // Mouse'u da resetle
+    mousePos.current = { x: window.innerWidth / 2, y: 500 };
+    cameraY.current = 0;
     setTargets([]);
   };
 
@@ -66,85 +68,95 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
   // --- OYUN DÖNGÜSÜ ---
   const gameLoop = () => {
-    if (gameOver) return;
-
     const inWater = fishPhys.current.y > SEA_LEVEL;
 
-    // --- FİZİK HESAPLAMA ---
+    // --- 1. GİRİŞ / ÇIKIŞ OLAYLARI (Sudan çıkış kontrolü) ---
+    if (wasInWater.current && !inWater) {
+        // Sudan ÇIKTIĞI AN:
+        // Hızını %60 kes! (Bu sayede uzaya gitmez)
+        fishPhys.current.vy *= 0.4; 
+    }
+    wasInWater.current = inWater;
+
+
+    // --- 2. HAREKET FİZİĞİ ---
     if (inWater) {
-      const targetWorldY = mousePos.current.y + cameraY.current; 
+      // --- SUDA HAREKET ---
       
-      const dx = mousePos.current.x - fishPhys.current.x; 
-      const dy = targetWorldY - fishPhys.current.y;
-
-      // Takip hızı (Smooth Follow)
-      fishPhys.current.vx += dx * FOLLOW_STRENGTH;
-      fishPhys.current.vy += dy * FOLLOW_STRENGTH;
+      let targetY = mousePos.current.y + cameraY.current;
       
-      // Sürtünme (Hızı kes)
-      fishPhys.current.vx *= (1 - WATER_DRAG);
-      fishPhys.current.vy *= (1 - WATER_DRAG);
+      // HEDEF SINIRLAMASI (YÜZEYDE TAKILMA ÇÖZÜMÜ):
+      // Eğer parmak suyun üstündeyse, balık oraya gitmeye çalışmasın.
+      // Balığın hedefi en fazla suyun 50px altı olabilir.
+      if (targetY < SEA_LEVEL + 50) {
+          targetY = SEA_LEVEL + 50;
+      }
 
-      // Yön Bulma
-      if (Math.abs(fishPhys.current.vx) > 0.5) {
-          setFaceDirection(fishPhys.current.vx > 0 ? 1 : -1);
+      const dx = mousePos.current.x - fishPhys.current.x;
+      const dy = targetY - fishPhys.current.y;
+
+      // Hızlandırma
+      fishPhys.current.vx += dx * FOLLOW_SPEED;
+      fishPhys.current.vy += dy * FOLLOW_SPEED;
+      
+      // Sürtünme
+      fishPhys.current.vx *= WATER_FRICTION;
+      fishPhys.current.vy *= WATER_FRICTION;
+
+      // Minimal Süzülme (Durmasın, çok yavaşça aksın)
+      if (Math.abs(fishPhys.current.vx) < MIN_IDLE_SPEED) {
+          fishPhys.current.vx += (faceDirection * 0.05); // Baktığı yöne minik itiş
       }
 
     } else {
-      // Havadayken
-      fishPhys.current.vy += GRAVITY; 
-      fishPhys.current.vx *= 0.98; 
+      // --- HAVADA HAREKET ---
+      fishPhys.current.vy += GRAVITY; // Yerçekimi (Aşağı çeker)
+      fishPhys.current.vx *= AIR_RESISTANCE; // Hava direnci
     }
 
     // Pozisyonu Uygula
     fishPhys.current.x += fishPhys.current.vx;
     fishPhys.current.y += fishPhys.current.vy;
 
-    // --- EKRAN SINIRLARI (Balık kaybolmasın) ---
-    // Sol ve Sağ duvarlar
-    if (fishPhys.current.x < 50) {
-        fishPhys.current.x = 50;
-        fishPhys.current.vx = 0; // Duvara çarpınca hızı sıfırla
-    }
-    if (fishPhys.current.x > window.innerWidth - 50) {
-        fishPhys.current.x = window.innerWidth - 50;
-        fishPhys.current.vx = 0;
+    // --- 3. YÖN VE DÖNME ---
+    if (Math.abs(fishPhys.current.vx) > 0.5) {
+        setFaceDirection(fishPhys.current.vx > 0 ? 1 : -1);
     }
 
-    // Dip Sınırı
-    if (fishPhys.current.y > WORLD_HEIGHT - 120) {
-        fishPhys.current.y = WORLD_HEIGHT - 120;
-        fishPhys.current.vy = 0;
-    }
-
-    // --- JELİBON EFEKTİ ---
-    const speed = Math.sqrt(fishPhys.current.vx**2 + fishPhys.current.vy**2);
-    const stretch = Math.min(speed * 0.02, 0.2); // Esnemeyi de biraz azalttım (Daha tok)
+    // Eğim (Tilt) Hesabı
+    let targetRotation = fishPhys.current.vy * 2 * faceDirection;
+    targetRotation = Math.max(-30, Math.min(30, targetRotation)); // Max 30 derece
     
-    let angle = Math.atan2(fishPhys.current.vy, fishPhys.current.vx) * (180 / Math.PI);
-    if (faceDirection === -1) { 
-        angle = angle - 180; 
-        angle = angle * -1; 
+    // Havadaysa burnu düşüş hızına göre dönsün (Cup diye girmesi için)
+    if (!inWater) {
+        // Eğer yukarı çıkıyorsa (vy negatif) dik dursun, düşüyorsa kafa aşağı
+        targetRotation = Math.min(fishPhys.current.vy * 5, 90) * faceDirection;
     }
-    // Havadayken kafa aşağı düşsün
-    if (!inWater) angle = 90;
 
-    fishPhys.current.rotation += (angle - fishPhys.current.rotation) * 0.1; // Yumuşak dönüş
+    fishPhys.current.rotation += (targetRotation - fishPhys.current.rotation) * 0.1;
+
+    // --- 4. JELİBON EFEKTİ ---
+    const totalSpeed = Math.sqrt(fishPhys.current.vx**2 + fishPhys.current.vy**2);
+    const stretch = Math.min(totalSpeed * 0.01, 0.2); 
     fishPhys.current.scaleX = 1 + stretch;
     fishPhys.current.scaleY = 1 - stretch * 0.5;
 
-    // --- KAMERA ---
+    // --- 5. SINIRLAR ---
+    if (fishPhys.current.x < 50) { fishPhys.current.x = 50; fishPhys.current.vx *= -0.5; }
+    if (fishPhys.current.x > window.innerWidth - 50) { fishPhys.current.x = window.innerWidth - 50; fishPhys.current.vx *= -0.5; }
+    if (fishPhys.current.y > WORLD_HEIGHT - 120) { fishPhys.current.y = WORLD_HEIGHT - 120; fishPhys.current.vy = 0; }
+
+    // --- 6. KAMERA ---
     const targetCamY = fishPhys.current.y - window.innerHeight / 2;
-    cameraY.current += (targetCamY - cameraY.current) * 0.08; // Kamera daha yavaş takip etsin
+    cameraY.current += (targetCamY - cameraY.current) * 0.1;
     if (cameraY.current < 0) cameraY.current = 0;
     if (cameraY.current > WORLD_HEIGHT - window.innerHeight) cameraY.current = WORLD_HEIGHT - window.innerHeight;
 
-    // --- ARKA PLAN KAYMASI ---
-    backgroundX.current -= SCROLL_SPEED;
+    backgroundX.current -= 1.5;
 
-    // --- HEDEFLER ---
+    // --- 7. HEDEF YÖNETİMİ ---
     setTargets(prev => {
-        if (Math.random() < 0.015) { // Hedef çıkma sıklığı
+        if (Math.random() < 0.015) { 
             return [...prev, {
                 id: Date.now(),
                 x: window.innerWidth + 100, 
@@ -153,19 +165,14 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                 type: 'food'
             }];
         }
-        
         return prev
-            .map(t => ({...t, x: t.x - SCROLL_SPEED}))
+            .map(t => ({...t, x: t.x - 2}))
             .filter(t => {
                 const dist = Math.hypot(fishPhys.current.x - t.x, fishPhys.current.y - t.y);
-                if (dist < 70) { // Yeme mesafesi (Hitbox)
+                if (dist < 70) { 
                     triggerEatAnimation();
                     setScore(s => s + 10);
-                    confetti({
-                         origin: { x: fishPhys.current.x / window.innerWidth, y: 0.5 },
-                         particleCount: 20,
-                         spread: 40
-                    });
+                    confetti({ origin: { x: fishPhys.current.x / window.innerWidth, y: 0.5 }, particleCount: 20, spread: 40 });
                     return false; 
                 }
                 return t.x > -100; 
@@ -182,11 +189,11 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
   return (
     <div 
-        className="fixed inset-0 overflow-hidden bg-sky-200 font-sans select-none touch-none" // touch-none mobilde kaydırmayı engeller
+        className="fixed inset-0 overflow-hidden bg-sky-200 font-sans select-none touch-none"
         onMouseMove={handleInput}
         onTouchMove={handleInput}
     >
-        {/* === DÜNYA CONTAINER === */}
+        {/* === DÜNYA === */}
         <div 
             className="absolute w-full top-0 left-0 will-change-transform"
             style={{ 
@@ -194,12 +201,12 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                 transform: `translateY(${-cameraY.current}px)` 
             }}
         >
-            {/* 1. GÖKYÜZÜ */}
+            {/* GÖKYÜZÜ */}
             <div style={{ height: SEA_LEVEL }} className="w-full bg-gradient-to-b from-sky-300 to-sky-100 relative">
-                <h1 className="text-center text-white/50 font-black text-6xl pt-20">GÖKYÜZÜ</h1>
+                 <h1 className="text-center text-white/50 font-black text-6xl pt-20">GÖKYÜZÜ</h1>
             </div>
 
-            {/* 2. DENİZ SUYU (Ana Gövde) */}
+            {/* DENİZ */}
             <div 
                 className="w-full relative"
                 style={{ 
@@ -208,7 +215,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     background: 'linear-gradient(to bottom, #60a5fa 0%, #1e3a8a 90%)' 
                 }}
             >
-                {/* SU YÜZEYİ (Dalgalar) */}
+                {/* SU YÜZEYİ */}
                 <div 
                     className="absolute top-0 left-0 w-[200%] h-16 pointer-events-none"
                     style={{ 
@@ -219,49 +226,43 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     }}
                 />
 
-                {/* --- ZEMİN (KUM) DÜZELTMESİ --- */}
-                {/* Altına bir kutu daha koyduk ve rengini kum rengi yaptık (blue glitch fix) */}
+                {/* ZEMİN (KUM) */}
                 <div 
                     className="absolute bottom-0 left-0 w-[200%] h-40 pointer-events-none"
                     style={{ 
                         backgroundImage: `url(${zeminImg})`,
-                        backgroundColor: '#e6c288', // Kum rengi astar (Altta mavi görünmesin diye)
+                        backgroundColor: '#e6c288',
                         backgroundRepeat: 'repeat-x',
-                        backgroundSize: 'auto 100%', // Resmi tam sığdır
-                        backgroundPosition: 'bottom', // En alta yapıştır
+                        backgroundSize: 'auto 100%',
+                        backgroundPosition: 'bottom',
                         transform: `translateX(${backgroundX.current % window.innerWidth}px)`
                     }}
                 />
             </div>
 
-            {/* 3. HEDEFLER */}
+            {/* HEDEFLER */}
             {targets.map(t => (
                 <div 
                     key={t.id}
                     className="absolute w-12 h-12 rounded-full shadow-lg border-2 border-white/50 flex items-center justify-center animate-pulse"
-                    style={{ 
-                        left: t.x, 
-                        top: t.y,
-                        backgroundColor: t.color 
-                    }}
+                    style={{ left: t.x, top: t.y, backgroundColor: t.color }}
                 >
-                    {/* Basit parlama efekti */}
                     <div className="w-4 h-4 bg-white/40 rounded-full blur-sm"></div>
                 </div>
             ))}
 
-            {/* 4. OYUNCU BALIĞI */}
+            {/* OYUNCU BALIĞI */}
             {isPlaying && (
                 <div 
                     className="absolute z-50 will-change-transform"
                     style={{
                         left: fishPhys.current.x,
                         top: fishPhys.current.y,
-                        width: 90, // Balığı biraz büyüttüm
+                        width: 90, 
                         height: 70,
                         transform: `translate(-50%, -50%) 
-                                    rotate(${fishPhys.current.rotation}deg) 
-                                    scale(${faceDirection * fishPhys.current.scaleX}, ${fishPhys.current.scaleY})` 
+                                    scale(${faceDirection * fishPhys.current.scaleX}, ${fishPhys.current.scaleY})
+                                    rotate(${fishPhys.current.rotation}deg)` 
                     }}
                 >
                     <img 
@@ -273,7 +274,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
             )}
         </div>
 
-        {/* === UI (ARAYÜZ) === */}
+        {/* UI */}
         <div className="fixed top-5 left-5 bg-white/90 backdrop-blur px-6 py-2 rounded-full shadow-xl border-4 border-orange-400 z-[100]">
             <span className="font-black text-2xl text-orange-600">SKOR: {score}</span>
         </div>
@@ -282,7 +283,6 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
             <XCircle className="text-red-500 w-8 h-8" />
         </button>
 
-        {/* MENÜ EKRANI */}
         {!isPlaying && (
             <div className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-center p-4">
                 <motion.button 
@@ -293,13 +293,8 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                 >
                     <Play size={40} fill="currentColor" /> BAŞLA
                 </motion.button>
-                <div className="mt-8 text-white/90 text-lg font-medium bg-white/10 p-4 rounded-xl backdrop-blur-md">
-                    <p>👆 Parmağınla balığı yönlendir</p>
-                    <p>🐟 Renkli yemleri topla</p>
-                </div>
             </div>
         )}
     </div>
   );
-    }
-    
+}
