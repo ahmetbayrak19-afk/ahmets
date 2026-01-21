@@ -1,214 +1,295 @@
-import { useState, useEffect } from 'react';
-import { db } from '../firebase'; // Yolunu kendi projene göre ayarla
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Gamepad2, GraduationCap, ClipboardCheck } from 'lucide-react';
-import { toast } from 'sonner';
-import { twMerge } from 'tailwind-merge';
-import { ABA_MODULES } from '@/shared/abaData';
+import { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { Play, RotateCcw, XCircle } from 'lucide-react';
+import confetti from 'canvas-confetti';
 
-// --- MEVCUT OYUNLAR ---
-import NesneEslemeGame1 from '@/aba/esle/NesneEslemeGame1';
-import NesneEslemeGame2 from '@/aba/esle/NesneEslemeGame2';
-import NesneEslemeGame3 from '@/aba/esle/NesneEslemeGame3';
-import NesneEslemeGame4 from '@/aba/esle/NesneEslemeGame4';
-import NesneEslemeGame13 from '@/aba/esle/NesneEslemeGame13';
-import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16';
+// --- GÖRSELLERİ İÇERİ AKTAR ---
+// Bu görsellerin bu dosya ile AYNI KLASÖRDE olması lazım
+import balikNormalImg from './balik.png';
+import balikYemeImg from './balik_yeme.png';
+import suYuzeyiImg from './su_yuzeyi.png';
+import zeminImg from './zemin.png';
 
-// --- YENİ EKLENEN DENİZALTI OYUNU ---
-// Dosya yolunun "./game/eslemegame" olduğundan emin ol
-import EslemeGame from './game/eslemegame'; 
+export default function EslemeGame({ onClose }: { onClose: () => void }) {
+  // --- OYUN AYARLARI ---
+  const WORLD_HEIGHT = 3000; // Denizin derinliği (Piksel)
+  const SEA_LEVEL = 400;     // Su yüzeyinin başladığı yer
+  const GRAVITY = 0.5;       // Havadaki yerçekimi
+  const WATER_DRAG = 0.08;   // Suyun sürtünmesi (Akışkanlık)
+  const SCROLL_SPEED = 4;    // Yanal akış hızı
 
-interface EslemePageProps {
-  studentId: string;
-  onBack: () => void;
-}
-
-export default function EslemePage({ studentId, onBack }: EslemePageProps) {
-  const [formData, setFormData] = useState<Record<string, any>>({});
-  const [loading, setLoading] = useState(true);
+  // --- STATE'LER ---
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
+  const [score, setScore] = useState(0);
   
-  const [activeGameMode, setActiveGameMode] = useState<'assessment' | 'instruction' | null>(null);
-  const [activeGameItem, setActiveGameItem] = useState<string | null>(null);
+  // Balık Görsel Durumu
+  const [isEating, setIsEating] = useState(false); 
+  const [faceDirection, setFaceDirection] = useState(1); // 1: Sağa, -1: Sola
 
-  // Eşleme Becerileri Modülünü Bul
-  const moduleData = ABA_MODULES.find(m => m.name.includes("EŞLEME BECERİLERİ"));
-  const items = moduleData ? moduleData.achievements : [];
+  // Fiziksel Referanslar (React render'ını yormamak için ref kullanıyoruz)
+  const fishPhys = useRef({ x: 200, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 });
+  const mousePos = useRef({ x: 200, y: 500 });
+  const cameraY = useRef(0);
+  const backgroundX = useRef(0);
+  const requestRef = useRef<number>();
+
+  // Hedefler
+  const [targets, setTargets] = useState<{id: number, x: number, y: number, color: string, type: 'food'|'enemy'}[]>([]);
+
+  // --- MOUSE / DOKUNMATİK TAKİBİ ---
+  const handleInput = (e: any) => {
+    if (!isPlaying) return;
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    // Mouse pozisyonunu kaydet
+    mousePos.current = { x: clientX, y: clientY };
+  };
+
+  // --- OYUNU BAŞLAT ---
+  const startGame = () => {
+    setIsPlaying(true);
+    setGameOver(false);
+    setScore(0);
+    // Balığı ekranın ortasına koy
+    fishPhys.current = { x: window.innerWidth / 2, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 };
+    setTargets([]);
+  };
+
+  // --- YEMEK YEME EFEKTİ ---
+  const triggerEatAnimation = () => {
+    setIsEating(true);
+    // 0.2 saniye sonra ağzını kapat
+    setTimeout(() => setIsEating(false), 200);
+  };
+
+  // --- ANA OYUN DÖNGÜSÜ (60 FPS) ---
+  const gameLoop = () => {
+    if (gameOver) return;
+
+    // 1. Balık Hangi Ortamda?
+    const inWater = fishPhys.current.y > SEA_LEVEL;
+
+    // 2. Hareket Mantığı
+    if (inWater) {
+      // --- SU FİZİĞİ ---
+      const targetWorldY = mousePos.current.y + cameraY.current; 
+      
+      const dx = mousePos.current.x - fishPhys.current.x; 
+      const dy = targetWorldY - fishPhys.current.y;
+
+      fishPhys.current.vx += dx * 0.05;
+      fishPhys.current.vy += dy * 0.05;
+      
+      // Sürtünme
+      fishPhys.current.vx *= (1 - WATER_DRAG);
+      fishPhys.current.vy *= (1 - WATER_DRAG);
+
+      // Yön Bulma
+      if (Math.abs(fishPhys.current.vx) > 1) {
+          setFaceDirection(fishPhys.current.vx > 0 ? 1 : -1);
+      }
+
+    } else {
+      // --- HAVA FİZİĞİ ---
+      fishPhys.current.vy += GRAVITY; 
+      fishPhys.current.vx *= 0.99; 
+    }
+
+    // Pozisyonu Güncelle
+    fishPhys.current.x += fishPhys.current.vx;
+    fishPhys.current.y += fishPhys.current.vy;
+
+    // Sınırlar (Dibe Çarpma)
+    if (fishPhys.current.y > WORLD_HEIGHT - 100) {
+        fishPhys.current.y = WORLD_HEIGHT - 100;
+        fishPhys.current.vy = 0;
+    }
+
+    // 3. JELİBON EFEKTİ (Squash & Stretch)
+    const speed = Math.sqrt(fishPhys.current.vx**2 + fishPhys.current.vy**2);
+    const stretch = Math.min(speed * 0.02, 0.3); // Maksimum %30 esneme
+    
+    let angle = Math.atan2(fishPhys.current.vy, fishPhys.current.vx) * (180 / Math.PI);
+    if (faceDirection === -1) { 
+        angle = angle - 180; 
+        angle = angle * -1; 
+    }
+
+    fishPhys.current.rotation = angle * 0.5; 
+    fishPhys.current.scaleX = 1 + stretch; // Hızlanınca uza
+    fishPhys.current.scaleY = 1 - stretch * 0.5; // İncel
+
+    // 4. KAMERA SİSTEMİ
+    const targetCamY = fishPhys.current.y - window.innerHeight / 2;
+    cameraY.current += (targetCamY - cameraY.current) * 0.1; // Yumuşak takip
+    if (cameraY.current < 0) cameraY.current = 0;
+    if (cameraY.current > WORLD_HEIGHT - window.innerHeight) cameraY.current = WORLD_HEIGHT - window.innerHeight;
+
+    // 5. SONSUZ DÜNYA AKIŞI
+    backgroundX.current -= SCROLL_SPEED;
+
+    // 6. HEDEF YÖNETİMİ
+    setTargets(prev => {
+        // Yeni hedef ekleme şansı
+        if (Math.random() < 0.02) {
+            return [...prev, {
+                id: Date.now(),
+                x: window.innerWidth + 100, 
+                y: Math.random() * (WORLD_HEIGHT - SEA_LEVEL) + SEA_LEVEL + 100, 
+                color: ['#ef4444', '#22c55e', '#eab308'][Math.floor(Math.random() * 3)],
+                type: 'food'
+            }];
+        }
+        
+        return prev
+            .map(t => ({...t, x: t.x - SCROLL_SPEED}))
+            .filter(t => {
+                // Çarpışma
+                const dist = Math.hypot(fishPhys.current.x - t.x, fishPhys.current.y - t.y);
+                
+                if (dist < 60) {
+                    // YENDİ!
+                    triggerEatAnimation();
+                    setScore(s => s + 10);
+                    confetti({
+                         origin: { x: mousePos.current.x / window.innerWidth, y: 0.5 },
+                         particleCount: 20,
+                         spread: 30
+                    });
+                    return false; 
+                }
+                return t.x > -100; 
+            });
+    });
+
+    requestRef.current = requestAnimationFrame(gameLoop);
+  };
 
   useEffect(() => {
-    const load = async () => {
-      if (!studentId) return;
-      try {
-        const instId = localStorage.getItem("kazanim-takip-institution-id");
-        if (instId) {
-            const docSnap = await getDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"));
-            if (docSnap.exists()) setFormData(docSnap.data());
-        }
-      } catch (error) {
-        toast.error("Veri yüklenirken hata oluştu.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [studentId]);
-
-  const handleSave = async (newData?: Record<string, any>) => {
-    try {
-      const instId = localStorage.getItem("kazanim-takip-institution-id");
-      const dataToSave = newData || formData;
-      if (instId) {
-          await setDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"), dataToSave, { merge: true });
-          if (!newData) toast.success("Değişiklikler kaydedildi.");
-      }
-    } catch (error) {
-      toast.error("Kaydetme hatası.");
-    }
-  };
-
-  const setStatus = (itemString: string, status: boolean) => {
-    setFormData(prev => ({ ...prev, [itemString]: prev[itemString] === status ? null : status }));
-  };
-
-  const handleGameComplete = async (success: boolean) => {
-    if (success && activeGameMode === 'assessment' && activeGameItem) {
-        const updatedData = { ...formData, [activeGameItem]: true };
-        setFormData(updatedData);
-        await handleSave(updatedData);
-        toast.success("Tebrikler! Kazanım tamamlandı. 🎉");
-    }
-    setActiveGameMode(null);
-    setActiveGameItem(null);
-  };
-
-  const calculateProgress = () => {
-    if (items.length === 0) return 0;
-    const completedCount = items.filter(item => formData[item] === true).length;
-    return Math.round((completedCount / items.length) * 100);
-  };
-
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
+    if (isPlaying) requestRef.current = requestAnimationFrame(gameLoop);
+    return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
+  }, [isPlaying]);
 
   return (
-    <div className="space-y-6 relative">
-      
-      {/* --- OYUN GÖSTERİM ALANI (MODAL) --- */}
-      {activeGameMode && activeGameItem && (
-         <>
-            {/* MEVCUT OYUNLAR... */}
-            {activeGameItem.startsWith("EB.1.1") && (
-                <NesneEslemeGame1 mode={activeGameMode} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
-            )}
-            {activeGameItem.startsWith("EB.1.2") && (
-                <NesneEslemeGame2 mode={activeGameMode} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
-            )}
-            {activeGameItem.startsWith("EB.1.3") && (
-                <NesneEslemeGame3 mode={activeGameMode} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
-            )}
-            {activeGameItem.startsWith("EB.1.4") && (
-                <NesneEslemeGame4 mode={activeGameMode} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
-            )}
-            {activeGameItem.startsWith("EB.3.4") && (
-                <NesneEslemeGame13 mode={activeGameMode} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
-            )}
-            {activeGameItem.startsWith("EB.4.2") && (
-                <NesneEslemeGame16 mode={activeGameMode} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
-            )}
+    <div 
+        className="fixed inset-0 overflow-hidden bg-sky-200 font-sans select-none"
+        onMouseMove={handleInput}
+        onTouchMove={handleInput}
+    >
+        {/* === KAMERA KATMANI === */}
+        <div 
+            className="absolute w-full top-0 left-0 will-change-transform"
+            style={{ 
+                height: WORLD_HEIGHT,
+                transform: `translateY(${-cameraY.current}px)` 
+            }}
+        >
+            {/* 1. GÖKYÜZÜ */}
+            <div style={{ height: SEA_LEVEL }} className="w-full bg-gradient-to-b from-sky-300 to-sky-100 relative">
+                <h1 className="text-center text-white/50 font-black text-6xl pt-20">GÖKYÜZÜ</h1>
+            </div>
 
-            {/* --- YENİ OYUN BURAYA EKLENDİ (EB.1.5) --- */}
-            {/* Eğer veri setinde EB.1.5 yoksa, bunu test etmek için EB.1.1 veya EB.1.2 yapabilirsin */}
-            {activeGameItem.startsWith("EB.1.5") && (
-                <div className="fixed inset-0 z-[100] bg-white">
-                    <EslemeGame 
-                        onClose={() => { 
-                            setActiveGameMode(null); 
-                            setActiveGameItem(null); 
-                        }} 
+            {/* 2. DENİZ SUYU */}
+            <div 
+                className="w-full relative"
+                style={{ 
+                    top: -2,
+                    height: WORLD_HEIGHT - SEA_LEVEL,
+                    background: 'linear-gradient(to bottom, #60a5fa 0%, #1e3a8a 100%)' 
+                }}
+            >
+                {/* SU YÜZEYİ */}
+                <div 
+                    className="absolute top-0 left-0 w-[200%] h-16 pointer-events-none"
+                    style={{ 
+                        backgroundImage: `url(${suYuzeyiImg})`,
+                        backgroundRepeat: 'repeat-x',
+                        backgroundSize: 'auto 100%',
+                        transform: `translateX(${backgroundX.current % window.innerWidth}px) translateY(-50%)`
+                    }}
+                />
+
+                {/* ZEMİN */}
+                <div 
+                    className="absolute bottom-0 left-0 w-[200%] h-32 pointer-events-none"
+                    style={{ 
+                        backgroundImage: `url(${zeminImg})`,
+                        backgroundRepeat: 'repeat-x',
+                        backgroundSize: 'auto 100%',
+                        transform: `translateX(${backgroundX.current % window.innerWidth}px)`
+                    }}
+                />
+            </div>
+
+            {/* 3. HEDEFLER */}
+            {targets.map(t => (
+                <div 
+                    key={t.id}
+                    className="absolute w-10 h-10 rounded-full shadow-lg border-2 border-white/50 flex items-center justify-center animate-pulse"
+                    style={{ 
+                        left: t.x, 
+                        top: t.y,
+                        backgroundColor: t.color 
+                    }}
+                >
+                    <div className="w-2 h-2 bg-white rounded-full opacity-50"></div>
+                </div>
+            ))}
+
+            {/* 4. OYUNCU BALIĞI */}
+            {isPlaying && (
+                <div 
+                    className="absolute z-50 will-change-transform"
+                    style={{
+                        left: fishPhys.current.x,
+                        top: fishPhys.current.y,
+                        width: 80, 
+                        height: 60,
+                        transform: `translate(-50%, -50%) 
+                                    rotate(${fishPhys.current.rotation}deg) 
+                                    scale(${faceDirection * fishPhys.current.scaleX}, ${fishPhys.current.scaleY})` 
+                    }}
+                >
+                    <img 
+                        src={isEating ? balikYemeImg : balikNormalImg} 
+                        alt="Karakter" 
+                        className="w-full h-full object-contain drop-shadow-2xl"
                     />
                 </div>
             )}
-         </>
-      )}
-
-      {/* HEADER */}
-      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex items-center justify-between sticky top-0 backdrop-blur-md z-10 shadow-lg">
-        <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={onBack} className="text-slate-400 hover:text-white"><ArrowLeft size={20} /></Button>
-            <div>
-                <h2 className="text-lg font-bold text-white">Eşleme Becerileri</h2>
-                <div className="flex items-center gap-2 text-xs text-slate-400">
-                    <div className="h-1.5 w-24 bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500" style={{ width: `${calculateProgress()}%` }}></div>
-                    </div>
-                    <span>%{calculateProgress()} Tamamlandı</span>
-                </div>
-            </div>
         </div>
-        <Button onClick={() => handleSave()} className="bg-green-600 hover:bg-green-700 h-8 text-xs"><Save className="mr-2 h-3.5 w-3.5" /> Kaydet</Button>
-      </div>
 
-      {/* LİSTE */}
-      <div className="grid gap-3 animate-in slide-in-from-bottom-4 duration-500 pb-20">
-        {items.map((item) => {
-            const status = formData[item];
-            const isCompleted = status === true;
-            
-            // Oyun butonu hangi maddelerde çıkacak? (EB.1.5 EKLENDİ)
-            const hasGame = item.startsWith("EB.1.1") || 
-                          item.startsWith("EB.1.2") || 
-                          item.startsWith("EB.1.3") || 
-                          item.startsWith("EB.1.4") ||
-                          item.startsWith("EB.1.5") || // <--- YENİ OYUN İÇİN BUTON AKTİF
-                          item.startsWith("EB.3.4") || 
-                          item.startsWith("EB.4.2"); 
-            
-            const firstSpaceIndex = item.indexOf(' ');
-            const code = item.substring(0, firstSpaceIndex);
-            const desc = item.substring(firstSpaceIndex + 1);
-            
-            return (
-                <div key={item} className={twMerge("group p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4", isCompleted ? "bg-green-950/10 border-green-500/20" : "bg-slate-900/40 border-slate-800 hover:bg-slate-800")}>
-                    <div className="flex items-start gap-4 flex-1">
-                        <div className={twMerge("min-w-[48px] h-10 rounded-lg flex items-center justify-center text-[10px] font-bold font-mono border", isCompleted ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-700 text-slate-500")}>
-                            {isCompleted ? <Trophy size={18} /> : code}
-                        </div>
-                        <div>
-                            <p className={twMerge("font-medium text-sm leading-relaxed", isCompleted ? "text-green-100" : "text-slate-200")}>{desc}</p>
-                            {hasGame && <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20"><Gamepad2 size={12} /> İnteraktif</span>}
-                        </div>
-                    </div>
-                    
-                    {/* BUTON GRUBU */}
-                    <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
-                        
-                        {hasGame && (
-                            <div className="flex items-center gap-1">
-                                <button 
-                                    onClick={() => { setActiveGameItem(item); setActiveGameMode('instruction'); }}
-                                    className="h-8 px-3 rounded-md bg-purple-600/90 text-white text-[10px] font-bold flex items-center gap-1 hover:bg-purple-500 border border-purple-400 shadow-sm transition-transform active:scale-95"
-                                >
-                                    <GraduationCap size={14} /> Öğretim
-                                </button>
-                                
-                                <button 
-                                    onClick={() => { setActiveGameItem(item); setActiveGameMode('assessment'); }}
-                                    className="h-8 px-3 rounded-md bg-blue-600/90 text-white text-[10px] font-bold flex items-center gap-1 hover:bg-blue-500 border border-blue-400 shadow-sm transition-transform active:scale-95"
-                                >
-                                    <ClipboardCheck size={14} /> Test
-                                </button>
-                            </div>
-                        )}
-                        
-                        <div className="flex items-center gap-1">
-                             <button onClick={() => setStatus(item, false)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center", status === false ? "bg-red-500/20 border-red-500 text-red-400" : "bg-slate-950 border-slate-800 text-slate-500")}><XCircle size={16} /></button>
-                             <button onClick={() => setStatus(item, true)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center", status === true ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-800 text-slate-500")}><CheckCircle2 size={16} /></button>
-                        </div>
-                    </div>
-                </div>
-            );
-        })}
-      </div>
+        {/* === ARAYÜZ (UI) === */}
+        <div className="fixed top-5 left-5 bg-white/90 backdrop-blur px-6 py-2 rounded-full shadow-xl border-4 border-orange-400 z-[100]">
+            <span className="font-black text-2xl text-orange-600">SKOR: {score}</span>
+        </div>
+
+        <button onClick={onClose} className="fixed top-5 right-5 z-[100] bg-white p-2 rounded-full shadow-lg hover:scale-110 transition">
+            <XCircle className="text-red-500 w-8 h-8" />
+        </button>
+
+        {/* BAŞLANGIÇ EKRANI */}
+        {!isPlaying && (
+            <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center">
+                <motion.button 
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={startGame}
+                    className="bg-orange-500 text-white px-12 py-6 rounded-3xl font-black text-4xl shadow-orange-500/50 shadow-2xl flex items-center gap-4 border-b-8 border-orange-700 active:border-b-0 active:translate-y-2 transition-all"
+                >
+                    <Play size={40} fill="currentColor" /> BAŞLA
+                </motion.button>
+                <p className="text-white mt-6 text-xl opacity-80 font-medium">Parmağınla balığı yüzdür, yemleri kap!</p>
+            </div>
+        )}
     </div>
   );
-                }
-                      
+         }
+                             
