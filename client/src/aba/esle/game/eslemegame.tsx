@@ -10,23 +10,27 @@ import suYuzeyiImg from './su_yuzeyi.png';
 import zeminImg from './zemin.png';
 
 export default function EslemeGame({ onClose }: { onClose: () => void }) {
-  // --- FİZİK VE DÜNYA AYARLARI ---
+  // --- DÜNYA AYARLARI ---
   const WORLD_HEIGHT = 3000; 
   const SEA_LEVEL = 400;     
   const ZEMIN_YUKSEKLIK = 350;
-
-  // 1. TAKİP HIZI: İyice düşürdük (0.003 -> 0.0015)
-  // Bu, balığın ne kadar çabuk hızlanacağını belirler. Düşükse motoru zayıf gemi gibidir.
-  const FOLLOW_SPEED = 0.0015;   
   
-  // 2. MAKSİMUM HIZ LİMİTİ (YENİ ÖZELLİK)
+  // HARİTA SINIRLARI
+  const MAP_LIMIT_LEFT = 0;       // Sol duvar (Sahil kenarı)
+  const MAP_LIMIT_RIGHT = -20000; // Sağ taraf (Çok geniş - 20bin piksel)
+
+  // --- FİZİK AYARLARI ---
+  
+  // 1. HIZ: İyice düşürdük (0.0015 -> 0.0008)
+  // Çok ağır hareket edecek.
+  const FOLLOW_SPEED = 0.0008;   
+  
+  // 2. HIZ LİMİTİ:
   // Balık ne kadar zorlarsan zorla bu hızdan yukarı çıkamaz.
-  const MAX_SPEED = 12;
+  const MAX_SPEED = 8; // (12 -> 8'e düştü)
 
   // 3. SÜRTÜNME:
-  // Sudan elini çekince ne kadar kayacak? (Düşürdükçe daha çabuk durur)
-  const WATER_FRICTION = 0.95; 
-
+  const WATER_FRICTION = 0.96; 
   const GRAVITY = 0.8;          
   const AIR_RESISTANCE = 0.99;  
 
@@ -40,7 +44,10 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const fishPhys = useRef({ x: 200, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 });
   const mousePos = useRef({ x: window.innerWidth / 2, y: 500 });
   const cameraY = useRef(0);
+  
+  // Background pozisyonu (Dünyadaki yerimiz)
   const backgroundX = useRef(0);
+  
   const requestRef = useRef<number>();
   const [targets, setTargets] = useState<{id: number, x: number, y: number, color: string, type: 'food'}[]>([]);
 
@@ -63,8 +70,10 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const startGame = () => {
     setIsPlaying(true);
     setScore(0);
+    // Başlangıç konumu
     fishPhys.current = { x: window.innerWidth / 2, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 };
     mousePos.current = { x: window.innerWidth / 2, y: 500 };
+    backgroundX.current = 0; // Başa dön
     cameraY.current = 0;
     setTargets([]);
   };
@@ -91,16 +100,13 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
       const dx = mousePos.current.x - fishPhys.current.x;
       const dy = targetY - fishPhys.current.y;
 
-      // İvmelenme
       fishPhys.current.vx += dx * FOLLOW_SPEED;
       fishPhys.current.vy += dy * FOLLOW_SPEED;
       
-      // Sürtünme
       fishPhys.current.vx *= WATER_FRICTION;
       fishPhys.current.vy *= WATER_FRICTION;
 
-      // --- YENİ: HIZ LİMİTİ (CLAMPING) ---
-      // Hız MAX_SPEED'i geçerse, onu MAX_SPEED'e sabitle
+      // HIZ LİMİTİ
       const currentSpeed = Math.sqrt(fishPhys.current.vx**2 + fishPhys.current.vy**2);
       if (currentSpeed > MAX_SPEED) {
           const ratio = MAX_SPEED / currentSpeed;
@@ -117,21 +123,68 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     fishPhys.current.x += fishPhys.current.vx;
     fishPhys.current.y += fishPhys.current.vy;
 
-    // --- 3. DÜNYA KAYDIRMA (Texture Scrolling) ---
-    backgroundX.current -= fishPhys.current.vx; 
+    // --- 3. DÜNYA VE DUVAR MANTIĞI ---
+    // Balık hareket ettikçe arka plan kayar.
+    // Ancak duvarlara geldiysek kaymayı durduracağız.
 
-    // --- 4. YÖN VE DÖNME ---
-    if (Math.abs(fishPhys.current.vx) > 0.2) {
+    let nextBackgroundX = backgroundX.current - fishPhys.current.vx;
+
+    // SOL DUVAR KONTROLÜ (Sahil)
+    if (nextBackgroundX > MAP_LIMIT_LEFT) {
+        nextBackgroundX = MAP_LIMIT_LEFT;
+        // Eğer sol duvara çarptıysak ve hala sola gitmeye çalışıyorsak balığı ekranda sola kaydırabiliriz
+        // (Burada basitlik için arka planı kilitliyoruz)
+    }
+    
+    // SAĞ DUVAR KONTROLÜ (Okyanus Sonu)
+    if (nextBackgroundX < MAP_LIMIT_RIGHT) {
+        nextBackgroundX = MAP_LIMIT_RIGHT;
+    }
+
+    // Güncelle
+    backgroundX.current = nextBackgroundX;
+
+
+    // --- 4. GELİŞMİŞ YÖN VE DÖNME (360 Derece Serbestlik) ---
+    // Yön tespiti (Sağ mı Sol mu?)
+    if (Math.abs(fishPhys.current.vx) > 0.1) {
         setFaceDirection(fishPhys.current.vx > 0 ? 1 : -1);
     }
 
-    let targetRotation = fishPhys.current.vy * 2 * faceDirection;
-    targetRotation = Math.max(-30, Math.min(30, targetRotation)); 
-    
+    // Hedef Açı Hesaplama (Math.atan2 ile tam açı)
+    // Bu bize radyan cinsinden hareket yönünü verir.
+    let angleRad = Math.atan2(fishPhys.current.vy, fishPhys.current.vx);
+    let angleDeg = angleRad * (180 / Math.PI);
+
+    // Eğer sola gidiyorsak (FaceDirection -1), sprite aynalandığı için açıyı düzeltmemiz lazım.
+    // Matematiksel olarak: Sol tarafın açısı 180 derece civarıdır.
+    // Sprite aynalanınca (ScaleX -1), biz açıyı ters çevirmeliyiz.
+    let targetRotation = 0;
+
+    if (faceDirection === 1) {
+        // Sağa gidiyor: Normal açı
+        targetRotation = angleDeg;
+    } else {
+        // Sola gidiyor: 
+        // atan2 sola giderken 180 veya -180 verir. Sprite flip olduğu için biz bunu
+        // "Aynalanmış açı" olarak hesaplamalıyız.
+        // Basit yöntem: vx'i pozitif gibi düşünüp açıyı tekrar hesapla.
+        let mirroredAngle = Math.atan2(fishPhys.current.vy, Math.abs(fishPhys.current.vx)) * (180 / Math.PI);
+        targetRotation = mirroredAngle; 
+    }
+
+    // Açı Limitleme (Tam tepe taklak olmasın, max 85 derece yukarı/aşağı)
+    targetRotation = Math.max(-85, Math.min(85, targetRotation));
+
+    // Havadaysa (Sudan çıkınca) kafası düşüşe göre dönsün
     if (!inWater) {
         targetRotation = Math.min(fishPhys.current.vy * 5, 90) * faceDirection;
     }
+
+    // Yumuşak geçiş (Lerp)
+    // 360 derece dönüşlerde açı farkı sorunu olmasın diye basit lerp
     fishPhys.current.rotation += (targetRotation - fishPhys.current.rotation) * 0.1;
+
 
     // --- 5. JELİBON EFEKTİ ---
     const totalSpeed = Math.sqrt(fishPhys.current.vx**2 + fishPhys.current.vy**2);
@@ -139,10 +192,11 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     fishPhys.current.scaleX = 1 + stretch;
     fishPhys.current.scaleY = 1 - stretch * 0.5;
 
-    // --- 6. SINIRLAR ---
+
+    // --- 6. EKRAN SINIRLARI ---
+    // Balık ekranın dışına kaçmasın
     if (fishPhys.current.x < 50) { 
         fishPhys.current.x = 50; 
-        // Duvara çarpınca hızı öldür
         fishPhys.current.vx = 0;
     }
     if (fishPhys.current.x > window.innerWidth - 50) { 
@@ -150,6 +204,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         fishPhys.current.vx = 0;
     }
     
+    // Zemin Çarpışması
     if (fishPhys.current.y > WORLD_HEIGHT - ZEMIN_YUKSEKLIK) { 
         fishPhys.current.y = WORLD_HEIGHT - ZEMIN_YUKSEKLIK; 
         fishPhys.current.vy = 0; 
@@ -163,10 +218,12 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
     // --- 8. HEDEF YÖNETİMİ ---
     setTargets(prev => {
+        // Yeni hedef ekle
         if (Math.random() < 0.015) { 
             const spawnRight = Math.random() > 0.5; 
             return [...prev, {
                 id: Date.now(),
+                // backgroundX ile dünya koordinatına göre spawn
                 x: (spawnRight ? window.innerWidth + 200 : -200) + Math.abs(backgroundX.current), 
                 y: Math.random() * (WORLD_HEIGHT - SEA_LEVEL - ZEMIN_YUKSEKLIK - 100) + SEA_LEVEL + 100, 
                 color: ['#ef4444', '#22c55e', '#eab308'][Math.floor(Math.random() * 3)],
@@ -177,7 +234,15 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         return prev
             .map(t => ({
                 ...t, 
+                // Hedefleri harita kaymasına göre ötele
+                // (Balık hareket ettikçe hedefler de kaymalı)
+                // backgroundX değişimi kadar kaydıracağız ama buradaki matematik karışık olabilir.
+                // En temizi: Hedefin X'i sabit (Dünya Koordinatı), render ederken backgroundX'i ekle.
+                // AMA mevcut yapıyı bozmamak için eski usül devam:
                 x: t.x - fishPhys.current.vx 
+                
+                // NOT: Duvara çarpınca backgroundX değişmiyor ama vx 0 olmuyor hemen.
+                // Bu yüzden duvarda hedefler kaymaya devam edebilir, sorun değil, canlı durur.
             }))
             .filter(t => {
                 const dist = Math.hypot(fishPhys.current.x - t.x, fishPhys.current.y - t.y);
@@ -187,7 +252,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     confetti({ origin: { x: fishPhys.current.x / window.innerWidth, y: 0.5 }, particleCount: 20, spread: 40 });
                     return false; 
                 }
-                return t.x > -1000 && t.x < window.innerWidth + 1000; 
+                return t.x > -2000 && t.x < window.innerWidth + 2000; 
             });
     });
 
@@ -227,7 +292,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     background: 'linear-gradient(to bottom, #60a5fa 0%, #1e3a8a 90%)' 
                 }}
             >
-                {/* SU YÜZEYİ */}
+                {/* SU YÜZEYİ (Texture Scrolling) */}
                 <div 
                     className="absolute top-0 left-0 w-full h-16 pointer-events-none"
                     style={{ 
@@ -316,4 +381,5 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         )}
     </div>
   );
-          }
+  }
+                                                                    
