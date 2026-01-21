@@ -13,16 +13,20 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   // --- FİZİK AYARLARI ---
   const WORLD_HEIGHT = 3000; 
   const SEA_LEVEL = 400;     
-  const ZEMIN_YUKSEKLIK = 350; // Zemin yüksekliği (Tepelik)
+  const ZEMIN_YUKSEKLIK = 350;
 
-  // 1. HIZ AYARI: Eski hızın 6'da 1'i (0.04 -> 0.007)
-  const FOLLOW_SPEED = 0.007;   
+  // HIZ AYARI:
+  // Balık ağır olsun (Tembel süzülme)
+  const FOLLOW_SPEED = 0.003;   
   
-  // 2. DİĞER FİZİKLER
-  const GRAVITY = 0.8;          // Su üstüne çıkınca aşağı çeken kuvvet
-  const WATER_FRICTION = 0.96;  // Suda süzülme (Daha kaygan yaptık ki yavaş hızda hareket edebilsin)
+  // SÜRTÜNME:
+  // 1.0'a ne kadar yakınsa o kadar çok kayar (Buz gibi).
+  // 0.90 civarı ise çabuk durur.
+  // 0.98 yaptık ki bıraktığında uzun süre süzülsün (Drift)
+  const WATER_FRICTION = 0.98; 
+
+  const GRAVITY = 0.8;          
   const AIR_RESISTANCE = 0.99;  
-  const MIN_IDLE_SPEED = 0.5;   
 
   // --- STATE'LER ---
   const [isPlaying, setIsPlaying] = useState(false);
@@ -33,8 +37,12 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   // Fiziksel Referanslar
   const fishPhys = useRef({ x: 200, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 });
   const mousePos = useRef({ x: window.innerWidth / 2, y: 500 });
+  
   const cameraY = useRef(0);
+  
+  // ÖNEMLİ: BackgroundX artık sabit değil, balığa göre değişecek
   const backgroundX = useRef(0);
+  
   const requestRef = useRef<number>();
   const [targets, setTargets] = useState<{id: number, x: number, y: number, color: string, type: 'food'}[]>([]);
 
@@ -57,6 +65,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const startGame = () => {
     setIsPlaying(true);
     setScore(0);
+    // Başlangıçta ekranın ortasında
     fishPhys.current = { x: window.innerWidth / 2, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 };
     mousePos.current = { x: window.innerWidth / 2, y: 500 };
     cameraY.current = 0;
@@ -74,15 +83,12 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
     // --- 1. SUDAN ÇIKIŞ KONTROLÜ ---
     if (wasInWater.current && !inWater) {
-        // Sudan çıktığı an dikey hızını yarıya düşür (Uzaya gitmesin ama zıplasın)
         fishPhys.current.vy *= 0.5; 
     }
     wasInWater.current = inWater;
 
     // --- 2. HAREKET FİZİĞİ ---
     if (inWater) {
-      // Zıplama Kilidini Kaldırdık! 
-      // Artık parmak neredeyse orayı hedefler.
       const targetY = mousePos.current.y + cameraY.current;
       
       const dx = mousePos.current.x - fishPhys.current.x;
@@ -94,43 +100,53 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
       fishPhys.current.vx *= WATER_FRICTION;
       fishPhys.current.vy *= WATER_FRICTION;
 
-      if (Math.abs(fishPhys.current.vx) < MIN_IDLE_SPEED) {
-          fishPhys.current.vx += (faceDirection * 0.05);
-      }
-
     } else {
       // HAVADAYKEN
       fishPhys.current.vy += GRAVITY; 
       fishPhys.current.vx *= AIR_RESISTANCE; 
     }
 
+    // Pozisyonu Güncelle (Burada X'i güncellemiyoruz, çünkü balık hep merkezde kalsın istiyoruz
+    // AMA senin istediğin "sola gitme hissi" için balık ekranda hareket etmeli,
+    // harita ise balığın tersine hareket etmeli.)
+    
     fishPhys.current.x += fishPhys.current.vx;
     fishPhys.current.y += fishPhys.current.vy;
 
-    // --- 3. YÖN VE DÖNME ---
-    if (Math.abs(fishPhys.current.vx) > 0.5) {
+    // --- 3. DÜNYA KAYDIRMA (ARADIĞIN ÖZELLİK BURADA) ---
+    // Balık sağa gidiyorsa (vx > 0), harita sola kaysın (backgroundX azalır)
+    // Balık sola gidiyorsa (vx < 0), harita sağa kaysın (backgroundX artar)
+    backgroundX.current -= fishPhys.current.vx; // Hız kadar kaydır
+
+    // --- 4. YÖN VE DÖNME ---
+    if (Math.abs(fishPhys.current.vx) > 0.2) {
         setFaceDirection(fishPhys.current.vx > 0 ? 1 : -1);
     }
 
     let targetRotation = fishPhys.current.vy * 2 * faceDirection;
     targetRotation = Math.max(-30, Math.min(30, targetRotation)); 
     
-    // Su dışında düşüş efekti
     if (!inWater) {
         targetRotation = Math.min(fishPhys.current.vy * 5, 90) * faceDirection;
     }
-
     fishPhys.current.rotation += (targetRotation - fishPhys.current.rotation) * 0.1;
 
-    // --- 4. JELİBON EFEKTİ ---
+    // --- 5. JELİBON EFEKTİ ---
     const totalSpeed = Math.sqrt(fishPhys.current.vx**2 + fishPhys.current.vy**2);
     const stretch = Math.min(totalSpeed * 0.01, 0.2); 
     fishPhys.current.scaleX = 1 + stretch;
     fishPhys.current.scaleY = 1 - stretch * 0.5;
 
-    // --- 5. SINIRLAR ---
-    if (fishPhys.current.x < 50) { fishPhys.current.x = 50; fishPhys.current.vx *= -0.5; }
-    if (fishPhys.current.x > window.innerWidth - 50) { fishPhys.current.x = window.innerWidth - 50; fishPhys.current.vx *= -0.5; }
+    // --- 6. SINIRLAR ---
+    // Yan duvara çarpınca harita akmaya devam etmesin
+    if (fishPhys.current.x < 50) { 
+        fishPhys.current.x = 50; 
+        fishPhys.current.vx = 0; 
+    }
+    if (fishPhys.current.x > window.innerWidth - 50) { 
+        fishPhys.current.x = window.innerWidth - 50; 
+        fishPhys.current.vx = 0; 
+    }
     
     // Zemin Çarpışması
     if (fishPhys.current.y > WORLD_HEIGHT - ZEMIN_YUKSEKLIK) { 
@@ -138,28 +154,34 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         fishPhys.current.vy = 0; 
     }
 
-    // --- 6. KAMERA ---
+    // --- 7. KAMERA ---
     const targetCamY = fishPhys.current.y - window.innerHeight / 2;
     cameraY.current += (targetCamY - cameraY.current) * 0.1;
     if (cameraY.current < 0) cameraY.current = 0;
     if (cameraY.current > WORLD_HEIGHT - window.innerHeight) cameraY.current = WORLD_HEIGHT - window.innerHeight;
 
-    backgroundX.current -= 1.5;
-
-    // --- 7. HEDEF YÖNETİMİ ---
+    // --- 8. HEDEF YÖNETİMİ ---
     setTargets(prev => {
+        // Yeni hedef ekle (Hem sağdan hem soldan gelebilir artık)
         if (Math.random() < 0.015) { 
+            const spawnRight = Math.random() > 0.5; // %50 sağdan, %50 soldan doğsun
             return [...prev, {
                 id: Date.now(),
-                x: window.innerWidth + 100, 
-                // Hedefler kuma gömülmesin diye ZEMIN_YUKSEKLIK kadar pay bıraktık
+                // Ekrana göre spawn konumu (Balık hareket ettiği için geniş bir alan lazım)
+                x: spawnRight ? window.innerWidth + 200 : -200, 
                 y: Math.random() * (WORLD_HEIGHT - SEA_LEVEL - ZEMIN_YUKSEKLIK - 100) + SEA_LEVEL + 100, 
                 color: ['#ef4444', '#22c55e', '#eab308'][Math.floor(Math.random() * 3)],
                 type: 'food'
             }];
         }
+
         return prev
-            .map(t => ({...t, x: t.x - 2}))
+            .map(t => ({
+                ...t, 
+                // ÖNEMLİ: Hedefler sabit duruyor gibi görünmeli.
+                // Balık sağa gidiyorsa hedef sola kaymalı.
+                x: t.x - fishPhys.current.vx 
+            }))
             .filter(t => {
                 const dist = Math.hypot(fishPhys.current.x - t.x, fishPhys.current.y - t.y);
                 if (dist < 80) { 
@@ -168,7 +190,8 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     confetti({ origin: { x: fishPhys.current.x / window.innerWidth, y: 0.5 }, particleCount: 20, spread: 40 });
                     return false; 
                 }
-                return t.x > -100; 
+                // Ekrandan çok uzaklaşanı sil (Her iki yönde de)
+                return t.x > -1000 && t.x < window.innerWidth + 1000; 
             });
     });
 
@@ -208,18 +231,19 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     background: 'linear-gradient(to bottom, #60a5fa 0%, #1e3a8a 90%)' 
                 }}
             >
-                {/* SU YÜZEYİ */}
+                {/* SU YÜZEYİ (Hareketli - Balığa bağlı) */}
                 <div 
                     className="absolute top-0 left-0 w-[200%] h-16 pointer-events-none"
                     style={{ 
                         backgroundImage: `url(${suYuzeyiImg})`,
                         backgroundRepeat: 'repeat-x',
                         backgroundSize: 'auto 100%',
+                        // backgroundX.current artık balığın hareketine göre artıp azalıyor
                         transform: `translateX(${backgroundX.current % window.innerWidth}px) translateY(-50%)`
                     }}
                 />
 
-                {/* ZEMİN (KUM) - YÜKSEK (350px) */}
+                {/* ZEMİN (KUM) - (Hareketli - Balığa bağlı) */}
                 <div 
                     className="absolute bottom-0 left-0 w-[200%] pointer-events-none"
                     style={{ 
@@ -229,6 +253,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                         backgroundRepeat: 'repeat-x',
                         backgroundSize: 'auto 100%', 
                         backgroundPosition: 'bottom',
+                        // backgroundX.current ile zemin de balığın tersine kayıyor
                         transform: `translateX(${backgroundX.current % window.innerWidth}px)`
                     }}
                 />
@@ -245,7 +270,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                 </div>
             ))}
 
-            {/* OYUNCU BALIĞI (3D EFFECT) */}
+            {/* OYUNCU BALIĞI */}
             {isPlaying && (
                 <div 
                     className="absolute z-50 will-change-transform"
@@ -255,9 +280,8 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                         width: 90, 
                         height: 70,
                         transform: (() => {
-                            // DERİNLİK HESABI
                             const depthRatio = Math.max(0, (fishPhys.current.y - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL));
-                            const depthScale = 1 + (depthRatio * 0.6); // %60 Büyüme
+                            const depthScale = 1 + (depthRatio * 0.6); 
 
                             return `translate(-50%, -50%) 
                                     rotate(${fishPhys.current.rotation}deg) 
@@ -297,5 +321,4 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         )}
     </div>
   );
-  }
-          
+}
