@@ -16,7 +16,7 @@ import NesneEslemeGame13 from '@/aba/esle/NesneEslemeGame13';
 import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16';
 
 // --- YENİ DENİZALTI OYUNU ---
-import EslemeGame from '.aba/esle/game/eslemegame'; 
+import EslemeGame from '@/aba/esle/game/eslemegame'; 
 
 interface EslemePageProps {
   studentId: string;
