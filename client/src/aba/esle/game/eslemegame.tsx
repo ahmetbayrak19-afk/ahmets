@@ -22,11 +22,20 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const ZEMIN_YUKSEKLIK = 350;
   const CHUNK_WIDTH = 2000; 
 
-  // 1. HIZ AYARI: 0.001 -> 0.002 (Bir tık hızlandı)
-  const FOLLOW_SPEED = 0.002;   
-  const MAX_SPEED = 7; 
+  // --- HUNGRY SHARK FİZİĞİ ---
   
-  const WATER_FRICTION = 0.95; 
+  // 1. HIZLANMA (İvme): Düşük tuttuk ki "ağır" hissettirsin.
+  const FOLLOW_SPEED = 0.0008;   
+  
+  // 2. MAKSİMUM HIZ: Yüksek tuttuk, hızlanınca tam aksın.
+  const MAX_SPEED = 10; 
+  
+  // 3. SÜRTÜNME (AKICILIK): 
+  // 0.90 -> Hemen durur (Çamur gibi)
+  // 0.98 -> Çok kaygan (Buz gibi / Hungry Shark hissi)
+  // Parmağını bıraksan bile balık süzülmeye devam eder.
+  const WATER_FRICTION = 0.98; 
+
   const GRAVITY = 0.8;          
   const AIR_RESISTANCE = 0.99;  
 
@@ -109,18 +118,21 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     }
     wasInWater.current = inWater;
 
-    // 2. Fizik
+    // 2. Fizik (HUNGRY SHARK TARZI)
     if (inWater) {
       const targetY = mousePos.current.y + cameraY.current;
       const dx = mousePos.current.x - fishPhys.current.x;
       const dy = targetY - fishPhys.current.y;
 
+      // İvmelenme (Yay sistemi yerine motor gücü gibi düşün)
       fishPhys.current.vx += dx * FOLLOW_SPEED;
       fishPhys.current.vy += dy * FOLLOW_SPEED;
+      
+      // Sürtünme (Artık çok düşük, yani çok kaygan)
       fishPhys.current.vx *= WATER_FRICTION;
       fishPhys.current.vy *= WATER_FRICTION;
 
-      // HIZ LİMİTİ
+      // HIZ LİMİTİ (Limit arttırıldı)
       const currentSpeed = Math.sqrt(fishPhys.current.vx**2 + fishPhys.current.vy**2);
       if (currentSpeed > MAX_SPEED) {
           const ratio = MAX_SPEED / currentSpeed;
@@ -135,16 +147,13 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     fishPhys.current.x += fishPhys.current.vx;
     fishPhys.current.y += fishPhys.current.vy;
 
-    // 3. Dünya Kaydırma (CRITICAL FIX)
-    // Önceki hatan buradaydı: Balık durunca dünya duruyordu.
-    // Artık balık ekranda sıkışsa bile (vx > 0) ise dünya kaymaya devam eder.
-    
-    // Sol duvar (Sahil)
+    // 3. Dünya Kaydırma
+    // Sol Duvar Kontrolü
     if (backgroundX.current - fishPhys.current.vx > 0) {
         backgroundX.current = 0; 
         if (fishPhys.current.vx < 0) fishPhys.current.vx = 0; 
     } else {
-        // Sonsuz sağa gidiş
+        // Sonsuz kaydırma
         backgroundX.current -= fishPhys.current.vx; 
     }
 
@@ -163,45 +172,36 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         return prevChunks;
     });
 
-    // 5. Yön ve Dönme (FIXED)
+    // 5. Yön ve Dönme
     if (Math.abs(fishPhys.current.vx) > 0.1) {
         setFaceDirection(fishPhys.current.vx > 0 ? 1 : -1);
     }
     
-    // DÖNÜŞ DÜZELTMESİ:
-    // Sola giderken (scaleX: -1), açıyı da ters çevirmeliyiz ki kafa aşağı insin.
+    // Açıyı hareket yönüne kilitle (Mouse'a değil, gittiği yere baksın)
+    // Bu sayede drift atarken kafa yönü doğru kalır.
     let angleRad = Math.atan2(fishPhys.current.vy, Math.abs(fishPhys.current.vx));
     let angleDeg = angleRad * (180 / Math.PI);
-    
-    // Eğer sola bakıyorsak (faceDirection -1), açıyı negatife çevir
-    // Böylece aşağı yüzerken kafa aşağı iner.
     let targetRotation = angleDeg * faceDirection;
     
-    // Yumuşak geçiş
+    // Dönüş yumuşatma
     fishPhys.current.rotation += (targetRotation - fishPhys.current.rotation) * 0.1;
 
-
-    // 6. Jelibon
+    // 6. Jelibon (Hızlanınca uzasın)
     const totalSpeed = Math.sqrt(fishPhys.current.vx**2 + fishPhys.current.vy**2);
-    const stretch = Math.min(totalSpeed * 0.01, 0.2); 
+    const stretch = Math.min(totalSpeed * 0.02, 0.3); // Esneme miktarını arttırdık
     fishPhys.current.scaleX = 1 + stretch;
     fishPhys.current.scaleY = 1 - stretch * 0.5;
 
-    // 7. Sınırlar ve Çarpışma
-    // EKRAN KENARLARI (ÖNEMLİ: vx'i sıfırlamıyoruz!)
-    // Sadece x konumunu kilitliyoruz, böylece vx sayesinde arka plan akmaya devam ediyor.
+    // 7. Sınırlar (X ekseni)
     if (fishPhys.current.x < 50) { 
         fishPhys.current.x = 50; 
-        // Sol duvarda dursun
         if(backgroundX.current >= 0) fishPhys.current.vx = 0; 
     }
     if (fishPhys.current.x > window.innerWidth - 50) { 
         fishPhys.current.x = window.innerWidth - 50; 
-        // Burada vx=0 yapmıyoruz! Balık ekranda dursa da yüzmeye devam ediyor gibi arka plan akacak.
     }
     
-    // DERİNLİK SINIRI (FIXED)
-    // Artık zemine takılmak yok, en dibe kadar inebilirsin.
+    // ZEMİN SINIRI: En dibe inebilsin (Otların arasına)
     if (fishPhys.current.y > WORLD_HEIGHT - 10) { 
         fishPhys.current.y = WORLD_HEIGHT - 10; 
         fishPhys.current.vy = 0; 
@@ -394,5 +394,5 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         )}
     </div>
   );
-    }
-                                  
+                           }
+      
