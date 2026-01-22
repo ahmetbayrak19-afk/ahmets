@@ -8,7 +8,7 @@ import balikNormalImg from './balik.png';
 import balikYemeImg from './balik_yeme.png';
 import suYuzeyiImg from './su_yuzeyi.png';
 
-// ZEMİN PARÇALARI (Bunların klasörde olması lazım)
+// ZEMİN PARÇALARI
 import altzemin1 from './altzemin1.png';
 import altzemin2 from './altzemin2.png';
 import ustzemin1 from './ustzemin1.png';
@@ -20,15 +20,12 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const WORLD_HEIGHT = 3000; 
   const SEA_LEVEL = 400;     
   const ZEMIN_YUKSEKLIK = 350;
-  
-  // HER BİR ZEMİN PARÇASININ GENİŞLİĞİ (Resimlerin genişliğine göre ayarla)
-  // Seamless olması için resim genişliğiyle aynı olması iyi olur.
-  // Örnek: 2000px genişliğinde parçalar ekleyerek gidiyoruz.
   const CHUNK_WIDTH = 2000; 
 
-  // HIZ AYARLARI (İyice Yavaşlatıldı)
-  const FOLLOW_SPEED = 0.0004;   
-  const MAX_SPEED = 4; // Hız limiti çok düşük
+  // 1. HIZ AYARI: (Biraz artırıldı: 0.0004 -> 0.001)
+  const FOLLOW_SPEED = 0.001;   
+  const MAX_SPEED = 6; // Hız limiti de biraz arttı
+  
   const WATER_FRICTION = 0.95; 
   const GRAVITY = 0.8;          
   const AIR_RESISTANCE = 0.99;  
@@ -39,33 +36,26 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const [isEating, setIsEating] = useState(false); 
   const [faceDirection, setFaceDirection] = useState(1); 
   
-  // ZEMİN PARÇALARI LİSTESİ (Map Chunks)
   const [chunks, setChunks] = useState<any[]>([]);
 
-  // Fiziksel Referanslar
   const fishPhys = useRef({ x: 200, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 });
   const mousePos = useRef({ x: window.innerWidth / 2, y: 500 });
   const cameraY = useRef(0);
   
-  // Dünyadaki konumumuz (Sonsuz ilerleme için)
   const backgroundX = useRef(0);
   
   const requestRef = useRef<number>();
   const [targets, setTargets] = useState<{id: number, x: number, y: number, color: string, type: 'food'}[]>([]);
   const wasInWater = useRef(true);
 
-  // --- ZEMİN ÜRETİCİ (PROCEDURAL GENERATION) ---
+  // --- ZEMİN ÜRETİCİ ---
   const generateChunk = (xPos: number) => {
-    // 1. Alt Zemin Seç (Yazı Tura)
     const baseImg = Math.random() > 0.5 ? altzemin1 : altzemin2;
-
-    // 2. Üst Zemin (Bitki) Seç (%75 ihtimalle bitki var, %25 boş)
     let overlayImg = null;
     const rand = Math.random();
     if (rand > 0.75) overlayImg = ustzemin1;
     else if (rand > 0.50) overlayImg = ustzemin2;
     else if (rand > 0.25) overlayImg = ustzemin3;
-    // else overlayImg = null (Sadece kum)
 
     return {
         id: Date.now() + Math.random(),
@@ -98,8 +88,6 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     cameraY.current = 0;
     setTargets([]);
 
-    // Başlangıçta 3 parça zemin oluştur (Ekranı kaplasın)
-    // -1 (Sol), 0 (Orta), 1 (Sağ)
     const initialChunks = [
         generateChunk(-CHUNK_WIDTH),
         generateChunk(0),
@@ -150,49 +138,45 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     fishPhys.current.y += fishPhys.current.vy;
 
     // 3. Dünya Kaydırma
-    // Sol duvar limiti (Sahil)
+    // 2. DÜZELTME: Harita limitini neredeyse sonsuz yaptık (-1.000.000 px)
     if (backgroundX.current - fishPhys.current.vx > 0) {
-        backgroundX.current = 0; // Daha sola gidemez
-        if (fishPhys.current.vx < 0) fishPhys.current.vx = 0; // Duvara toslama
+        backgroundX.current = 0; // Sol duvar (Sahil)
+        if (fishPhys.current.vx < 0) fishPhys.current.vx = 0; 
+    } else if (backgroundX.current - fishPhys.current.vx < -1000000) {
+        // Sağ sınır (Çok uzak)
+        backgroundX.current = -1000000;
     } else {
         backgroundX.current -= fishPhys.current.vx; 
     }
 
-    // 4. SONSUZ ZEMİN YÖNETİMİ (Chunk Manager)
+    // 4. Chunk Yönetimi
     setChunks(prevChunks => {
         const currentRightEdge = -backgroundX.current + window.innerWidth;
         const lastChunk = prevChunks[prevChunks.length - 1];
         
-        // Eğer ekranın sağına yaklaştıysak yeni parça ekle
         if (lastChunk && lastChunk.x < currentRightEdge + CHUNK_WIDTH) {
             return [...prevChunks, generateChunk(lastChunk.x + CHUNK_WIDTH)];
         }
-
-        // Ekranın çok solunda kalanları sil (Performans için)
-        // Ancak geri dönme ihtimaline karşı hemen silmiyoruz, biraz pay bırakıyoruz (2 chunk gerisi)
         const currentLeftEdge = -backgroundX.current;
         if (prevChunks[0].x < currentLeftEdge - CHUNK_WIDTH * 2) {
              return prevChunks.slice(1);
         }
-
         return prevChunks;
     });
 
-    // 5. Yön ve Dönme
+    // 5. Yön ve Dönme (1. DÜZELTME: Tam Dönüş)
     if (Math.abs(fishPhys.current.vx) > 0.1) {
         setFaceDirection(fishPhys.current.vx > 0 ? 1 : -1);
     }
-    let angleRad = Math.atan2(fishPhys.current.vy, fishPhys.current.vx);
+    
+    // Açıyı hesaplarken mutlak hız kullanıyoruz ki sola giderken ters dönmesin
+    // Balık sola baksa bile (scaleX: -1), burnunu yukarı kaldırması 'pozitif' açı olmalı.
+    let angleRad = Math.atan2(fishPhys.current.vy, Math.abs(fishPhys.current.vx));
     let angleDeg = angleRad * (180 / Math.PI);
-    let targetRotation = 0;
-    if (faceDirection === 1) targetRotation = angleDeg;
-    else {
-        let mirroredAngle = Math.atan2(fishPhys.current.vy, Math.abs(fishPhys.current.vx)) * (180 / Math.PI);
-        targetRotation = mirroredAngle; 
-    }
-    targetRotation = Math.max(-85, Math.min(85, targetRotation));
-    if (!inWater) targetRotation = Math.min(fishPhys.current.vy * 5, 90) * faceDirection;
-    fishPhys.current.rotation += (targetRotation - fishPhys.current.rotation) * 0.1;
+    
+    // Yumuşak geçiş
+    fishPhys.current.rotation += (angleDeg - fishPhys.current.rotation) * 0.1;
+
 
     // 6. Jelibon
     const totalSpeed = Math.sqrt(fishPhys.current.vx**2 + fishPhys.current.vy**2);
@@ -200,11 +184,14 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     fishPhys.current.scaleX = 1 + stretch;
     fishPhys.current.scaleY = 1 - stretch * 0.5;
 
-    // 7. Sınırlar
+    // 7. Sınırlar ve Çarpışma
     if (fishPhys.current.x < 50) { fishPhys.current.x = 50; fishPhys.current.vx = 0; }
     if (fishPhys.current.x > window.innerWidth - 50) { fishPhys.current.x = window.innerWidth - 50; fishPhys.current.vx = 0; }
-    if (fishPhys.current.y > WORLD_HEIGHT - ZEMIN_YUKSEKLIK) { 
-        fishPhys.current.y = WORLD_HEIGHT - ZEMIN_YUKSEKLIK; 
+    
+    // 4. DÜZELTME: Zemin çarpışması iyileştirildi.
+    // Artık zeminin içine girebilirsin (WORLD_HEIGHT - 50px'e kadar inebilirsin)
+    if (fishPhys.current.y > WORLD_HEIGHT - 50) { 
+        fishPhys.current.y = WORLD_HEIGHT - 50; 
         fishPhys.current.vy = 0; 
     }
 
@@ -284,7 +271,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     background: 'linear-gradient(to bottom, #60a5fa 0%, #1e3a8a 90%)' 
                 }}
             >
-                {/* SU YÜZEYİ (Tekrar eden sabit desen) */}
+                {/* SU YÜZEYİ */}
                 <div 
                     className="absolute top-0 left-0 w-full h-16 pointer-events-none"
                     style={{ 
@@ -296,7 +283,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     }}
                 />
 
-                {/* --- SONSUZ ZEMİN PARÇALARI (CHUNKS) --- */}
+                {/* --- SONSUZ ZEMİN PARÇALARI --- */}
                 {chunks.map(chunk => (
                     <div 
                         key={chunk.id}
@@ -305,21 +292,20 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                             left: 0,
                             width: CHUNK_WIDTH,
                             height: ZEMIN_YUKSEKLIK,
-                            // Parçanın kendi konumu + Dünya kayması
                             transform: `translateX(${chunk.x + backgroundX.current}px)`
                         }}
                     >
-                        {/* KATMAN 1: ALT ZEMİN (KUM) */}
+                        {/* KATMAN 1: KUM */}
                         <div 
                             className="absolute bottom-0 left-0 w-full h-full"
                             style={{
                                 backgroundImage: `url(${chunk.base})`,
-                                backgroundSize: '100% 100%', // Resim parçaya tam otursun
+                                backgroundSize: '100% 100%',
                                 filter: 'brightness(0.95)'
                             }}
                         />
 
-                        {/* KATMAN 2: ÜST ZEMİN (BİTKİ) - Eğer varsa */}
+                        {/* KATMAN 2: BİTKİ */}
                         {chunk.overlay && (
                             <div 
                                 className="absolute bottom-0 left-0 w-full h-full"
@@ -396,4 +382,5 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         )}
     </div>
   );
-              }
+    }
+                                        
