@@ -3,9 +3,18 @@ import { motion } from 'framer-motion';
 import { Play, XCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-// --- GÖRSELLER ---
-import balikNormalImg from './balik.png';
-import balikYemeImg from './balik_yeme.png';
+// --- GÖRSELLER (YENİLER EKLENDİ) ---
+// Yüzme Kareleri
+import duzbalikAna from './duzbalikana.png';
+import duzbalik1 from './duzbalik1.png';
+import duzbalik2 from './duzbalik2.png';
+
+// Yeme Kareleri
+import balikye1 from './balikye1.png';
+import balikye2 from './balikye2.png';
+import balikye3 from './balikye3.png';
+import balikye4 from './balikye4.png';
+
 import suYuzeyiImg from './su_yuzeyi.png';
 
 // ZEMİN PARÇALARI
@@ -15,6 +24,10 @@ import ustzemin1 from './ustzemin1.png';
 import ustzemin2 from './ustzemin2.png';
 import ustzemin3 from './ustzemin3.png';
 
+// --- ANİMASYON DİZİLERİ ---
+const SWIM_FRAMES = [duzbalikAna, duzbalik1, duzbalik2, duzbalik1]; // 1-2-Ana-1 döngüsü daha akıcı olur
+const EAT_FRAMES = [balikye1, balikye2, balikye3, balikye4];
+
 export default function EslemeGame({ onClose }: { onClose: () => void }) {
   // --- AYARLAR ---
   const WORLD_HEIGHT = 3000; 
@@ -22,29 +35,22 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const ZEMIN_YUKSEKLIK = 350;
   const CHUNK_WIDTH = 2000; 
 
-  // --- HUNGRY SHARK FİZİĞİ ---
-  
-  // 1. HIZLANMA (İvme): Düşük tuttuk ki "ağır" hissettirsin.
+  // --- FİZİK AYARLARI ---
   const FOLLOW_SPEED = 0.0008;   
-  
-  // 2. MAKSİMUM HIZ: Yüksek tuttuk, hızlanınca tam aksın.
   const MAX_SPEED = 10; 
-  
-  // 3. SÜRTÜNME (AKICILIK): 
-  // 0.90 -> Hemen durur (Çamur gibi)
-  // 0.98 -> Çok kaygan (Buz gibi / Hungry Shark hissi)
-  // Parmağını bıraksan bile balık süzülmeye devam eder.
   const WATER_FRICTION = 0.98; 
-
   const GRAVITY = 0.8;          
   const AIR_RESISTANCE = 0.99;  
 
   // --- STATE'LER ---
   const [isPlaying, setIsPlaying] = useState(false);
   const [score, setScore] = useState(0);
-  const [isEating, setIsEating] = useState(false); 
-  const [faceDirection, setFaceDirection] = useState(1); 
   
+  // ANİMASYON STATE'LERİ
+  const [isEating, setIsEating] = useState(false); 
+  const [currentFrameIndex, setCurrentFrameIndex] = useState(0); // Hangi karedeyiz?
+  
+  const [faceDirection, setFaceDirection] = useState(1); 
   const [chunks, setChunks] = useState<any[]>([]);
 
   const fishPhys = useRef({ x: 200, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 });
@@ -54,6 +60,20 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const requestRef = useRef<number>();
   const [targets, setTargets] = useState<{id: number, x: number, y: number, color: string, type: 'food'}[]>([]);
   const wasInWater = useRef(true);
+
+  // --- ANİMASYON MOTORU (YENİ) ---
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    // Animasyon hızı: 
+    // Balık hızlı yüzerse (vx artarsa) kuyruk daha hızlı sallansın istersek burayı dinamik yapabiliriz.
+    // Şimdilik sabit 100ms (saniyede 10 kare) idealdir.
+    const animInterval = setInterval(() => {
+        setCurrentFrameIndex(prev => prev + 1);
+    }, 120); 
+
+    return () => clearInterval(animInterval);
+  }, [isPlaying]);
 
   // --- ZEMİN ÜRETİCİ ---
   const generateChunk = (xPos: number) => {
@@ -105,7 +125,9 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
   const triggerEatAnimation = () => {
     setIsEating(true);
-    setTimeout(() => setIsEating(false), 200);
+    setCurrentFrameIndex(0); // Yeme animasyonunu baştan başlat
+    // 4 karelik yeme animasyonu bitince normale dön (4 kare * 100ms = 400ms)
+    setTimeout(() => setIsEating(false), 400);
   };
 
   // --- OYUN DÖNGÜSÜ ---
@@ -118,21 +140,18 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     }
     wasInWater.current = inWater;
 
-    // 2. Fizik (HUNGRY SHARK TARZI)
+    // 2. Fizik
     if (inWater) {
       const targetY = mousePos.current.y + cameraY.current;
       const dx = mousePos.current.x - fishPhys.current.x;
       const dy = targetY - fishPhys.current.y;
 
-      // İvmelenme (Yay sistemi yerine motor gücü gibi düşün)
       fishPhys.current.vx += dx * FOLLOW_SPEED;
       fishPhys.current.vy += dy * FOLLOW_SPEED;
       
-      // Sürtünme (Artık çok düşük, yani çok kaygan)
       fishPhys.current.vx *= WATER_FRICTION;
       fishPhys.current.vy *= WATER_FRICTION;
 
-      // HIZ LİMİTİ (Limit arttırıldı)
       const currentSpeed = Math.sqrt(fishPhys.current.vx**2 + fishPhys.current.vy**2);
       if (currentSpeed > MAX_SPEED) {
           const ratio = MAX_SPEED / currentSpeed;
@@ -148,12 +167,10 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     fishPhys.current.y += fishPhys.current.vy;
 
     // 3. Dünya Kaydırma
-    // Sol Duvar Kontrolü
     if (backgroundX.current - fishPhys.current.vx > 0) {
         backgroundX.current = 0; 
         if (fishPhys.current.vx < 0) fishPhys.current.vx = 0; 
     } else {
-        // Sonsuz kaydırma
         backgroundX.current -= fishPhys.current.vx; 
     }
 
@@ -177,22 +194,19 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         setFaceDirection(fishPhys.current.vx > 0 ? 1 : -1);
     }
     
-    // Açıyı hareket yönüne kilitle (Mouse'a değil, gittiği yere baksın)
-    // Bu sayede drift atarken kafa yönü doğru kalır.
     let angleRad = Math.atan2(fishPhys.current.vy, Math.abs(fishPhys.current.vx));
     let angleDeg = angleRad * (180 / Math.PI);
     let targetRotation = angleDeg * faceDirection;
     
-    // Dönüş yumuşatma
     fishPhys.current.rotation += (targetRotation - fishPhys.current.rotation) * 0.1;
 
-    // 6. Jelibon (Hızlanınca uzasın)
+    // 6. Esneme
     const totalSpeed = Math.sqrt(fishPhys.current.vx**2 + fishPhys.current.vy**2);
-    const stretch = Math.min(totalSpeed * 0.02, 0.3); // Esneme miktarını arttırdık
+    const stretch = Math.min(totalSpeed * 0.02, 0.3); 
     fishPhys.current.scaleX = 1 + stretch;
     fishPhys.current.scaleY = 1 - stretch * 0.5;
 
-    // 7. Sınırlar (X ekseni)
+    // 7. Sınırlar
     if (fishPhys.current.x < 50) { 
         fishPhys.current.x = 50; 
         if(backgroundX.current >= 0) fishPhys.current.vx = 0; 
@@ -201,7 +215,6 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         fishPhys.current.x = window.innerWidth - 50; 
     }
     
-    // ZEMİN SINIRI: En dibe inebilsin (Otların arasına)
     if (fishPhys.current.y > WORLD_HEIGHT - 10) { 
         fishPhys.current.y = WORLD_HEIGHT - 10; 
         fishPhys.current.vy = 0; 
@@ -246,6 +259,19 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     if (isPlaying) requestRef.current = requestAnimationFrame(gameLoop);
     return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
   }, [isPlaying]);
+
+  // --- GÖRSEL SEÇİCİ ---
+  // Hangi resmi göstereceğimize karar veren fonksiyon
+  const getCurrentImage = () => {
+    if (isEating) {
+        // Yeme modundaysak EAT_FRAMES dizisinden sıradaki kareyi al
+        // Modulo (%) operatörü dizinin dışına taşmayı engeller (0,1,2,3,0,1,2,3...)
+        return EAT_FRAMES[currentFrameIndex % EAT_FRAMES.length];
+    } else {
+        // Yüzme modundaysak SWIM_FRAMES dizisinden al
+        return SWIM_FRAMES[currentFrameIndex % SWIM_FRAMES.length];
+    }
+  };
 
   return (
     <div 
@@ -295,7 +321,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     }}
                 />
 
-                {/* --- SONSUZ ZEMİN PARÇALARI --- */}
+                {/* --- CHUNKS --- */}
                 {chunks.map(chunk => (
                     <div 
                         key={chunk.id}
@@ -307,7 +333,6 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                             transform: `translateX(${chunk.x + backgroundX.current}px)`
                         }}
                     >
-                        {/* KATMAN 1: KUM */}
                         <div 
                             className="absolute bottom-0 left-0 w-full h-full"
                             style={{
@@ -316,8 +341,6 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                                 filter: 'brightness(0.95)'
                             }}
                         />
-
-                        {/* KATMAN 2: BİTKİ */}
                         {chunk.overlay && (
                             <div 
                                 className="absolute bottom-0 left-0 w-full h-full"
@@ -334,7 +357,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                 ))}
             </div>
 
-            {/* HEDEFLER & BALIK */}
+            {/* HEDEFLER */}
             {targets.map(t => (
                 <div 
                     key={t.id}
@@ -345,14 +368,18 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                 </div>
             ))}
 
+            {/* --- BALIK --- */}
             {isPlaying && (
                 <div 
                     className="absolute z-50 will-change-transform"
                     style={{
                         left: fishPhys.current.x,
                         top: fishPhys.current.y,
-                        width: 90, 
-                        height: 70,
+                        width: 120, // Balık biraz daha büyük görünsün diye 120 yaptım
+                        height: 90,
+                        // Balık Pivot Merkezini Ayarlama
+                        // Not: Eğer balık biraz aşağıda kalıyorsa buradaki `translate` değerleriyle oyna.
+                        // Şu an tam ortalıyor: (-50%, -50%)
                         transform: (() => {
                             const depthRatio = Math.max(0, (fishPhys.current.y - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL));
                             const depthScale = 1 + (depthRatio * 0.6); 
@@ -363,9 +390,12 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     }}
                 >
                     <img 
-                        src={isEating ? balikYemeImg : balikNormalImg} 
+                        // BURASI OTOMATİK DEĞİŞİYOR
+                        src={getCurrentImage()} 
                         alt="Karakter" 
                         className="w-full h-full object-contain drop-shadow-2xl"
+                        // Eğer resim içinde balık biraz kayıksa, ince ayar için buraya margin verebilirsin:
+                        // style={{ marginTop: '-10px' }} gibi.
                     />
                 </div>
             )}
@@ -394,5 +424,4 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         )}
     </div>
   );
-                           }
-      
+}
