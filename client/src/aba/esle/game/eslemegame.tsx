@@ -22,9 +22,9 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const ZEMIN_YUKSEKLIK = 350;
   const CHUNK_WIDTH = 2000; 
 
-  // 1. HIZ AYARI: (Biraz artırıldı: 0.0004 -> 0.001)
-  const FOLLOW_SPEED = 0.001;   
-  const MAX_SPEED = 6; // Hız limiti de biraz arttı
+  // 1. HIZ AYARI: 0.001 -> 0.002 (Bir tık hızlandı)
+  const FOLLOW_SPEED = 0.002;   
+  const MAX_SPEED = 7; 
   
   const WATER_FRICTION = 0.95; 
   const GRAVITY = 0.8;          
@@ -41,9 +41,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const fishPhys = useRef({ x: 200, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 });
   const mousePos = useRef({ x: window.innerWidth / 2, y: 500 });
   const cameraY = useRef(0);
-  
   const backgroundX = useRef(0);
-  
   const requestRef = useRef<number>();
   const [targets, setTargets] = useState<{id: number, x: number, y: number, color: string, type: 'food'}[]>([]);
   const wasInWater = useRef(true);
@@ -137,15 +135,16 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     fishPhys.current.x += fishPhys.current.vx;
     fishPhys.current.y += fishPhys.current.vy;
 
-    // 3. Dünya Kaydırma
-    // 2. DÜZELTME: Harita limitini neredeyse sonsuz yaptık (-1.000.000 px)
+    // 3. Dünya Kaydırma (CRITICAL FIX)
+    // Önceki hatan buradaydı: Balık durunca dünya duruyordu.
+    // Artık balık ekranda sıkışsa bile (vx > 0) ise dünya kaymaya devam eder.
+    
+    // Sol duvar (Sahil)
     if (backgroundX.current - fishPhys.current.vx > 0) {
-        backgroundX.current = 0; // Sol duvar (Sahil)
+        backgroundX.current = 0; 
         if (fishPhys.current.vx < 0) fishPhys.current.vx = 0; 
-    } else if (backgroundX.current - fishPhys.current.vx < -1000000) {
-        // Sağ sınır (Çok uzak)
-        backgroundX.current = -1000000;
     } else {
+        // Sonsuz sağa gidiş
         backgroundX.current -= fishPhys.current.vx; 
     }
 
@@ -164,18 +163,22 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         return prevChunks;
     });
 
-    // 5. Yön ve Dönme (1. DÜZELTME: Tam Dönüş)
+    // 5. Yön ve Dönme (FIXED)
     if (Math.abs(fishPhys.current.vx) > 0.1) {
         setFaceDirection(fishPhys.current.vx > 0 ? 1 : -1);
     }
     
-    // Açıyı hesaplarken mutlak hız kullanıyoruz ki sola giderken ters dönmesin
-    // Balık sola baksa bile (scaleX: -1), burnunu yukarı kaldırması 'pozitif' açı olmalı.
+    // DÖNÜŞ DÜZELTMESİ:
+    // Sola giderken (scaleX: -1), açıyı da ters çevirmeliyiz ki kafa aşağı insin.
     let angleRad = Math.atan2(fishPhys.current.vy, Math.abs(fishPhys.current.vx));
     let angleDeg = angleRad * (180 / Math.PI);
     
+    // Eğer sola bakıyorsak (faceDirection -1), açıyı negatife çevir
+    // Böylece aşağı yüzerken kafa aşağı iner.
+    let targetRotation = angleDeg * faceDirection;
+    
     // Yumuşak geçiş
-    fishPhys.current.rotation += (angleDeg - fishPhys.current.rotation) * 0.1;
+    fishPhys.current.rotation += (targetRotation - fishPhys.current.rotation) * 0.1;
 
 
     // 6. Jelibon
@@ -185,13 +188,22 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     fishPhys.current.scaleY = 1 - stretch * 0.5;
 
     // 7. Sınırlar ve Çarpışma
-    if (fishPhys.current.x < 50) { fishPhys.current.x = 50; fishPhys.current.vx = 0; }
-    if (fishPhys.current.x > window.innerWidth - 50) { fishPhys.current.x = window.innerWidth - 50; fishPhys.current.vx = 0; }
+    // EKRAN KENARLARI (ÖNEMLİ: vx'i sıfırlamıyoruz!)
+    // Sadece x konumunu kilitliyoruz, böylece vx sayesinde arka plan akmaya devam ediyor.
+    if (fishPhys.current.x < 50) { 
+        fishPhys.current.x = 50; 
+        // Sol duvarda dursun
+        if(backgroundX.current >= 0) fishPhys.current.vx = 0; 
+    }
+    if (fishPhys.current.x > window.innerWidth - 50) { 
+        fishPhys.current.x = window.innerWidth - 50; 
+        // Burada vx=0 yapmıyoruz! Balık ekranda dursa da yüzmeye devam ediyor gibi arka plan akacak.
+    }
     
-    // 4. DÜZELTME: Zemin çarpışması iyileştirildi.
-    // Artık zeminin içine girebilirsin (WORLD_HEIGHT - 50px'e kadar inebilirsin)
-    if (fishPhys.current.y > WORLD_HEIGHT - 50) { 
-        fishPhys.current.y = WORLD_HEIGHT - 50; 
+    // DERİNLİK SINIRI (FIXED)
+    // Artık zemine takılmak yok, en dibe kadar inebilirsin.
+    if (fishPhys.current.y > WORLD_HEIGHT - 10) { 
+        fishPhys.current.y = WORLD_HEIGHT - 10; 
         fishPhys.current.vy = 0; 
     }
 
@@ -383,4 +395,4 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     </div>
   );
     }
-                                        
+                                  
