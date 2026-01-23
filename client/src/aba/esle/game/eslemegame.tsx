@@ -45,7 +45,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const [faceDirection, setFaceDirection] = useState(1); 
   
   const [chunks, setChunks] = useState<any[]>([]);
-  const [surfaceTilt, setSurfaceTilt] = useState(0); 
+  const [surfaceTilt, setSurfaceTilt] = useState(30); // Başlangıç açısı 30
 
   // Balık Başlangıç
   const fishPhys = useRef({ x: WORLD_WIDTH / 2, y: 800, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 });
@@ -154,33 +154,25 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     if (camera.current.x < 0) camera.current.x = 0;
     if (camera.current.x > WORLD_WIDTH) camera.current.x = WORLD_WIDTH;
 
-    // --- OPTİK AÇI HESABI (YENİ FORMÜL) ---
-    // Derinlik (d): Balığın su yüzeyine olan uzaklığı
-    // Bakış Mesafesi (w): Balığın ne kadar ileriye baktığı (sabit bir ufuk mesafesi alıyoruz, örn: 600px)
-    // Açı = arctan(d / w) -> Bu bize balığın yüzeyi ne kadar "dik" gördüğünü verir.
-    
+    // --- YENİ TILT HESABI (30 dereceden 90 dereceye) ---
     const depth = Math.max(0, fishPhys.current.y - SEA_LEVEL);
+    const maxTiltDist = 600; 
     
-    // Yüzeye çok yakınsa (örn: 0-200px), açı hızla 90'a yaklaşmalı (Çizgi olmalı)
-    // Derindeyse (örn: 1000px), açı azalmalı ve yüzeyi geniş görmeliyiz (ama ters orantılı)
+    // 0 (Yüzey) ile 1 (Dip) arası bir oran
+    const surfaceFactor = Math.min(1, depth / maxTiltDist);
     
-    // Basitleştirilmiş Optik Formül:
-    // Derinlik 0 ise -> Tilt 90 (Çizgi)
-    // Derinlik 1000 ise -> Tilt 0 (Düz Levha)
+    // Formül: Factor 1 ise (Dip) -> 30 derece
+    // Formül: Factor 0 ise (Yüzey) -> 90 derece
+    // Linear Interpolation (Lerp)
+    const minTilt = 30; // En az 30 derece eğik olsun (Dik değil)
+    const maxTilt = 90; // Yüzeyde tam 90 (Çizgi)
     
-    const maxVisibleDepth = 1200; // Bu derinlikten sonra yüzey dümdüz görünür
-    const normalizedDepth = Math.min(depth, maxVisibleDepth) / maxVisibleDepth;
-    
-    // 0 (Yüzey) -> 1 (Dip)
-    // Yüzeyde (0) iken Tilt 90 olsun. Dipte (1) iken Tilt 0 olsun.
-    // Easing ekleyerek (kareköklü) geçişi yumuşatıyoruz ki robotik durmasın.
-    const calculatedTilt = 90 * (1 - Math.pow(normalizedDepth, 0.8));
-    
-    setSurfaceTilt(calculatedTilt);
+    const currentTilt = maxTilt - (surfaceFactor * (maxTilt - minTilt));
+    setSurfaceTilt(currentTilt);
 
     if (Math.abs(fishPhys.current.vx) > 0.1) setFaceDirection(fishPhys.current.vx > 0 ? 1 : -1);
-    let angleRad = Math.atan2(fishPhys.current.vy, Math.abs(fishPhys.current.vx));
-    let angleDeg = angleRad * (180 / Math.PI);
+    let angleRadRot = Math.atan2(fishPhys.current.vy, Math.abs(fishPhys.current.vx));
+    let angleDeg = angleRadRot * (180 / Math.PI);
     let targetRotation = angleDeg * faceDirection;
     fishPhys.current.rotation += (targetRotation - fishPhys.current.rotation) * 0.1;
     if (!inWater && Math.abs(fishPhys.current.rotation) > 60) fishPhys.current.rotation *= 0.9;
@@ -236,55 +228,68 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                 <div className="absolute top-0 bottom-0 bg-black" style={{ left: -5000, width: 5000, zIndex: 100 }} />
                 <div className="absolute top-0 bottom-0 bg-black" style={{ left: WORLD_WIDTH, width: 5000, zIndex: 100 }} />
 
-                {/* 2. GÖKYÜZÜ (GECE MODU) */}
+                {/* 2. GÖKYÜZÜ (GECE MODU) - HER YERE YAYILDI */}
+                {/* Width: WORLD_WIDTH diyerek tüm haritayı kapsamasını garanti ettik */}
                 <div 
-                    className="w-[200%] absolute top-[-500px] -left-1/2" 
+                    className="absolute top-[-500px] left-0" 
                     style={{ 
+                        width: WORLD_WIDTH,
                         height: SEA_LEVEL + 500,
                         backgroundImage: `url(${geceImg})`,
-                        backgroundSize: 'cover',
+                        backgroundSize: 'cover', 
+                        backgroundRepeat: 'repeat-x', // Geniş ekranlarda tekrar etsin
                         backgroundPosition: 'bottom center'
                     }} 
                 />
 
-                {/* 3. DENİZ GRADYANI */}
+                {/* 3. DENİZ GRADYANI - HER YERE YAYILDI */}
                 <div 
-                    className="absolute left-0 w-full"
+                    className="absolute left-0"
                     style={{
                         top: SEA_LEVEL,
+                        width: WORLD_WIDTH,
                         height: WORLD_HEIGHT - SEA_LEVEL,
                         background: 'linear-gradient(to bottom, #4fc3f7 0%, #01579b 40%, #000000 100%)',
                         zIndex: 5
                     }}
                 />
 
-                {/* 4. SU YÜZEYİ (TAHTEREVALLİ - OPTİK TILT) */}
+                {/* 4. SU YÜZEYİ RESMİ (TAHTEREVALLİ) */}
                 <div 
-                    className="absolute w-full left-0 will-change-transform"
+                    className="absolute left-0 will-change-transform"
                     style={{
+                        width: WORLD_WIDTH, // Tüm harita boyunca
                         top: SEA_LEVEL - 300, 
                         height: 600, 
-                        // DÜZELTME: Origin Center ve Eksi Tilt
                         transformOrigin: 'center center',
+                        // ÖNE YATIRMA (Negatif)
                         transform: `rotateX(${-surfaceTilt}deg)`,
                         zIndex: 35 
                     }}
                 >
-                    <div 
-                        className="w-full h-full opacity-70"
-                        style={{
-                            backgroundImage: `url(${suDokuImg})`,
-                            backgroundRepeat: 'repeat', 
-                            backgroundSize: '800px auto', 
-                            animation: 'waterFlow 20s linear infinite',
-                            mixBlendMode: 'overlay'
-                        }}
-                    />
-                    {/* Parlak Çizgi - Tam ortada */}
-                    <div 
-                        className="absolute w-full h-1 bg-white/90 shadow-[0_0_20px_white]" 
-                        style={{ top: '50%', transform: 'translateY(-50%)' }}
-                    />
+                    {/* SU DOKUSU + GRADYAN MASKE */}
+                    <div className="w-full h-full relative overflow-hidden">
+                         {/* Asıl Resim */}
+                        <div 
+                            className="w-full h-full"
+                            style={{
+                                backgroundImage: `url(${suDokuImg})`,
+                                backgroundColor: '#29b6f6', 
+                                backgroundRepeat: 'repeat', 
+                                backgroundSize: '800px auto', 
+                                animation: 'waterFlow 20s linear infinite',
+                                opacity: 0.5 // DÜZELTME: Şeffaflık artırıldı (daha transparan)
+                            }}
+                        />
+                        {/* IŞIK KIRILMASI GRADYANI (Maske) */}
+                        {/* Üst taraf (Ufuk) Siyah/Koyu -> Alt taraf (Yakın) Şeffaf */}
+                        <div 
+                            className="absolute inset-0 pointer-events-none"
+                            style={{
+                                background: 'linear-gradient(to bottom, rgba(0,0,20,0.8) 0%, rgba(0,0,50,0.0) 100%)'
+                            }}
+                        />
+                    </div>
                 </div>
 
                 {/* 5. KUM ZEMİNLER */}
