@@ -9,7 +9,10 @@ import d4 from './d4.png'; import d5 from './d5.png'; import d6 from './d6.png';
 import d7 from './d7.png'; import d8 from './d8.png'; 
 import balikye1 from './balikye1.png'; import balikye2 from './balikye2.png';
 import balikye3 from './balikye3.png'; import balikye4 from './balikye4.png';
-import suYuzeyiImg from './su_yuzeyi.png'; // Bu resmin alt kısmı şeffaf değilse "mix-blend-mode" kullanacağız
+
+// YENİ EKLENEN SU DOKUSU (Senin gönderdiğin mavi resim)
+import suDokuImg from './su_doku.png'; // 1000095257.png dosyasının adı bu olsun
+
 import altzemin1 from './altzemin1.png'; import altzemin2 from './altzemin2.png';
 import ustzemin1 from './ustzemin1.png'; import ustzemin2 from './ustzemin2.png';
 import ustzemin3 from './ustzemin3.png';
@@ -19,8 +22,8 @@ const EAT_FRAMES = [balikye1, balikye2, balikye3, balikye4];
 
 export default function EslemeGame({ onClose }: { onClose: () => void }) {
   // --- AYARLAR ---
-  const WORLD_HEIGHT = 3000; 
-  const SEA_LEVEL = 400;     
+  const WORLD_HEIGHT = 4000; // Dünyayı biraz daha derinleştirdik
+  const SEA_LEVEL = 500;     
   const ZEMIN_YUKSEKLIK = 350;
   const CHUNK_WIDTH = 2000; 
 
@@ -40,8 +43,11 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const [faceDirection, setFaceDirection] = useState(1); 
   const [chunks, setChunks] = useState<any[]>([]);
 
-  const fishPhys = useRef({ x: 0, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 });
-  const mousePos = useRef({ x: 0, y: 500 });
+  // 3D TILT EFEKTİ İÇİN STATE
+  const [viewTilt, setViewTilt] = useState(0); // 0 (Düz) - 45 (Yatık) arası
+
+  const fishPhys = useRef({ x: 0, y: 600, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 });
+  const mousePos = useRef({ x: 0, y: 600 });
   const camera = useRef({ x: 0, y: 0 });
   const animTimerRef = useRef(0);
   const requestRef = useRef<number>();
@@ -88,8 +94,8 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
   const startGame = () => {
     setIsPlaying(true); setScore(0);
-    fishPhys.current = { x: 0, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 };
-    camera.current = { x: 0, y: 500 }; mousePos.current = { x: 0, y: 500 };
+    fishPhys.current = { x: 0, y: 800, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 };
+    camera.current = { x: 0, y: 800 }; mousePos.current = { x: 0, y: 800 };
     animTimerRef.current = 0; setTargets([]);
     setChunks([generateChunk(-CHUNK_WIDTH), generateChunk(0), generateChunk(CHUNK_WIDTH)]);
   };
@@ -120,10 +126,29 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     }
     fishPhys.current.x += fishPhys.current.vx; fishPhys.current.y += fishPhys.current.vy;
 
+    // --- KAMERA ---
     camera.current.x += (fishPhys.current.x - camera.current.x) * 0.15;
     camera.current.y += (fishPhys.current.y - camera.current.y) * 0.1;
+    
+    // Kamera Sınırları
     if (camera.current.y < screenH / 2) camera.current.y = screenH / 2;
     if (camera.current.y > WORLD_HEIGHT - screenH / 2) camera.current.y = WORLD_HEIGHT - screenH / 2;
+
+    // --- 3D TILT HESAPLAMA (KRİTİK BÖLÜM) ---
+    // Balık su yüzeyine (SEA_LEVEL) yaklaştıkça Tilt açısı artar.
+    // Derinlik 1500px'den fazlaysa tilt 0 olur.
+    // Yüzeye geldiğinde tilt 60 dereceye kadar çıkar.
+    const distanceToSurface = Math.max(0, fishPhys.current.y - SEA_LEVEL);
+    const maxTiltDepth = 1200; // Bu derinlikten sonra düzleşir
+    
+    // Yüzeye ne kadar yakınız? (0 = çok derin, 1 = yüzeyde)
+    const surfaceProximity = 1 - Math.min(1, distanceToSurface / maxTiltDepth);
+    
+    // Tilt açısını ayarla (0 ile 60 derece arası)
+    // Easing ekledik (kareköklü geçiş) daha doğal durur
+    const targetTilt = Math.pow(surfaceProximity, 1.5) * 60; 
+    setViewTilt(targetTilt);
+
 
     setChunks(prevChunks => {
         const currentRightEdge = camera.current.x + screenW / 2;
@@ -174,16 +199,19 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                 position: 'absolute', left: '50%', top: '50%',
                 transform: isPortrait ? 'translate(-50%, -50%) rotate(90deg)' : 'translate(-50%, -50%)',
                 zIndex: 10,
-                backgroundColor: '#AEEEEE' // Temel gökyüzü rengi
+                backgroundColor: '#87CEEB', // Gökyüzü rengi
+                // 3D Perspektif için konteyner ayarı
+                perspective: '1000px', // Derinlik hissini veren değer
+                perspectiveOrigin: 'center center'
             }}
             onMouseMove={handleInput} onTouchMove={handleInput}
         >
             <style>{`
+                @keyframes waterShimmer { 0% { transform: translateX(0); } 100% { transform: translateX(-50px); } }
                 @keyframes yosunSallan { 0% { transform: skewX(0deg); } 50% { transform: skewX(4deg); } 100% { transform: skewX(0deg); } }
-                @keyframes lightRays { 0% { transform: translateX(0) skewX(-20deg); opacity: 0.3; } 50% { opacity: 0.6; } 100% { transform: translateX(-50px) skewX(-20deg); opacity: 0.3; } }
             `}</style>
 
-            {/* KAMERA KONTEYNERİ */}
+            {/* KAMERA HAREKETİ (X ve Y) */}
             <div 
                 className="absolute w-full top-0 left-0 will-change-transform"
                 style={{ 
@@ -191,95 +219,85 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     transform: `translate(${-camera.current.x + (isPortrait ? window.innerHeight : window.innerWidth) / 2}px, ${-camera.current.y + (isPortrait ? window.innerWidth : window.innerHeight) / 2}px)` 
                 }}
             >
-                {/* --- KATMAN 1: GÖKYÜZÜ ve UFUK --- */}
-                {/* Gökyüzü: Yukarı çıktıkça koyulaşan, ufukta beyazlaşan */}
-                <div style={{ height: SEA_LEVEL + 500 }} className="w-[200%] absolute top-0 -left-1/2">
-                    <div className="w-full h-full bg-gradient-to-b from-[#4fa8d1] via-[#b3e0f2] to-[#e6f7ff]" />
-                    
-                    {/* DAĞLAR (SİLÜET) - CSS ile yapay dağ efekti */}
-                    <div 
-                        className="absolute bottom-[400px] w-full h-64 opacity-60"
-                        style={{
-                            background: 'linear-gradient(to top, #6faebf, transparent)',
-                            clipPath: 'polygon(0% 100%, 10% 60%, 25% 90%, 40% 50%, 60% 85%, 80% 40%, 100% 100%)',
-                            transform: `translateX(${camera.current.x * 0.1}px)` // Paralaks etkisi: Yavaş hareket eder
-                        }}
-                    />
-                     <div 
-                        className="absolute bottom-[380px] w-full h-48 opacity-40 mix-blend-multiply"
-                        style={{
-                            backgroundColor: '#5d8a9e',
-                            clipPath: 'polygon(0% 100%, 15% 70%, 35% 90%, 55% 65%, 75% 90%, 100% 100%)',
-                            transform: `translateX(${camera.current.x * 0.2}px)` 
-                        }}
-                    />
+                {/* --- KATMAN 1: GÖKYÜZÜ (SABİT) --- */}
+                <div style={{ height: SEA_LEVEL + 800 }} className="w-[200%] absolute top-[-500px] -left-1/2">
+                    <div className="w-full h-full bg-gradient-to-b from-[#2ebbf5] via-[#a3dff7] to-[#e0f7fa]" />
                 </div>
 
-                {/* --- KATMAN 2: SU ALTI ATMOSFERİ (DENİZ BODY) --- */}
+                {/* --- KATMAN 2: DENİZ ARKAPLANI (PERSPEKTİF UYGULANACAK) --- */}
+                {/* İşte büyü burada: Sadece Deniz katmanını eğiyoruz! */}
                 <div 
-                    className="w-full absolute left-0"
+                    className="w-full absolute left-0 origin-top will-change-transform"
                     style={{ 
                         top: SEA_LEVEL,
                         height: WORLD_HEIGHT - SEA_LEVEL,
-                        // Açık turkuazdan, derin maviye geçiş
-                        background: 'linear-gradient(to bottom, rgba(64, 224, 208, 0.9) 0%, rgba(0, 105, 148, 0.95) 30%, #001f3f 100%)',
-                        // Üst kenarda hafif bulanıklık vererek su-hava geçişini yumuşat
-                        boxShadow: 'inset 0 10px 20px rgba(255,255,255,0.3)' 
+                        // Balık yüzeye yaklaştıkça bu katman arkaya doğru yatar (rotateX)
+                        transform: `rotateX(${viewTilt}deg)`,
+                        transformStyle: 'preserve-3d',
+                        // Senin gönderdiğin resmin renginden (açık mavi) dibe doğru (koyu lacivert) geçiş
+                        background: 'linear-gradient(to bottom, #1ca3ec 0%, #006994 30%, #001e36 90%)'
                     }}
                 >
-                    {/* IŞIK HÜZMELERİ (GOD RAYS) - CSS İLE */}
+                    {/* SU DOKUSU (Senin PNG'n) */}
                     <div 
-                        className="absolute top-0 left-0 w-[200%] h-full pointer-events-none"
-                        style={{
-                            background: 'repeating-linear-gradient(90deg, transparent, transparent 50px, rgba(255, 255, 255, 0.05) 50px, rgba(255, 255, 255, 0.05) 100px)',
-                            transformOrigin: 'top center',
-                            animation: 'lightRays 8s infinite alternate ease-in-out',
-                            mixBlendMode: 'overlay'
-                        }}
-                    />
-
-                    {/* SU YÜZEYİ ÇİZGİSİ */}
-                    <div 
-                        className="absolute top-0 left-0 w-full h-12 pointer-events-none opacity-90"
+                        className="absolute top-0 left-0 w-[200%] h-[1500px] pointer-events-none opacity-40 mix-blend-overlay"
                         style={{ 
-                            backgroundImage: `url(${suYuzeyiImg})`, 
-                            backgroundRepeat: 'repeat-x', 
-                            backgroundSize: 'auto 100%',
-                            backgroundPositionX: `${camera.current.x * 0.5}px`, 
-                            transform: `translateY(-50%)`,
-                            // Eğer PNG'nin arka planı beyazsa bunu kullan:
-                            // mixBlendMode: 'multiply' 
+                            backgroundImage: `url(${suDokuImg})`, 
+                            backgroundRepeat: 'repeat', 
+                            backgroundSize: '800px auto',
+                            // Doku hafifçe kaysın
+                            animation: 'waterShimmer 2s linear infinite'
                         }}
                     />
 
                     {/* ZEMİN (KUM) */}
                     {chunks.map(chunk => (
                         <div key={`base-${chunk.id}`} className="absolute bottom-0 pointer-events-none" style={{ left: 0, width: CHUNK_WIDTH, height: ZEMIN_YUKSEKLIK, transform: `translateX(${chunk.x}px)`, zIndex: 10 }}>
-                            <div className="absolute bottom-0 left-0 w-full h-full" style={{ backgroundImage: `url(${chunk.base})`, backgroundSize: '100% 100%', filter: 'brightness(0.9)' }} />
-                        </div>
-                    ))}
-
-                    {/* HEDEFLER */}
-                    {targets.map(t => (
-                        <div key={t.id} className="absolute w-12 h-12 rounded-full shadow-lg border-2 border-white/50 flex items-center justify-center animate-pulse" style={{ left: t.x, top: t.y, backgroundColor: t.color, zIndex: 20 }}>
-                            <div className="w-4 h-4 bg-white/40 rounded-full blur-sm"></div>
-                        </div>
-                    ))}
-
-                    {/* BALIK */}
-                    {isPlaying && (
-                        <div className="absolute will-change-transform" style={{ left: fishPhys.current.x, top: fishPhys.current.y, width: 160, height: 120, zIndex: 30, transform: (() => { const depthRatio = Math.max(0, (fishPhys.current.y - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL)); const depthScale = 1 + (depthRatio * 0.6); return `translate(-50%, -50%) rotate(${fishPhys.current.rotation}deg) scale(${faceDirection * fishPhys.current.scaleX * depthScale}, ${fishPhys.current.scaleY * depthScale})`; })() }}>
-                            <img src={getCurrentImage()} alt="Karakter" className="w-full h-full object-contain drop-shadow-2xl" />
-                        </div>
-                    )}
-
-                    {/* OTLAR (USTZEMİN) */}
-                    {chunks.map(chunk => chunk.overlay && (
-                        <div key={`overlay-${chunk.id}`} className="absolute bottom-0 pointer-events-none" style={{ left: 0, width: CHUNK_WIDTH, height: ZEMIN_YUKSEKLIK, transform: `translateX(${chunk.x}px)`, zIndex: 40 }}>
-                            <div className="absolute bottom-0 left-0 w-full h-full" style={{ backgroundImage: `url(${chunk.overlay})`, backgroundSize: '100% 100%', transformOrigin: 'bottom center', animation: 'yosunSallan 5s infinite ease-in-out', filter: 'drop-shadow(5px 10px 10px rgba(0,0,0,0.6)) brightness(0.8)' }} />
+                            <div className="absolute bottom-0 left-0 w-full h-full" style={{ backgroundImage: `url(${chunk.base})`, backgroundSize: '100% 100%', filter: 'brightness(0.7)' }} />
                         </div>
                     ))}
                 </div>
+
+                {/* --- KATMAN 3: BALIK VE YEMLER (EĞİLMEYEN KATMAN) --- */}
+                {/* Balık eğilmez, hep kameraya bakar (Billboard etkisi) */}
+                
+                {/* HEDEFLER */}
+                {targets.map(t => (
+                    <div key={t.id} className="absolute w-12 h-12 rounded-full shadow-lg border-2 border-white/50 flex items-center justify-center animate-pulse" style={{ left: t.x, top: t.y, backgroundColor: t.color, zIndex: 30 }}>
+                        <div className="w-4 h-4 bg-white/40 rounded-full blur-sm"></div>
+                    </div>
+                ))}
+
+                {/* BALIK (Z-INDEX 35: Suyun ve Arkaplanın önünde) */}
+                {isPlaying && (
+                    <div className="absolute will-change-transform" style={{ left: fishPhys.current.x, top: fishPhys.current.y, width: 160, height: 120, zIndex: 35, transform: (() => { const depthRatio = Math.max(0, (fishPhys.current.y - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL)); const depthScale = 1 + (depthRatio * 0.6); return `translate(-50%, -50%) rotate(${fishPhys.current.rotation}deg) scale(${faceDirection * fishPhys.current.scaleX * depthScale}, ${fishPhys.current.scaleY * depthScale})`; })() }}>
+                        <img src={getCurrentImage()} alt="Karakter" className="w-full h-full object-contain drop-shadow-2xl" />
+                    </div>
+                )}
+
+                {/* --- KATMAN 4: SU YÜZEYİ ÇİZGİSİ (KESKİN AYRIM) --- */}
+                {/* Su ile havanın birleştiği o beyazımsı çizgi */}
+                <div 
+                    className="absolute left-0 w-full h-2 bg-white/50 blur-sm pointer-events-none"
+                    style={{ top: SEA_LEVEL, zIndex: 25, transform: 'translateY(-50%)' }}
+                />
+
+                {/* --- KATMAN 5: OTLAR (EN ÖN) --- */}
+                {/* Balığı örtsün diye en üste koyduk, ama suyun içinde kalması için top değerine dikkat */}
+                {/* NOT: Otları da perspektife sokmak istersek Deniz Arkaplanı div'inin içine almalıyız. 
+                    Ama balığın önüne geçmesini istediğimiz için burada tutuyoruz. 
+                    Hafif bir opaklık verelim ki balık tamamen kaybolmasın. */}
+                <div 
+                     className="w-full absolute left-0 pointer-events-none"
+                     style={{ top: SEA_LEVEL, height: WORLD_HEIGHT - SEA_LEVEL }}
+                >
+                    {chunks.map(chunk => chunk.overlay && (
+                        <div key={`overlay-${chunk.id}`} className="absolute bottom-0" style={{ left: 0, width: CHUNK_WIDTH, height: ZEMIN_YUKSEKLIK, transform: `translateX(${chunk.x}px)`, zIndex: 40 }}>
+                            <div className="absolute bottom-0 left-0 w-full h-full" style={{ backgroundImage: `url(${chunk.overlay})`, backgroundSize: '100% 100%', transformOrigin: 'bottom center', animation: 'yosunSallan 5s infinite ease-in-out', filter: 'drop-shadow(5px 10px 10px rgba(0,0,0,0.8)) brightness(0.7)' }} />
+                        </div>
+                    ))}
+                </div>
+
             </div>
 
             {/* UI */}
@@ -293,4 +311,5 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         </div>
     </div>
   );
-    }
+      }
+                                                              
