@@ -4,6 +4,7 @@ import { Play, XCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 // --- GÖRSELLER ---
+// (Buradaki importların senin projendeki gibi olduğunu varsayıyorum)
 import d1 from './d1.png'; import d2 from './d2.png'; import d3 from './d3.png';
 import d4 from './d4.png'; import d5 from './d5.png'; import d6 from './d6.png';
 import d7 from './d7.png'; import d8 from './d8.png'; 
@@ -13,6 +14,7 @@ import balikye3 from './balikye3.png'; import balikye4 from './balikye4.png';
 import suDokuImg from './su_doku.png'; 
 import geceImg from './gece.png';
 
+// Zeminler
 import altzemin1 from './altzemin1.png'; import altzemin2 from './altzemin2.png';
 import ustzemin1 from './ustzemin1.png'; import ustzemin2 from './ustzemin2.png';
 import ustzemin3 from './ustzemin3.png';
@@ -22,7 +24,7 @@ const EAT_FRAMES = [balikye1, balikye2, balikye3, balikye4];
 
 export default function EslemeGame({ onClose }: { onClose: () => void }) {
   // --- DÜNYA AYARLARI ---
-  const CHUNK_COUNT = 7; 
+  const CHUNK_COUNT = 10; // Daha uzun dünya
   const CHUNK_WIDTH = 2000; 
   const WORLD_WIDTH = CHUNK_COUNT * CHUNK_WIDTH; 
   const WORLD_HEIGHT = 2000; 
@@ -143,10 +145,12 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     }
     fishPhys.current.x += fishPhys.current.vx; fishPhys.current.y += fishPhys.current.vy;
 
+    // Sınırlar
     if (fishPhys.current.x < 50) { fishPhys.current.x = 50; fishPhys.current.vx = 0; }
     if (fishPhys.current.x > WORLD_WIDTH - 50) { fishPhys.current.x = WORLD_WIDTH - 50; fishPhys.current.vx = 0; }
     if (fishPhys.current.y > WORLD_HEIGHT - 50) { fishPhys.current.y = WORLD_HEIGHT - 50; fishPhys.current.vy = 0; }
 
+    // Kamera Takibi
     camera.current.x += (fishPhys.current.x - camera.current.x) * 0.15;
     camera.current.y += (fishPhys.current.y - camera.current.y) * 0.1;
     if (camera.current.y < screenH / 2) camera.current.y = screenH / 2;
@@ -154,10 +158,18 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     if (camera.current.x < 0) camera.current.x = 0;
     if (camera.current.x > WORLD_WIDTH) camera.current.x = WORLD_WIDTH;
 
-    // --- OPTİK AÇI HESABI (30-90 Derece) ---
+    // --- TEMBEL AÇI (LAZY TILT) ---
+    // Balık yüzeye yaklaşırken açı hemen kapanmasın, son ana kadar "açık" (30-40 derece) kalsın.
     const depth = Math.max(0, fishPhys.current.y - SEA_LEVEL);
-    const opticalCurve = 1 / (1 + depth * 0.0025);
-    const currentTilt = 30 + (60 * opticalCurve);
+    
+    // Gecikme Faktörü: Derinlik arttıkça etkiyi logaritmik olarak azaltıyoruz.
+    // Bu formül, derinlik azalsa bile tilt'in 90'a fırlamasını geciktirir.
+    // "Sıkışmış bant" hissini çözer.
+    const delayFactor = 300; // Bu sayı ne kadar büyükse, kapanma o kadar gecikir.
+    const tiltCurve = depth / (depth + delayFactor);
+    
+    // Dipte 30 derece (Geniş), Yüzeyde 90 derece (Çizgi)
+    const currentTilt = 90 - (60 * tiltCurve); 
     setSurfaceTilt(currentTilt);
 
     if (Math.abs(fishPhys.current.vx) > 0.1) setFaceDirection(fishPhys.current.vx > 0 ? 1 : -1);
@@ -191,7 +203,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden touch-none select-none flex items-center justify-center">
-        {/* ANA OYUN KONTEYNERİ */}
+        {/* ANA OYUN ALANI */}
         <div 
             className="relative overflow-hidden shadow-2xl"
             style={{
@@ -201,12 +213,14 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                 left: '50%', top: '50%',
                 transform: isPortrait ? 'translate(-50%, -50%) rotate(90deg)' : 'translate(-50%, -50%)',
                 zIndex: 10,
-                backgroundColor: '#000', 
+                // --- KRİTİK DEĞİŞİKLİK 1: SABİT ARKA PLAN (FIXED) ---
+                // Sola sağa gidince renk değişmez, hep 5.jpg tonu kalır.
+                background: 'radial-gradient(circle at 50% 0%, #0d2b52 0%, #020a1a 100%)',
                 perspective: '1200px'
             }}
             onMouseMove={handleInput} onTouchMove={handleInput}
         >
-            {/* KAMERA KATMANI */}
+            {/* KAMERA HAREKETİ (Sadece nesneler hareket eder, arka plan sabit kalır) */}
             <div 
                 className="absolute w-full top-0 left-0 will-change-transform"
                 style={{ 
@@ -214,11 +228,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     transform: `translate(${-camera.current.x + (isPortrait ? window.innerHeight : window.innerWidth) / 2}px, ${-camera.current.y + (isPortrait ? window.innerWidth : window.innerHeight) / 2}px)` 
                 }}
             >
-                {/* 1. SİYAH DUVARLAR */}
-                <div className="absolute top-0 bottom-0 bg-black" style={{ left: -5000, width: 5000, zIndex: 100 }} />
-                <div className="absolute top-0 bottom-0 bg-black" style={{ left: WORLD_WIDTH, width: 5000, zIndex: 100 }} />
-
-                {/* 2. GÖKYÜZÜ - FIXED BACKGROUND ETKİSİ İÇİN GENİŞ */}
+                {/* 1. GÖKYÜZÜ (Uzay Boşluğu) */}
                 <div 
                     className="absolute top-[-500px] left-0" 
                     style={{ 
@@ -227,95 +237,72 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                         backgroundImage: `url(${geceImg})`,
                         backgroundSize: 'cover', 
                         backgroundRepeat: 'repeat-x', 
-                        backgroundPosition: 'bottom center',
                         zIndex: 1
                     }} 
                 />
 
-                {/* 3. DENİZ GRADYANI (RADIAL - DERİNLİK HİSSİ) */}
-                {/* Düz mavi yerine, merkezden dışa kararan bir yapı kurduk */}
-                <div 
-                    className="absolute left-0"
-                    style={{
-                        top: SEA_LEVEL,
-                        width: WORLD_WIDTH,
-                        height: WORLD_HEIGHT - SEA_LEVEL,
-                        // MERKEZ: Açık Mavi (#4fc3f7) -> KÖŞELER: Koyu Lacivert/Siyah (#000000)
-                        background: 'radial-gradient(circle at 50% 0%, #4fc3f7 10%, #0d47a1 50%, #000000 90%)',
-                        zIndex: 5
-                    }}
-                />
-
-                {/* 4. ÇİFT KATLI SU YÜZEYİ (AYNA TAKTİĞİ) */}
+                {/* 2. SU YÜZEYİ (HAYALET MODU) */}
+                {/* Şeridi silmedik ama %15 opaklık ve karışım moduyla hayalet yaptık. */}
+                {/* Böylece o "kutu gibi çizgi" yok oldu ama "dalga hissi" kaldı. */}
                 <div 
                     className="absolute left-0 will-change-transform"
                     style={{
                         width: WORLD_WIDTH, 
                         top: SEA_LEVEL - 300, 
-                        // İki kat yükseklik: 600px + 600px = 1200px (Ama maskeyle eritilecek)
-                        height: 1200, 
-                        transformOrigin: 'center 300px', // Dönme noktası ilk resmin ortası
-                        transform: `rotateX(${-surfaceTilt}deg)`,
+                        height: 600, 
+                        transformOrigin: 'center center',
+                        transform: `rotateX(${-surfaceTilt}deg)`, // Tembel Açı burada işliyor
                         zIndex: 35 
                     }}
                 >
-                    {/* KAT 1: NORMAL SU YÜZEYİ */}
                     <div 
-                        className="w-full h-[600px]"
+                        className="w-full h-full relative"
                         style={{
-                            backgroundImage: `url(${suDokuImg})`,
-                            backgroundRepeat: 'repeat', 
-                            backgroundSize: '800px auto', 
-                            animation: 'waterFlow 20s linear infinite',
-                            opacity: 0.65 
+                            // ALTTAN ERİTME: Keskin bitiş yok.
+                            WebkitMaskImage: 'linear-gradient(to bottom, black 10%, transparent 80%)',
+                            maskImage: 'linear-gradient(to bottom, black 10%, transparent 80%)'
                         }}
-                    />
-                    
-                    {/* KAT 2: TERS ÇEVRİLMİŞ (MIRROR) SU YÜZEYİ */}
-                    {/* Bu sayede Kat 1'in altıyla Kat 2'nin üstü kusursuz birleşir. Çizgi olmaz. */}
-                    <div 
-                        className="w-full h-[600px] relative"
-                        style={{
-                            backgroundImage: `url(${suDokuImg})`,
-                            backgroundRepeat: 'repeat', 
-                            backgroundSize: '800px auto', 
-                            animation: 'waterFlow 20s linear infinite', // Aynı hızda akmalı
-                            opacity: 0.65,
-                            transform: 'scaleY(-1)', // DİKEY ÇEVİRME (AYNA)
-                            
-                            // MASKELEME: Bu katmanın alt ucu (ters durduğu için aslında üstü) eriyip gitsin
-                            WebkitMaskImage: 'linear-gradient(to top, black 40%, transparent 100%)',
-                            maskImage: 'linear-gradient(to top, black 40%, transparent 100%)'
-                        }}
-                    />
+                    >
+                        <div 
+                            className="w-full h-full"
+                            style={{
+                                backgroundImage: `url(${suDokuImg})`,
+                                backgroundRepeat: 'repeat', 
+                                backgroundSize: '800px auto', 
+                                animation: 'waterFlow 20s linear infinite',
+                                // HAYALET AYARI:
+                                opacity: 0.15, // Çok silik, sadece pırıltı
+                                mixBlendMode: 'screen' // Koyunun üzerine ışık olarak düşer
+                            }}
+                        />
+                    </div>
                 </div>
 
-                {/* 5. KUM ZEMİNLER */}
+                {/* 3. KUM ZEMİNLER */}
                 {chunks.map(chunk => (
                     <div key={chunk.id} className="absolute bottom-0 pointer-events-none" style={{ left: chunk.x, width: CHUNK_WIDTH, height: ZEMIN_YUKSEKLIK, zIndex: 10 }}>
-                        <div className="absolute bottom-0 left-0 w-full h-full" style={{ backgroundImage: `url(${chunk.base})`, backgroundSize: '100% 100%', filter: 'brightness(0.9)' }} />
+                        <div className="absolute bottom-0 left-0 w-full h-full" style={{ backgroundImage: `url(${chunk.base})`, backgroundSize: '100% 100%', filter: 'brightness(0.7)' }} />
                     </div>
                 ))}
                 
-                {/* 6. YEMLER */}
+                {/* 4. YEMLER */}
                 {targets.map(t => (
                     <div key={t.id} className="absolute w-12 h-12 rounded-full shadow-lg border-2 border-white/50 flex items-center justify-center animate-pulse" style={{ left: t.x, top: t.y, backgroundColor: t.color, zIndex: 30 }}></div>
                 ))}
 
-                {/* 7. BALIK */}
+                {/* 5. BALIK */}
                 {isPlaying && (
                     <div className="absolute will-change-transform" style={{ left: fishPhys.current.x, top: fishPhys.current.y, width: 160, height: 120, zIndex: 50, transform: (() => { const depthRatio = Math.max(0, (fishPhys.current.y - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL)); const depthScale = 1 + (depthRatio * 0.6); return `translate(-50%, -50%) rotate(${fishPhys.current.rotation}deg) scale(${faceDirection * fishPhys.current.scaleX * depthScale}, ${fishPhys.current.scaleY * depthScale})`; })() }}>
                         <img src={getCurrentImage()} alt="Karakter" className="w-full h-full object-contain drop-shadow-2xl" />
                     </div>
                 )}
 
-                {/* 8. YOSUNLAR */}
+                {/* 6. YOSUNLAR */}
                 {chunks.map(chunk => chunk.overlay && (
                     <div key={`overlay-${chunk.id}`} className="absolute bottom-0 pointer-events-none" style={{ left: chunk.x, width: CHUNK_WIDTH, height: ZEMIN_YUKSEKLIK, zIndex: 60 }}>
                         <div className="absolute bottom-0 left-0 w-full h-full" style={{ backgroundImage: `url(${chunk.overlay})`, backgroundSize: '100% 100%', transformOrigin: 'bottom center', zIndex: 60, filter: 'drop-shadow(5px 5px 10px rgba(0,0,0,0.5))' }} />
                     </div>
                 ))}
-
             </div>
 
             {/* UI */}
