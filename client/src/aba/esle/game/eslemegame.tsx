@@ -60,10 +60,16 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const [faceDirection, setFaceDirection] = useState(1); 
   const [chunks, setChunks] = useState<any[]>([]);
 
-  const fishPhys = useRef({ x: 200, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 });
-  const mousePos = useRef({ x: window.innerWidth / 2, y: 500 });
-  const cameraY = useRef(0);
-  const backgroundX = useRef(0);
+  // Balığın DÜNYA üzerindeki mutlak konumu
+  const fishPhys = useRef({ x: 0, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 });
+  const mousePos = useRef({ x: 0, y: 500 });
+  
+  // KAMERA KONUMU (Artık hem X hem Y var)
+  const camera = useRef({ x: 0, y: 0 });
+  
+  // Animasyon sayacı (Tıkırdamayı önlemek için gameLoop içinde kullanılacak)
+  const animTimerRef = useRef(0);
+
   const requestRef = useRef<number>();
   const [targets, setTargets] = useState<{id: number, x: number, y: number, color: string, type: 'food'}[]>([]);
   const wasInWater = useRef(true);
@@ -71,7 +77,6 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   // --- EKRAN YÖNÜ KONTROLÜ ---
   useEffect(() => {
     const checkOrientation = () => {
-      // Ekran boyutlarını anlık al
       setIsPortrait(window.innerHeight > window.innerWidth);
     };
     checkOrientation();
@@ -79,14 +84,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('resize', checkOrientation);
   }, []);
 
-  // --- ANİMASYON MOTORU ---
-  useEffect(() => {
-    if (!isPlaying) return;
-    const animInterval = setInterval(() => {
-        setCurrentFrameIndex(prev => prev + 1);
-    }, 50); 
-    return () => clearInterval(animInterval);
-  }, [isPlaying]);
+  //NOT: Eski useEffect tabanlı animasyon motoru silindi. Artık gameLoop içinde.
 
   // --- ZEMİN ÜRETİCİ ---
   const generateChunk = (xPos: number) => {
@@ -105,7 +103,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     };
   };
 
-  // --- INPUT YÖNETİMİ (DÜZELTİLDİ) ---
+  // --- INPUT YÖNETİMİ ---
   const handleInput = (e: any) => {
     if (!isPlaying) return;
     
@@ -118,35 +116,38 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
       rawY = e.clientY;
     }
 
+    // Mouse pozisyonunu ekranın ortasına göre ayarla (Merkez 0,0 olsun)
+    const screenW = isPortrait ? window.innerHeight : window.innerWidth;
+    const screenH = isPortrait ? window.innerWidth : window.innerHeight;
+    
+    let screenMouseX, screenMouseY;
+
     if (isPortrait) {
-        // DİKEY MODDA DOKUNMATİK DÖNÜŞÜMÜ
-        // Ekran 90 derece döndüğü için X ve Y yer değiştirir
-        // Dokunduğun Y koordinatı -> Oyunun X'i olur
-        // Dokunduğun X koordinatı -> Oyunun Y'si olur (Ters çevrilmiş)
-        mousePos.current = { 
-            x: rawY, 
-            y: window.innerWidth - rawX 
-        };
+        screenMouseX = rawY - screenW / 2;
+        screenMouseY = (window.innerWidth - rawX) - screenH / 2;
     } else {
-        // YATAY MOD (NORMAL)
-        mousePos.current = { x: rawX, y: rawY };
+        screenMouseX = rawX - screenW / 2;
+        screenMouseY = rawY - screenH / 2;
     }
+
+    // Mouse'un dünya üzerindeki hedef konumu = Kamera Konumu + Ekran Merkezine Uzaklık
+    mousePos.current = { 
+        x: camera.current.x + screenMouseX,
+        y: camera.current.y + screenMouseY
+    };
   };
 
   const startGame = () => {
     setIsPlaying(true);
     setScore(0);
-    // Başlangıç konumu (Ekranın ortası)
-    const screenW = isPortrait ? window.innerHeight : window.innerWidth;
-    const screenH = isPortrait ? window.innerWidth : window.innerHeight;
     
-    fishPhys.current = { x: screenW / 2, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 };
-    mousePos.current = { x: screenW / 2, y: 500 };
-    
-    backgroundX.current = 0;
-    cameraY.current = 0;
-    setTargets([]);
+    // Başlangıçta her şey 0 noktasında
+    fishPhys.current = { x: 0, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 };
+    camera.current = { x: 0, y: 500 };
+    mousePos.current = { x: 0, y: 500 };
+    animTimerRef.current = 0;
 
+    setTargets([]);
     const initialChunks = [
         generateChunk(-CHUNK_WIDTH),
         generateChunk(0),
@@ -161,27 +162,31 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     setTimeout(() => setIsEating(false), 300);
   };
 
-  // --- OYUN DÖNGÜSÜ ---
+  // --- OYUN DÖNGÜSÜ (GÜNCELLENDİ) ---
   const gameLoop = () => {
-    // Oyun içi ekran boyutları (Dikeyse yer değiştirmiş hali)
-    const currentScreenWidth = isPortrait ? window.innerHeight : window.innerWidth;
-    const currentScreenHeight = isPortrait ? window.innerWidth : window.innerHeight;
+    const screenW = isPortrait ? window.innerHeight : window.innerWidth;
+    const screenH = isPortrait ? window.innerWidth : window.innerHeight;
 
-    const inWater = fishPhys.current.y > SEA_LEVEL;
-
-    if (wasInWater.current && !inWater) {
-        fishPhys.current.vy *= 0.5; 
+    // --- 1. YENİ ANİMASYON MOTORU (SENKRONİZE) ---
+    // Her döngü yaklaşık 16ms sürer (60fps). Bunu sayaca ekliyoruz.
+    animTimerRef.current += 16.67; 
+    // 50ms (saniyede 20 kare) geçince resmi değiştir.
+    if (animTimerRef.current >= 50) {
+        setCurrentFrameIndex(prev => prev + 1);
+        animTimerRef.current = 0; // Sayacı sıfırla
     }
+
+    // --- 2. FİZİK ---
+    const inWater = fishPhys.current.y > SEA_LEVEL;
+    if (wasInWater.current && !inWater) fishPhys.current.vy *= 0.5; 
     wasInWater.current = inWater;
 
     if (inWater) {
-      const targetY = mousePos.current.y + cameraY.current;
       const dx = mousePos.current.x - fishPhys.current.x;
-      const dy = targetY - fishPhys.current.y;
+      const dy = mousePos.current.y - fishPhys.current.y;
 
       fishPhys.current.vx += dx * FOLLOW_SPEED;
       fishPhys.current.vy += dy * FOLLOW_SPEED;
-      
       fishPhys.current.vx *= WATER_FRICTION;
       fishPhys.current.vy *= WATER_FRICTION;
 
@@ -199,27 +204,39 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     fishPhys.current.x += fishPhys.current.vx;
     fishPhys.current.y += fishPhys.current.vy;
 
-    if (backgroundX.current - fishPhys.current.vx > 0) {
-        backgroundX.current = 0; 
-        if (fishPhys.current.vx < 0) fishPhys.current.vx = 0; 
-    } else {
-        backgroundX.current -= fishPhys.current.vx; 
-    }
+    // --- 3. KAMERA TAKİBİ (MERKEZCİL SİSTEM) ---
+    // Kamera balığın tam olduğu yere gitmek ister
+    const targetCamX = fishPhys.current.x;
+    const targetCamY = fishPhys.current.y;
 
+    // X ekseninde daha sıkı takip et (0.1 yerine 0.15 yaptım, balık daha ortada kalır)
+    camera.current.x += (targetCamX - camera.current.x) * 0.15;
+    // Y ekseninde biraz daha yumuşak takip et (derinlik hissi için)
+    camera.current.y += (targetCamY - camera.current.y) * 0.1;
+
+    // Kamera Y sınırları
+    if (camera.current.y < screenH / 2) camera.current.y = screenH / 2;
+    if (camera.current.y > WORLD_HEIGHT - screenH / 2) camera.current.y = WORLD_HEIGHT - screenH / 2;
+
+
+    // --- 4. DÜNYA YÖNETİMİ ---
     setChunks(prevChunks => {
-        const currentRightEdge = -backgroundX.current + currentScreenWidth;
+        // Ekranın sağ kenarının dünya koordinatı
+        const currentRightEdge = camera.current.x + screenW / 2;
         const lastChunk = prevChunks[prevChunks.length - 1];
         
         if (lastChunk && lastChunk.x < currentRightEdge + CHUNK_WIDTH) {
             return [...prevChunks, generateChunk(lastChunk.x + CHUNK_WIDTH)];
         }
-        const currentLeftEdge = -backgroundX.current;
+        // Ekranın sol kenarının dünya koordinatı
+        const currentLeftEdge = camera.current.x - screenW / 2;
         if (prevChunks[0].x < currentLeftEdge - CHUNK_WIDTH * 2) {
              return prevChunks.slice(1);
         }
         return prevChunks;
     });
 
+    // --- 5. GÖRSEL EFEKTLER (Dönme, Esneme) ---
     if (Math.abs(fishPhys.current.vx) > 0.1) {
         setFaceDirection(fishPhys.current.vx > 0 ? 1 : -1);
     }
@@ -227,7 +244,6 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     let angleRad = Math.atan2(fishPhys.current.vy, Math.abs(fishPhys.current.vx));
     let angleDeg = angleRad * (180 / Math.PI);
     let targetRotation = angleDeg * faceDirection;
-    
     fishPhys.current.rotation += (targetRotation - fishPhys.current.rotation) * 0.1;
 
     const totalSpeed = Math.sqrt(fishPhys.current.vx**2 + fishPhys.current.vy**2);
@@ -235,47 +251,39 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     fishPhys.current.scaleX = 1 + stretch;
     fishPhys.current.scaleY = 1 - stretch * 0.5;
 
-    // SINIRLAR
-    if (fishPhys.current.x < 50) { 
-        fishPhys.current.x = 50; 
-        if(backgroundX.current >= 0) fishPhys.current.vx = 0; 
-    }
-    if (fishPhys.current.x > currentScreenWidth - 50) { 
-        fishPhys.current.x = currentScreenWidth - 50; 
-    }
-    
+    // --- 6. SINIRLAR ---
+    // X sınırı kaldırıldı (Sonsuz dünya)
     if (fishPhys.current.y > WORLD_HEIGHT - 10) { 
         fishPhys.current.y = WORLD_HEIGHT - 10; 
         fishPhys.current.vy = 0; 
     }
 
-    const targetCamY = fishPhys.current.y - currentScreenHeight / 2;
-    cameraY.current += (targetCamY - cameraY.current) * 0.1;
-    if (cameraY.current < 0) cameraY.current = 0;
-    if (cameraY.current > WORLD_HEIGHT - currentScreenHeight) cameraY.current = WORLD_HEIGHT - currentScreenHeight;
-
+    // --- 7. HEDEFLER ---
     setTargets(prev => {
         if (Math.random() < 0.015) { 
             const spawnRight = Math.random() > 0.5; 
+            // Hedefleri kameranın görüş alanının hemen dışına koy
+            const spawnX = camera.current.x + (spawnRight ? screenW/2 + 200 : -screenW/2 - 200);
             return [...prev, {
                 id: Date.now(),
-                x: (spawnRight ? currentScreenWidth + 200 : -200) + Math.abs(backgroundX.current), 
+                x: spawnX,
                 y: Math.random() * (WORLD_HEIGHT - SEA_LEVEL - ZEMIN_YUKSEKLIK - 100) + SEA_LEVEL + 100, 
                 color: ['#ef4444', '#22c55e', '#eab308'][Math.floor(Math.random() * 3)],
                 type: 'food'
             }];
         }
         return prev
-            .map(t => ({ ...t, x: t.x - fishPhys.current.vx }))
             .filter(t => {
                 const dist = Math.hypot(fishPhys.current.x - t.x, fishPhys.current.y - t.y);
                 if (dist < 100) { 
                     triggerEatAnimation();
                     setScore(s => s + 10);
-                    confetti({ origin: { x: fishPhys.current.x / currentScreenWidth, y: 0.5 }, particleCount: 20, spread: 40 });
+                    // Konfeti ekranın ortasında patlasın
+                    confetti({ origin: { x: 0.5, y: 0.5 }, particleCount: 20, spread: 40 });
                     return false; 
                 }
-                return t.x > -2000 && t.x < currentScreenWidth + 2000; 
+                // Kameradan çok uzaklaşanları sil
+                return Math.abs(t.x - camera.current.x) < screenW + 1000;
             });
     });
 
@@ -296,7 +304,6 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   };
 
   // --- ANA RENDER ---
-  // Burada siyah ekranı çözen stil güncellemeleri var
   return (
     <div className="fixed inset-0 bg-black overflow-hidden touch-none select-none flex items-center justify-center">
         
@@ -304,18 +311,11 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         <div 
             className="relative overflow-hidden bg-sky-200 shadow-2xl"
             style={{
-                // EKRANIN TAM ORTASINA SABİTLE VE ORADAN DÖNDÜR
-                // Bu yöntem "siyah ekran" veya "ekran dışına taşma" sorununu %100 çözer.
                 width: isPortrait ? '100vh' : '100vw',
                 height: isPortrait ? '100vw' : '100vh',
                 position: 'absolute',
-                left: '50%',
-                top: '50%',
-                transform: isPortrait 
-                    ? 'translate(-50%, -50%) rotate(90deg)'  // Önce ortala, sonra döndür
-                    : 'translate(-50%, -50%)',               // Sadece ortala
-                
-                // Z-Index ile en üstte olduğundan emin olalım
+                left: '50%', top: '50%',
+                transform: isPortrait ? 'translate(-50%, -50%) rotate(90deg)' : 'translate(-50%, -50%)',
                 zIndex: 10
             }}
             onMouseMove={handleInput}
@@ -329,12 +329,17 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
             }
             `}</style>
 
-            {/* === DÜNYA === */}
+            {/* === DÜNYA (Kamera X ve Y'ye göre kayıyor) === */}
             <div 
                 className="absolute w-full top-0 left-0 will-change-transform"
                 style={{ 
                     height: WORLD_HEIGHT,
-                    transform: `translateY(${-cameraY.current}px)` 
+                    // İŞTE BÜYÜK DEĞİŞİKLİK: Hem X hem Y kayıyor.
+                    // Ekranın ortası referans alındığı için screenW/2 ve screenH/2 ekliyoruz.
+                    transform: `translate(
+                        ${-camera.current.x + (isPortrait ? window.innerHeight : window.innerWidth) / 2}px, 
+                        ${-camera.current.y + (isPortrait ? window.innerWidth : window.innerHeight) / 2}px
+                    )` 
                 }}
             >
                 {/* GÖKYÜZÜ */}
@@ -351,14 +356,14 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                         background: 'linear-gradient(to bottom, #60a5fa 0%, #1e3a8a 90%)' 
                     }}
                 >
-                    {/* SU YÜZEYİ */}
+                    {/* SU YÜZEYİ (Paralaks efekti için daha yavaş kayıyor: * 0.5) */}
                     <div 
                         className="absolute top-0 left-0 w-full h-16 pointer-events-none"
                         style={{ 
                             backgroundImage: `url(${suYuzeyiImg})`,
                             backgroundRepeat: 'repeat-x',
                             backgroundSize: 'auto 100%',
-                            backgroundPositionX: `${backgroundX.current}px`,
+                            backgroundPositionX: `${camera.current.x * 0.5}px`, 
                             transform: `translateY(-50%)`
                         }}
                     />
@@ -372,7 +377,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                                 left: 0,
                                 width: CHUNK_WIDTH,
                                 height: ZEMIN_YUKSEKLIK,
-                                transform: `translateX(${chunk.x + backgroundX.current}px)`
+                                transform: `translateX(${chunk.x}px)` // Artık sadece kendi X'i
                             }}
                         >
                             <div 
@@ -415,6 +420,8 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     <div 
                         className="absolute z-50 will-change-transform"
                         style={{
+                            // Balık artık dünya koordinatlarında duruyor.
+                            // Dünya kameraya göre kaydığı için balık ekranda sabit görünecek.
                             left: fishPhys.current.x,
                             top: fishPhys.current.y,
                             width: 160, 
@@ -462,4 +469,4 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     </div>
   );
   }
-          
+                           
