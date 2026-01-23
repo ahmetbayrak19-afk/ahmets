@@ -154,10 +154,8 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     if (camera.current.x < 0) camera.current.x = 0;
     if (camera.current.x > WORLD_WIDTH) camera.current.x = WORLD_WIDTH;
 
-    // --- GELİŞMİŞ OPTİK AÇI HESABI ---
+    // --- OPTİK AÇI HESABI (30-90 Derece) ---
     const depth = Math.max(0, fishPhys.current.y - SEA_LEVEL);
-    
-    // FORMÜL: Ters Orantı (1/x Eğrisi)
     const opticalCurve = 1 / (1 + depth * 0.0025);
     const currentTilt = 30 + (60 * opticalCurve);
     setSurfaceTilt(currentTilt);
@@ -220,7 +218,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                 <div className="absolute top-0 bottom-0 bg-black" style={{ left: -5000, width: 5000, zIndex: 100 }} />
                 <div className="absolute top-0 bottom-0 bg-black" style={{ left: WORLD_WIDTH, width: 5000, zIndex: 100 }} />
 
-                {/* 2. GÖKYÜZÜ (GECE MODU) */}
+                {/* 2. GÖKYÜZÜ - FIXED BACKGROUND ETKİSİ İÇİN GENİŞ */}
                 <div 
                     className="absolute top-[-500px] left-0" 
                     style={{ 
@@ -234,53 +232,62 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     }} 
                 />
 
-                {/* 3. DENİZ GRADYANI (SUYUN İÇ RENGİ) */}
+                {/* 3. DENİZ GRADYANI (RADIAL - DERİNLİK HİSSİ) */}
+                {/* Düz mavi yerine, merkezden dışa kararan bir yapı kurduk */}
                 <div 
                     className="absolute left-0"
                     style={{
                         top: SEA_LEVEL,
                         width: WORLD_WIDTH,
                         height: WORLD_HEIGHT - SEA_LEVEL,
-                        // Su yüzeyine yakın yer biraz daha koyu olsun ki resimle kaynaşsın
-                        background: 'linear-gradient(to bottom, #0d47a1 0%, #4fc3f7 50%, #000000 100%)',
+                        // MERKEZ: Açık Mavi (#4fc3f7) -> KÖŞELER: Koyu Lacivert/Siyah (#000000)
+                        background: 'radial-gradient(circle at 50% 0%, #4fc3f7 10%, #0d47a1 50%, #000000 90%)',
                         zIndex: 5
                     }}
                 />
 
-                {/* 4. SU YÜZEYİ RESMİ (MASKELEME TEKNİĞİ) */}
+                {/* 4. ÇİFT KATLI SU YÜZEYİ (AYNA TAKTİĞİ) */}
                 <div 
                     className="absolute left-0 will-change-transform"
                     style={{
                         width: WORLD_WIDTH, 
                         top: SEA_LEVEL - 300, 
-                        height: 600, 
-                        transformOrigin: 'center center',
+                        // İki kat yükseklik: 600px + 600px = 1200px (Ama maskeyle eritilecek)
+                        height: 1200, 
+                        transformOrigin: 'center 300px', // Dönme noktası ilk resmin ortası
                         transform: `rotateX(${-surfaceTilt}deg)`,
                         zIndex: 35 
                     }}
                 >
-                    {/* ÇİZGİYİ YOK EDEN KUTU */}
+                    {/* KAT 1: NORMAL SU YÜZEYİ */}
                     <div 
-                        className="w-full h-full relative"
+                        className="w-full h-[600px]"
                         style={{
-                            // İŞTE SİHİR BURADA: CSS MASK
-                            // Yukarıda tam görünür (black), aşağı indikçe şeffaflaşır (transparent)
-                            WebkitMaskImage: 'linear-gradient(to bottom, black 20%, transparent 100%)',
-                            maskImage: 'linear-gradient(to bottom, black 20%, transparent 100%)'
+                            backgroundImage: `url(${suDokuImg})`,
+                            backgroundRepeat: 'repeat', 
+                            backgroundSize: '800px auto', 
+                            animation: 'waterFlow 20s linear infinite',
+                            opacity: 0.65 
                         }}
-                    >
-                        <div 
-                            className="w-full h-full"
-                            style={{
-                                backgroundImage: `url(${suDokuImg})`,
-                                backgroundColor: '#29b6f6', 
-                                backgroundRepeat: 'repeat', 
-                                backgroundSize: '800px auto', 
-                                animation: 'waterFlow 20s linear infinite',
-                                opacity: 0.7 
-                            }}
-                        />
-                    </div>
+                    />
+                    
+                    {/* KAT 2: TERS ÇEVRİLMİŞ (MIRROR) SU YÜZEYİ */}
+                    {/* Bu sayede Kat 1'in altıyla Kat 2'nin üstü kusursuz birleşir. Çizgi olmaz. */}
+                    <div 
+                        className="w-full h-[600px] relative"
+                        style={{
+                            backgroundImage: `url(${suDokuImg})`,
+                            backgroundRepeat: 'repeat', 
+                            backgroundSize: '800px auto', 
+                            animation: 'waterFlow 20s linear infinite', // Aynı hızda akmalı
+                            opacity: 0.65,
+                            transform: 'scaleY(-1)', // DİKEY ÇEVİRME (AYNA)
+                            
+                            // MASKELEME: Bu katmanın alt ucu (ters durduğu için aslında üstü) eriyip gitsin
+                            WebkitMaskImage: 'linear-gradient(to top, black 40%, transparent 100%)',
+                            maskImage: 'linear-gradient(to top, black 40%, transparent 100%)'
+                        }}
+                    />
                 </div>
 
                 {/* 5. KUM ZEMİNLER */}
