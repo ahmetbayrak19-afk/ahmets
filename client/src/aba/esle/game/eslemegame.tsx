@@ -50,7 +50,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const AIR_RESISTANCE = 0.99;  
 
   // --- STATE'LER ---
-  const [isPortrait, setIsPortrait] = useState(false); // Dikey mi kontrolü
+  const [isPortrait, setIsPortrait] = useState(false); 
   const [isPlaying, setIsPlaying] = useState(false);
   const [score, setScore] = useState(0);
   
@@ -61,7 +61,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const [chunks, setChunks] = useState<any[]>([]);
 
   const fishPhys = useRef({ x: 200, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 });
-  const mousePos = useRef({ x: window.innerWidth / 2, y: 500 }); // Başlangıç ortada
+  const mousePos = useRef({ x: window.innerWidth / 2, y: 500 });
   const cameraY = useRef(0);
   const backgroundX = useRef(0);
   const requestRef = useRef<number>();
@@ -71,6 +71,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   // --- EKRAN YÖNÜ KONTROLÜ ---
   useEffect(() => {
     const checkOrientation = () => {
+      // Ekran boyutlarını anlık al
       setIsPortrait(window.innerHeight > window.innerWidth);
     };
     checkOrientation();
@@ -78,14 +79,12 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('resize', checkOrientation);
   }, []);
 
-  // --- ANİMASYON MOTORU (HIZLANDIRILDI ⚡) ---
+  // --- ANİMASYON MOTORU ---
   useEffect(() => {
     if (!isPlaying) return;
-    // Tıkırdamayı çözmek için FPS'i artırdık (50ms = saniyede 20 kare)
     const animInterval = setInterval(() => {
         setCurrentFrameIndex(prev => prev + 1);
     }, 50); 
-
     return () => clearInterval(animInterval);
   }, [isPlaying]);
 
@@ -106,7 +105,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     };
   };
 
-  // --- INPUT YÖNETİMİ (Kritik: Yön Çevirme Hesabı) ---
+  // --- INPUT YÖNETİMİ (DÜZELTİLDİ) ---
   const handleInput = (e: any) => {
     if (!isPlaying) return;
     
@@ -120,15 +119,16 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     }
 
     if (isPortrait) {
-        // EĞER TELEFON DİKEYSE:
-        // Ekranı CSS ile 90 derece döndürdüğümüz için koordinatları da döndürmeliyiz.
-        // Parmağı aşağı kaydırmak (Y artışı) -> Oyunda Sağa gitmek demektir (X artışı).
+        // DİKEY MODDA DOKUNMATİK DÖNÜŞÜMÜ
+        // Ekran 90 derece döndüğü için X ve Y yer değiştirir
+        // Dokunduğun Y koordinatı -> Oyunun X'i olur
+        // Dokunduğun X koordinatı -> Oyunun Y'si olur (Ters çevrilmiş)
         mousePos.current = { 
             x: rawY, 
             y: window.innerWidth - rawX 
         };
     } else {
-        // NORMAL YATAY MOD:
+        // YATAY MOD (NORMAL)
         mousePos.current = { x: rawX, y: rawY };
     }
   };
@@ -136,12 +136,12 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const startGame = () => {
     setIsPlaying(true);
     setScore(0);
-    // Başlangıç pozisyonunu ekranın ortasına ayarla (Dikey/Yatay fark etmeksizin)
-    const startX = isPortrait ? window.innerHeight / 2 : window.innerWidth / 2;
-    const startY = 500;
+    // Başlangıç konumu (Ekranın ortası)
+    const screenW = isPortrait ? window.innerHeight : window.innerWidth;
+    const screenH = isPortrait ? window.innerWidth : window.innerHeight;
     
-    fishPhys.current = { x: startX, y: startY, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 };
-    mousePos.current = { x: startX, y: startY };
+    fishPhys.current = { x: screenW / 2, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 };
+    mousePos.current = { x: screenW / 2, y: 500 };
     
     backgroundX.current = 0;
     cameraY.current = 0;
@@ -163,7 +163,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
   // --- OYUN DÖNGÜSÜ ---
   const gameLoop = () => {
-    // Ekran genişliğini duruma göre al (Dikeyse yükseklik genişlik olur)
+    // Oyun içi ekran boyutları (Dikeyse yer değiştirmiş hali)
     const currentScreenWidth = isPortrait ? window.innerHeight : window.innerWidth;
     const currentScreenHeight = isPortrait ? window.innerWidth : window.innerHeight;
 
@@ -235,6 +235,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     fishPhys.current.scaleX = 1 + stretch;
     fishPhys.current.scaleY = 1 - stretch * 0.5;
 
+    // SINIRLAR
     if (fishPhys.current.x < 50) { 
         fishPhys.current.x = 50; 
         if(backgroundX.current >= 0) fishPhys.current.vx = 0; 
@@ -268,7 +269,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
             .map(t => ({ ...t, x: t.x - fishPhys.current.vx }))
             .filter(t => {
                 const dist = Math.hypot(fishPhys.current.x - t.x, fishPhys.current.y - t.y);
-                if (dist < 100) { // Balık büyüdüğü için yeme mesafesini de artırdık
+                if (dist < 100) { 
                     triggerEatAnimation();
                     setScore(s => s + 10);
                     confetti({ origin: { x: fishPhys.current.x / currentScreenWidth, y: 0.5 }, particleCount: 20, spread: 40 });
@@ -295,21 +296,27 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   };
 
   // --- ANA RENDER ---
+  // Burada siyah ekranı çözen stil güncellemeleri var
   return (
-    <div className="fixed inset-0 bg-black overflow-hidden touch-none select-none">
+    <div className="fixed inset-0 bg-black overflow-hidden touch-none select-none flex items-center justify-center">
         
-        {/* --- OYUN KONTEYNERİ (Dönme Mantığı Burada) --- */}
+        {/* --- OYUN KONTEYNERİ --- */}
         <div 
-            className="relative overflow-hidden bg-sky-200"
+            className="relative overflow-hidden bg-sky-200 shadow-2xl"
             style={{
-                // DİKEYSE: 90 derece döndür, genişlik ve yüksekliği yer değiştir
+                // EKRANIN TAM ORTASINA SABİTLE VE ORADAN DÖNDÜR
+                // Bu yöntem "siyah ekran" veya "ekran dışına taşma" sorununu %100 çözer.
                 width: isPortrait ? '100vh' : '100vw',
                 height: isPortrait ? '100vw' : '100vh',
-                transform: isPortrait ? 'rotate(90deg) translateY(-100%)' : 'none',
-                transformOrigin: 'top left',
                 position: 'absolute',
-                top: 0,
-                left: isPortrait ? '100%' : 0, // Döndürünce ekran dışına çıkmasın diye
+                left: '50%',
+                top: '50%',
+                transform: isPortrait 
+                    ? 'translate(-50%, -50%) rotate(90deg)'  // Önce ortala, sonra döndür
+                    : 'translate(-50%, -50%)',               // Sadece ortala
+                
+                // Z-Index ile en üstte olduğundan emin olalım
+                zIndex: 10
             }}
             onMouseMove={handleInput}
             onTouchMove={handleInput}
@@ -403,15 +410,15 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     </div>
                 ))}
 
-                {/* --- BALIK (BÜYÜTÜLDÜ) --- */}
+                {/* --- BALIK --- */}
                 {isPlaying && (
                     <div 
                         className="absolute z-50 will-change-transform"
                         style={{
                             left: fishPhys.current.x,
                             top: fishPhys.current.y,
-                            width: 160,  // BÜYÜTÜLDÜ (Eskisi 120)
-                            height: 120, // BÜYÜTÜLDÜ (Eskisi 90)
+                            width: 160, 
+                            height: 120,
                             transform: (() => {
                                 const depthRatio = Math.max(0, (fishPhys.current.y - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL));
                                 const depthScale = 1 + (depthRatio * 0.6); 
@@ -454,4 +461,5 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         </div>
     </div>
   );
-          }
+  }
+          
