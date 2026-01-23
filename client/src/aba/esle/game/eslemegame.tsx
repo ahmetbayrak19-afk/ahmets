@@ -1,20 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Play, XCircle, RotateCcw } from 'lucide-react'; // Rotate ikonu ekledim
+import { Play, XCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 // --- GÖRSELLER ---
-// Yüzme Kareleri (Yeni Sinüs Dalgası Serisi)
-import d1 from './d1.png'; // Merkez
+import d1 from './d1.png'; 
 import d2 from './d2.png';
 import d3 from './d3.png';
-import d4 from './d4.png'; // En uç (Sağ)
-import d5 from './d5.png'; // Merkezden diğer tarafa geçiş
+import d4 from './d4.png'; 
+import d5 from './d5.png'; 
 import d6 from './d6.png';
 import d7 from './d7.png';
-import d8 from './d8.png'; // En uç (Sol)
+import d8 from './d8.png'; 
 
-// Yeme Kareleri
 import balikye1 from './balikye1.png';
 import balikye2 from './balikye2.png';
 import balikye3 from './balikye3.png';
@@ -22,7 +20,6 @@ import balikye4 from './balikye4.png';
 
 import suYuzeyiImg from './su_yuzeyi.png';
 
-// ZEMİN PARÇALARI
 import altzemin1 from './altzemin1.png';
 import altzemin2 from './altzemin2.png';
 import ustzemin1 from './ustzemin1.png';
@@ -30,11 +27,10 @@ import ustzemin2 from './ustzemin2.png';
 import ustzemin3 from './ustzemin3.png';
 
 // --- ANİMASYON DİZİLERİ ---
-// Tamamen senin istediğin "Yağ Gibi Akan" döngü
 const SWIM_FRAMES = [
-  d1, d2, d3, d4, d3, d2,       // Sağa kuyruk salla ve dön
-  d1,                           // Merkeze gel
-  d5, d6, d7, d8, d7, d6, d5    // Sola kuyruk salla ve dön
+  d1, d2, d3, d4, d3, d2,       
+  d1,                           
+  d5, d6, d7, d8, d7, d6, d5    
 ];
 
 const EAT_FRAMES = [balikye1, balikye2, balikye3, balikye4];
@@ -48,17 +44,16 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
   // --- FİZİK AYARLARI ---
   const FOLLOW_SPEED = 0.0008;   
-  const MAX_SPEED = 10; 
-  const WATER_FRICTION = 0.98; 
+  const MAX_SPEED = 11; 
+  const WATER_FRICTION = 0.97; 
   const GRAVITY = 0.8;          
   const AIR_RESISTANCE = 0.99;  
 
   // --- STATE'LER ---
-  const [isLandscape, setIsLandscape] = useState(true); // YATAY MOD KONTROLÜ
+  const [isPortrait, setIsPortrait] = useState(false); // Dikey mi kontrolü
   const [isPlaying, setIsPlaying] = useState(false);
   const [score, setScore] = useState(0);
   
-  // ANİMASYON STATE'LERİ
   const [isEating, setIsEating] = useState(false); 
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   
@@ -66,37 +61,30 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const [chunks, setChunks] = useState<any[]>([]);
 
   const fishPhys = useRef({ x: 200, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 });
-  const mousePos = useRef({ x: window.innerWidth / 2, y: 500 });
+  const mousePos = useRef({ x: window.innerWidth / 2, y: 500 }); // Başlangıç ortada
   const cameraY = useRef(0);
   const backgroundX = useRef(0);
   const requestRef = useRef<number>();
   const [targets, setTargets] = useState<{id: number, x: number, y: number, color: string, type: 'food'}[]>([]);
   const wasInWater = useRef(true);
 
-  // --- 1. YATAY MOD KONTROLÜ (LANDSCAPE CHECK) ---
+  // --- EKRAN YÖNÜ KONTROLÜ ---
   useEffect(() => {
     const checkOrientation = () => {
-      // Genişlik Yükseklikten büyükse yataydır
-      setIsLandscape(window.innerWidth > window.innerHeight);
+      setIsPortrait(window.innerHeight > window.innerWidth);
     };
-
-    // İlk açılışta kontrol et
     checkOrientation();
-
-    // Ekran çevrilince tekrar kontrol et
     window.addEventListener('resize', checkOrientation);
     return () => window.removeEventListener('resize', checkOrientation);
   }, []);
 
-  // --- 2. ANİMASYON MOTORU ---
+  // --- ANİMASYON MOTORU (HIZLANDIRILDI ⚡) ---
   useEffect(() => {
     if (!isPlaying) return;
-
-    // Saniyede yaklaşık 12-15 kare arası oynatır.
-    // Balık çok hızlıysa bu hızı artırabiliriz ama şimdilik sabit akıcılık en iyisi.
+    // Tıkırdamayı çözmek için FPS'i artırdık (50ms = saniyede 20 kare)
     const animInterval = setInterval(() => {
         setCurrentFrameIndex(prev => prev + 1);
-    }, 80); // 80ms yaptık (Daha seri akması için)
+    }, 50); 
 
     return () => clearInterval(animInterval);
   }, [isPlaying]);
@@ -118,25 +106,43 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     };
   };
 
-  // --- INPUT ---
+  // --- INPUT YÖNETİMİ (Kritik: Yön Çevirme Hesabı) ---
   const handleInput = (e: any) => {
     if (!isPlaying) return;
-    let clientX, clientY;
+    
+    let rawX, rawY;
     if (e.touches && e.touches.length > 0) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
+      rawX = e.touches[0].clientX;
+      rawY = e.touches[0].clientY;
     } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
+      rawX = e.clientX;
+      rawY = e.clientY;
     }
-    mousePos.current = { x: clientX, y: clientY };
+
+    if (isPortrait) {
+        // EĞER TELEFON DİKEYSE:
+        // Ekranı CSS ile 90 derece döndürdüğümüz için koordinatları da döndürmeliyiz.
+        // Parmağı aşağı kaydırmak (Y artışı) -> Oyunda Sağa gitmek demektir (X artışı).
+        mousePos.current = { 
+            x: rawY, 
+            y: window.innerWidth - rawX 
+        };
+    } else {
+        // NORMAL YATAY MOD:
+        mousePos.current = { x: rawX, y: rawY };
+    }
   };
 
   const startGame = () => {
     setIsPlaying(true);
     setScore(0);
-    fishPhys.current = { x: window.innerWidth / 2, y: 500, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 };
-    mousePos.current = { x: window.innerWidth / 2, y: 500 };
+    // Başlangıç pozisyonunu ekranın ortasına ayarla (Dikey/Yatay fark etmeksizin)
+    const startX = isPortrait ? window.innerHeight / 2 : window.innerWidth / 2;
+    const startY = 500;
+    
+    fishPhys.current = { x: startX, y: startY, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 };
+    mousePos.current = { x: startX, y: startY };
+    
     backgroundX.current = 0;
     cameraY.current = 0;
     setTargets([]);
@@ -152,11 +158,15 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const triggerEatAnimation = () => {
     setIsEating(true);
     setCurrentFrameIndex(0); 
-    setTimeout(() => setIsEating(false), 400);
+    setTimeout(() => setIsEating(false), 300);
   };
 
   // --- OYUN DÖNGÜSÜ ---
   const gameLoop = () => {
+    // Ekran genişliğini duruma göre al (Dikeyse yükseklik genişlik olur)
+    const currentScreenWidth = isPortrait ? window.innerHeight : window.innerWidth;
+    const currentScreenHeight = isPortrait ? window.innerWidth : window.innerHeight;
+
     const inWater = fishPhys.current.y > SEA_LEVEL;
 
     if (wasInWater.current && !inWater) {
@@ -197,7 +207,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     }
 
     setChunks(prevChunks => {
-        const currentRightEdge = -backgroundX.current + window.innerWidth;
+        const currentRightEdge = -backgroundX.current + currentScreenWidth;
         const lastChunk = prevChunks[prevChunks.length - 1];
         
         if (lastChunk && lastChunk.x < currentRightEdge + CHUNK_WIDTH) {
@@ -229,8 +239,8 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         fishPhys.current.x = 50; 
         if(backgroundX.current >= 0) fishPhys.current.vx = 0; 
     }
-    if (fishPhys.current.x > window.innerWidth - 50) { 
-        fishPhys.current.x = window.innerWidth - 50; 
+    if (fishPhys.current.x > currentScreenWidth - 50) { 
+        fishPhys.current.x = currentScreenWidth - 50; 
     }
     
     if (fishPhys.current.y > WORLD_HEIGHT - 10) { 
@@ -238,17 +248,17 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         fishPhys.current.vy = 0; 
     }
 
-    const targetCamY = fishPhys.current.y - window.innerHeight / 2;
+    const targetCamY = fishPhys.current.y - currentScreenHeight / 2;
     cameraY.current += (targetCamY - cameraY.current) * 0.1;
     if (cameraY.current < 0) cameraY.current = 0;
-    if (cameraY.current > WORLD_HEIGHT - window.innerHeight) cameraY.current = WORLD_HEIGHT - window.innerHeight;
+    if (cameraY.current > WORLD_HEIGHT - currentScreenHeight) cameraY.current = WORLD_HEIGHT - currentScreenHeight;
 
     setTargets(prev => {
         if (Math.random() < 0.015) { 
             const spawnRight = Math.random() > 0.5; 
             return [...prev, {
                 id: Date.now(),
-                x: (spawnRight ? window.innerWidth + 200 : -200) + Math.abs(backgroundX.current), 
+                x: (spawnRight ? currentScreenWidth + 200 : -200) + Math.abs(backgroundX.current), 
                 y: Math.random() * (WORLD_HEIGHT - SEA_LEVEL - ZEMIN_YUKSEKLIK - 100) + SEA_LEVEL + 100, 
                 color: ['#ef4444', '#22c55e', '#eab308'][Math.floor(Math.random() * 3)],
                 type: 'food'
@@ -258,13 +268,13 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
             .map(t => ({ ...t, x: t.x - fishPhys.current.vx }))
             .filter(t => {
                 const dist = Math.hypot(fishPhys.current.x - t.x, fishPhys.current.y - t.y);
-                if (dist < 80) { 
+                if (dist < 100) { // Balık büyüdüğü için yeme mesafesini de artırdık
                     triggerEatAnimation();
                     setScore(s => s + 10);
-                    confetti({ origin: { x: fishPhys.current.x / window.innerWidth, y: 0.5 }, particleCount: 20, spread: 40 });
+                    confetti({ origin: { x: fishPhys.current.x / currentScreenWidth, y: 0.5 }, particleCount: 20, spread: 40 });
                     return false; 
                 }
-                return t.x > -2000 && t.x < window.innerWidth + 2000; 
+                return t.x > -2000 && t.x < currentScreenWidth + 2000; 
             });
     });
 
@@ -284,167 +294,164 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     }
   };
 
-  // --- EĞER DİKEY MODDAYSA UYARI GÖSTER ---
-  if (!isLandscape) {
-    return (
-        <div className="fixed inset-0 bg-sky-900 flex flex-col items-center justify-center z-[999] text-white">
-            <motion.div 
-                animate={{ rotate: 90 }} 
-                transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-            >
-                <RotateCcw size={80} />
-            </motion.div>
-            <h2 className="mt-8 text-3xl font-bold text-center px-4">Lütfen Telefonu Çevirin</h2>
-            <p className="mt-2 text-sky-200">Bu oyun sadece yatay modda oynanabilir.</p>
-        </div>
-    );
-  }
-
-  // --- OYUN EKRANI ---
+  // --- ANA RENDER ---
   return (
-    <div 
-        className="fixed inset-0 overflow-hidden bg-sky-200 font-sans select-none touch-none"
-        onMouseMove={handleInput}
-        onTouchMove={handleInput}
-    >
-        <style>{`
-          @keyframes yosunSallan {
-            0% { transform: skewX(0deg); }
-            50% { transform: skewX(4deg); }
-            100% { transform: skewX(0deg); }
-          }
-        `}</style>
-
-        {/* === DÜNYA === */}
+    <div className="fixed inset-0 bg-black overflow-hidden touch-none select-none">
+        
+        {/* --- OYUN KONTEYNERİ (Dönme Mantığı Burada) --- */}
         <div 
-            className="absolute w-full top-0 left-0 will-change-transform"
-            style={{ 
-                height: WORLD_HEIGHT,
-                transform: `translateY(${-cameraY.current}px)` 
+            className="relative overflow-hidden bg-sky-200"
+            style={{
+                // DİKEYSE: 90 derece döndür, genişlik ve yüksekliği yer değiştir
+                width: isPortrait ? '100vh' : '100vw',
+                height: isPortrait ? '100vw' : '100vh',
+                transform: isPortrait ? 'rotate(90deg) translateY(-100%)' : 'none',
+                transformOrigin: 'top left',
+                position: 'absolute',
+                top: 0,
+                left: isPortrait ? '100%' : 0, // Döndürünce ekran dışına çıkmasın diye
             }}
+            onMouseMove={handleInput}
+            onTouchMove={handleInput}
         >
-            {/* GÖKYÜZÜ */}
-            <div style={{ height: SEA_LEVEL }} className="w-full bg-gradient-to-b from-sky-300 to-sky-100 relative">
-                 <h1 className="text-center text-white/50 font-black text-6xl pt-20">GÖKYÜZÜ</h1>
-            </div>
+            <style>{`
+            @keyframes yosunSallan {
+                0% { transform: skewX(0deg); }
+                50% { transform: skewX(4deg); }
+                100% { transform: skewX(0deg); }
+            }
+            `}</style>
 
-            {/* DENİZ */}
+            {/* === DÜNYA === */}
             <div 
-                className="w-full relative"
+                className="absolute w-full top-0 left-0 will-change-transform"
                 style={{ 
-                    top: -2,
-                    height: WORLD_HEIGHT - SEA_LEVEL,
-                    background: 'linear-gradient(to bottom, #60a5fa 0%, #1e3a8a 90%)' 
+                    height: WORLD_HEIGHT,
+                    transform: `translateY(${-cameraY.current}px)` 
                 }}
             >
-                {/* SU YÜZEYİ */}
-                <div 
-                    className="absolute top-0 left-0 w-full h-16 pointer-events-none"
-                    style={{ 
-                        backgroundImage: `url(${suYuzeyiImg})`,
-                        backgroundRepeat: 'repeat-x',
-                        backgroundSize: 'auto 100%',
-                        backgroundPositionX: `${backgroundX.current}px`,
-                        transform: `translateY(-50%)`
-                    }}
-                />
+                {/* GÖKYÜZÜ */}
+                <div style={{ height: SEA_LEVEL }} className="w-full bg-gradient-to-b from-sky-300 to-sky-100 relative">
+                    <h1 className="text-center text-white/50 font-black text-6xl pt-20">GÖKYÜZÜ</h1>
+                </div>
 
-                {/* --- CHUNKS --- */}
-                {chunks.map(chunk => (
+                {/* DENİZ */}
+                <div 
+                    className="w-full relative"
+                    style={{ 
+                        top: -2,
+                        height: WORLD_HEIGHT - SEA_LEVEL,
+                        background: 'linear-gradient(to bottom, #60a5fa 0%, #1e3a8a 90%)' 
+                    }}
+                >
+                    {/* SU YÜZEYİ */}
                     <div 
-                        key={chunk.id}
-                        className="absolute bottom-0 pointer-events-none"
-                        style={{
-                            left: 0,
-                            width: CHUNK_WIDTH,
-                            height: ZEMIN_YUKSEKLIK,
-                            transform: `translateX(${chunk.x + backgroundX.current}px)`
+                        className="absolute top-0 left-0 w-full h-16 pointer-events-none"
+                        style={{ 
+                            backgroundImage: `url(${suYuzeyiImg})`,
+                            backgroundRepeat: 'repeat-x',
+                            backgroundSize: 'auto 100%',
+                            backgroundPositionX: `${backgroundX.current}px`,
+                            transform: `translateY(-50%)`
                         }}
-                    >
+                    />
+
+                    {/* --- CHUNKS --- */}
+                    {chunks.map(chunk => (
                         <div 
-                            className="absolute bottom-0 left-0 w-full h-full"
+                            key={chunk.id}
+                            className="absolute bottom-0 pointer-events-none"
                             style={{
-                                backgroundImage: `url(${chunk.base})`,
-                                backgroundSize: '100% 100%',
-                                filter: 'brightness(0.95)'
+                                left: 0,
+                                width: CHUNK_WIDTH,
+                                height: ZEMIN_YUKSEKLIK,
+                                transform: `translateX(${chunk.x + backgroundX.current}px)`
                             }}
-                        />
-                        {chunk.overlay && (
+                        >
                             <div 
                                 className="absolute bottom-0 left-0 w-full h-full"
                                 style={{
-                                    backgroundImage: `url(${chunk.overlay})`,
+                                    backgroundImage: `url(${chunk.base})`,
                                     backgroundSize: '100% 100%',
-                                    transformOrigin: 'bottom center',
-                                    animation: 'yosunSallan 5s infinite ease-in-out',
-                                    filter: 'drop-shadow(5px 10px 10px rgba(0,0,0,0.6)) brightness(0.9)'
+                                    filter: 'brightness(0.95)'
                                 }}
                             />
-                        )}
+                            {chunk.overlay && (
+                                <div 
+                                    className="absolute bottom-0 left-0 w-full h-full"
+                                    style={{
+                                        backgroundImage: `url(${chunk.overlay})`,
+                                        backgroundSize: '100% 100%',
+                                        transformOrigin: 'bottom center',
+                                        animation: 'yosunSallan 5s infinite ease-in-out',
+                                        filter: 'drop-shadow(5px 10px 10px rgba(0,0,0,0.6)) brightness(0.9)'
+                                    }}
+                                />
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                {/* HEDEFLER */}
+                {targets.map(t => (
+                    <div 
+                        key={t.id}
+                        className="absolute w-12 h-12 rounded-full shadow-lg border-2 border-white/50 flex items-center justify-center animate-pulse"
+                        style={{ left: t.x, top: t.y, backgroundColor: t.color }}
+                    >
+                        <div className="w-4 h-4 bg-white/40 rounded-full blur-sm"></div>
                     </div>
                 ))}
+
+                {/* --- BALIK (BÜYÜTÜLDÜ) --- */}
+                {isPlaying && (
+                    <div 
+                        className="absolute z-50 will-change-transform"
+                        style={{
+                            left: fishPhys.current.x,
+                            top: fishPhys.current.y,
+                            width: 160,  // BÜYÜTÜLDÜ (Eskisi 120)
+                            height: 120, // BÜYÜTÜLDÜ (Eskisi 90)
+                            transform: (() => {
+                                const depthRatio = Math.max(0, (fishPhys.current.y - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL));
+                                const depthScale = 1 + (depthRatio * 0.6); 
+                                return `translate(-50%, -50%) 
+                                        rotate(${fishPhys.current.rotation}deg) 
+                                        scale(${faceDirection * fishPhys.current.scaleX * depthScale}, ${fishPhys.current.scaleY * depthScale})`;
+                            })()
+                        }}
+                    >
+                        <img 
+                            src={getCurrentImage()} 
+                            alt="Karakter" 
+                            className="w-full h-full object-contain drop-shadow-2xl"
+                        />
+                    </div>
+                )}
             </div>
 
-            {/* HEDEFLER */}
-            {targets.map(t => (
-                <div 
-                    key={t.id}
-                    className="absolute w-12 h-12 rounded-full shadow-lg border-2 border-white/50 flex items-center justify-center animate-pulse"
-                    style={{ left: t.x, top: t.y, backgroundColor: t.color }}
-                >
-                    <div className="w-4 h-4 bg-white/40 rounded-full blur-sm"></div>
-                </div>
-            ))}
+            {/* UI */}
+            <div className="fixed top-5 left-5 bg-white/90 backdrop-blur px-6 py-2 rounded-full shadow-xl border-4 border-orange-400 z-[100]">
+                <span className="font-black text-2xl text-orange-600">SKOR: {score}</span>
+            </div>
 
-            {/* --- BALIK --- */}
-            {isPlaying && (
-                <div 
-                    className="absolute z-50 will-change-transform"
-                    style={{
-                        left: fishPhys.current.x,
-                        top: fishPhys.current.y,
-                        width: 120,
-                        height: 90,
-                        transform: (() => {
-                            const depthRatio = Math.max(0, (fishPhys.current.y - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL));
-                            const depthScale = 1 + (depthRatio * 0.6); 
-                            return `translate(-50%, -50%) 
-                                    rotate(${fishPhys.current.rotation}deg) 
-                                    scale(${faceDirection * fishPhys.current.scaleX * depthScale}, ${fishPhys.current.scaleY * depthScale})`;
-                        })()
-                    }}
-                >
-                    <img 
-                        src={getCurrentImage()} 
-                        alt="Karakter" 
-                        className="w-full h-full object-contain drop-shadow-2xl"
-                    />
+            <button onClick={onClose} className="fixed top-5 right-5 z-[100] bg-white p-2 rounded-full shadow-lg hover:scale-110 transition">
+                <XCircle className="text-red-500 w-8 h-8" />
+            </button>
+
+            {!isPlaying && (
+                <div className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-center p-4">
+                    <motion.button 
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={startGame}
+                        className="bg-orange-500 text-white px-12 py-6 rounded-3xl font-black text-4xl shadow-orange-500/50 shadow-2xl flex items-center gap-4 border-b-8 border-orange-700 active:border-b-0 active:translate-y-2 transition-all"
+                    >
+                        <Play size={40} fill="currentColor" /> BAŞLA
+                    </motion.button>
                 </div>
             )}
         </div>
-
-        {/* UI */}
-        <div className="fixed top-5 left-5 bg-white/90 backdrop-blur px-6 py-2 rounded-full shadow-xl border-4 border-orange-400 z-[100]">
-            <span className="font-black text-2xl text-orange-600">SKOR: {score}</span>
-        </div>
-
-        <button onClick={onClose} className="fixed top-5 right-5 z-[100] bg-white p-2 rounded-full shadow-lg hover:scale-110 transition">
-            <XCircle className="text-red-500 w-8 h-8" />
-        </button>
-
-        {!isPlaying && (
-            <div className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-center p-4">
-                <motion.button 
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={startGame}
-                    className="bg-orange-500 text-white px-12 py-6 rounded-3xl font-black text-4xl shadow-orange-500/50 shadow-2xl flex items-center gap-4 border-b-8 border-orange-700 active:border-b-0 active:translate-y-2 transition-all"
-                >
-                    <Play size={40} fill="currentColor" /> BAŞLA
-                </motion.button>
-            </div>
-        )}
     </div>
   );
-}
-  
+          }
