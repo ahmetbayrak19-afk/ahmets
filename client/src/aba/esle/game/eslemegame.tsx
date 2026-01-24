@@ -1,168 +1,171 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { XCircle, Play } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 import { loadAssets, AssetLibrary } from './Assets';
-import { PhysicsEngine, WORLD_WIDTH, WORLD_HEIGHT } from './Physics';
+import { PhysicsEngine } from './Physics';
 import { GameRenderer } from './Renderer';
+import { Camera } from './Camera';
 
 export default function EslemeGame({ onClose }: { onClose: () => void }) {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    const assets = useRef<AssetLibrary | null>(null);
-    const physics = useRef(new PhysicsEngine());
-    const renderer = useRef<GameRenderer | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [score, setScore] = useState(0);
 
-    const fish = useRef({
-        x: 3000,
-        y: 900,
-        vx: 0,
-        vy: 0,
-        rotation: 0,
-        scaleX: 1,
-        scaleY: 1,
-        frame: 0,
-        timer: 0,
-        isEating: false
-    });
+  // Engine
+  const assets = useRef<AssetLibrary | null>(null);
+  const physics = useRef(new PhysicsEngine());
+  const renderer = useRef<GameRenderer | null>(null);
+  const camera = useRef(new Camera());
 
-    const camera = useRef({ x: 3000, y: 900 });
-    const target = useRef({ x: 3000, y: 900 });
-    const chunks = useRef<any[]>([]);
-    const targets = useRef<any[]>([]);
-    const score = useRef(0);
+  // World
+  const fish = useRef({
+    x: 1000,
+    y: 900,
+    vx: 0,
+    vy: 0,
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1,
+    frame: 0,
+    timer: 0,
+    isEating: false
+  });
 
-    const [, forceUI] = useState(0);
-    const [loaded, setLoaded] = useState(false);
-    const [playing, setPlaying] = useState(false);
+  const mouse = useRef({ x: 1000, y: 900 });
+  const chunks = useRef<any[]>([]);
+  const targets = useRef<any[]>([]);
+  const raf = useRef<number>();
 
-    /* ---------- INIT ---------- */
-    useEffect(() => {
-        loadAssets().then(a => {
-            assets.current = a;
+  /* ================= INIT ================= */
+  useEffect(() => {
+    const init = async () => {
+      assets.current = await loadAssets();
 
-            chunks.current = Array.from({ length: 10 }).map((_, i) => ({
-                id: i,
-                x: i * 2000,
-                base: a.zeminler[Math.floor(Math.random() * a.zeminler.length)],
-                overlay: Math.random() > 0.5 ? a.ustler[Math.floor(Math.random() * a.ustler.length)] : null
-            }));
+      const list = [];
+      for (let i = 0; i < 12; i++) {
+        const base = assets.current.zeminler[Math.floor(Math.random() * assets.current.zeminler.length)];
+        const overlay =
+          Math.random() > 0.5
+            ? assets.current.ustler[Math.floor(Math.random() * assets.current.ustler.length)]
+            : null;
 
-            setLoaded(true);
-        });
-    }, []);
+        list.push({ id: i, x: i * 2000, base, overlay });
+      }
 
-    /* ---------- INPUT ---------- */
-    const handleInput = (e: any) => {
-        if (!canvasRef.current) return;
-        const rect = canvasRef.current.getBoundingClientRect();
-        const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-        const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-
-        target.current.x = camera.current.x + (x - rect.width / 2);
-        target.current.y = camera.current.y + (y - rect.height / 2);
+      chunks.current = list;
+      setIsLoaded(true);
     };
 
-    /* ---------- GAME LOOP ---------- */
-    useEffect(() => {
-        if (!playing || !loaded || !canvasRef.current || !assets.current) return;
+    init();
+  }, []);
 
-        renderer.current = new GameRenderer(canvasRef.current);
-        let running = true;
+  /* ================= INPUT ================= */
+  const handleInput = (e: any) => {
+    if (!canvasRef.current || !isPlaying) return;
 
-        const loop = () => {
-            if (!running) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
 
-            const w = window.innerWidth;
-            const h = window.innerHeight;
-            renderer.current!.resize(w, h);
+    mouse.current.x = camera.current.x + (cx - rect.width / 2);
+    mouse.current.y = camera.current.y + (cy - rect.height / 2);
+  };
 
-            physics.current.updateFish(
-                fish.current,
-                target.current.x,
-                target.current.y
-            );
+  /* ================= LOOP ================= */
+  useEffect(() => {
+    if (!isLoaded || !isPlaying || !canvasRef.current || !assets.current) return;
 
-            // Kamera balığın biraz arkasında
-            camera.current.x += (fish.current.x - 150 - camera.current.x) * 0.08;
-            camera.current.y += (fish.current.y - camera.current.y) * 0.1;
+    renderer.current = new GameRenderer(canvasRef.current);
 
-            // Yem spawn
-            if (targets.current.length < 25 && Math.random() < 0.02) {
-                targets.current.push({
-                    id: Date.now(),
-                    x: Math.random() * WORLD_WIDTH,
-                    y: Math.random() * (WORLD_HEIGHT - 600) + 500,
-                    r: 18,
-                    pulse: Math.random() * Math.PI * 2,
-                    color: ['#ef4444', '#22c55e', '#eab308'][Math.floor(Math.random() * 3)]
-                });
-            }
+    const loop = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
 
-            // Yem collision
-            targets.current = targets.current.filter(t => {
-                t.pulse += 0.1;
-                const d = Math.hypot(fish.current.x - t.x, fish.current.y - t.y);
-                if (d < 70) {
-                    score.current += 10;
-                    fish.current.isEating = true;
-                    fish.current.frame = 0;
-                    setTimeout(() => (fish.current.isEating = false), 250);
-                    confetti({ particleCount: 18, spread: 40 });
-                    forceUI(s => s + 1);
-                    return false;
-                }
-                return true;
-            });
+      renderer.current!.resize(w, h);
 
-            renderer.current!.draw(
-                assets.current!,
-                fish.current,
-                camera.current,
-                chunks.current,
-                targets.current
-            );
+      physics.current.updateFish(fish.current, mouse.current.x, mouse.current.y);
+      camera.current.update(fish.current.x, fish.current.y);
 
-            requestAnimationFrame(loop);
-        };
+      // Yem spawn
+      if (Math.random() < 0.025) {
+        targets.current.push({
+          id: Date.now(),
+          x: camera.current.x + Math.random() * 1200 - 600,
+          y: camera.current.y + Math.random() * 600 - 300,
+          color: ['#ef4444', '#22c55e', '#eab308'][Math.floor(Math.random() * 3)]
+        });
+      }
 
-        requestAnimationFrame(loop);
-        return () => { running = false; };
-    }, [playing, loaded]);
+      // Çarpışma
+      targets.current = targets.current.filter(t => {
+        const d = Math.hypot(fish.current.x - t.x, fish.current.y - t.y);
+        if (d < 80) {
+          setScore(s => s + 10);
+          confetti({ particleCount: 20, spread: 50 });
+          fish.current.isEating = true;
+          fish.current.frame = 0;
+          setTimeout(() => (fish.current.isEating = false), 250);
+          return false;
+        }
+        return true;
+      });
 
-    /* ---------- UI ---------- */
-    return (
-        <div className="fixed inset-0 bg-black overflow-hidden">
-            {loaded && (
-                <>
-                    <canvas
-                        ref={canvasRef}
-                        className="touch-none"
-                        onMouseMove={handleInput}
-                        onTouchMove={handleInput}
-                        onClick={handleInput}
-                    />
+      renderer.current!.draw(
+        assets.current!,
+        fish.current,
+        camera.current,
+        chunks.current,
+        targets.current
+      );
 
-                    <div className="fixed top-4 left-4 z-50 bg-white/90 px-5 py-2 rounded-full text-xl font-black text-orange-600">
-                        SKOR: {score.current}
-                    </div>
+      raf.current = requestAnimationFrame(loop);
+    };
 
-                    <button onClick={onClose} className="fixed top-4 right-4 z-50 bg-white p-2 rounded-full">
-                        <XCircle className="w-8 h-8 text-red-500" />
-                    </button>
+    raf.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf.current!);
+  }, [isLoaded, isPlaying]);
 
-                    {!playing && (
-                        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70">
-                            <button
-                                onClick={() => setPlaying(true)}
-                                className="bg-orange-500 text-white px-12 py-6 rounded-3xl text-4xl font-black flex gap-4 items-center"
-                            >
-                                <Play size={40} fill="currentColor" /> BAŞLA
-                            </button>
-                        </div>
-                    )}
-                </>
-            )}
+  /* ================= UI ================= */
+  return (
+    <div className="fixed inset-0 bg-black overflow-hidden">
+      {!isLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center text-white text-xl animate-pulse">
+          OYUN YÜKLENİYOR…
         </div>
-    );
-}
+      )}
+
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 touch-none"
+        onMouseMove={handleInput}
+        onTouchMove={handleInput}
+        onClick={handleInput}
+      />
+
+      <div className="fixed top-5 left-5 bg-white/90 px-6 py-2 rounded-full border-4 border-orange-400 font-bold text-2xl text-orange-600 z-50">
+        SKOR: {score}
+      </div>
+
+      <button
+        onClick={onClose}
+        className="fixed top-5 right-5 z-50 bg-white p-2 rounded-full shadow-lg"
+      >
+        <XCircle className="text-red-500 w-8 h-8" />
+      </button>
+
+      {!isPlaying && isLoaded && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <button
+            onClick={() => setIsPlaying(true)}
+            className="bg-orange-500 text-white px-12 py-6 rounded-3xl text-4xl font-black flex gap-4 items-center shadow-2xl hover:scale-105 transition"
+          >
+            <Play size={40} fill="currentColor" /> BAŞLA
+          </button>
+        </div>
+      )}
+    </div>
+  );
+            }
