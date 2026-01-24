@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Play, XCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-// --- GÖRSELLER ---
+// --- GÖRSELLER (Senin dosya yolların) ---
 import d1 from './d1.png'; import d2 from './d2.png'; import d3 from './d3.png';
 import d4 from './d4.png'; import d5 from './d5.png'; import d6 from './d6.png';
 import d7 from './d7.png'; import d8 from './d8.png'; 
@@ -12,16 +12,15 @@ import balikye3 from './balikye3.png'; import balikye4 from './balikye4.png';
 
 import suDokuImg from './su_doku.png'; 
 import geceImg from './gece.png';
-
 import altzemin1 from './altzemin1.png'; import altzemin2 from './altzemin2.png';
 import ustzemin1 from './ustzemin1.png'; import ustzemin2 from './ustzemin2.png';
 import ustzemin3 from './ustzemin3.png';
 
-const SWIM_FRAMES = [d1, d2, d3, d4, d3, d2, d1, d5, d6, d7, d8, d7, d6, d5];
-const EAT_FRAMES = [balikye1, balikye2, balikye3, balikye4];
+const SWIM_SRCS = [d1, d2, d3, d4, d3, d2, d1, d5, d6, d7, d8, d7, d6, d5];
+const EAT_SRCS = [balikye1, balikye2, balikye3, balikye4];
 
 export default function EslemeGame({ onClose }: { onClose: () => void }) {
-  // --- DÜNYA AYARLARI ---
+  // --- AYARLAR ---
   const CHUNK_COUNT = 10; 
   const CHUNK_WIDTH = 2000; 
   const WORLD_WIDTH = CHUNK_COUNT * CHUNK_WIDTH; 
@@ -29,327 +28,333 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const SEA_LEVEL = 500;     
   const ZEMIN_YUKSEKLIK = 350;
 
-  // --- FİZİK ---
-  const FOLLOW_SPEED = 0.0008;   
-  const MAX_SPEED = 11; 
-  const WATER_FRICTION = 0.97; 
-  const GRAVITY = 0.8;          
-  const AIR_RESISTANCE = 0.99;  
+  // --- HTML5 CANVAS REFERANSI ---
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // --- STATE'LER (Sadece Arayüz İçin) ---
-  const [isPortrait, setIsPortrait] = useState(false); 
+  // --- STATE'LER ---
   const [isPlaying, setIsPlaying] = useState(false);
   const [score, setScore] = useState(0);
-  
-  // --- REFS (PERFORMANS İÇİN KRİTİK) ---
-  // React State yerine bunları kullanacağız. Re-render yapmaz, kasmayı önler.
-  const fishDivRef = useRef<HTMLDivElement>(null);
-  const cameraRef = useRef<HTMLDivElement>(null);
-  const surfaceRef = useRef<HTMLDivElement>(null); // Su Yüzeyi Ref'i
-  
-  const fishPhys = useRef({ x: WORLD_WIDTH / 2, y: 800, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 });
-  const mousePos = useRef({ x: WORLD_WIDTH / 2, y: 800 });
+  const [isLoaded, setIsLoaded] = useState(false); // Resimler yüklendi mi?
+
+  // --- OYUN VERİLERİ (REACT STATE DEĞİL, REF KULLANIYORUZ - HIZ İÇİN) ---
+  const assets = useRef<any>({}); // Yüklenen resimler burada duracak
+  const fish = useRef({ x: WORLD_WIDTH / 2, y: 800, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1, frame: 0, timer: 0, isEating: false });
   const camera = useRef({ x: WORLD_WIDTH / 2, y: 0 });
-  
-  const animTimerRef = useRef(0);
+  const targets = useRef<{id: number, x: number, y: number, color: string}[]>([]);
+  const chunks = useRef<any[]>([]);
+  const mousePos = useRef({ x: WORLD_WIDTH / 2, y: 800 });
   const requestRef = useRef<number>();
-  const [targets, setTargets] = useState<{id: number, x: number, y: number, color: string, type: 'food'}[]>([]);
-  
-  // Balık Animasyonu Frame'i
-  const currentFrameIndexRef = useRef(0);
-  const isEatingRef = useRef(false);
-  const [currentFishImg, setCurrentFishImg] = useState(d1); // Sadece resim değişince render olsun
+  const waterOffset = useRef(0); // Su akış animasyonu için
 
-  const wasInWater = useRef(true);
-
-  // Zeminleri state olarak değil sabit hesaplıyoruz (Render yükünü azaltır)
-  const chunksRef = useRef<any[]>([]);
-
+  // --- RESİMLERİ ÖNDEN YÜKLEME (PRELOAD) ---
+  // Canvas'ta resim göstermek için önce tarayıcının o resmi hafızaya alması şarttır.
   useEffect(() => {
-    const checkOrientation = () => setIsPortrait(window.innerHeight > window.innerWidth);
-    checkOrientation();
-    window.addEventListener('resize', checkOrientation);
-    // Zeminleri bir kere oluştur
-    const newChunks = [];
-    for (let i = 0; i < CHUNK_COUNT; i++) {
-        const baseImg = Math.random() > 0.5 ? altzemin1 : altzemin2;
-        let overlayImg = null;
-        const rand = Math.random();
-        if (rand > 0.75) overlayImg = ustzemin1;
-        else if (rand > 0.50) overlayImg = ustzemin2;
-        else if (rand > 0.25) overlayImg = ustzemin3;
-        newChunks.push({ id: i, x: i * CHUNK_WIDTH, base: baseImg, overlay: overlayImg });
-    }
-    chunksRef.current = newChunks;
+    const loadImages = async () => {
+      const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve) => {
+        const img = new Image();
+        img.src = src;
+        img.onload = () => resolve(img);
+      });
 
-    return () => window.removeEventListener('resize', checkOrientation);
+      // Tüm görselleri yükle
+      const loaded: any = {};
+      loaded.swim = await Promise.all(SWIM_SRCS.map(src => loadImage(src)));
+      loaded.eat = await Promise.all(EAT_SRCS.map(src => loadImage(src)));
+      loaded.su = await loadImage(suDokuImg);
+      loaded.gece = await loadImage(geceImg);
+      loaded.zeminler = await Promise.all([loadImage(altzemin1), loadImage(altzemin2)]);
+      loaded.ustler = await Promise.all([loadImage(ustzemin1), loadImage(ustzemin2), loadImage(ustzemin3)]);
+      
+      assets.current = loaded;
+
+      // Zemin haritasını oluştur
+      const newChunks = [];
+      for (let i = 0; i < CHUNK_COUNT; i++) {
+        newChunks.push({
+            id: i, x: i * CHUNK_WIDTH, 
+            base: Math.random() > 0.5 ? loaded.zeminler[0] : loaded.zeminler[1],
+            overlay: Math.random() > 0.5 ? loaded.ustler[Math.floor(Math.random()*3)] : null
+        });
+      }
+      chunks.current = newChunks;
+      setIsLoaded(true);
+    };
+    loadImages();
   }, []);
 
+  // --- INPUT HANDLER ---
   const handleInput = (e: any) => {
     if (!isPlaying) return;
-    let rawX, rawY;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    let clientX, clientY;
     if (e.touches && e.touches.length > 0) {
-      rawX = e.touches[0].clientX; rawY = e.touches[0].clientY;
+        clientX = e.touches[0].clientX; clientY = e.touches[0].clientY;
     } else {
-      rawX = e.clientX; rawY = e.clientY;
+        clientX = e.clientX; clientY = e.clientY;
     }
-    
-    const screenW = isPortrait ? window.innerHeight : window.innerWidth;
-    const screenH = isPortrait ? window.innerWidth : window.innerHeight;
-    
-    let screenMouseX, screenMouseY;
+
+    // Canvas koordinatlarını dünya koordinatlarına çevir
+    const rect = canvas.getBoundingClientRect();
+    const screenX = clientX - rect.left;
+    const screenY = clientY - rect.top;
+
+    // Portrait/Landscape farkını burada çözüyoruz (CSS rotate ettiğimiz için mouse ters çalışır)
+    const isPortrait = window.innerHeight > window.innerWidth;
+    let worldMouseX, worldMouseY;
+
     if (isPortrait) {
-        screenMouseX = rawY - screenW / 2;
-        screenMouseY = (window.innerWidth - rawX) - screenH / 2;
+        // Ekran döndüğü için X ve Y yer değiştirir
+        const centerX = window.innerHeight / 2;
+        const centerY = window.innerWidth / 2;
+        const relX = screenY - centerX; // Dikkat: Y ekseni X oldu
+        const relY = (window.innerWidth - screenX) - centerY; 
+        worldMouseX = camera.current.x + relX;
+        worldMouseY = camera.current.y + relY;
     } else {
-        screenMouseX = rawX - screenW / 2;
-        screenMouseY = rawY - screenH / 2;
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
+        worldMouseX = camera.current.x + (screenX - centerX);
+        worldMouseY = camera.current.y + (screenY - centerY);
     }
-    mousePos.current = { x: camera.current.x + screenMouseX, y: camera.current.y + screenMouseY };
+    
+    mousePos.current = { x: worldMouseX, y: worldMouseY };
   };
 
   const startGame = () => {
     setIsPlaying(true); setScore(0);
-    fishPhys.current = { x: WORLD_WIDTH / 2, y: 800, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 };
+    fish.current = { x: WORLD_WIDTH / 2, y: 800, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1, frame: 0, timer: 0, isEating: false };
     camera.current = { x: WORLD_WIDTH / 2, y: 800 }; 
     mousePos.current = { x: WORLD_WIDTH / 2, y: 800 };
-    animTimerRef.current = 0; setTargets([]);
+    targets.current = [];
   };
 
-  const triggerEatAnimation = () => {
-    isEatingRef.current = true;
-    currentFrameIndexRef.current = 0;
-    setTimeout(() => { isEatingRef.current = false; }, 300);
-  };
+  // --- OYUN DÖNGÜSÜ (GAME LOOP) ---
+  useEffect(() => {
+    if (!isPlaying || !isLoaded) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d', { alpha: false }); // Alpha false performansı artırır
+    if (!canvas || !ctx) return;
 
-  const gameLoop = () => {
-    const screenW = isPortrait ? window.innerHeight : window.innerWidth;
-    const screenH = isPortrait ? window.innerWidth : window.innerHeight;
+    const loop = () => {
+      // 1. Ekran Boyutlarını Ayarla
+      const isPortrait = window.innerHeight > window.innerWidth;
+      // Canvas'ın render çözünürlüğü ekranla birebir olsun (Netlik için)
+      if (canvas.width !== (isPortrait ? window.innerHeight : window.innerWidth)) {
+          canvas.width = isPortrait ? window.innerHeight : window.innerWidth;
+          canvas.height = isPortrait ? window.innerWidth : window.innerHeight;
+      }
+      const screenW = canvas.width;
+      const screenH = canvas.height;
 
-    // --- ANİMASYON KARE HESABI ---
-    animTimerRef.current += 16.67; 
-    if (animTimerRef.current >= 50) { 
-        currentFrameIndexRef.current++; 
-        animTimerRef.current = 0; 
+      // 2. Fizik Hesapları (Aynı mantık)
+      const f = fish.current;
+      const inWater = f.y > SEA_LEVEL;
+      
+      if (inWater) {
+          const dx = mousePos.current.x - f.x; const dy = mousePos.current.y - f.y;
+          f.vx += dx * 0.0008; f.vy += dy * 0.0008;
+          f.vx *= 0.97; f.vy *= 0.97;
+          const speed = Math.sqrt(f.vx**2 + f.vy**2);
+          if (speed > 11) { const r = 11/speed; f.vx*=r; f.vy*=r; }
+      } else {
+          f.vy += 0.8; f.vx *= 0.99;
+      }
+      f.x += f.vx; f.y += f.vy;
+
+      // Sınırlar
+      if(f.x < 50) f.x = 50; if(f.x > WORLD_WIDTH-50) f.x = WORLD_WIDTH-50; if(f.y > WORLD_HEIGHT-50) f.y = WORLD_HEIGHT-50;
+
+      // Kamera
+      camera.current.x += (f.x - camera.current.x) * 0.15;
+      camera.current.y += (f.y - camera.current.y) * 0.1;
+      
+      // Kamera Sınırları
+      if (camera.current.y < screenH/2) camera.current.y = screenH/2;
+      if (camera.current.y > WORLD_HEIGHT - screenH/2) camera.current.y = WORLD_HEIGHT - screenH/2;
+      if (camera.current.x < 0) camera.current.x = 0; 
+      if (camera.current.x > WORLD_WIDTH) camera.current.x = WORLD_WIDTH;
+
+      // Animasyon Timer
+      f.timer++;
+      if (f.timer > 3) {
+          f.frame++;
+          f.timer = 0;
+      }
+      waterOffset.current += 1; // Su akış hızı
+
+      // ---------------------------------------------
+      // --- ÇİZİM (RENDERING) - SİHİR BURADA ---
+      // ---------------------------------------------
+
+      // A. ARKA PLAN (SABİT)
+      // ctx.fillStyle ile gradient oluşturuyoruz. HTML'deki o kasma yok.
+      const bgGrad = ctx.createRadialGradient(screenW/2, 0, 100, screenW/2, screenH/2, screenW);
+      bgGrad.addColorStop(0, '#0d2b52'); // Merkez
+      bgGrad.addColorStop(1, '#020a1a'); // Köşeler
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, screenW, screenH);
+
+      // KAMERA TRANSFERİ (Tüm dünyayı kameraya göre kaydır)
+      ctx.save();
+      ctx.translate(-camera.current.x + screenW/2, -camera.current.y + screenH/2);
+
+      // B. GÖKYÜZÜ
+      if (assets.current.gece) {
+          // Sonsuz döngü için basit mantık
+          const pat = ctx.createPattern(assets.current.gece, 'repeat');
+          if(pat) {
+            ctx.fillStyle = pat;
+            ctx.translate(0, -500); // Gökyüzü konumu
+            ctx.fillRect(camera.current.x - screenW, 0, WORLD_WIDTH + screenW*2, SEA_LEVEL + 500); 
+            ctx.translate(0, 500); // Geri al
+          }
+      }
+
+      // C. SU YÜZEYİ (EN KRİTİK KISIM - PERFORMANCE OPTİMİZASYONU)
+      const depth = Math.max(0, f.y - SEA_LEVEL);
+      const lazyTilt = 100 - (70 * (depth / (depth + 600))); // Tembel Açı hesabı
+      
+      // Canvas'ta 3D Transform (Perspective) simülasyonu zordur ama scaleY ile hile yaparız.
+      ctx.save();
+      ctx.translate(camera.current.x, SEA_LEVEL); // Suyun başladığı yer
+      ctx.scale(1, Math.cos(lazyTilt * Math.PI / 180)); // Açıyı "basıklık" olarak simüle et
+      
+      // Su Dokusu (Hayalet Mod + Maske)
+      if (assets.current.su) {
+        ctx.globalAlpha = 0.4; // %40 Opaklık
+        ctx.globalCompositeOperation = 'overlay'; // Renk karışımı
         
-        // React'i sadece resim değişince rahatsız et
-        const frames = isEatingRef.current ? EAT_FRAMES : SWIM_FRAMES;
-        setCurrentFishImg(frames[currentFrameIndexRef.current % frames.length]);
-    }
-
-    // --- FİZİK HESAPLARI ---
-    const inWater = fishPhys.current.y > SEA_LEVEL;
-    if (wasInWater.current && !inWater) fishPhys.current.vy *= 0.5; 
-    wasInWater.current = inWater;
-
-    if (inWater) {
-      const dx = mousePos.current.x - fishPhys.current.x; const dy = mousePos.current.y - fishPhys.current.y;
-      fishPhys.current.vx += dx * FOLLOW_SPEED; fishPhys.current.vy += dy * FOLLOW_SPEED;
-      fishPhys.current.vx *= WATER_FRICTION; fishPhys.current.vy *= WATER_FRICTION;
-      const currentSpeed = Math.sqrt(fishPhys.current.vx**2 + fishPhys.current.vy**2);
-      if (currentSpeed > MAX_SPEED) { const ratio = MAX_SPEED / currentSpeed; fishPhys.current.vx *= ratio; fishPhys.current.vy *= ratio; }
-    } else {
-      fishPhys.current.vy += GRAVITY; fishPhys.current.vx *= AIR_RESISTANCE; 
-    }
-    fishPhys.current.x += fishPhys.current.vx; fishPhys.current.y += fishPhys.current.vy;
-
-    // Sınırlar
-    if (fishPhys.current.x < 50) fishPhys.current.x = 50;
-    if (fishPhys.current.x > WORLD_WIDTH - 50) fishPhys.current.x = WORLD_WIDTH - 50;
-    if (fishPhys.current.y > WORLD_HEIGHT - 50) fishPhys.current.y = WORLD_HEIGHT - 50;
-
-    // Kamera Takibi
-    camera.current.x += (fishPhys.current.x - camera.current.x) * 0.15;
-    camera.current.y += (fishPhys.current.y - camera.current.y) * 0.1;
-    if (camera.current.y < screenH / 2) camera.current.y = screenH / 2;
-    if (camera.current.y > WORLD_HEIGHT - screenH / 2) camera.current.y = WORLD_HEIGHT - screenH / 2;
-    if (camera.current.x < 0) camera.current.x = 0;
-    if (camera.current.x > WORLD_WIDTH) camera.current.x = WORLD_WIDTH;
-
-    // --- DOM GÜNCELLEME (React Yok, Sıfır Kasma) ---
-    // 1. Kamera Hareketi
-    if (cameraRef.current) {
-        cameraRef.current.style.transform = `translate3d(${-camera.current.x + (isPortrait ? window.innerHeight : window.innerWidth) / 2}px, ${-camera.current.y + (isPortrait ? window.innerWidth : window.innerHeight) / 2}px, 0)`;
-    }
-
-    // 2. Balık Hareketi
-    const faceDirection = fishPhys.current.vx > 0.1 ? 1 : (fishPhys.current.vx < -0.1 ? -1 : (fishPhys.current.scaleX > 0 ? 1 : -1)); // Yönü koru
-    let angleRadRot = Math.atan2(fishPhys.current.vy, Math.abs(fishPhys.current.vx));
-    let angleDeg = angleRadRot * (180 / Math.PI);
-    let targetRotation = angleDeg * faceDirection;
-    fishPhys.current.rotation += (targetRotation - fishPhys.current.rotation) * 0.1;
-    if (!inWater && Math.abs(fishPhys.current.rotation) > 60) fishPhys.current.rotation *= 0.9;
-    
-    // Esneme Efekti
-    const totalSpeed = Math.sqrt(fishPhys.current.vx**2 + fishPhys.current.vy**2);
-    const stretch = Math.min(totalSpeed * 0.02, 0.3); 
-    const finalScaleX = faceDirection * (1 + stretch);
-    const finalScaleY = 1 - stretch * 0.5;
-
-    // Derinlik Efekti (Balık Boyutu)
-    const depthRatio = Math.max(0, (fishPhys.current.y - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL));
-    const depthScale = 1 + (depthRatio * 0.6);
-
-    if (fishDivRef.current) {
-        fishDivRef.current.style.transform = `translate3d(${fishPhys.current.x}px, ${fishPhys.current.y}px, 0) translate(-50%, -50%) rotate(${fishPhys.current.rotation}deg) scale(${finalScaleX * depthScale}, ${finalScaleY * depthScale})`;
-    }
-
-    // 3. SU YÜZEYİ "TEMBEL AÇI" (LAZY TILT)
-    // React State kullanmıyoruz, direkt stile yazıyoruz.
-    if (surfaceRef.current) {
-        const depth = Math.max(0, fishPhys.current.y - SEA_LEVEL);
-        // 600 faktörüyle kapanmayı iyice geciktirdik (Tembel mod)
-        const tiltCurve = depth / (depth + 600); 
-        const currentTilt = 90 - (60 * tiltCurve); // 90'dan başlar (çizgi), yavaşça 30'a iner
-        surfaceRef.current.style.transform = `rotateX(${-currentTilt}deg)`;
-    }
-
-    // --- OYUN MANTIĞI (Yemler) ---
-    // Yemleri state'te tutmak zorundayız (DOM eklenip çıkıyor), ama bu sadece yerken çalışır.
-    setTargets(prev => {
-        if (Math.random() < 0.04) { 
-            const spawnX = Math.random() * WORLD_WIDTH;
-            return [...prev, { id: Date.now(), x: spawnX, y: Math.random() * (WORLD_HEIGHT - SEA_LEVEL - ZEMIN_YUKSEKLIK - 100) + SEA_LEVEL + 100, color: ['#ef4444', '#22c55e', '#eab308'][Math.floor(Math.random() * 3)], type: 'food' }];
+        // Deseni kaydırarak akış efekti
+        const patternOffset = waterOffset.current % 800;
+        ctx.translate(-patternOffset, -300); // 300px yukarıdan başlat
+        
+        const pattern = ctx.createPattern(assets.current.su, 'repeat');
+        if (pattern) {
+            ctx.fillStyle = pattern;
+            // Çok geniş bir alana çiz ki kamera gidince bitmesin
+            ctx.fillRect(camera.current.x - screenW - patternOffset, 0, WORLD_WIDTH + screenW*2, 600);
         }
-        return prev.filter(t => {
-            if (Math.hypot(fishPhys.current.x - t.x, fishPhys.current.y - t.y) < 120) { 
-                triggerEatAnimation(); 
-                setScore(s => s + 10); // Skor değişimi render yapar ama sorun değil, sık olmuyor
-                confetti({ origin: { x: 0.5, y: 0.5 }, particleCount: 20, spread: 40 }); 
-                return false; 
-            }
-            return true;
-        });
-    });
-    
-    requestRef.current = requestAnimationFrame(gameLoop);
-  };
+      }
+      ctx.restore(); // Transformu sıfırla
 
-  useEffect(() => { if (isPlaying) requestRef.current = requestAnimationFrame(gameLoop); return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); }; }, [isPlaying]);
+      // D. ZEMİNLER
+      chunks.current.forEach(chunk => {
+          // Sadece ekranda görünenleri çiz (Culling) - Performans artırır
+          if (Math.abs(chunk.x - camera.current.x) < screenW + 1000) {
+              if (chunk.base) ctx.drawImage(chunk.base, chunk.x, WORLD_HEIGHT - ZEMIN_YUKSEKLIK, 2000, 350);
+              if (chunk.overlay) ctx.drawImage(chunk.overlay, chunk.x, WORLD_HEIGHT - ZEMIN_YUKSEKLIK, 2000, 350);
+          }
+      });
+
+      // E. YEMLER
+      targets.current.forEach(t => {
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, 20, 0, Math.PI * 2);
+          ctx.fillStyle = t.color;
+          ctx.shadowBlur = 15; ctx.shadowColor = t.color; // Işık efekti
+          ctx.fill();
+          ctx.shadowBlur = 0; // Reset
+      });
+
+      // F. BALIK
+      ctx.save();
+      ctx.translate(f.x, f.y);
+      
+      // Derinlik efekti (Scale)
+      const depthRatio = Math.max(0, (f.y - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL));
+      const depthScale = 1 + (depthRatio * 0.6);
+      
+      // Yön ve Dönüş
+      const faceDir = f.vx > 0.1 ? 1 : (f.vx < -0.1 ? -1 : (f.scaleX > 0 ? 1 : -1));
+      let angle = Math.atan2(f.vy, Math.abs(f.vx));
+      f.rotation += (angle * (180/Math.PI) * faceDir - f.rotation) * 0.1;
+      
+      ctx.rotate(f.rotation * Math.PI / 180);
+      ctx.scale(faceDir * depthScale, depthScale);
+
+      const frames = f.isEating ? assets.current.eat : assets.current.swim;
+      const currentImg = frames[f.frame % frames.length];
+      if (currentImg) {
+          // Resmi ortala
+          ctx.drawImage(currentImg, -80, -60, 160, 120);
+      }
+      ctx.restore();
+
+      ctx.restore(); // Kamera translate'ini bitir
+
+      // G. YEM MANTIĞI & SPAWN
+      if (Math.random() < 0.04) {
+         targets.current.push({ 
+             id: Date.now(), 
+             x: Math.random() * WORLD_WIDTH, 
+             y: Math.random() * (WORLD_HEIGHT - SEA_LEVEL - ZEMIN_YUKSEKLIK) + SEA_LEVEL + 100, 
+             color: ['#ef4444', '#22c55e', '#eab308'][Math.floor(Math.random() * 3)] 
+         });
+      }
+      targets.current = targets.current.filter(t => {
+          const dist = Math.hypot(f.x - t.x, f.y - t.y);
+          if (dist < 80) {
+              setScore(s => s + 10);
+              confetti({ origin: { x: 0.5, y: 0.5 }, particleCount: 20, spread: 40 });
+              f.isEating = true; f.frame = 0;
+              setTimeout(() => f.isEating = false, 300);
+              return false;
+          }
+          return true;
+      });
+
+      requestRef.current = requestAnimationFrame(loop);
+    };
+
+    requestRef.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(requestRef.current!);
+  }, [isPlaying, isLoaded]); // Sadece oyun başlayınca ve resimler yüklenince çalış
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden touch-none select-none flex items-center justify-center">
-        {/* ANA KAPSAYICI (SABİT ARKAPLAN - KASMAYI ÖNLER) */}
-        <div 
-            className="relative overflow-hidden shadow-2xl"
+        {/* CANVAS: HTML DOM'un HANTALLIĞI YOK, SAF PERFORMANS */}
+        <canvas 
+            ref={canvasRef}
+            className="block"
             style={{
-                width: isPortrait ? '100vh' : '100vw', 
+                width: isPortrait ? '100vh' : '100vw',
                 height: isPortrait ? '100vw' : '100vh',
-                position: 'absolute', 
-                left: '50%', top: '50%',
-                transform: isPortrait ? 'translate(-50%, -50%) rotate(90deg)' : 'translate(-50%, -50%)',
-                zIndex: 10,
-                // --- RENK AÇILMASI SORUNU ÇÖZÜLDÜ: SABİT ZEMİN ---
-                background: 'radial-gradient(circle at 50% 0%, #0d2b52 0%, #020a1a 100%)',
-                perspective: '1200px'
+                transform: isPortrait ? 'rotate(90deg)' : 'none',
+                // Mobilde yumuşatma ayarları
+                touchAction: 'none'
             }}
-            onMouseMove={handleInput} onTouchMove={handleInput}
-        >
-            {/* HAREKETLİ KAMERA KATMANI (Ref ile yönetiliyor, React yok) */}
-            <div 
-                ref={cameraRef}
-                className="absolute w-full top-0 left-0 will-change-transform" // GPU Hızlandırma
-                style={{ height: WORLD_HEIGHT }} // Transform JS'den gelecek
-            >
-                {/* 1. UZAY/GÖKYÜZÜ */}
-                <div 
-                    className="absolute top-[-500px] left-0" 
-                    style={{ 
-                        width: WORLD_WIDTH,
-                        height: SEA_LEVEL + 500,
-                        backgroundImage: `url(${geceImg})`,
-                        backgroundSize: 'cover', 
-                        backgroundRepeat: 'repeat-x', 
-                        zIndex: 1
-                    }} 
-                />
+            onMouseMove={handleInput}
+            onTouchMove={handleInput}
+            onClick={handleInput}
+        />
 
-                {/* 2. SU YÜZEYİ (HAYALET MODU + RENK AŞISI) */}
-                <div 
-                    ref={surfaceRef} // JS buradan tutup bükecek
-                    className="absolute left-0 will-change-transform" // GPU
-                    style={{
-                        width: WORLD_WIDTH, 
-                        top: SEA_LEVEL - 300, 
-                        height: 600, 
-                        transformOrigin: 'center center',
-                        // rotateX JS'den gelecek
-                        zIndex: 35 
-                    }}
-                >
-                    <div 
-                        className="w-full h-full relative"
-                        style={{
-                            // ALTTAN ERİTME (Çizgiyi yok eder)
-                            WebkitMaskImage: 'linear-gradient(to bottom, black 20%, transparent 90%)',
-                            maskImage: 'linear-gradient(to bottom, black 20%, transparent 90%)'
-                        }}
-                    >
-                        <div 
-                            className="w-full h-full"
-                            style={{
-                                backgroundImage: `url(${suDokuImg})`,
-                                backgroundRepeat: 'repeat', 
-                                backgroundSize: '800px auto', 
-                                animation: 'waterFlow 20s linear infinite',
-                                
-                                // --- RENK DÜZELTME & CANLILIK ---
-                                opacity: 0.45, // Biraz daha görünür yaptık
-                                mixBlendMode: 'overlay', // Koyu zeminde renkleri patlatır
-                                filter: 'brightness(1.5) saturate(1.8)' // Ölü rengi canlandırır
-                            }}
-                        />
-                    </div>
-                </div>
-
-                {/* 3. KUM ZEMİNLER (Static Render) */}
-                {chunksRef.current.map(chunk => (
-                    <div key={chunk.id} className="absolute bottom-0 pointer-events-none" style={{ left: chunk.x, width: CHUNK_WIDTH, height: ZEMIN_YUKSEKLIK, zIndex: 10 }}>
-                        <div className="absolute bottom-0 left-0 w-full h-full" style={{ backgroundImage: `url(${chunk.base})`, backgroundSize: '100% 100%', filter: 'brightness(0.7)' }} />
-                    </div>
-                ))}
-                
-                {/* 4. YEMLER */}
-                {targets.map(t => (
-                    <div key={t.id} className="absolute w-12 h-12 rounded-full shadow-lg border-2 border-white/50 flex items-center justify-center animate-pulse" style={{ left: t.x, top: t.y, backgroundColor: t.color, zIndex: 30 }}></div>
-                ))}
-
-                {/* 5. YOSUNLAR */}
-                {chunksRef.current.map(chunk => chunk.overlay && (
-                    <div key={`overlay-${chunk.id}`} className="absolute bottom-0 pointer-events-none" style={{ left: chunk.x, width: CHUNK_WIDTH, height: ZEMIN_YUKSEKLIK, zIndex: 60 }}>
-                        <div className="absolute bottom-0 left-0 w-full h-full" style={{ backgroundImage: `url(${chunk.overlay})`, backgroundSize: '100% 100%', transformOrigin: 'bottom center', zIndex: 60, filter: 'drop-shadow(5px 5px 10px rgba(0,0,0,0.5))' }} />
-                    </div>
-                ))}
-            </div>
-
-            {/* BALIK (DOM Ref ile yönetiliyor, React render döngüsü dışında) */}
-            {isPlaying && (
-                <div 
-                    ref={fishDivRef}
-                    className="absolute top-0 left-0 w-[160px] h-[120px] z-50 will-change-transform" // GPU
-                    // Transform JS'den gelecek
-                >
-                    <img src={currentFishImg} alt="Karakter" className="w-full h-full object-contain drop-shadow-2xl" />
-                </div>
-            )}
-
-            {/* UI */}
-            <div className="fixed top-5 left-5 bg-white/90 backdrop-blur px-6 py-2 rounded-full shadow-xl border-4 border-orange-400 z-[100]"><span className="font-black text-2xl text-orange-600">SKOR: {score}</span></div>
-            <button onClick={onClose} className="fixed top-5 right-5 z-[100] bg-white p-2 rounded-full shadow-lg hover:scale-110 transition"><XCircle className="text-red-500 w-8 h-8" /></button>
-            {!isPlaying && (
-                <div className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-center p-4">
-                    <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={startGame} className="bg-orange-500 text-white px-12 py-6 rounded-3xl font-black text-4xl shadow-orange-500/50 shadow-2xl flex items-center gap-4 border-b-8 border-orange-700 active:border-b-0 active:translate-y-2 transition-all"><Play size={40} fill="currentColor" /> BAŞLA</motion.button>
-                </div>
-            )}
-            
-            <style>{`
-                @keyframes waterFlow { 
-                    0% { background-position: 0 0; } 
-                    100% { background-position: 1000px 0; } 
-                }
-            `}</style>
+        {/* UI KATMANI (Burası HTML kalabilir, performansı etkilemez) */}
+        <div className="fixed top-5 left-5 bg-white/90 backdrop-blur px-6 py-2 rounded-full shadow-xl border-4 border-orange-400 z-[100]">
+            <span className="font-black text-2xl text-orange-600">SKOR: {score}</span>
         </div>
+        
+        <button onClick={onClose} className="fixed top-5 right-5 z-[100] bg-white p-2 rounded-full shadow-lg hover:scale-110 transition">
+            <XCircle className="text-red-500 w-8 h-8" />
+        </button>
+
+        {/* LOADING EKRANI */}
+        {!isLoaded && (
+             <div className="fixed inset-0 bg-black flex items-center justify-center text-white">
+                 YÜKLENİYOR...
+             </div>
+        )}
+
+        {/* BAŞLANGIÇ EKRANI */}
+        {!isPlaying && isLoaded && (
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-center p-4 z-[110]">
+                <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={startGame} className="bg-orange-500 text-white px-12 py-6 rounded-3xl font-black text-4xl shadow-orange-500/50 shadow-2xl flex items-center gap-4 border-b-8 border-orange-700 active:border-b-0 active:translate-y-2 transition-all">
+                    <Play size={40} fill="currentColor" /> BAŞLA
+                </motion.button>
+            </div>
+        )}
     </div>
   );
   }
-              
+        
