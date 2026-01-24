@@ -1,6 +1,5 @@
-// Renderer.ts
 import { AssetLibrary } from './Assets';
-import { FishState, WORLD_WIDTH, WORLD_HEIGHT, SEA_LEVEL } from './Physics';
+import { FishState, WORLD_WIDTH, WORLD_HEIGHT } from './Physics';
 import { SeaSurfaceRenderer } from './SeaSurfaceRenderer';
 
 export class GameRenderer {
@@ -31,8 +30,7 @@ export class GameRenderer {
     const w = this.width;
     const h = this.height;
 
-    // BACKGROUND (Uzay / Gece)
-    ctx.fillStyle = '#000';
+    ctx.fillStyle = '#020617';
     ctx.fillRect(0, 0, w, h);
 
     if (assets.gece) {
@@ -46,15 +44,12 @@ export class GameRenderer {
     ctx.save();
     ctx.translate(-camera.x + w / 2, -camera.y + h / 2);
 
-    // SEA SURFACE
     this.sea.draw(ctx, assets.su, camera.x, fish.y, w);
 
-    // ZEMINLER (erken çiz → pop yok)
     chunks.forEach(c => {
       if (c.base) ctx.drawImage(c.base, c.x, WORLD_HEIGHT - 350, 2000, 350);
     });
 
-    // YEMLER
     targets.forEach(t => {
       ctx.beginPath();
       ctx.arc(t.x, t.y, 18, 0, Math.PI * 2);
@@ -62,7 +57,6 @@ export class GameRenderer {
       ctx.fill();
     });
 
-    // BALIK
     ctx.save();
     ctx.translate(fish.x, fish.y);
     ctx.rotate((fish.rotation * Math.PI) / 180);
@@ -73,11 +67,10 @@ export class GameRenderer {
     ctx.drawImage(img, -80, -60, 160, 120);
     ctx.restore();
 
-    // ÜST ZEMIN (foreground)
     chunks.forEach(c => {
       if (c.overlay) ctx.drawImage(c.overlay, c.x, WORLD_HEIGHT - 350, 2000, 350);
     });
 
     ctx.restore();
   }
-}
+                }
