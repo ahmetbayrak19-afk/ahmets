@@ -1,6 +1,6 @@
-// game/Renderer.ts
-import { AssetLibrary } from './Assets';
-import { FishState, WORLD_WIDTH, WORLD_HEIGHT, SEA_LEVEL } from './Physics';
+// Renderer.ts
+import { AssetLibrary } from './Assets'; // Yanındaki dosyadan alıyor
+import { FishState, WORLD_WIDTH, WORLD_HEIGHT, SEA_LEVEL } from './Physics'; // Yanındaki dosyadan alıyor
 
 export class GameRenderer {
     private ctx: CanvasRenderingContext2D;
@@ -25,7 +25,7 @@ export class GameRenderer {
         const h = this.height;
         this.waterOffset += 1;
 
-        // 1. Arka Plan (Gradyan - Resim yoksa bile çalışır)
+        // 1. Arka Plan
         const bgGrad = ctx.createRadialGradient(w/2, 0, 100, w/2, h/2, w);
         bgGrad.addColorStop(0, '#0d2b52');
         bgGrad.addColorStop(1, '#020a1a');
@@ -67,7 +67,6 @@ export class GameRenderer {
 
         // 4. Zeminler
         chunks.forEach(chunk => {
-             // Görünüyorsa çiz
              if (Math.abs(chunk.x - camera.x) < w + 1000) {
                  if (chunk.base && chunk.base.width > 0) ctx.drawImage(chunk.base, chunk.x, WORLD_HEIGHT - 350, 2000, 350);
                  if (chunk.overlay && chunk.overlay.width > 0) ctx.drawImage(chunk.overlay, chunk.x, WORLD_HEIGHT - 350, 2000, 350);
@@ -94,7 +93,7 @@ export class GameRenderer {
         if (img && img.width > 0) {
             ctx.drawImage(img, -80, -60, 160, 120);
         } else {
-            // Placeholder (Hata varsa Kırmızı Kutu Çiz)
+            // Resim yüklenemediyse kırmızı kutu çiz
             ctx.fillStyle = 'red';
             ctx.fillRect(-80, -60, 160, 120);
         }
@@ -103,3 +102,4 @@ export class GameRenderer {
         ctx.restore();
     }
     }
+    
