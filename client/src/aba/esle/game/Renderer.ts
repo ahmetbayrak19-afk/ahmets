@@ -1,7 +1,7 @@
 import { AssetLibrary } from './Assets';
 import { FishState, WORLD_WIDTH, WORLD_HEIGHT, SEA_LEVEL } from './Physics';
 
-// --- SU YÜZEYİ VE IŞIK EFEKTİ ---
+// --- SU YÜZEYİ EFEKTİ ---
 class SeaSurfaceRenderer {
   private offset = 0;
 
@@ -10,31 +10,22 @@ class SeaSurfaceRenderer {
 
     this.offset += 0.5; // Akış hızı
 
-    // Derinliğe göre ışık açısı değişsin
-    const depth = Math.max(0, fishY - SEA_LEVEL);
-    const t = Math.min(1, depth / 600);
-    
-    // Işık hüzmelerinin uzaması (Yüzeye yakınken kısa, derinde uzun)
-    const scaleY = 1 + t * 2; 
-
+    // Yüzey efekti
     ctx.save();
-    // Su yüzeyinin başladığı yer
     ctx.translate(-cameraX + screenW / 2, SEA_LEVEL);
     
-    // Perspektif efekti (üst taraf dar, alt taraf geniş gibi hile yapıyoruz)
-    ctx.scale(1, scaleY);
+    // Yüzeyi biraz basıklaştır (Perspektif)
+    ctx.scale(1, 0.3); 
 
-    // Işık Hüzmesi Rengi (Beyaz/Mavi karışımı)
-    ctx.globalCompositeOperation = 'overlay'; // Renkleri parlatır
-    ctx.globalAlpha = 0.3; // Şeffaflık
+    ctx.globalAlpha = 0.6; // Hafif şeffaf
+    ctx.globalCompositeOperation = 'screen'; // Parlaklık verir
 
     const pat = ctx.createPattern(texture, 'repeat');
     if (pat) {
       ctx.fillStyle = pat;
-      // Dokuyu hareket ettir
       ctx.translate(-this.offset, 0);
-      // Çok uzun bir dikdörtgen çiz ki derine inince bitmesin
-      ctx.fillRect(cameraX - screenW, 0, WORLD_WIDTH + screenW * 2, 1000);
+      // Sadece yüzey çizgisi boyunca çiz
+      ctx.fillRect(cameraX - screenW, -50, WORLD_WIDTH + screenW * 2, 200); 
     }
     ctx.restore();
   }
@@ -63,75 +54,82 @@ export class GameRenderer {
     const w = this.width;
     const h = this.height;
 
-    // 1. ADIM: GÖKYÜZÜ (YILDIZLAR)
-    // Önce arka planı lacivert yap
+    // --- KATMAN 1: GÖKYÜZÜ VE YILDIZLAR (EN ARKA) ---
+    // Önce simsiyah uzay rengi
     ctx.fillStyle = '#020617'; 
     ctx.fillRect(0, 0, w, h);
 
-    // Yıldız resmini sadece yukarı çiz (Background)
+    // Yıldızları çiz (Tüm ekrana, çünkü kamera yukarı çıkınca görünmeli)
     if (assets.gece) {
       const pat = ctx.createPattern(assets.gece, 'repeat');
       if (pat) {
         ctx.save();
         ctx.fillStyle = pat;
-        // Yıldızlar kamerayla çok az hareket etsin (Parallax efekti)
-        ctx.translate(-camera.x * 0.1, -camera.y * 0.1); 
-        ctx.fillRect(0, 0, w + 2000, h + 2000); // Geniş çiz
+        // Hafif hareket (Parallax)
+        ctx.translate(-camera.x * 0.05, -camera.y * 0.05); 
+        ctx.fillRect(0, 0, w * 2 + WORLD_WIDTH, h * 2 + WORLD_HEIGHT); 
         ctx.restore();
       }
     }
 
     ctx.save();
-    // Kamerayı ayarla (Dünya koordinatlarına geçiş)
+    // DÜNYA KOORDİNATLARINA GEÇİŞ (Kamera Hareketi)
     ctx.translate(-camera.x + w / 2, -camera.y + h / 2);
 
-    // 2. ADIM: SUYUN KENDİSİ (MAVİ PERDE)
-    // Yıldızların üzerine mavi bir katman atıyoruz ki su gibi görünsün
-    const gradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, SEA_LEVEL + 1500);
-    gradient.addColorStop(0, 'rgba(0, 105, 148, 0.4)'); // Yüzeyde açık mavi, şeffaf
-    gradient.addColorStop(0.3, 'rgba(2, 6, 23, 0.95)'); // Biraz aşağıda koyulaşsın
-    gradient.addColorStop(1, 'rgba(0, 0, 0, 1)');       // Dipte zifiri karanlık
+    // --- KATMAN 2: MAVİ SU PERDESİ (YILDIZLARI KAPATAN KATMAN) ---
+    // Deniz seviyesinden (SEA_LEVEL) en aşağıya kadar mavi bir dikdörtgen çiziyoruz.
+    // Bu sayede suyun altındaki yıldızlar kapanıyor.
+    
+    const waterGrad = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
+    waterGrad.addColorStop(0, 'rgba(0, 100, 180, 0.6)');   // Yüzey: Açık mavi, az şeffaf (Yıldızlar azıcık görünür)
+    waterGrad.addColorStop(0.1, 'rgba(1, 20, 40, 0.95)');  // Biraz altı: Koyu mavi (Yıldızlar kapanır)
+    waterGrad.addColorStop(1, '#000000');                  // Dip: Simsiyah
 
-    ctx.fillStyle = gradient;
-    // Deniz seviyesinden aşağıya doğru kocaman bir dikdörtgen çiz
-    ctx.fillRect(camera.x - w, SEA_LEVEL, WORLD_WIDTH + w * 2, WORLD_HEIGHT);
+    ctx.fillStyle = waterGrad;
+    // Sadece Deniz Seviyesinden aşağısını boya!
+    ctx.fillRect(camera.x - w, SEA_LEVEL, WORLD_WIDTH + w * 2, WORLD_HEIGHT - SEA_LEVEL + 500);
 
-    // 3. ADIM: SU YÜZEYİ EFEKTİ (GOD RAYS)
-    // Senin yolladığın texture burada kullanılıyor
+
+    // --- KATMAN 3: SU YÜZEYİ DOKUSU (GOD RAYS) ---
     this.sea.draw(ctx, assets.su, camera.x, fish.y, w);
 
-    // 4. ADIM: SU YÜZEYİ ÇİZGİSİ (Beyaz Köpük)
+    // Beyaz bir çizgi çekelim tam su sınırına (Netlik için)
     ctx.beginPath();
     ctx.moveTo(camera.x - w, SEA_LEVEL);
     ctx.lineTo(camera.x + w * 2, SEA_LEVEL);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 1;
     ctx.stroke();
 
-    // 5. ADIM: ZEMİNLER
+
+    // --- KATMAN 4: ZEMİNLER (KUMLAR) ---
+    // En altta çiziyoruz
     chunks.forEach(c => {
-      // Sadece ekranda görünenleri çiz (Performans için)
+      // Sadece ekranda görünenleri çiz
       if (Math.abs(c.x - camera.x) < w + 500) {
-        if (c.base) ctx.drawImage(c.base, c.x, WORLD_HEIGHT - 350, 2000, 350);
+        if (c.base) {
+            // WORLD_HEIGHT'ın en altına yapıştır
+            ctx.drawImage(c.base, c.x, WORLD_HEIGHT - 350, 2000, 350);
+        }
       }
     });
 
-    // 6. ADIM: YEMLER
+
+    // --- KATMAN 5: OYUN NESNELERİ (YEMLER) ---
     targets.forEach(t => {
       ctx.beginPath();
       ctx.arc(t.x, t.y, 18, 0, Math.PI * 2);
       ctx.fillStyle = t.color;
       ctx.shadowBlur = 15; 
-      ctx.shadowColor = t.color; // Yemler parlasın
+      ctx.shadowColor = t.color; 
       ctx.fill();
       ctx.shadowBlur = 0;
     });
 
-    // 7. ADIM: BALIK
+
+    // --- KATMAN 6: BALIK ---
     ctx.save();
     ctx.translate(fish.x, fish.y);
-    
-    // Balık dönüşü ve derinlik efekti (Scale)
     ctx.rotate((fish.rotation * Math.PI) / 180);
     ctx.scale(fish.scaleX, fish.scaleY);
 
@@ -139,7 +137,6 @@ export class GameRenderer {
     const img = frames[fish.frame % frames.length];
     
     if (img) {
-      // Gölge efekti (Balık derinlik hissi versin)
       ctx.shadowColor = 'rgba(0,0,0,0.5)';
       ctx.shadowBlur = 20;
       ctx.drawImage(img, -80, -60, 160, 120);
@@ -147,11 +144,11 @@ export class GameRenderer {
     }
     ctx.restore();
 
-    // 8. ADIM: ÖN KATMAN (Yosunlar balığın önünde kalsın)
+
+    // --- KATMAN 7: ÖN PLAN SÜSLERİ (Yosunlar balığın önünde) ---
     chunks.forEach(c => {
       if (Math.abs(c.x - camera.x) < w + 500) {
         if (c.overlay) {
-             // Hafif sallanma efekti verilebilir mi? Şimdilik sabit kalsın.
              ctx.drawImage(c.overlay, c.x, WORLD_HEIGHT - 350, 2000, 350);
         }
       }
@@ -159,5 +156,5 @@ export class GameRenderer {
 
     ctx.restore();
   }
-      }
-        
+  }
+  
