@@ -4,7 +4,6 @@ import { Play, XCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 // --- GÖRSELLER ---
-// (Buradaki importların senin projendeki gibi olduğunu varsayıyorum)
 import d1 from './d1.png'; import d2 from './d2.png'; import d3 from './d3.png';
 import d4 from './d4.png'; import d5 from './d5.png'; import d6 from './d6.png';
 import d7 from './d7.png'; import d8 from './d8.png'; 
@@ -14,7 +13,6 @@ import balikye3 from './balikye3.png'; import balikye4 from './balikye4.png';
 import suDokuImg from './su_doku.png'; 
 import geceImg from './gece.png';
 
-// Zeminler
 import altzemin1 from './altzemin1.png'; import altzemin2 from './altzemin2.png';
 import ustzemin1 from './ustzemin1.png'; import ustzemin2 from './ustzemin2.png';
 import ustzemin3 from './ustzemin3.png';
@@ -24,7 +22,7 @@ const EAT_FRAMES = [balikye1, balikye2, balikye3, balikye4];
 
 export default function EslemeGame({ onClose }: { onClose: () => void }) {
   // --- DÜNYA AYARLARI ---
-  const CHUNK_COUNT = 10; // Daha uzun dünya
+  const CHUNK_COUNT = 10; 
   const CHUNK_WIDTH = 2000; 
   const WORLD_WIDTH = CHUNK_COUNT * CHUNK_WIDTH; 
   const WORLD_HEIGHT = 2000; 
@@ -38,52 +36,54 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const GRAVITY = 0.8;          
   const AIR_RESISTANCE = 0.99;  
 
-  // --- STATE'LER ---
+  // --- STATE'LER (Sadece Arayüz İçin) ---
   const [isPortrait, setIsPortrait] = useState(false); 
   const [isPlaying, setIsPlaying] = useState(false);
   const [score, setScore] = useState(0);
-  const [isEating, setIsEating] = useState(false); 
-  const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
-  const [faceDirection, setFaceDirection] = useState(1); 
   
-  const [chunks, setChunks] = useState<any[]>([]);
-  const [surfaceTilt, setSurfaceTilt] = useState(30); 
-
-  // Balık Başlangıç
+  // --- REFS (PERFORMANS İÇİN KRİTİK) ---
+  // React State yerine bunları kullanacağız. Re-render yapmaz, kasmayı önler.
+  const fishDivRef = useRef<HTMLDivElement>(null);
+  const cameraRef = useRef<HTMLDivElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null); // Su Yüzeyi Ref'i
+  
   const fishPhys = useRef({ x: WORLD_WIDTH / 2, y: 800, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 });
   const mousePos = useRef({ x: WORLD_WIDTH / 2, y: 800 });
   const camera = useRef({ x: WORLD_WIDTH / 2, y: 0 });
+  
   const animTimerRef = useRef(0);
   const requestRef = useRef<number>();
   const [targets, setTargets] = useState<{id: number, x: number, y: number, color: string, type: 'food'}[]>([]);
+  
+  // Balık Animasyonu Frame'i
+  const currentFrameIndexRef = useRef(0);
+  const isEatingRef = useRef(false);
+  const [currentFishImg, setCurrentFishImg] = useState(d1); // Sadece resim değişince render olsun
+
   const wasInWater = useRef(true);
+
+  // Zeminleri state olarak değil sabit hesaplıyoruz (Render yükünü azaltır)
+  const chunksRef = useRef<any[]>([]);
 
   useEffect(() => {
     const checkOrientation = () => setIsPortrait(window.innerHeight > window.innerWidth);
     checkOrientation();
     window.addEventListener('resize', checkOrientation);
-    return () => window.removeEventListener('resize', checkOrientation);
-  }, []);
-
-  const initWorld = () => {
-      const newChunks = [];
-      for (let i = 0; i < CHUNK_COUNT; i++) {
+    // Zeminleri bir kere oluştur
+    const newChunks = [];
+    for (let i = 0; i < CHUNK_COUNT; i++) {
         const baseImg = Math.random() > 0.5 ? altzemin1 : altzemin2;
         let overlayImg = null;
         const rand = Math.random();
         if (rand > 0.75) overlayImg = ustzemin1;
         else if (rand > 0.50) overlayImg = ustzemin2;
         else if (rand > 0.25) overlayImg = ustzemin3;
+        newChunks.push({ id: i, x: i * CHUNK_WIDTH, base: baseImg, overlay: overlayImg });
+    }
+    chunksRef.current = newChunks;
 
-        newChunks.push({
-            id: i,
-            x: i * CHUNK_WIDTH, 
-            base: baseImg,
-            overlay: overlayImg
-        });
-      }
-      setChunks(newChunks);
-  };
+    return () => window.removeEventListener('resize', checkOrientation);
+  }, []);
 
   const handleInput = (e: any) => {
     if (!isPlaying) return;
@@ -98,7 +98,6 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     const screenH = isPortrait ? window.innerWidth : window.innerHeight;
     
     let screenMouseX, screenMouseY;
-
     if (isPortrait) {
         screenMouseX = rawY - screenW / 2;
         screenMouseY = (window.innerWidth - rawX) - screenH / 2;
@@ -106,12 +105,10 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         screenMouseX = rawX - screenW / 2;
         screenMouseY = rawY - screenH / 2;
     }
-    
     mousePos.current = { x: camera.current.x + screenMouseX, y: camera.current.y + screenMouseY };
   };
 
   const startGame = () => {
-    initWorld(); 
     setIsPlaying(true); setScore(0);
     fishPhys.current = { x: WORLD_WIDTH / 2, y: 800, vx: 0, vy: 0, rotation: 0, scaleY: 1, scaleX: 1 };
     camera.current = { x: WORLD_WIDTH / 2, y: 800 }; 
@@ -120,16 +117,27 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   };
 
   const triggerEatAnimation = () => {
-    setIsEating(true); setCurrentFrameIndex(0); setTimeout(() => setIsEating(false), 300);
+    isEatingRef.current = true;
+    currentFrameIndexRef.current = 0;
+    setTimeout(() => { isEatingRef.current = false; }, 300);
   };
 
   const gameLoop = () => {
     const screenW = isPortrait ? window.innerHeight : window.innerWidth;
     const screenH = isPortrait ? window.innerWidth : window.innerHeight;
 
+    // --- ANİMASYON KARE HESABI ---
     animTimerRef.current += 16.67; 
-    if (animTimerRef.current >= 50) { setCurrentFrameIndex(prev => prev + 1); animTimerRef.current = 0; }
+    if (animTimerRef.current >= 50) { 
+        currentFrameIndexRef.current++; 
+        animTimerRef.current = 0; 
+        
+        // React'i sadece resim değişince rahatsız et
+        const frames = isEatingRef.current ? EAT_FRAMES : SWIM_FRAMES;
+        setCurrentFishImg(frames[currentFrameIndexRef.current % frames.length]);
+    }
 
+    // --- FİZİK HESAPLARI ---
     const inWater = fishPhys.current.y > SEA_LEVEL;
     if (wasInWater.current && !inWater) fishPhys.current.vy *= 0.5; 
     wasInWater.current = inWater;
@@ -146,9 +154,9 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     fishPhys.current.x += fishPhys.current.vx; fishPhys.current.y += fishPhys.current.vy;
 
     // Sınırlar
-    if (fishPhys.current.x < 50) { fishPhys.current.x = 50; fishPhys.current.vx = 0; }
-    if (fishPhys.current.x > WORLD_WIDTH - 50) { fishPhys.current.x = WORLD_WIDTH - 50; fishPhys.current.vx = 0; }
-    if (fishPhys.current.y > WORLD_HEIGHT - 50) { fishPhys.current.y = WORLD_HEIGHT - 50; fishPhys.current.vy = 0; }
+    if (fishPhys.current.x < 50) fishPhys.current.x = 50;
+    if (fishPhys.current.x > WORLD_WIDTH - 50) fishPhys.current.x = WORLD_WIDTH - 50;
+    if (fishPhys.current.y > WORLD_HEIGHT - 50) fishPhys.current.y = WORLD_HEIGHT - 50;
 
     // Kamera Takibi
     camera.current.x += (fishPhys.current.x - camera.current.x) * 0.15;
@@ -158,31 +166,46 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     if (camera.current.x < 0) camera.current.x = 0;
     if (camera.current.x > WORLD_WIDTH) camera.current.x = WORLD_WIDTH;
 
-    // --- TEMBEL AÇI (LAZY TILT) ---
-    // Balık yüzeye yaklaşırken açı hemen kapanmasın, son ana kadar "açık" (30-40 derece) kalsın.
-    const depth = Math.max(0, fishPhys.current.y - SEA_LEVEL);
-    
-    // Gecikme Faktörü: Derinlik arttıkça etkiyi logaritmik olarak azaltıyoruz.
-    // Bu formül, derinlik azalsa bile tilt'in 90'a fırlamasını geciktirir.
-    // "Sıkışmış bant" hissini çözer.
-    const delayFactor = 300; // Bu sayı ne kadar büyükse, kapanma o kadar gecikir.
-    const tiltCurve = depth / (depth + delayFactor);
-    
-    // Dipte 30 derece (Geniş), Yüzeyde 90 derece (Çizgi)
-    const currentTilt = 90 - (60 * tiltCurve); 
-    setSurfaceTilt(currentTilt);
+    // --- DOM GÜNCELLEME (React Yok, Sıfır Kasma) ---
+    // 1. Kamera Hareketi
+    if (cameraRef.current) {
+        cameraRef.current.style.transform = `translate3d(${-camera.current.x + (isPortrait ? window.innerHeight : window.innerWidth) / 2}px, ${-camera.current.y + (isPortrait ? window.innerWidth : window.innerHeight) / 2}px, 0)`;
+    }
 
-    if (Math.abs(fishPhys.current.vx) > 0.1) setFaceDirection(fishPhys.current.vx > 0 ? 1 : -1);
+    // 2. Balık Hareketi
+    const faceDirection = fishPhys.current.vx > 0.1 ? 1 : (fishPhys.current.vx < -0.1 ? -1 : (fishPhys.current.scaleX > 0 ? 1 : -1)); // Yönü koru
     let angleRadRot = Math.atan2(fishPhys.current.vy, Math.abs(fishPhys.current.vx));
     let angleDeg = angleRadRot * (180 / Math.PI);
     let targetRotation = angleDeg * faceDirection;
     fishPhys.current.rotation += (targetRotation - fishPhys.current.rotation) * 0.1;
     if (!inWater && Math.abs(fishPhys.current.rotation) > 60) fishPhys.current.rotation *= 0.9;
-
+    
+    // Esneme Efekti
     const totalSpeed = Math.sqrt(fishPhys.current.vx**2 + fishPhys.current.vy**2);
     const stretch = Math.min(totalSpeed * 0.02, 0.3); 
-    fishPhys.current.scaleX = 1 + stretch; fishPhys.current.scaleY = 1 - stretch * 0.5;
+    const finalScaleX = faceDirection * (1 + stretch);
+    const finalScaleY = 1 - stretch * 0.5;
 
+    // Derinlik Efekti (Balık Boyutu)
+    const depthRatio = Math.max(0, (fishPhys.current.y - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL));
+    const depthScale = 1 + (depthRatio * 0.6);
+
+    if (fishDivRef.current) {
+        fishDivRef.current.style.transform = `translate3d(${fishPhys.current.x}px, ${fishPhys.current.y}px, 0) translate(-50%, -50%) rotate(${fishPhys.current.rotation}deg) scale(${finalScaleX * depthScale}, ${finalScaleY * depthScale})`;
+    }
+
+    // 3. SU YÜZEYİ "TEMBEL AÇI" (LAZY TILT)
+    // React State kullanmıyoruz, direkt stile yazıyoruz.
+    if (surfaceRef.current) {
+        const depth = Math.max(0, fishPhys.current.y - SEA_LEVEL);
+        // 600 faktörüyle kapanmayı iyice geciktirdik (Tembel mod)
+        const tiltCurve = depth / (depth + 600); 
+        const currentTilt = 90 - (60 * tiltCurve); // 90'dan başlar (çizgi), yavaşça 30'a iner
+        surfaceRef.current.style.transform = `rotateX(${-currentTilt}deg)`;
+    }
+
+    // --- OYUN MANTIĞI (Yemler) ---
+    // Yemleri state'te tutmak zorundayız (DOM eklenip çıkıyor), ama bu sadece yerken çalışır.
     setTargets(prev => {
         if (Math.random() < 0.04) { 
             const spawnX = Math.random() * WORLD_WIDTH;
@@ -190,20 +213,23 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         }
         return prev.filter(t => {
             if (Math.hypot(fishPhys.current.x - t.x, fishPhys.current.y - t.y) < 120) { 
-                triggerEatAnimation(); setScore(s => s + 10); confetti({ origin: { x: 0.5, y: 0.5 }, particleCount: 20, spread: 40 }); return false; 
+                triggerEatAnimation(); 
+                setScore(s => s + 10); // Skor değişimi render yapar ama sorun değil, sık olmuyor
+                confetti({ origin: { x: 0.5, y: 0.5 }, particleCount: 20, spread: 40 }); 
+                return false; 
             }
             return true;
         });
     });
+    
     requestRef.current = requestAnimationFrame(gameLoop);
   };
 
   useEffect(() => { if (isPlaying) requestRef.current = requestAnimationFrame(gameLoop); return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); }; }, [isPlaying]);
-  const getCurrentImage = () => isEating ? EAT_FRAMES[currentFrameIndex % EAT_FRAMES.length] : SWIM_FRAMES[currentFrameIndex % SWIM_FRAMES.length];
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden touch-none select-none flex items-center justify-center">
-        {/* ANA OYUN ALANI */}
+        {/* ANA KAPSAYICI (SABİT ARKAPLAN - KASMAYI ÖNLER) */}
         <div 
             className="relative overflow-hidden shadow-2xl"
             style={{
@@ -213,22 +239,19 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                 left: '50%', top: '50%',
                 transform: isPortrait ? 'translate(-50%, -50%) rotate(90deg)' : 'translate(-50%, -50%)',
                 zIndex: 10,
-                // --- KRİTİK DEĞİŞİKLİK 1: SABİT ARKA PLAN (FIXED) ---
-                // Sola sağa gidince renk değişmez, hep 5.jpg tonu kalır.
+                // --- RENK AÇILMASI SORUNU ÇÖZÜLDÜ: SABİT ZEMİN ---
                 background: 'radial-gradient(circle at 50% 0%, #0d2b52 0%, #020a1a 100%)',
                 perspective: '1200px'
             }}
             onMouseMove={handleInput} onTouchMove={handleInput}
         >
-            {/* KAMERA HAREKETİ (Sadece nesneler hareket eder, arka plan sabit kalır) */}
+            {/* HAREKETLİ KAMERA KATMANI (Ref ile yönetiliyor, React yok) */}
             <div 
-                className="absolute w-full top-0 left-0 will-change-transform"
-                style={{ 
-                    height: WORLD_HEIGHT,
-                    transform: `translate(${-camera.current.x + (isPortrait ? window.innerHeight : window.innerWidth) / 2}px, ${-camera.current.y + (isPortrait ? window.innerWidth : window.innerHeight) / 2}px)` 
-                }}
+                ref={cameraRef}
+                className="absolute w-full top-0 left-0 will-change-transform" // GPU Hızlandırma
+                style={{ height: WORLD_HEIGHT }} // Transform JS'den gelecek
             >
-                {/* 1. GÖKYÜZÜ (Uzay Boşluğu) */}
+                {/* 1. UZAY/GÖKYÜZÜ */}
                 <div 
                     className="absolute top-[-500px] left-0" 
                     style={{ 
@@ -241,26 +264,25 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     }} 
                 />
 
-                {/* 2. SU YÜZEYİ (HAYALET MODU) */}
-                {/* Şeridi silmedik ama %15 opaklık ve karışım moduyla hayalet yaptık. */}
-                {/* Böylece o "kutu gibi çizgi" yok oldu ama "dalga hissi" kaldı. */}
+                {/* 2. SU YÜZEYİ (HAYALET MODU + RENK AŞISI) */}
                 <div 
-                    className="absolute left-0 will-change-transform"
+                    ref={surfaceRef} // JS buradan tutup bükecek
+                    className="absolute left-0 will-change-transform" // GPU
                     style={{
                         width: WORLD_WIDTH, 
                         top: SEA_LEVEL - 300, 
                         height: 600, 
                         transformOrigin: 'center center',
-                        transform: `rotateX(${-surfaceTilt}deg)`, // Tembel Açı burada işliyor
+                        // rotateX JS'den gelecek
                         zIndex: 35 
                     }}
                 >
                     <div 
                         className="w-full h-full relative"
                         style={{
-                            // ALTTAN ERİTME: Keskin bitiş yok.
-                            WebkitMaskImage: 'linear-gradient(to bottom, black 10%, transparent 80%)',
-                            maskImage: 'linear-gradient(to bottom, black 10%, transparent 80%)'
+                            // ALTTAN ERİTME (Çizgiyi yok eder)
+                            WebkitMaskImage: 'linear-gradient(to bottom, black 20%, transparent 90%)',
+                            maskImage: 'linear-gradient(to bottom, black 20%, transparent 90%)'
                         }}
                     >
                         <div 
@@ -270,16 +292,18 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                                 backgroundRepeat: 'repeat', 
                                 backgroundSize: '800px auto', 
                                 animation: 'waterFlow 20s linear infinite',
-                                // HAYALET AYARI:
-                                opacity: 0.15, // Çok silik, sadece pırıltı
-                                mixBlendMode: 'screen' // Koyunun üzerine ışık olarak düşer
+                                
+                                // --- RENK DÜZELTME & CANLILIK ---
+                                opacity: 0.45, // Biraz daha görünür yaptık
+                                mixBlendMode: 'overlay', // Koyu zeminde renkleri patlatır
+                                filter: 'brightness(1.5) saturate(1.8)' // Ölü rengi canlandırır
                             }}
                         />
                     </div>
                 </div>
 
-                {/* 3. KUM ZEMİNLER */}
-                {chunks.map(chunk => (
+                {/* 3. KUM ZEMİNLER (Static Render) */}
+                {chunksRef.current.map(chunk => (
                     <div key={chunk.id} className="absolute bottom-0 pointer-events-none" style={{ left: chunk.x, width: CHUNK_WIDTH, height: ZEMIN_YUKSEKLIK, zIndex: 10 }}>
                         <div className="absolute bottom-0 left-0 w-full h-full" style={{ backgroundImage: `url(${chunk.base})`, backgroundSize: '100% 100%', filter: 'brightness(0.7)' }} />
                     </div>
@@ -290,20 +314,24 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                     <div key={t.id} className="absolute w-12 h-12 rounded-full shadow-lg border-2 border-white/50 flex items-center justify-center animate-pulse" style={{ left: t.x, top: t.y, backgroundColor: t.color, zIndex: 30 }}></div>
                 ))}
 
-                {/* 5. BALIK */}
-                {isPlaying && (
-                    <div className="absolute will-change-transform" style={{ left: fishPhys.current.x, top: fishPhys.current.y, width: 160, height: 120, zIndex: 50, transform: (() => { const depthRatio = Math.max(0, (fishPhys.current.y - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL)); const depthScale = 1 + (depthRatio * 0.6); return `translate(-50%, -50%) rotate(${fishPhys.current.rotation}deg) scale(${faceDirection * fishPhys.current.scaleX * depthScale}, ${fishPhys.current.scaleY * depthScale})`; })() }}>
-                        <img src={getCurrentImage()} alt="Karakter" className="w-full h-full object-contain drop-shadow-2xl" />
-                    </div>
-                )}
-
-                {/* 6. YOSUNLAR */}
-                {chunks.map(chunk => chunk.overlay && (
+                {/* 5. YOSUNLAR */}
+                {chunksRef.current.map(chunk => chunk.overlay && (
                     <div key={`overlay-${chunk.id}`} className="absolute bottom-0 pointer-events-none" style={{ left: chunk.x, width: CHUNK_WIDTH, height: ZEMIN_YUKSEKLIK, zIndex: 60 }}>
                         <div className="absolute bottom-0 left-0 w-full h-full" style={{ backgroundImage: `url(${chunk.overlay})`, backgroundSize: '100% 100%', transformOrigin: 'bottom center', zIndex: 60, filter: 'drop-shadow(5px 5px 10px rgba(0,0,0,0.5))' }} />
                     </div>
                 ))}
             </div>
+
+            {/* BALIK (DOM Ref ile yönetiliyor, React render döngüsü dışında) */}
+            {isPlaying && (
+                <div 
+                    ref={fishDivRef}
+                    className="absolute top-0 left-0 w-[160px] h-[120px] z-50 will-change-transform" // GPU
+                    // Transform JS'den gelecek
+                >
+                    <img src={currentFishImg} alt="Karakter" className="w-full h-full object-contain drop-shadow-2xl" />
+                </div>
+            )}
 
             {/* UI */}
             <div className="fixed top-5 left-5 bg-white/90 backdrop-blur px-6 py-2 rounded-full shadow-xl border-4 border-orange-400 z-[100]"><span className="font-black text-2xl text-orange-600">SKOR: {score}</span></div>
@@ -323,4 +351,5 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         </div>
     </div>
   );
-}
+  }
+              
