@@ -1,171 +1,134 @@
-import { useState, useEffect, useRef } from 'react';
-import { XCircle, Play } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import { useEffect, useRef, useState } from "react";
 
-import { loadAssets, AssetLibrary } from './Assets';
-import { PhysicsEngine } from './Physics';
-import { GameRenderer } from './Renderer';
-import { Camera } from './Camera';
+const SCREEN_W = window.innerWidth;
+const SCREEN_H = window.innerHeight;
 
-export default function EslemeGame({ onClose }: { onClose: () => void }) {
+// DENİZ SINIRLARI
+const SEA_TOP = SCREEN_H * 0.2;
+const SEA_BOTTOM = SCREEN_H * 0.75;
+
+// KUM (EN ALT TABAN)
+const SAND_HEIGHT = 80;
+
+type Dot = {
+  x: number;
+  y: number;
+  r: number;
+  color: string;
+};
+
+export default function EslemeGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [score, setScore] = useState(0);
+  const [fishY, setFishY] = useState((SEA_TOP + SEA_BOTTOM) / 2);
+  const fishVy = useRef(0);
 
-  // Engine
-  const assets = useRef<AssetLibrary | null>(null);
-  const physics = useRef(new PhysicsEngine());
-  const renderer = useRef<GameRenderer | null>(null);
-  const camera = useRef(new Camera());
+  const dots = useRef<Dot[]>([]);
 
-  // World
-  const fish = useRef({
-    x: 1000,
-    y: 900,
-    vx: 0,
-    vy: 0,
-    rotation: 0,
-    scaleX: 1,
-    scaleY: 1,
-    frame: 0,
-    timer: 0,
-    isEating: false
-  });
-
-  const mouse = useRef({ x: 1000, y: 900 });
-  const chunks = useRef<any[]>([]);
-  const targets = useRef<any[]>([]);
-  const raf = useRef<number>();
-
-  /* ================= INIT ================= */
+  // TOP ÜRETİMİ
   useEffect(() => {
-    const init = async () => {
-      assets.current = await loadAssets();
+    const colors = ["green", "yellow", "red"];
 
-      const list = [];
-      for (let i = 0; i < 12; i++) {
-        const base = assets.current.zeminler[Math.floor(Math.random() * assets.current.zeminler.length)];
-        const overlay =
-          Math.random() > 0.5
-            ? assets.current.ustler[Math.floor(Math.random() * assets.current.ustler.length)]
-            : null;
+    const interval = setInterval(() => {
+      dots.current.push({
+        x: SCREEN_W + 30,
+        y:
+          SEA_TOP +
+          Math.random() * (SEA_BOTTOM - SEA_TOP - SAND_HEIGHT),
+        r: 10,
+        color: colors[Math.floor(Math.random() * colors.length)],
+      });
+    }, 600);
 
-        list.push({ id: i, x: i * 2000, base, overlay });
-      }
-
-      chunks.current = list;
-      setIsLoaded(true);
-    };
-
-    init();
+    return () => clearInterval(interval);
   }, []);
 
-  /* ================= INPUT ================= */
-  const handleInput = (e: any) => {
-    if (!canvasRef.current || !isPlaying) return;
-
-    const rect = canvasRef.current.getBoundingClientRect();
-    const cx = e.touches ? e.touches[0].clientX : e.clientX;
-    const cy = e.touches ? e.touches[0].clientY : e.clientY;
-
-    mouse.current.x = camera.current.x + (cx - rect.width / 2);
-    mouse.current.y = camera.current.y + (cy - rect.height / 2);
-  };
-
-  /* ================= LOOP ================= */
+  // ANA OYUN DÖNGÜSÜ
   useEffect(() => {
-    if (!isLoaded || !isPlaying || !canvasRef.current || !assets.current) return;
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
+    canvas.width = SCREEN_W;
+    canvas.height = SCREEN_H;
 
-    renderer.current = new GameRenderer(canvasRef.current);
+    let animationId: number;
 
     const loop = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
+      ctx.clearRect(0, 0, SCREEN_W, SCREEN_H);
 
-      renderer.current!.resize(w, h);
+      // 🌌 UZAY (ARKA PLAN)
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
 
-      physics.current.updateFish(fish.current, mouse.current.x, mouse.current.y);
-      camera.current.update(fish.current.x, fish.current.y);
+      // 🌊 DENİZ
+      const seaGrad = ctx.createLinearGradient(0, SEA_TOP, 0, SEA_BOTTOM);
+      seaGrad.addColorStop(0, "#06354a");
+      seaGrad.addColorStop(1, "#041f2d");
+      ctx.fillStyle = seaGrad;
+      ctx.fillRect(0, SEA_TOP, SCREEN_W, SEA_BOTTOM - SEA_TOP);
 
-      // Yem spawn
-      if (Math.random() < 0.025) {
-        targets.current.push({
-          id: Date.now(),
-          x: camera.current.x + Math.random() * 1200 - 600,
-          y: camera.current.y + Math.random() * 600 - 300,
-          color: ['#ef4444', '#22c55e', '#eab308'][Math.floor(Math.random() * 3)]
-        });
-      }
-
-      // Çarpışma
-      targets.current = targets.current.filter(t => {
-        const d = Math.hypot(fish.current.x - t.x, fish.current.y - t.y);
-        if (d < 80) {
-          setScore(s => s + 10);
-          confetti({ particleCount: 20, spread: 50 });
-          fish.current.isEating = true;
-          fish.current.frame = 0;
-          setTimeout(() => (fish.current.isEating = false), 250);
-          return false;
-        }
-        return true;
-      });
-
-      renderer.current!.draw(
-        assets.current!,
-        fish.current,
-        camera.current,
-        chunks.current,
-        targets.current
+      // 🟨 KUM (EN ALT SINIR)
+      ctx.fillStyle = "#c2a46d";
+      ctx.fillRect(
+        0,
+        SEA_BOTTOM - SAND_HEIGHT,
+        SCREEN_W,
+        SAND_HEIGHT
       );
 
-      raf.current = requestAnimationFrame(loop);
+      // 🐟 BALIK
+      ctx.fillStyle = "orange";
+      ctx.beginPath();
+      ctx.arc(120, fishY, 20, 0, Math.PI * 2);
+      ctx.fill();
+
+      // BALIK FİZİK
+      fishVy.current += 0.5;
+      let newY = fishY + fishVy.current;
+
+      // ÜST SINIR (DENİZ DIŞI YOK)
+      if (newY < SEA_TOP + 20) {
+        newY = SEA_TOP + 20;
+        fishVy.current = 0;
+      }
+
+      // ALT SINIR (KUM)
+      const FISH_BOTTOM_LIMIT = SEA_BOTTOM - SAND_HEIGHT - 20;
+      if (newY > FISH_BOTTOM_LIMIT) {
+        newY = FISH_BOTTOM_LIMIT;
+        fishVy.current = 0;
+      }
+
+      setFishY(newY);
+
+      // ⚪ TOPLAR
+      dots.current.forEach((d) => {
+        d.x -= 3;
+        ctx.fillStyle = d.color;
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      dots.current = dots.current.filter((d) => d.x > -50);
+
+      animationId = requestAnimationFrame(loop);
     };
 
-    raf.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf.current!);
-  }, [isLoaded, isPlaying]);
+    loop();
 
-  /* ================= UI ================= */
+    return () => cancelAnimationFrame(animationId);
+  }, [fishY]);
+
+  // DOKUN / TIKLA
+  const jump = () => {
+    fishVy.current = -8;
+  };
+
   return (
-    <div className="fixed inset-0 bg-black overflow-hidden">
-      {!isLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center text-white text-xl animate-pulse">
-          OYUN YÜKLENİYOR…
-        </div>
-      )}
-
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 touch-none"
-        onMouseMove={handleInput}
-        onTouchMove={handleInput}
-        onClick={handleInput}
-      />
-
-      <div className="fixed top-5 left-5 bg-white/90 px-6 py-2 rounded-full border-4 border-orange-400 font-bold text-2xl text-orange-600 z-50">
-        SKOR: {score}
-      </div>
-
-      <button
-        onClick={onClose}
-        className="fixed top-5 right-5 z-50 bg-white p-2 rounded-full shadow-lg"
-      >
-        <XCircle className="text-red-500 w-8 h-8" />
-      </button>
-
-      {!isPlaying && isLoaded && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <button
-            onClick={() => setIsPlaying(true)}
-            className="bg-orange-500 text-white px-12 py-6 rounded-3xl text-4xl font-black flex gap-4 items-center shadow-2xl hover:scale-105 transition"
-          >
-            <Play size={40} fill="currentColor" /> BAŞLA
-          </button>
-        </div>
-      )}
-    </div>
+    <canvas
+      ref={canvasRef}
+      onClick={jump}
+      style={{ display: "block" }}
+    />
   );
-            }
+                                      }
