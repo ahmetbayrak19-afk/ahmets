@@ -1,6 +1,6 @@
-// game/Physics.ts
+// Physics.ts
 
-export const WORLD_WIDTH = 20000; // 10 Chunk * 2000
+export const WORLD_WIDTH = 20000; // 10 Chunk
 export const WORLD_HEIGHT = 2000;
 export const SEA_LEVEL = 500;
 
@@ -22,15 +22,16 @@ export class PhysicsEngine {
         const inWater = fish.y > SEA_LEVEL;
 
         if (inWater) {
-            // Su fiziği (Sürtünmeli takip)
             const dx = targetX - fish.x;
             const dy = targetY - fish.y;
+            // Takip hızı
             fish.vx += dx * 0.0008;
             fish.vy += dy * 0.0008;
+            // Sürtünme
             fish.vx *= 0.97;
             fish.vy *= 0.97;
 
-            // Hız Limiti
+            // Hız limiti
             const speed = Math.sqrt(fish.vx**2 + fish.vy**2);
             if (speed > 11) {
                 const ratio = 11 / speed;
@@ -38,36 +39,36 @@ export class PhysicsEngine {
                 fish.vy *= ratio;
             }
         } else {
-            // Hava fiziği (Yerçekimi)
+            // Hava (Yerçekimi)
             fish.vy += 0.8; 
             fish.vx *= 0.99;
         }
 
-        // Pozisyon güncelleme
         fish.x += fish.vx;
         fish.y += fish.vy;
 
-        // Dünya Sınırları
+        // Sınırlar
         if (fish.x < 50) fish.x = 50;
         if (fish.x > WORLD_WIDTH - 50) fish.x = WORLD_WIDTH - 50;
         if (fish.y > WORLD_HEIGHT - 50) fish.y = WORLD_HEIGHT - 50;
 
-        // Animasyon Frame
+        // Animasyon sayacı
         fish.timer++;
         if (fish.timer > 3) {
             fish.frame++;
             fish.timer = 0;
         }
 
-        // Dönüş (Rotation) Hesabı
+        // Dönüş açısı
         const faceDir = fish.vx > 0.1 ? 1 : (fish.vx < -0.1 ? -1 : (fish.scaleX > 0 ? 1 : -1));
         let angle = Math.atan2(fish.vy, Math.abs(fish.vx));
         fish.rotation += (angle * (180 / Math.PI) * faceDir - fish.rotation) * 0.1;
         
-        // Derinlik Efekti (Scale)
+        // Derinlik efekti
         const depthRatio = Math.max(0, (fish.y - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL));
         const depthScale = 1 + (depthRatio * 0.6);
         fish.scaleX = faceDir * depthScale;
         fish.scaleY = depthScale;
     }
-          }
+    }
+    
