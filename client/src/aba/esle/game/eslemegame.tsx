@@ -1,9 +1,12 @@
-// EslemeGame.tsx (Ana Dosyan)
+// EslemeGame.tsx
 import { useState, useEffect, useRef } from 'react';
 import { XCircle, Play } from 'lucide-react';
-import { loadAssets, AssetLibrary } from './game/Assets';
-import { PhysicsEngine } from './game/Physics';
-import { GameRenderer } from './game/Renderer';
+import confetti from 'canvas-confetti';
+
+// HEPSİ YAN YANA OLDUĞU İÇİN ARTIK './' KULLANIYORUZ
+import { loadAssets, AssetLibrary } from './Assets';
+import { PhysicsEngine } from './Physics';
+import { GameRenderer } from './Renderer';
 
 export default function EslemeGame({ onClose }: { onClose: () => void }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -24,35 +27,33 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     const targets = useRef<any[]>([]);
     const reqRef = useRef<number>();
 
-    // 1. BAŞLATMA (INIT)
+    // 1. BAŞLATMA
     useEffect(() => {
         const init = async () => {
             try {
-                // Assetleri yükle
                 assets.current = await loadAssets();
                 
-                // Zemin haritasını oluştur
+                // Zemin haritası
                 const newChunks = [];
                 for(let i=0; i<10; i++) {
                     const zems = assets.current.zeminler;
                     const usts = assets.current.ustler;
-                    newChunks.push({
-                        id: i, x: i*2000,
-                        base: zems[Math.floor(Math.random()*zems.length)],
-                        overlay: Math.random()>0.5 ? usts[Math.floor(Math.random()*usts.length)] : null
-                    });
+                    // Resimler boş gelse bile hata vermesin
+                    const base = zems.length > 0 ? zems[Math.floor(Math.random()*zems.length)] : null;
+                    const overlay = (usts.length > 0 && Math.random()>0.5) ? usts[Math.floor(Math.random()*usts.length)] : null;
+                    
+                    newChunks.push({ id: i, x: i*2000, base, overlay });
                 }
                 chunks.current = newChunks;
-
-                setIsLoaded(true); // Oyun hazır!
+                setIsLoaded(true);
             } catch (e) {
-                console.error("Kritik Hata:", e);
+                console.error("Başlatma hatası:", e);
             }
         };
         init();
     }, []);
 
-    // 2. INPUT HANDLER
+    // 2. INPUT
     const handleInput = (e: any) => {
         if (!isPlaying || !canvasRef.current) return;
         const rect = canvasRef.current.getBoundingClientRect();
@@ -87,19 +88,35 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
             const w = isPortrait ? window.innerHeight : window.innerWidth;
             const h = isPortrait ? window.innerWidth : window.innerHeight;
             
-            // Renderer boyut güncelleme
             renderer.current?.resize(w, h);
-
-            // Fizik
             physics.current.updateFish(fish.current, mousePos.current.x, mousePos.current.y);
 
-            // Kamera Takip
             camera.current.x += (fish.current.x - camera.current.x) * 0.1;
             camera.current.y += (fish.current.y - camera.current.y) * 0.1;
 
-            // Çizim
-            renderer.current?.draw(assets.current!, fish.current, camera.current, chunks.current, targets.current);
+            // Yem Mantığı
+            if (Math.random() < 0.04) {
+                 targets.current.push({ 
+                     id: Date.now(), 
+                     x: Math.random() * 20000, 
+                     y: Math.random() * (2000 - 500 - 350) + 500 + 100, 
+                     color: ['#ef4444', '#22c55e', '#eab308'][Math.floor(Math.random() * 3)] 
+                 });
+            }
+            targets.current = targets.current.filter(t => {
+                const dist = Math.hypot(fish.current.x - t.x, fish.current.y - t.y);
+                if (dist < 80) {
+                    setScore(s => s + 10);
+                    confetti({ origin: { x: 0.5, y: 0.5 }, particleCount: 20, spread: 40 });
+                    fish.current.isEating = true; 
+                    fish.current.frame = 0;
+                    setTimeout(() => fish.current.isEating = false, 300);
+                    return false;
+                }
+                return true;
+            });
 
+            renderer.current?.draw(assets.current!, fish.current, camera.current, chunks.current, targets.current);
             reqRef.current = requestAnimationFrame(loop);
         };
         reqRef.current = requestAnimationFrame(loop);
@@ -121,12 +138,14 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
                         }}
                         onMouseMove={handleInput} onTouchMove={handleInput} onClick={handleInput}
                     />
-                     {/* UI */}
-                    <button onClick={onClose} className="fixed top-5 right-5 z-50 bg-white p-2 rounded-full"><XCircle className="text-red-500"/></button>
+                    <div className="fixed top-5 left-5 bg-white/90 px-6 py-2 rounded-full border-4 border-orange-400 z-50 font-bold text-2xl text-orange-600">
+                        SKOR: {score}
+                    </div>
+                    <button onClick={onClose} className="fixed top-5 right-5 z-50 bg-white p-2 rounded-full shadow-lg"><XCircle className="text-red-500 w-8 h-8"/></button>
                     {!isPlaying && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-                            <button onClick={() => setIsPlaying(true)} className="bg-orange-500 text-white px-8 py-4 rounded-xl text-2xl font-bold flex gap-2">
-                                <Play/> BAŞLA
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                            <button onClick={() => setIsPlaying(true)} className="bg-orange-500 text-white px-12 py-6 rounded-3xl text-4xl font-black flex gap-4 items-center shadow-2xl hover:scale-105 transition">
+                                <Play size={40} fill="currentColor"/> BAŞLA
                             </button>
                         </div>
                     )}
@@ -136,5 +155,4 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
             )}
         </div>
     );
-      }
-                  
+}
