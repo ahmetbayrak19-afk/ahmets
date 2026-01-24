@@ -1,74 +1,56 @@
-// Physics.ts
-
-export const WORLD_WIDTH = 20000; // 10 Chunk
+export const WORLD_WIDTH = 20000;
 export const WORLD_HEIGHT = 2000;
 export const SEA_LEVEL = 500;
 
 export interface FishState {
-    x: number;
-    y: number;
-    vx: number;
-    vy: number;
+    x: number; y: number;
+    vx: number; vy: number;
     rotation: number;
-    scaleX: number;
-    scaleY: number;
-    frame: number;
-    timer: number;
+    scaleX: number; scaleY: number;
+    frame: number; timer: number;
     isEating: boolean;
 }
 
 export class PhysicsEngine {
-    updateFish(fish: FishState, targetX: number, targetY: number) {
-        const inWater = fish.y > SEA_LEVEL;
+    updateFish(fish: FishState, tx: number, ty: number) {
+        const dx = tx - fish.x;
+        const dy = ty - fish.y;
+        const dist = Math.hypot(dx, dy);
 
-        if (inWater) {
-            const dx = targetX - fish.x;
-            const dy = targetY - fish.y;
-            // Takip hızı
-            fish.vx += dx * 0.0008;
-            fish.vy += dy * 0.0008;
-            // Sürtünme
-            fish.vx *= 0.97;
-            fish.vy *= 0.97;
+        const boost = Math.min(dist / 300, 1);
+        fish.vx += dx * 0.0012 * boost;
+        fish.vy += dy * 0.001 * boost;
 
-            // Hız limiti
-            const speed = Math.sqrt(fish.vx**2 + fish.vy**2);
-            if (speed > 11) {
-                const ratio = 11 / speed;
-                fish.vx *= ratio;
-                fish.vy *= ratio;
-            }
-        } else {
-            // Hava (Yerçekimi)
-            fish.vy += 0.8; 
-            fish.vx *= 0.99;
+        fish.vx *= 0.96;
+        fish.vy *= 0.96;
+
+        const speed = Math.hypot(fish.vx, fish.vy);
+        if (speed > 14) {
+            const r = 14 / speed;
+            fish.vx *= r; fish.vy *= r;
         }
 
         fish.x += fish.vx;
         fish.y += fish.vy;
 
-        // Sınırlar
-        if (fish.x < 50) fish.x = 50;
-        if (fish.x > WORLD_WIDTH - 50) fish.x = WORLD_WIDTH - 50;
-        if (fish.y > WORLD_HEIGHT - 50) fish.y = WORLD_HEIGHT - 50;
+        fish.x = Math.max(60, Math.min(WORLD_WIDTH - 60, fish.x));
+        fish.y = Math.min(WORLD_HEIGHT - 60, fish.y);
 
-        // Animasyon sayacı
         fish.timer++;
         if (fish.timer > 3) {
             fish.frame++;
             fish.timer = 0;
         }
 
-        // Dönüş açısı
-        const faceDir = fish.vx > 0.1 ? 1 : (fish.vx < -0.1 ? -1 : (fish.scaleX > 0 ? 1 : -1));
-        let angle = Math.atan2(fish.vy, Math.abs(fish.vx));
-        fish.rotation += (angle * (180 / Math.PI) * faceDir - fish.rotation) * 0.1;
-        
-        // Derinlik efekti
-        const depthRatio = Math.max(0, (fish.y - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL));
-        const depthScale = 1 + (depthRatio * 0.6);
-        fish.scaleX = faceDir * depthScale;
-        fish.scaleY = depthScale;
+        const face = fish.vx >= 0 ? 1 : -1;
+        const targetRot = Math.atan2(fish.vy, Math.abs(fish.vx)) * 180 / Math.PI * face;
+        fish.rotation += (targetRot - fish.rotation) * 0.15;
+
+        const depth = Math.max(0, (fish.y - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL));
+        const scale = 1 + depth * 0.6;
+        const eatPulse = fish.isEating ? 0.1 : 0;
+
+        fish.scaleX = face * (scale + eatPulse);
+        fish.scaleY = scale - eatPulse;
     }
-    }
-    
+            }
