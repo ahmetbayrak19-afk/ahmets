@@ -1,160 +1,176 @@
-import { AssetLibrary } from './Assets';
-import { FishState, WORLD_WIDTH, WORLD_HEIGHT, SEA_LEVEL } from './Physics';
+// eslemegame.tsx
+import { useState, useEffect, useRef } from 'react';
+import { XCircle, Play } from 'lucide-react';
+import confetti from 'canvas-confetti';
 
-// --- SU YÜZEYİ EFEKTİ ---
-class SeaSurfaceRenderer {
-  private offset = 0;
+import { loadAssets, AssetLibrary } from './Assets';
+import { PhysicsEngine, WORLD_WIDTH, WORLD_HEIGHT, SEA_LEVEL } from './Physics';
+import { GameRenderer } from './Renderer';
 
-  draw(ctx: CanvasRenderingContext2D, texture: HTMLImageElement | null, cameraX: number, fishY: number, screenW: number) {
-    if (!texture || texture.width === 0) return;
+export default function EslemeGame({ onClose }: { onClose: () => void }) {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [isLoaded, setIsLoaded] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [score, setScore] = useState(0);
 
-    this.offset += 0.5; // Akış hızı
-
-    // Yüzey efekti
-    ctx.save();
-    ctx.translate(-cameraX + screenW / 2, SEA_LEVEL);
+    // Motor Parçaları
+    const assets = useRef<AssetLibrary | null>(null);
+    const physics = useRef(new PhysicsEngine());
+    const renderer = useRef<GameRenderer | null>(null);
     
-    // Yüzeyi biraz basıklaştır (Perspektif)
-    ctx.scale(1, 0.3); 
+    // Oyun Durumu
+    const fish = useRef({ x: 10000, y: 800, vx: 0, vy: 0, rotation: 0, scaleX: 1, scaleY: 1, frame: 0, timer: 0, isEating: false });
+    const camera = useRef({ x: 10000, y: 800 });
+    const mousePos = useRef({ x: 10000, y: 800 });
+    const chunks = useRef<any[]>([]);
+    const targets = useRef<any[]>([]);
+    const reqRef = useRef<number>();
 
-    ctx.globalAlpha = 0.6; // Hafif şeffaf
-    ctx.globalCompositeOperation = 'screen'; // Parlaklık verir
+    // 1. BAŞLATMA
+    useEffect(() => {
+        const init = async () => {
+            try {
+                assets.current = await loadAssets();
+                
+                // Zemin haritası oluştur
+                const newChunks = [];
+                for(let i=0; i<10; i++) {
+                    const zems = assets.current.zeminler;
+                    const usts = assets.current.ustler;
+                    const base = zems.length > 0 ? zems[i % zems.length] : null;
+                    const overlay = (usts.length > 0 && Math.random()>0.6) ? usts[Math.floor(Math.random()*usts.length)] : null;
+                    newChunks.push({ id: i, x: i*2000, base, overlay });
+                }
+                chunks.current = newChunks;
+                setIsLoaded(true);
+            } catch (e) {
+                console.error("Başlatma hatası:", e);
+            }
+        };
+        init();
+    }, []);
 
-    const pat = ctx.createPattern(texture, 'repeat');
-    if (pat) {
-      ctx.fillStyle = pat;
-      ctx.translate(-this.offset, 0);
-      // Sadece yüzey çizgisi boyunca çiz
-      ctx.fillRect(cameraX - screenW, -50, WORLD_WIDTH + screenW * 2, 200); 
-    }
-    ctx.restore();
-  }
-}
-
-// --- ANA RESSAM ---
-export class GameRenderer {
-  private ctx: CanvasRenderingContext2D;
-  private width = 0;
-  private height = 0;
-  private sea = new SeaSurfaceRenderer();
-
-  constructor(canvas: HTMLCanvasElement) {
-    this.ctx = canvas.getContext('2d', { alpha: false })!;
-  }
-
-  resize(w: number, h: number) {
-    this.width = w;
-    this.height = h;
-    this.ctx.canvas.width = w;
-    this.ctx.canvas.height = h;
-  }
-
-  draw(assets: AssetLibrary, fish: FishState, camera: { x: number; y: number }, chunks: any[], targets: any[]) {
-    const ctx = this.ctx;
-    const w = this.width;
-    const h = this.height;
-
-    // --- KATMAN 1: GÖKYÜZÜ VE YILDIZLAR (EN ARKA) ---
-    // Önce simsiyah uzay rengi
-    ctx.fillStyle = '#020617'; 
-    ctx.fillRect(0, 0, w, h);
-
-    // Yıldızları çiz (Tüm ekrana, çünkü kamera yukarı çıkınca görünmeli)
-    if (assets.gece) {
-      const pat = ctx.createPattern(assets.gece, 'repeat');
-      if (pat) {
-        ctx.save();
-        ctx.fillStyle = pat;
-        // Hafif hareket (Parallax)
-        ctx.translate(-camera.x * 0.05, -camera.y * 0.05); 
-        ctx.fillRect(0, 0, w * 2 + WORLD_WIDTH, h * 2 + WORLD_HEIGHT); 
-        ctx.restore();
-      }
-    }
-
-    ctx.save();
-    // DÜNYA KOORDİNATLARINA GEÇİŞ (Kamera Hareketi)
-    ctx.translate(-camera.x + w / 2, -camera.y + h / 2);
-
-    // --- KATMAN 2: MAVİ SU PERDESİ (YILDIZLARI KAPATAN KATMAN) ---
-    // Deniz seviyesinden (SEA_LEVEL) en aşağıya kadar mavi bir dikdörtgen çiziyoruz.
-    // Bu sayede suyun altındaki yıldızlar kapanıyor.
-    
-    const waterGrad = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
-    waterGrad.addColorStop(0, 'rgba(0, 100, 180, 0.6)');   // Yüzey: Açık mavi, az şeffaf (Yıldızlar azıcık görünür)
-    waterGrad.addColorStop(0.1, 'rgba(1, 20, 40, 0.95)');  // Biraz altı: Koyu mavi (Yıldızlar kapanır)
-    waterGrad.addColorStop(1, '#000000');                  // Dip: Simsiyah
-
-    ctx.fillStyle = waterGrad;
-    // Sadece Deniz Seviyesinden aşağısını boya!
-    ctx.fillRect(camera.x - w, SEA_LEVEL, WORLD_WIDTH + w * 2, WORLD_HEIGHT - SEA_LEVEL + 500);
-
-
-    // --- KATMAN 3: SU YÜZEYİ DOKUSU (GOD RAYS) ---
-    this.sea.draw(ctx, assets.su, camera.x, fish.y, w);
-
-    // Beyaz bir çizgi çekelim tam su sınırına (Netlik için)
-    ctx.beginPath();
-    ctx.moveTo(camera.x - w, SEA_LEVEL);
-    ctx.lineTo(camera.x + w * 2, SEA_LEVEL);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-
-    // --- KATMAN 4: ZEMİNLER (KUMLAR) ---
-    // En altta çiziyoruz
-    chunks.forEach(c => {
-      // Sadece ekranda görünenleri çiz
-      if (Math.abs(c.x - camera.x) < w + 500) {
-        if (c.base) {
-            // WORLD_HEIGHT'ın en altına yapıştır
-            ctx.drawImage(c.base, c.x, WORLD_HEIGHT - 350, 2000, 350);
-        }
-      }
-    });
-
-
-    // --- KATMAN 5: OYUN NESNELERİ (YEMLER) ---
-    targets.forEach(t => {
-      ctx.beginPath();
-      ctx.arc(t.x, t.y, 18, 0, Math.PI * 2);
-      ctx.fillStyle = t.color;
-      ctx.shadowBlur = 15; 
-      ctx.shadowColor = t.color; 
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    });
-
-
-    // --- KATMAN 6: BALIK ---
-    ctx.save();
-    ctx.translate(fish.x, fish.y);
-    ctx.rotate((fish.rotation * Math.PI) / 180);
-    ctx.scale(fish.scaleX, fish.scaleY);
-
-    const frames = fish.isEating ? assets.eat : assets.swim;
-    const img = frames[fish.frame % frames.length];
-    
-    if (img) {
-      ctx.shadowColor = 'rgba(0,0,0,0.5)';
-      ctx.shadowBlur = 20;
-      ctx.drawImage(img, -80, -60, 160, 120);
-      ctx.shadowBlur = 0;
-    }
-    ctx.restore();
-
-
-    // --- KATMAN 7: ÖN PLAN SÜSLERİ (Yosunlar balığın önünde) ---
-    chunks.forEach(c => {
-      if (Math.abs(c.x - camera.x) < w + 500) {
-        if (c.overlay) {
-             ctx.drawImage(c.overlay, c.x, WORLD_HEIGHT - 350, 2000, 350);
-        }
-      }
-    });
-
-    ctx.restore();
-  }
-        }
+    // 2. INPUT (Dokunmatik ve Mouse)
+    const handleInput = (e: any) => {
+        if (!isPlaying || !canvasRef.current) return;
+        const rect = canvasRef.current.getBoundingClientRect();
+        let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        let clientY = e.touches ? e.touches[0].clientY : e.clientY;
         
+        const isPortrait = window.innerHeight > window.innerWidth;
+        const screenX = clientX - rect.left;
+        const screenY = clientY - rect.top;
+
+        // Koordinat çevrimi (Yatay/Dikey ekran için)
+        if (isPortrait) {
+            const cx = window.innerHeight / 2;
+            const cy = window.innerWidth / 2;
+            mousePos.current.x = camera.current.x + (screenY - cx);
+            mousePos.current.y = camera.current.y + ((window.innerWidth - screenX) - cy);
+        } else {
+            const cx = window.innerWidth / 2;
+            const cy = window.innerHeight / 2;
+            mousePos.current.x = camera.current.x + (screenX - cx);
+            mousePos.current.y = camera.current.y + (screenY - cy);
+        }
+    };
+
+    // 3. OYUN DÖNGÜSÜ
+    useEffect(() => {
+        if (!isPlaying || !isLoaded || !canvasRef.current || !assets.current) return;
+        
+        renderer.current = new GameRenderer(canvasRef.current);
+
+        const loop = () => {
+            const isPortrait = window.innerHeight > window.innerWidth;
+            const w = isPortrait ? window.innerHeight : window.innerWidth;
+            const h = isPortrait ? window.innerWidth : window.innerHeight;
+            
+            // Ekran boyutunu güncelle
+            renderer.current?.resize(w, h);
+            
+            // Fiziği güncelle
+            physics.current.updateFish(fish.current, mousePos.current.x, mousePos.current.y);
+
+            // Kamera Takip (Yumuşak Geçiş)
+            const safeY = Math.max(SEA_LEVEL + 150, fish.current.y);
+            camera.current.x += (fish.current.x - camera.current.x) * 0.08;
+            camera.current.y += (safeY - camera.current.y) * 0.06;
+            
+            // Kamera Sınırları
+            camera.current.x = Math.max(0, Math.min(WORLD_WIDTH, camera.current.x));
+            camera.current.y = Math.max(SEA_LEVEL + 120, Math.min(WORLD_HEIGHT, camera.current.y));
+
+            // Yem Oluşturma Mantığı
+            if (Math.random() < 0.03) {
+                 targets.current.push({ 
+                     id: Date.now(), 
+                     x: Math.random() * WORLD_WIDTH, 
+                     y: Math.random() * (WORLD_HEIGHT - SEA_LEVEL - 400) + SEA_LEVEL + 100, 
+                     color: ['#ef4444', '#22c55e', '#eab308'][Math.floor(Math.random() * 3)] 
+                 });
+            }
+            
+            // Yem Yeme Kontrolü
+            targets.current = targets.current.filter(t => {
+                const dist = Math.hypot(fish.current.x - t.x, fish.current.y - t.y);
+                if (dist < 80) {
+                    setScore(s => s + 10);
+                    confetti({ origin: { x: 0.5, y: 0.5 }, particleCount: 20, spread: 40 });
+                    fish.current.isEating = true; 
+                    fish.current.frame = 0;
+                    setTimeout(() => fish.current.isEating = false, 300);
+                    return false;
+                }
+                return true;
+            });
+
+            // Ekrana Çiz
+            renderer.current?.draw(assets.current!, fish.current, camera.current, chunks.current, targets.current);
+            reqRef.current = requestAnimationFrame(loop);
+        };
+        reqRef.current = requestAnimationFrame(loop);
+
+        return () => cancelAnimationFrame(reqRef.current!);
+    }, [isPlaying, isLoaded]);
+
+    return (
+        <div className="fixed inset-0 bg-black flex items-center justify-center overflow-hidden">
+            {isLoaded ? (
+                <>
+                    <canvas 
+                        ref={canvasRef}
+                        className="block touch-none"
+                        style={{
+                            width: window.innerHeight > window.innerWidth ? '100vh' : '100vw',
+                            height: window.innerHeight > window.innerWidth ? '100vw' : '100vh',
+                            transform: window.innerHeight > window.innerWidth ? 'rotate(90deg)' : 'none'
+                        }}
+                        onMouseMove={handleInput} onTouchMove={handleInput} onClick={handleInput}
+                    />
+                    
+                    {/* UI Katmanı */}
+                    <div className="fixed top-5 left-5 bg-white/90 px-6 py-2 rounded-full border-4 border-orange-400 z-50 font-bold text-2xl text-orange-600">
+                        SKOR: {score}
+                    </div>
+                    <button onClick={onClose} className="fixed top-5 right-5 z-50 bg-white p-2 rounded-full shadow-lg">
+                        <XCircle className="text-red-500 w-8 h-8"/>
+                    </button>
+                    
+                    {!isPlaying && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                            <button onClick={() => setIsPlaying(true)} className="bg-orange-500 text-white px-12 py-6 rounded-3xl text-4xl font-black flex gap-4 items-center shadow-2xl hover:scale-105 transition border-b-8 border-orange-700 active:translate-y-2 active:border-b-0">
+                                <Play size={40} fill="currentColor"/> BAŞLA
+                            </button>
+                        </div>
+                    )}
+                </>
+            ) : (
+                <div className="text-white text-xl animate-pulse">
+                    Grafikler Yükleniyor...
+                </div>
+            )}
+        </div>
+    );
+                  }
+                              
