@@ -1,73 +1,83 @@
+// Renderer.ts
 import { AssetLibrary } from './Assets';
 import { FishState, WORLD_WIDTH, WORLD_HEIGHT, SEA_LEVEL } from './Physics';
+import { SeaSurfaceRenderer } from './SeaSurfaceRenderer';
 
 export class GameRenderer {
-    private ctx: CanvasRenderingContext2D;
-    private w = 0;
-    private h = 0;
-    private waterOffset = 0;
+  private ctx: CanvasRenderingContext2D;
+  private width = 0;
+  private height = 0;
+  private sea = new SeaSurfaceRenderer();
 
-    constructor(canvas: HTMLCanvasElement) {
-        this.ctx = canvas.getContext('2d', { alpha: false })!;
+  constructor(canvas: HTMLCanvasElement) {
+    this.ctx = canvas.getContext('2d', { alpha: false })!;
+  }
+
+  resize(w: number, h: number) {
+    this.width = w;
+    this.height = h;
+    this.ctx.canvas.width = w;
+    this.ctx.canvas.height = h;
+  }
+
+  draw(
+    assets: AssetLibrary,
+    fish: FishState,
+    camera: { x: number; y: number },
+    chunks: any[],
+    targets: any[]
+  ) {
+    const ctx = this.ctx;
+    const w = this.width;
+    const h = this.height;
+
+    // BACKGROUND (Uzay / Gece)
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+
+    if (assets.gece) {
+      const pat = ctx.createPattern(assets.gece, 'repeat');
+      if (pat) {
+        ctx.fillStyle = pat;
+        ctx.fillRect(0, 0, w, h);
+      }
     }
 
-    resize(w: number, h: number) {
-        if (this.w !== w || this.h !== h) {
-            this.w = w; this.h = h;
-            this.ctx.canvas.width = w;
-            this.ctx.canvas.height = h;
-        }
-    }
+    ctx.save();
+    ctx.translate(-camera.x + w / 2, -camera.y + h / 2);
 
-    draw(
-        assets: AssetLibrary,
-        fish: FishState,
-        camera: { x: number; y: number },
-        chunks: any[],
-        targets: any[]
-    ) {
-        const ctx = this.ctx;
-        ctx.clearRect(0, 0, this.w, this.h);
-        this.waterOffset++;
+    // SEA SURFACE
+    this.sea.draw(ctx, assets.su, camera.x, fish.y, w);
 
-        // Background
-        const g = ctx.createLinearGradient(0, 0, 0, this.h);
-        g.addColorStop(0, '#0b2c55');
-        g.addColorStop(1, '#020a1a');
-        ctx.fillStyle = g;
-        ctx.fillRect(0, 0, this.w, this.h);
+    // ZEMINLER (erken çiz → pop yok)
+    chunks.forEach(c => {
+      if (c.base) ctx.drawImage(c.base, c.x, WORLD_HEIGHT - 350, 2000, 350);
+    });
 
-        ctx.save();
-        ctx.translate(-camera.x + this.w / 2, -camera.y + this.h / 2);
+    // YEMLER
+    targets.forEach(t => {
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, 18, 0, Math.PI * 2);
+      ctx.fillStyle = t.color;
+      ctx.fill();
+    });
 
-        // Zemin
-        chunks.forEach(c => {
-            if (Math.abs(c.x - camera.x) < this.w + 1000) {
-                c.base && ctx.drawImage(c.base, c.x, WORLD_HEIGHT - 350, 2000, 350);
-                c.overlay && ctx.drawImage(c.overlay, c.x, WORLD_HEIGHT - 350, 2000, 350);
-            }
-        });
+    // BALIK
+    ctx.save();
+    ctx.translate(fish.x, fish.y);
+    ctx.rotate((fish.rotation * Math.PI) / 180);
+    ctx.scale(fish.scaleX, fish.scaleY);
 
-        // Yemler
-        targets.forEach(t => {
-            const pulse = Math.sin(t.pulse) * 3;
-            ctx.beginPath();
-            ctx.arc(t.x, t.y, t.r + pulse, 0, Math.PI * 2);
-            ctx.fillStyle = t.color;
-            ctx.fill();
-        });
+    const frames = fish.isEating ? assets.eat : assets.swim;
+    const img = frames[fish.frame % frames.length];
+    ctx.drawImage(img, -80, -60, 160, 120);
+    ctx.restore();
 
-        // Balık
-        ctx.save();
-        ctx.translate(fish.x, fish.y);
-        ctx.rotate(fish.rotation * Math.PI / 180);
-        ctx.scale(fish.scaleX, fish.scaleY);
+    // ÜST ZEMIN (foreground)
+    chunks.forEach(c => {
+      if (c.overlay) ctx.drawImage(c.overlay, c.x, WORLD_HEIGHT - 350, 2000, 350);
+    });
 
-        const frames = fish.isEating ? assets.eat : assets.swim;
-        const img = frames[fish.frame % frames.length];
-        img && ctx.drawImage(img, -80, -60, 160, 120);
-
-        ctx.restore();
-        ctx.restore();
-    }
-                  }
+    ctx.restore();
+  }
+}
