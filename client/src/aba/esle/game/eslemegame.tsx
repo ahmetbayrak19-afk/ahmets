@@ -1,148 +1,126 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-const CANVAS_WIDTH = 360;
-const CANVAS_HEIGHT = 640;
+const SCREEN_W = window.innerWidth;
+const SCREEN_H = window.innerHeight;
 
-// Y eksenleri
-const SEA_TOP_Y = 80;        // deniz yüzeyi
-const SAND_TOP_Y = 520;      // kumun başladığı yer
-const SAND_HEIGHT = 120;
+// DENİZ SINIRLARI (mantıksal – çizim tüm ekran)
+const SEA_TOP = 0;
+const SEA_BOTTOM = SCREEN_H;
 
-// Balık
-const FISH_RADIUS = 14;
-const GRAVITY = 0.35;
-const SWIM_FORCE = -6;
+// KUM
+const SAND_HEIGHT = 80;
+
+type Dot = {
+  x: number;
+  y: number;
+  r: number;
+  color: string;
+};
 
 export default function EslemeGame() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Balık state (ref ile – performans için)
-  const fish = useRef({
-    x: CANVAS_WIDTH / 2,
-    y: 200,
-    vy: 0,
-  });
+  const [fishY, setFishY] = useState(SCREEN_H / 2);
+  const fishVy = useRef(0);
 
+  const dots = useRef<Dot[]>([]);
+
+  // TOP ÜRET
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const colors = ["green", "yellow", "red"];
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const interval = setInterval(() => {
+      dots.current.push({
+        x: SCREEN_W + 30,
+        y: Math.random() * (SCREEN_H - SAND_HEIGHT - 40),
+        r: 10,
+        color: colors[Math.floor(Math.random() * colors.length)],
+      });
+    }, 600);
 
-    let animationId: number;
+    return () => clearInterval(interval);
+  }, []);
 
-    const draw = () => {
-      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  // OYUN LOOP
+  useEffect(() => {
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
+    canvas.width = SCREEN_W;
+    canvas.height = SCREEN_H;
 
-      /* ===============================
-         UZAY (ARKAPLAN – GÖRÜNMEYECEK)
-         =============================== */
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    const loop = () => {
+      // 🌊 DENİZ – TÜM EKRAN (UZAY YOK)
+      const seaGrad = ctx.createLinearGradient(0, 0, 0, SCREEN_H);
+      seaGrad.addColorStop(0, "#1e88e5"); // yüzey açık
+      seaGrad.addColorStop(0.5, "#0d47a1");
+      seaGrad.addColorStop(1, "#041a2d"); // dip koyu
 
-      /* ===============================
-         DENİZ (GRADYAN)
-         =============================== */
-      const seaGradient = ctx.createLinearGradient(
-        0,
-        SEA_TOP_Y,
-        0,
-        SAND_TOP_Y
-      );
-      seaGradient.addColorStop(0, "#0b4f6c"); // üst
-      seaGradient.addColorStop(1, "#021a26"); // alt
+      ctx.fillStyle = seaGrad;
+      ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
 
-      ctx.fillStyle = seaGradient;
+      // 🟨 KUM – EN ALT
+      ctx.fillStyle = "#c2a46d";
       ctx.fillRect(
         0,
-        SEA_TOP_Y,
-        CANVAS_WIDTH,
-        SAND_TOP_Y - SEA_TOP_Y
+        SCREEN_H - SAND_HEIGHT,
+        SCREEN_W,
+        SAND_HEIGHT + 20 // biraz taşabilir, sorun değil
       );
 
-      /* ===============================
-         DENİZ YÜZEYİ ÇİZGİSİ
-         =============================== */
-      ctx.strokeStyle = "#7fd7ff";
-      ctx.lineWidth = 2;
+      // 🐟 BALIK
+      ctx.fillStyle = "orange";
       ctx.beginPath();
-      ctx.moveTo(0, SEA_TOP_Y);
-      ctx.lineTo(CANVAS_WIDTH, SEA_TOP_Y);
-      ctx.stroke();
+      ctx.arc(120, fishY, 20, 0, Math.PI * 2);
+      ctx.fill();
 
-      /* ===============================
-         KUM (EN ALT – SINIR)
-         =============================== */
-      ctx.fillStyle = "#c2a15f";
-      ctx.fillRect(
-        0,
-        SAND_TOP_Y,
-        CANVAS_WIDTH,
-        SAND_HEIGHT
-      );
-
-      /* ===============================
-         BALIK FİZİK
-         =============================== */
-      fish.current.vy += GRAVITY;
-      fish.current.y += fish.current.vy;
+      // BALIK FİZİK
+      fishVy.current += 0.5;
+      let newY = fishY + fishVy.current;
 
       // ÜST SINIR (deniz yüzeyi)
-      if (fish.current.y - FISH_RADIUS < SEA_TOP_Y) {
-        fish.current.y = SEA_TOP_Y + FISH_RADIUS;
-        fish.current.vy = 0;
+      if (newY < 20) {
+        newY = 20;
+        fishVy.current = 0;
       }
 
       // ALT SINIR (kum)
-      if (fish.current.y + FISH_RADIUS > SAND_TOP_Y) {
-        fish.current.y = SAND_TOP_Y - FISH_RADIUS;
-        fish.current.vy = 0;
+      const FISH_BOTTOM_LIMIT =
+        SCREEN_H - SAND_HEIGHT - 20;
+      if (newY > FISH_BOTTOM_LIMIT) {
+        newY = FISH_BOTTOM_LIMIT;
+        fishVy.current = 0;
       }
 
-      /* ===============================
-         BALIK ÇİZİM (GEÇİCİ)
-         =============================== */
-      ctx.fillStyle = "#ff9933";
-      ctx.beginPath();
-      ctx.arc(
-        fish.current.x,
-        fish.current.y,
-        FISH_RADIUS,
-        0,
-        Math.PI * 2
-      );
-      ctx.fill();
+      setFishY(newY);
 
-      animationId = requestAnimationFrame(draw);
+      // ⚪ TOPLAR
+      dots.current.forEach((d) => {
+        d.x -= 3;
+
+        ctx.fillStyle = d.color;
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      dots.current = dots.current.filter((d) => d.x > -50);
+
+      requestAnimationFrame(loop);
     };
 
-    draw();
+    loop();
+  }, [fishY]);
 
-    const swimUp = () => {
-      fish.current.vy = SWIM_FORCE;
-    };
-
-    window.addEventListener("mousedown", swimUp);
-    window.addEventListener("touchstart", swimUp);
-
-    return () => {
-      cancelAnimationFrame(animationId);
-      window.removeEventListener("mousedown", swimUp);
-      window.removeEventListener("touchstart", swimUp);
-    };
-  }, []);
+  // TIKLA → ZIPLA
+  const jump = () => {
+    fishVy.current = -8;
+  };
 
   return (
     <canvas
       ref={canvasRef}
-      width={CANVAS_WIDTH}
-      height={CANVAS_HEIGHT}
-      style={{
-        display: "block",
-        margin: "0 auto",
-        background: "black",
-      }}
+      onClick={jump}
+      style={{ display: "block" }}
     />
   );
-}
+      }
