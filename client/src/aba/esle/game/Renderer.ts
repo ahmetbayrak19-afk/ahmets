@@ -32,23 +32,16 @@ export class GameRenderer {
         ctx.translate(-camera.x + w / 2, -camera.y + h / 2);
 
 
-        // --- KATMAN 1: GÖKYÜZÜ (YAN YANA MURAL) ---
-        // Deniz seviyesinden (SEA_LEVEL) YUKARIYA çiziyoruz.
-        // Dünyamız 3000px genişliğinde. 
-        // 0-1500 arasına gok1, 1500-3000 arasına gok2 koyuyoruz.
+        // --- KATMAN 1: GÖKYÜZÜ (TEK PARÇA) ---
+        // Deniz seviyesinden (SEA_LEVEL) yukarıya doğru çiziyoruz.
+        // Resim 200px yüksekliğinde ama ekranı doldursun diye 1500px'e uzatıyoruz.
         
-        const skyHeight = 1500; // Gökyüzü ne kadar yukarı uzasın?
-        const skyY = SEA_LEVEL - skyHeight; // Çizim başlangıç Y noktası
+        const skyHeight = 1500; 
+        const skyY = SEA_LEVEL - skyHeight;
         
-        // 1. Parça: SOL GÖK (gok1)
-        if (assets.gok1) {
-            // Parallax efektini kapattım ki "yan yana" tam otursun, kaymasın.
-            ctx.drawImage(assets.gok1, 0, skyY, WORLD_WIDTH / 2, skyHeight); 
-        }
-        
-        // 2. Parça: SAĞ GÖK (gok2)
-        if (assets.gok2) {
-             ctx.drawImage(assets.gok2, WORLD_WIDTH / 2, skyY, WORLD_WIDTH / 2, skyHeight);
+        if (assets.gok) {
+            // Tek parça resim, 0'dan başla, dünyanın sonuna (WORLD_WIDTH) kadar uzat.
+            ctx.drawImage(assets.gok, 0, skyY, WORLD_WIDTH, skyHeight); 
         }
 
 
@@ -65,8 +58,7 @@ export class GameRenderer {
 
 
         // --- KATMAN 3: DERİN SU PERDESİ (MAVİ 1) ---
-        // Gökyüzünden hemen sonra (SEA_LEVEL'den itibaren) başlar.
-        ctx.fillStyle = 'rgba(0, 60, 120, 0.4)'; // Biraz daha belirgin deniz mavisi
+        ctx.fillStyle = 'rgba(0, 60, 120, 0.4)'; 
         ctx.fillRect(0, SEA_LEVEL, WORLD_WIDTH, WORLD_HEIGHT - SEA_LEVEL);
 
 
@@ -90,17 +82,13 @@ export class GameRenderer {
         ctx.restore();
 
 
-        // --- (SU DOKUSU KALDIRILDI) --- 
-        // Kullanıcı isteği üzerine su_doku katmanı iptal.
-
-
         // --- KATMAN 5: YÜZEY SU PERDESİ (MAVİ 2 - CİLA) ---
         ctx.fillStyle = 'rgba(0, 40, 100, 0.2)'; 
         ctx.fillRect(0, SEA_LEVEL, WORLD_WIDTH, WORLD_HEIGHT - SEA_LEVEL);
 
 
         // --- SÜSLER ---
-        // Su ile Gökyüzü arasına net bir çizgi
+        // Ufuk Çizgisi (Deniz ile Gökyüzü arası)
         ctx.beginPath();
         ctx.moveTo(0, SEA_LEVEL);
         ctx.lineTo(WORLD_WIDTH, SEA_LEVEL);
