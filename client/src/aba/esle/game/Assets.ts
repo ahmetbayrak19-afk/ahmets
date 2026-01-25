@@ -1,26 +1,24 @@
 // Assets.ts
-
-// 1. BALIK RESİMLERİ (balik klasörünün içinde)
 import d1 from './balik/d1.png'; import d2 from './balik/d2.png'; import d3 from './balik/d3.png';
 import d4 from './balik/d4.png'; import d5 from './balik/d5.png'; import d6 from './balik/d6.png';
 import d7 from './balik/d7.png'; import d8 from './balik/d8.png';
 
-// Dönüş Animasyonu
 import l1 from './balik/l1.png'; import l2 from './balik/l2.png'; import l3 from './balik/l3.png';
 import l4 from './balik/l4.png'; import l5 from './balik/l5.png'; import l6 from './balik/l6.png';
 import l7 from './balik/l7.png';
 
-// Yeme Animasyonu
 import y1 from './balik/y1.png'; import y2 from './balik/y2.png'; import y3 from './balik/y3.png';
 import y4 from './balik/y4.png'; 
 
-// 2. ÇEVRE RESİMLERİ
-import gokImg from './gok.png'; // <--- YENİ TEK PARÇA GÖKYÜZÜ
+// ÇEVRE
+import gokImg from './gok.png'; 
 import anazemin from './anazemin.png'; 
 import zemin from './zemin.png';
 import suDokuImg from './su_doku.png'; 
+import kayaImg from './kaya.png'; 
+import ot1Img from './ot1.png'; // <--- YENİ
+import ot2Img from './ot2.png'; // <--- YENİ
 
-// LİSTELER
 const SWIM_SRCS = [d1, d2, d3, d4, d3, d2, d1, d5, d6, d7, d8, d7, d6, d5];
 const TURN_LEFT_SRCS = [l1, l2, l3, l4, l5, l6, l7];
 const EAT_SRCS = [y1, y2, y3, y4, y3, y2, y1]; 
@@ -29,9 +27,11 @@ export type AssetLibrary = {
     swim: HTMLImageElement[];
     turnLeft: HTMLImageElement[];
     eat: HTMLImageElement[];
-    gok: HTMLImageElement | null; // <--- Tekil İsim
+    gok: HTMLImageElement | null;
     zeminler: HTMLImageElement[];
     su: HTMLImageElement | null;
+    kaya: HTMLImageElement | null;
+    otlar: { ot1: HTMLImageElement | null; ot2: HTMLImageElement | null }; // <--- GRUP
 };
 
 export const loadAssets = async (): Promise<AssetLibrary> => {
@@ -46,21 +46,26 @@ export const loadAssets = async (): Promise<AssetLibrary> => {
     });
 
     try {
-        const [swim, turnLeft, eat, gok, anazeminImg, zeminImg, suImg] = await Promise.all([
+        const [swim, turnLeft, eat, gok, anazeminImg, zeminImg, suImg, kayaImgLoaded, ot1, ot2] = await Promise.all([
             Promise.all(SWIM_SRCS.map((s, i) => loadImage(s, `swim_${i}`))),
             Promise.all(TURN_LEFT_SRCS.map((s, i) => loadImage(s, `turn_${i}`))),
             Promise.all(EAT_SRCS.map((s, i) => loadImage(s, `eat_${i}`))),
-            loadImage(gokImg, 'gok'), // <--- gok.png yükleniyor
+            loadImage(gokImg, 'gok'),
             loadImage(anazemin, 'anazemin'),
             loadImage(zemin, 'zemin'),
-            loadImage(suDokuImg, 'su_doku')
+            loadImage(suDokuImg, 'su_doku'),
+            loadImage(kayaImg, 'kaya'),
+            loadImage(ot1Img, 'ot1'), // Yükle
+            loadImage(ot2Img, 'ot2')  // Yükle
         ]);
 
         return { 
             swim, turnLeft, eat, 
-            gok, // <--- Tek parça olarak dönüyor
+            gok, 
             zeminler: [anazeminImg, zeminImg],
-            su: suImg
+            su: suImg,
+            kaya: kayaImgLoaded,
+            otlar: { ot1, ot2 } // Pakete koy
         };
     } catch (e) {
         console.error("Asset Hatası:", e);
