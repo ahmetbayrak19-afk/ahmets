@@ -15,11 +15,9 @@ import y1 from './balik/y1.png'; import y2 from './balik/y2.png'; import y3 from
 import y4 from './balik/y4.png'; 
 
 // 2. ÇEVRE RESİMLERİ
-import gok1Img from './gok1.png'; // Sol Gökyüzü
-import gok2Img from './gok2.png'; // Sağ Gökyüzü (Yeni Eklendi)
+import gokImg from './gok.png'; // <--- YENİ TEK PARÇA GÖKYÜZÜ
 import anazemin from './anazemin.png'; 
 import zemin from './zemin.png';
-// su_doku şimdilik kaldırıldı ama import hatası vermesin diye dursun, kullanmayacağız.
 import suDokuImg from './su_doku.png'; 
 
 // LİSTELER
@@ -31,8 +29,7 @@ export type AssetLibrary = {
     swim: HTMLImageElement[];
     turnLeft: HTMLImageElement[];
     eat: HTMLImageElement[];
-    gok1: HTMLImageElement | null;
-    gok2: HTMLImageElement | null;
+    gok: HTMLImageElement | null; // <--- Tekil İsim
     zeminler: HTMLImageElement[];
     su: HTMLImageElement | null;
 };
@@ -49,12 +46,11 @@ export const loadAssets = async (): Promise<AssetLibrary> => {
     });
 
     try {
-        const [swim, turnLeft, eat, gok1, gok2, anazeminImg, zeminImg, suImg] = await Promise.all([
+        const [swim, turnLeft, eat, gok, anazeminImg, zeminImg, suImg] = await Promise.all([
             Promise.all(SWIM_SRCS.map((s, i) => loadImage(s, `swim_${i}`))),
             Promise.all(TURN_LEFT_SRCS.map((s, i) => loadImage(s, `turn_${i}`))),
             Promise.all(EAT_SRCS.map((s, i) => loadImage(s, `eat_${i}`))),
-            loadImage(gok1Img, 'gok1'),
-            loadImage(gok2Img, 'gok2'), // gok2 yükleniyor
+            loadImage(gokImg, 'gok'), // <--- gok.png yükleniyor
             loadImage(anazemin, 'anazemin'),
             loadImage(zemin, 'zemin'),
             loadImage(suDokuImg, 'su_doku')
@@ -62,7 +58,7 @@ export const loadAssets = async (): Promise<AssetLibrary> => {
 
         return { 
             swim, turnLeft, eat, 
-            gok1, gok2, // Ayrı ayrı döndürüyoruz
+            gok, // <--- Tek parça olarak dönüyor
             zeminler: [anazeminImg, zeminImg],
             su: suImg
         };
