@@ -1,4 +1,3 @@
-// Renderer.ts
 import { AssetLibrary } from './Assets';
 import { FishState, WORLD_WIDTH, WORLD_HEIGHT, SEA_LEVEL } from './Physics';
 
@@ -23,8 +22,8 @@ export class GameRenderer {
         const w = this.width;
         const h = this.height;
 
-        // 1. TEMİZLİK (Siyah Arka Plan)
-        ctx.fillStyle = '#000000';
+        // 1. TEMİZLİK
+        ctx.fillStyle = '#87CEEB'; 
         ctx.fillRect(0, 0, w, h);
 
         ctx.save();
@@ -32,20 +31,18 @@ export class GameRenderer {
         ctx.translate(-camera.x + w / 2, -camera.y + h / 2);
 
 
-        // --- KATMAN 1: GÖKYÜZÜ (TEK PARÇA) ---
-        // Deniz seviyesinden (SEA_LEVEL) yukarıya doğru çiziyoruz.
-        // Resim 200px yüksekliğinde ama ekranı doldursun diye 1500px'e uzatıyoruz.
-        
-        const skyHeight = 1500; 
-        const skyY = SEA_LEVEL - skyHeight;
-        
+        // --- KATMAN 1: GÖKYÜZÜ (3010x500 - ORİJİNAL) ---
         if (assets.gok) {
-            // Tek parça resim, 0'dan başla, dünyanın sonuna (WORLD_WIDTH) kadar uzat.
-            ctx.drawImage(assets.gok, 0, skyY, WORLD_WIDTH, skyHeight); 
+            // Hiç hesap kitap yapmaya gerek yok.
+            // SEA_LEVEL 500 olduğu için, 500 yükseklikteki resim
+            // tam 0 (tepe) noktasından başlayıp 500'e (suya) kadar iner.
+            
+            // Resmi 0,0 noktasına koyuyoruz. Genişlik 3010, Yükseklik 500.
+            ctx.drawImage(assets.gok, 0, 0, 3010, 500); 
         }
 
 
-        // --- KATMAN 2: ZEMİNLER (EN ALT) ---
+        // --- KATMAN 2: ZEMİNLER ---
         const tileW = 600; 
         const tileOrder = [0, 0, 1, 0, 1]; 
         
@@ -88,7 +85,6 @@ export class GameRenderer {
 
 
         // --- SÜSLER ---
-        // Ufuk Çizgisi (Deniz ile Gökyüzü arası)
         ctx.beginPath();
         ctx.moveTo(0, SEA_LEVEL);
         ctx.lineTo(WORLD_WIDTH, SEA_LEVEL);
@@ -96,7 +92,7 @@ export class GameRenderer {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Duvarlar
+        // Duvarlar (Siyah)
         ctx.restore(); 
         ctx.save();
         ctx.translate(-camera.x + w / 2, -camera.y + h / 2);
