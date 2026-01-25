@@ -6,12 +6,21 @@ export class GameRenderer {
     private width = 0;
     private height = 0;
     
+    // YENİ: Su yüzeyini güvenle işlemek için geçici (hayalet) tuval
+    private tempCanvas: HTMLCanvasElement;
+    private tempCtx: CanvasRenderingContext2D;
+    
     private surfaceOffset = 0; 
     private lightTimer = 0; 
     private rays: { x: number, w: number, speed: number }[] = [];
 
     constructor(canvas: HTMLCanvasElement) {
         this.ctx = canvas.getContext('2d', { alpha: false })!;
+        
+        // Geçici tuvali oluşturuyoruz (Ekrana basılmayacak, işlem için)
+        this.tempCanvas = document.createElement('canvas');
+        this.tempCtx = this.tempCanvas.getContext('2d')!;
+
         for(let i = -500; i < WORLD_WIDTH + 500; i += 400) {
             this.rays.push({
                 x: i,
@@ -26,6 +35,10 @@ export class GameRenderer {
         this.height = h;
         this.ctx.canvas.width = w;
         this.ctx.canvas.height = h;
+        
+        // Geçici tuvali de boyutlandır
+        this.tempCanvas.width = w;
+        this.tempCanvas.height = h;
     }
 
     draw(assets: AssetLibrary, fish: FishState, camera: { x: number; y: number }, targets: any[]) {
@@ -51,12 +64,13 @@ export class GameRenderer {
 
 
         // --- KATMAN 1: GÖKYÜZÜ RESMİ ---
+        // Artık silinmeyecek çünkü silgiyi başka katmanda kullanacağız.
         if (assets.gok) {
             ctx.drawImage(assets.gok, 0, 0, 3010, 500); 
         }
 
 
-        // --- KATMAN 1.5: SU YÜZEYİ (GRADYANLI FADE) ---
+        // --- KATMAN 1.5: SU YÜZEYİ (HAYALET KATMAN TEKNİĞİ) ---
         if (assets.su) {
             const distFromSurface = Math.max(0, camera.y - SEA_LEVEL);
             const lidHeight = Math.max(20, Math.min(500, distFromSurface * 0.6));
@@ -65,12 +79,12 @@ export class GameRenderer {
                 const upPart = lidHeight * 0.95; // %95 Havada
                 const drawY = SEA_LEVEL - upPart; 
 
-                ctx.save();
-                
-                // 1. Resmi Çiziyoruz (Normal Mod)
-                ctx.globalAlpha = 0.9; // Temel görünürlük yüksek
-                ctx.globalCompositeOperation = 'source-over'; 
-                
+                // A) Önce Geçici Tuvali Temizle
+                this.tempCtx.clearRect(0, 0, w, h);
+                this.tempCtx.save();
+                this.tempCtx.translate(-camera.x + w / 2, -camera.y + h / 2);
+
+                // B) Suyu Geçici Tuvale Çiz (Tam Netlikte)
                 const imgW = 592; 
                 const shift = this.surfaceOffset % imgW;
                 const count = Math.ceil(WORLD_WIDTH / imgW) + 2; 
@@ -78,27 +92,29 @@ export class GameRenderer {
                 for (let i = 0; i < count; i++) {
                     const drawX = (i * imgW) - shift;
                     if (drawX < WORLD_WIDTH && drawX + imgW > -500) {
-                        ctx.drawImage(assets.su, drawX, drawY, imgW, lidHeight);
+                        this.tempCtx.drawImage(assets.su, drawX, drawY, imgW, lidHeight);
                     }
                 }
+
+                // C) SİLGİ İŞLEMİ (Sadece Geçici Tuvalde!)
+                // Üst tarafı silikleştir, altı net bırak.
+                this.tempCtx.globalCompositeOperation = 'destination-in';
                 
-                // 2. MASKELEME (İSTEĞİN OLAN KISIM)
-                // "destination-in" modu, var olan çizimi maskeler (keser/siler).
-                // Gradyan ile üst tarafı siliyoruz, alt tarafı tutuyoruz.
-                ctx.globalCompositeOperation = 'destination-in';
-                
-                const fadeGradient = ctx.createLinearGradient(0, drawY, 0, drawY + lidHeight);
-                // ÜST (Ufuk): Opacity 0.1 (Çok silik, Gökyüzü görünüyor)
+                const fadeGradient = this.tempCtx.createLinearGradient(0, drawY, 0, drawY + lidHeight);
+                // ÜST (Ufuk): %10 Görünürlük (Çok şeffaf)
                 fadeGradient.addColorStop(0, 'rgba(0, 0, 0, 0.1)'); 
-                // ORTA: Opacity 0.6 (Belirginleşiyor)
-                fadeGradient.addColorStop(0.4, 'rgba(0, 0, 0, 0.6)'); 
-                // ALT (Deniz): Opacity 1.0 (Tam Net)
+                // ORTA: %70 Görünürlük
+                fadeGradient.addColorStop(0.4, 'rgba(0, 0, 0, 0.7)'); 
+                // ALT (Deniz): %100 Görünürlük (Tam Net)
                 fadeGradient.addColorStop(1, 'rgba(0, 0, 0, 1.0)'); 
                 
-                ctx.fillStyle = fadeGradient;
-                ctx.fillRect(camera.x - w, drawY, w * 3, lidHeight);
+                this.tempCtx.fillStyle = fadeGradient;
+                this.tempCtx.fillRect(camera.x - w, drawY, w * 3, lidHeight);
+                this.tempCtx.restore();
 
-                ctx.restore();
+                // D) HAZIRLANMIŞ SUYU ANA EKRANA YAPIŞTIR
+                // Artık gökyüzünü silmez, sadece üstüne biner.
+                ctx.drawImage(this.tempCanvas, camera.x - w / 2, camera.y - h / 2);
             }
         }
 
@@ -114,12 +130,17 @@ export class GameRenderer {
         });
 
 
-        // --- KATMAN 3: DERİN SU PERDESİ (GÜNDÜZ) ---
+        // --- KATMAN 3: DERİN SU PERDESİ (FERAH GÜNDÜZ MODU) ---
         ctx.globalCompositeOperation = 'source-over';
         const deepGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
+        
+        // Üst taraf: Kristal Mavi (%5)
         deepGradient.addColorStop(0, 'rgba(0, 180, 255, 0.05)'); 
-        deepGradient.addColorStop(0.5, 'rgba(0, 100, 200, 0.3)'); 
-        deepGradient.addColorStop(1, 'rgba(0, 40, 100, 0.85)');    
+        // Orta taraf: Okyanus Mavisi (Daha açık)
+        deepGradient.addColorStop(0.5, 'rgba(0, 120, 220, 0.3)'); 
+        // Dip taraf: Lacivert (Zifiri siyah değil!)
+        deepGradient.addColorStop(1, 'rgba(0, 60, 140, 0.85)');    
+        
         ctx.fillStyle = deepGradient;
         ctx.fillRect(0, SEA_LEVEL, WORLD_WIDTH, WORLD_HEIGHT - SEA_LEVEL);
 
@@ -128,7 +149,7 @@ export class GameRenderer {
         ctx.save();
         ctx.globalCompositeOperation = 'overlay'; 
         const rayGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
-        rayGradient.addColorStop(0, 'rgba(255, 255, 255, 0.2)'); 
+        rayGradient.addColorStop(0, 'rgba(255, 255, 255, 0.25)'); // Biraz daha parlak
         rayGradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');   
         ctx.fillStyle = rayGradient;
         this.rays.forEach((ray, index) => {
@@ -176,13 +197,14 @@ export class GameRenderer {
         });
 
 
-        // --- SÜSLER ---
+        // --- SÜSLER (YÜZEY ÇİZGİSİ) ---
         ctx.beginPath();
         ctx.moveTo(0, SEA_LEVEL);
         ctx.lineTo(WORLD_WIDTH, SEA_LEVEL);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 1;
         ctx.stroke();
+
         ctx.restore(); 
         
         // Duvarlar
