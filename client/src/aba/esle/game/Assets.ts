@@ -15,10 +15,11 @@ import y1 from './balik/y1.png'; import y2 from './balik/y2.png'; import y3 from
 import y4 from './balik/y4.png'; 
 
 // 2. ÇEVRE RESİMLERİ (Assets.ts ile yan yana)
-import geceImg from './gece.png';
+// --- DEĞİŞİKLİK BURADA ---
+import geceImg from './gok1.png'; // <-- gece.png yerine gok1.png geldi
 import anazemin from './anazemin.png'; 
 import zemin from './zemin.png';
-import suDokuImg from './su_doku.png'; // <--- İŞTE BU EKSİKTİ, EKLENDİ.
+import suDokuImg from './su_doku.png'; 
 
 // LİSTELER
 const SWIM_SRCS = [d1, d2, d3, d4, d3, d2, d1, d5, d6, d7, d8, d7, d6, d5];
@@ -29,9 +30,9 @@ export type AssetLibrary = {
     swim: HTMLImageElement[];
     turnLeft: HTMLImageElement[];
     eat: HTMLImageElement[];
-    gece: HTMLImageElement | null;
+    gece: HTMLImageElement | null; // Adı 'gece' kalsa da artık gok1.png yüklenecek
     zeminler: HTMLImageElement[]; // [anazemin, zemin]
-    su: HTMLImageElement | null;  // <--- TİP TANIMI EKLENDİ
+    su: HTMLImageElement | null;
 };
 
 export const loadAssets = async (): Promise<AssetLibrary> => {
@@ -53,7 +54,7 @@ export const loadAssets = async (): Promise<AssetLibrary> => {
             loadImage(geceImg, 'gece'),
             loadImage(anazemin, 'anazemin'),
             loadImage(zemin, 'zemin'),
-            loadImage(suDokuImg, 'su_doku') // <--- YÜKLEME EKLENDİ
+            loadImage(suDokuImg, 'su_doku')
         ]);
 
         return { 
@@ -62,7 +63,7 @@ export const loadAssets = async (): Promise<AssetLibrary> => {
             eat, 
             gece, 
             zeminler: [anazeminImg, zeminImg],
-            su: suImg // <--- PAKETE DAHİL EDİLDİ
+            su: suImg
         };
     } catch (e) {
         console.error("Asset Hatası:", e);
