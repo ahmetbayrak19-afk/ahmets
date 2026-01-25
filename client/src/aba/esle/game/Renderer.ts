@@ -6,11 +6,11 @@ export class GameRenderer {
     private width = 0;
     private height = 0;
     
-    // bgRocks listesi SİLİNDİ
+    // Su akışını kontrol etmek için sayaç
+    private surfaceOffset = 0; 
 
     constructor(canvas: HTMLCanvasElement) {
         this.ctx = canvas.getContext('2d', { alpha: false })!;
-        // Kaya oluşturma döngüsü SİLİNDİ
     }
 
     resize(w: number, h: number) {
@@ -24,6 +24,9 @@ export class GameRenderer {
         const ctx = this.ctx;
         const w = this.width;
         const h = this.height;
+
+        // Her karede suyun kayma miktarını artır (Hız: 1.5 birim)
+        this.surfaceOffset += 1.5;
 
         // 1. TEMİZLİK
         ctx.fillStyle = '#87CEEB'; 
@@ -40,13 +43,52 @@ export class GameRenderer {
         }
 
 
-        // --- (KAYA KATMANI SİLİNDİ) ---
+        // --- KATMAN 1.5: SU KAPAĞI (AKAN + ŞEFFAF) ---
+        if (assets.su) {
+            const distFromSurface = Math.max(0, camera.y - SEA_LEVEL);
+            // Yükseklik yine perspektife göre değişiyor
+            const lidHeight = Math.min(600, distFromSurface * 0.5);
+
+            if (lidHeight > 1) { 
+                ctx.save();
+                
+                // --- ŞEFFAFLIK AYARI ---
+                // "Hafif gökyüzü görünsün ama az" dediğin yer burası.
+                // 1.0 = Beton gibi (arkası görünmez)
+                // 0.0 = Görünmez
+                // 0.55 = Tam kararında (Su net, ama arkadaki bulut hayal meyal belli)
+                ctx.globalAlpha = 0.55; 
+                
+                // Karıştırma modu: Normal (source-over) yaparak gökyüzüyle doğal karışmasını sağladım.
+                // Overlay yaparsak çok parlıyordu, bu daha doğal.
+                ctx.globalCompositeOperation = 'source-over'; 
+                
+                const imgW = 592; 
+                // Kayma miktarı (Modülüs alıyoruz ki sayı sonsuza gitmesin)
+                const shift = this.surfaceOffset % imgW;
+                
+                // Ekranı doldurmak için kaç tane lazım? (+2 diyerek kenarlardaki boşluk riskini alıyoruz)
+                const count = Math.ceil(WORLD_WIDTH / imgW) + 2; 
+
+                for (let i = 0; i < count; i++) {
+                    // X Hesabı: (Sıra * Genişlik) - (Kayma Miktarı)
+                    // Böylece hepsi sola doğru kayar.
+                    const drawX = (i * imgW) - shift;
+                    
+                    // Sadece ekranda görünenleri çiz (Performans)
+                    if (drawX < WORLD_WIDTH && drawX + imgW > -500) {
+                        ctx.drawImage(assets.su, drawX, SEA_LEVEL, imgW, lidHeight);
+                    }
+                }
+                
+                ctx.restore();
+            }
+        }
 
 
-        // --- KATMAN 2: ZEMİNLER (EN ALT) ---
+        // --- KATMAN 2: ZEMİNLER ---
         const tileW = 600; 
         const tileOrder = [0, 0, 1, 0, 1]; 
-        
         tileOrder.forEach((type, index) => {
             const img = assets.zeminler[type];
             if (img) {
@@ -55,8 +97,12 @@ export class GameRenderer {
         });
 
 
-        // --- KATMAN 3: DERİN SU PERDESİ (MAVİ 1) ---
-        ctx.fillStyle = 'rgba(0, 60, 120, 0.4)'; 
+        // --- KATMAN 3: DERİN SU PERDESİ (GRADYANLI) ---
+        const deepGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
+        deepGradient.addColorStop(0, 'rgba(0, 150, 255, 0.3)'); 
+        deepGradient.addColorStop(1, 'rgba(0, 10, 50, 0.6)');   
+        
+        ctx.fillStyle = deepGradient;
         ctx.fillRect(0, SEA_LEVEL, WORLD_WIDTH, WORLD_HEIGHT - SEA_LEVEL);
 
 
@@ -80,25 +126,22 @@ export class GameRenderer {
         ctx.restore();
 
 
-        // --- KATMAN 5: OTLAR (ÖN PLAN) ---
-        // Balık çizildi, şimdi otlar üstüne geliyor.
+        // --- KATMAN 5: OTLAR ---
         const grassMap = ['ot1', null, 'ot2', 'ot1', null];
-
         grassMap.forEach((grassType, index) => {
             if (!grassType) return; 
-
             const grassImg = grassType === 'ot1' ? assets.otlar.ot1 : assets.otlar.ot2;
-            
             if (grassImg) {
-                // Konum: Zeminin olduğu yer
                 ctx.drawImage(grassImg, index * tileW, WORLD_HEIGHT - 300, 600, 300);
             }
         });
 
 
-        // --- KATMAN 6: YÜZEY SU PERDESİ (MAVİ 2 - CİLA) ---
-        // Otların ve balığın üstüne gelen son katman
-        ctx.fillStyle = 'rgba(0, 40, 100, 0.2)'; 
+        // --- KATMAN 6: YÜZEY CİLASI ---
+        const surfaceGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
+        surfaceGradient.addColorStop(0, 'rgba(0, 100, 200, 0.1)');
+        surfaceGradient.addColorStop(1, 'rgba(0, 50, 100, 0.3)'); 
+        ctx.fillStyle = surfaceGradient;
         ctx.fillRect(0, SEA_LEVEL, WORLD_WIDTH, WORLD_HEIGHT - SEA_LEVEL);
 
 
