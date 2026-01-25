@@ -9,7 +9,6 @@ export class GameRenderer {
     private tempCanvas: HTMLCanvasElement;
     private tempCtx: CanvasRenderingContext2D;
     
-    // Sütunları sakladığımız dizi
     private columns: { x: number, w: number, alpha: number }[] = [];
     
     private surfaceOffset = 0; 
@@ -21,16 +20,11 @@ export class GameRenderer {
         this.tempCanvas = document.createElement('canvas');
         this.tempCtx = this.tempCanvas.getContext('2d')!;
 
-        // --- SIKLAŞTIRILMIŞ SÜTUNLAR ---
+        // Sütunları oluştur
         let currentX = -2000; 
         while (currentX < WORLD_WIDTH + 2000) {
-            // DÜZELTME 2: Genişliği azalttık (Daha sık sütunlar)
-            // Eskiden: 100-400px idi. Şimdi: 40-120px arası.
-            const w = 40 + Math.random() * 80;
-            
-            // Görünürlük ayarı (Bazıları çok belirgin, bazıları silik)
+            const w = 40 + Math.random() * 80; 
             const alpha = 0.03 + Math.random() * 0.12;
-            
             this.columns.push({ x: currentX, w: w, alpha: alpha });
             currentX += w; 
         }
@@ -54,7 +48,7 @@ export class GameRenderer {
         this.surfaceOffset += 1.0; 
         this.lightTimer += 1;
 
-        // 1. GENEL TEMİZLİK (Gök Mavisi)
+        // 1. GENEL TEMİZLİK
         ctx.fillStyle = '#87CEEB'; 
         ctx.fillRect(0, 0, w, h);
 
@@ -62,7 +56,7 @@ export class GameRenderer {
         ctx.translate(-camera.x + w / 2, -camera.y + h / 2);
 
 
-        // --- KATMAN 0: SONSUZ GÖKYÜZÜ ASTARI ---
+        // --- KATMAN 0: SONSUZ GÖKYÜZÜ ---
         ctx.fillStyle = '#87CEEB'; 
         ctx.fillRect(-5000, -10000, WORLD_WIDTH + 10000, 10000 + SEA_LEVEL);
 
@@ -73,7 +67,44 @@ export class GameRenderer {
         }
 
 
-        // --- KATMAN 1.5: SU YÜZEYİ (HAYALET KATMAN) ---
+        // --- KATMAN 2: DİKEY OKYANUS ARKA PLANI ---
+        ctx.globalCompositeOperation = 'source-over';
+        
+        const baseGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
+        baseGradient.addColorStop(0, '#0077be');    
+        baseGradient.addColorStop(0.6, '#004488');  
+        baseGradient.addColorStop(1, '#002244');    
+        
+        ctx.fillStyle = baseGradient;
+        ctx.fillRect(0, SEA_LEVEL, WORLD_WIDTH, WORLD_HEIGHT - SEA_LEVEL);
+
+        // Sütunlar
+        ctx.globalCompositeOperation = 'soft-light';
+        this.columns.forEach(col => {
+            if (col.x + col.w > camera.x - w && col.x < camera.x + w) {
+                const colGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
+                colGradient.addColorStop(0, `rgba(200, 240, 255, ${col.alpha})`);
+                colGradient.addColorStop(1, 'rgba(200, 240, 255, 0)');
+                ctx.fillStyle = colGradient;
+                ctx.fillRect(col.x, SEA_LEVEL, col.w, WORLD_HEIGHT - SEA_LEVEL);
+            }
+        });
+        ctx.globalCompositeOperation = 'source-over';
+
+
+        // --- KATMAN 3: ZEMİNLER ---
+        const tileW = 600; 
+        const tileOrder = [0, 0, 1, 0, 1]; 
+        tileOrder.forEach((type, index) => {
+            const img = assets.zeminler[type];
+            if (img) {
+                ctx.drawImage(img, index * tileW, WORLD_HEIGHT - 300, tileW, 300);
+            }
+        });
+
+
+        // --- KATMAN 4: SU YÜZEYİ DOKUSU (YERİ DEĞİŞTİ!) ---
+        // Balıktan ÖNCE çiziyoruz ki balık bunun üstüne gelsin.
         if (assets.su) {
             const distFromSurface = Math.max(0, camera.y - SEA_LEVEL);
             const lidHeight = Math.max(20, Math.min(500, distFromSurface * 0.6));
@@ -112,64 +143,7 @@ export class GameRenderer {
         }
 
 
-        // --- KATMAN 2: ZEMİNLER ---
-        const tileW = 600; 
-        const tileOrder = [0, 0, 1, 0, 1]; 
-        tileOrder.forEach((type, index) => {
-            const img = assets.zeminler[type];
-            if (img) {
-                ctx.drawImage(img, index * tileW, WORLD_HEIGHT - 300, tileW, 300);
-            }
-        });
-
-
-        // --- KATMAN 3: DİKEY ARKA PLAN (MAVİ TONLAR) ---
-        
-        // 1. ADIM: Zemin Rengi (DÜZELTME 1: YEŞİL YOK, SAF MAVİ VAR)
-        ctx.globalCompositeOperation = 'source-over';
-        
-        const baseGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
-        // Üst: Parlak Okyanus Mavisi (Yeşil yok)
-        baseGradient.addColorStop(0, '#0077be'); 
-        // Orta: Derin Deniz Mavisi
-        baseGradient.addColorStop(0.6, '#004488'); 
-        // Alt: Gece Mavisi / Lacivert (Hafif morumsu koyuluk, yeşil değil)
-        baseGradient.addColorStop(1, '#002244'); 
-        
-        ctx.fillStyle = baseGradient;
-        ctx.fillRect(0, SEA_LEVEL, WORLD_WIDTH, WORLD_HEIGHT - SEA_LEVEL);
-
-
-        // 2. ADIM: Asimetrik Sütunlar (DÜZELTME 2: DAHA SIK)
-        ctx.globalCompositeOperation = 'soft-light'; // Işıklandırma modu
-
-        this.columns.forEach(col => {
-            if (col.x + col.w > camera.x - w && col.x < camera.x + w) {
-                
-                const colGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
-                
-                // Işık hüzmesi rengi (Beyazımsı mavi)
-                colGradient.addColorStop(0, `rgba(200, 240, 255, ${col.alpha})`);
-                colGradient.addColorStop(1, 'rgba(200, 240, 255, 0)');
-                
-                ctx.fillStyle = colGradient;
-                ctx.fillRect(col.x, SEA_LEVEL, col.w, WORLD_HEIGHT - SEA_LEVEL);
-                
-                // Çizgiler (Detay)
-                ctx.beginPath();
-                ctx.moveTo(col.x, SEA_LEVEL);
-                ctx.lineTo(col.x, WORLD_HEIGHT);
-                // Çizgi rengi de hafif mavi, siyah değil
-                ctx.strokeStyle = `rgba(0, 50, 100, 0.15)`; 
-                ctx.lineWidth = 1; // Daha ince, daha zarif
-                ctx.stroke();
-            }
-        });
-        
-        ctx.globalCompositeOperation = 'source-over';
-
-
-        // --- KATMAN 4: BALIK ---
+        // --- KATMAN 5: BALIK (ARTIK YÜZEYİN ÜSTÜNDE) ---
         ctx.save();
         ctx.translate(fish.x, fish.y);
         ctx.rotate((fish.rotation * Math.PI) / 180);
@@ -187,7 +161,8 @@ export class GameRenderer {
         ctx.restore();
 
 
-        // --- KATMAN 5: OTLAR ---
+        // --- KATMAN 6: OTLAR (BALIĞIN ÜSTÜNDE) ---
+        // Balık otların arkasında kalıp saklanabilsin diye balıktan SONRA çiziyoruz.
         const grassMap = ['ot1', null, 'ot2', 'ot1', null];
         grassMap.forEach((grassType, index) => {
             if (!grassType) return; 
@@ -196,6 +171,19 @@ export class GameRenderer {
                 ctx.drawImage(grassImg, index * tileW, WORLD_HEIGHT - 300, 600, 300);
             }
         });
+
+
+        // --- KATMAN 7: SU ATMOSFERİ CİLASI (TINT - EN ÜSTTE) ---
+        // Zemin, Otlar, Balık ve Yüzeyin bir kısmı bu cilanın altında kalır.
+        // Hepsine "suyun içi" havası verir.
+        ctx.globalCompositeOperation = 'source-over';
+        const tintGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
+        
+        tintGradient.addColorStop(0, 'rgba(0, 80, 120, 0.05)'); // Yüzeyde çok az
+        tintGradient.addColorStop(1, 'rgba(0, 30, 70, 0.5)');   // Dipte yoğun
+        
+        ctx.fillStyle = tintGradient;
+        ctx.fillRect(camera.x - w, SEA_LEVEL, w * 3, WORLD_HEIGHT - SEA_LEVEL);
 
 
         // --- SÜSLER ---
