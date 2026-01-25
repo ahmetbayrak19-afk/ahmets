@@ -103,18 +103,40 @@ export class GameRenderer {
         });
 
 
-        // --- KATMAN 4: SU YÜZEYİ DOKUSU (GÜNCELLENDİ: OPTİMUM BOYUT) ---
+        // --- KATMAN 4: SU YÜZEYİ DOKUSU (PERSPEKTİFLİ KAĞIT EFEKTİ) ---
         if (assets.su) {
-            const distFromSurface = Math.max(0, camera.y - SEA_LEVEL);
+            // "diff": Kameranın deniz seviyesinden farkı.
+            // Pozitifse sudayız, Negatifse havadayız.
+            const diff = camera.y - SEA_LEVEL; 
             
-            // DÜZELTME: 1.4 yerine 0.9 (Daha dengeli uzama)
-            // Maksimum boy: 750px (Ekranı yutmaz)
-            const lidHeight = Math.max(50, Math.min(750, distFromSurface * 0.9));
+            let lidHeight = 0;
+            let drawY = SEA_LEVEL; // Varsayılan çizim noktası
 
-            if (lidHeight > 2) { 
-                const upPart = lidHeight * 0.95; 
-                const drawY = SEA_LEVEL - upPart; 
+            if (diff >= 0) {
+                // DURUM 1: SUYUN ALTINDAYIZ (Kağıdın altına bakıyoruz)
+                // Aşağı indikçe uzayan yansıma efekti (Eskisi gibi)
+                lidHeight = Math.min(800, diff * 1.1);
+                
+                // Çizim Yeri: Yüzeyden YUKARI doğru uzasın
+                drawY = SEA_LEVEL - (lidHeight * 0.98); 
+            } else {
+                // DURUM 2: HAVADAYIZ (Kağıdın üstüne bakıyoruz)
+                // Yukarı çıktıkça "diff" negatif büyür. Mutlak değerini alıyoruz.
+                // 0.4 katsayısı ile çarpıyoruz ki su altındaki kadar devasa olmasın, daha kibar bir yüzey şeridi olsun.
+                // Math.min(150, ...) ile bir noktada sınırlıyoruz, ekranı kaplamasın.
+                lidHeight = Math.min(150, Math.abs(diff) * 0.4);
+                
+                // Çizim Yeri: Yüzeyden (SEA_LEVEL) itibaren çizilsin.
+                // Yüzeyin "üstünü" gördüğümüz için merkezden hafif yukarı kaydırıyoruz perspektif için.
+                drawY = SEA_LEVEL - (lidHeight * 0.5);
+            }
 
+            // Hangi durumda olursak olalım, tam sınırda (0 noktası) bile en az 2 piksel çizgi olsun.
+            // Böylece "anlık görme" kesintiye uğramaz.
+            lidHeight = Math.max(2, lidHeight);
+
+            // ÇİZİM İŞLEMİ
+            if (lidHeight > 0.1) {
                 this.tempCtx.clearRect(0, 0, w, h);
                 this.tempCtx.save();
                 this.tempCtx.translate(-camera.x + w / 2, -camera.y + h / 2);
@@ -181,6 +203,7 @@ export class GameRenderer {
         tintGradient.addColorStop(1, 'rgba(0, 30, 70, 0.5)');   
         
         ctx.fillStyle = tintGradient;
+        // Cilanın başlangıç noktasını SEA_LEVEL yapıyoruz, böylece gökyüzü maviye boyanmıyor.
         ctx.fillRect(camera.x - w, SEA_LEVEL, w * 3, WORLD_HEIGHT - SEA_LEVEL);
 
 
