@@ -15,9 +15,9 @@ import gokImg from './gok.png';
 import anazemin from './anazemin.png'; 
 import zemin from './zemin.png';
 import suDokuImg from './su_doku.png'; 
-import kayaImg from './kaya.png'; 
-import ot1Img from './ot1.png'; // <--- YENİ
-import ot2Img from './ot2.png'; // <--- YENİ
+// kaya.png SİLİNDİ
+import ot1Img from './ot1.png'; 
+import ot2Img from './ot2.png'; 
 
 const SWIM_SRCS = [d1, d2, d3, d4, d3, d2, d1, d5, d6, d7, d8, d7, d6, d5];
 const TURN_LEFT_SRCS = [l1, l2, l3, l4, l5, l6, l7];
@@ -30,8 +30,8 @@ export type AssetLibrary = {
     gok: HTMLImageElement | null;
     zeminler: HTMLImageElement[];
     su: HTMLImageElement | null;
-    kaya: HTMLImageElement | null;
-    otlar: { ot1: HTMLImageElement | null; ot2: HTMLImageElement | null }; // <--- GRUP
+    // kaya SİLİNDİ
+    otlar: { ot1: HTMLImageElement | null; ot2: HTMLImageElement | null }; 
 };
 
 export const loadAssets = async (): Promise<AssetLibrary> => {
@@ -46,7 +46,8 @@ export const loadAssets = async (): Promise<AssetLibrary> => {
     });
 
     try {
-        const [swim, turnLeft, eat, gok, anazeminImg, zeminImg, suImg, kayaImgLoaded, ot1, ot2] = await Promise.all([
+        // Promise listesinden kayaImg çıkarıldı
+        const [swim, turnLeft, eat, gok, anazeminImg, zeminImg, suImg, ot1, ot2] = await Promise.all([
             Promise.all(SWIM_SRCS.map((s, i) => loadImage(s, `swim_${i}`))),
             Promise.all(TURN_LEFT_SRCS.map((s, i) => loadImage(s, `turn_${i}`))),
             Promise.all(EAT_SRCS.map((s, i) => loadImage(s, `eat_${i}`))),
@@ -54,9 +55,9 @@ export const loadAssets = async (): Promise<AssetLibrary> => {
             loadImage(anazemin, 'anazemin'),
             loadImage(zemin, 'zemin'),
             loadImage(suDokuImg, 'su_doku'),
-            loadImage(kayaImg, 'kaya'),
-            loadImage(ot1Img, 'ot1'), // Yükle
-            loadImage(ot2Img, 'ot2')  // Yükle
+            // kaya yükleme satırı SİLİNDİ
+            loadImage(ot1Img, 'ot1'), 
+            loadImage(ot2Img, 'ot2')  
         ]);
 
         return { 
@@ -64,8 +65,8 @@ export const loadAssets = async (): Promise<AssetLibrary> => {
             gok, 
             zeminler: [anazeminImg, zeminImg],
             su: suImg,
-            kaya: kayaImgLoaded,
-            otlar: { ot1, ot2 } // Pakete koy
+            // kaya return SİLİNDİ
+            otlar: { ot1, ot2 } 
         };
     } catch (e) {
         console.error("Asset Hatası:", e);
