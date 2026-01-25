@@ -6,27 +6,33 @@ export class GameRenderer {
     private width = 0;
     private height = 0;
     
-    // YENİ: Su yüzeyini güvenle işlemek için geçici (hayalet) tuval
+    // Geçici tuval (Su yüzeyi yumuşatma işlemleri için)
     private tempCanvas: HTMLCanvasElement;
     private tempCtx: CanvasRenderingContext2D;
     
+    // Arka Plan Sütunları (Bir kere oluşturup saklayacağız, her karede hesaplamasın)
+    private columns: { x: number, w: number, alpha: number }[] = [];
+    
     private surfaceOffset = 0; 
     private lightTimer = 0; 
-    private rays: { x: number, w: number, speed: number }[] = [];
 
     constructor(canvas: HTMLCanvasElement) {
         this.ctx = canvas.getContext('2d', { alpha: false })!;
         
-        // Geçici tuvali oluşturuyoruz (Ekrana basılmayacak, işlem için)
         this.tempCanvas = document.createElement('canvas');
         this.tempCtx = this.tempCanvas.getContext('2d')!;
 
-        for(let i = -500; i < WORLD_WIDTH + 500; i += 400) {
-            this.rays.push({
-                x: i,
-                w: 200 + Math.random() * 150, 
-                speed: 0.02 + Math.random() * 0.03 
-            });
+        // --- ASİMETRİK SÜTUNLARI OLUŞTURMA ---
+        // Dünyanın başından sonuna kadar rastgele genişlikte şeritler oluşturuyoruz.
+        let currentX = -2000; // Ekranın solundan biraz geriden başla
+        while (currentX < WORLD_WIDTH + 2000) {
+            // Sütun genişliği: 100px ile 400px arası rastgele (Simetrik olmasın diye)
+            const w = 100 + Math.random() * 300;
+            // Görünürlük (Alpha): Bazıları silik, bazıları net olsun (0.05 - 0.2 arası)
+            const alpha = 0.05 + Math.random() * 0.15;
+            
+            this.columns.push({ x: currentX, w: w, alpha: alpha });
+            currentX += w; // Bir sonraki sütuna geç
         }
     }
 
@@ -36,7 +42,6 @@ export class GameRenderer {
         this.ctx.canvas.width = w;
         this.ctx.canvas.height = h;
         
-        // Geçici tuvali de boyutlandır
         this.tempCanvas.width = w;
         this.tempCanvas.height = h;
     }
@@ -49,42 +54,38 @@ export class GameRenderer {
         this.surfaceOffset += 1.0; 
         this.lightTimer += 1;
 
-        // 1. TEMİZLİK
+        // 1. GENEL TEMİZLİK (Gök Mavisi)
         ctx.fillStyle = '#87CEEB'; 
         ctx.fillRect(0, 0, w, h);
 
         ctx.save();
-        // KAMERA SİSTEMİ
         ctx.translate(-camera.x + w / 2, -camera.y + h / 2);
 
 
         // --- KATMAN 0: SONSUZ GÖKYÜZÜ ASTARI ---
         ctx.fillStyle = '#87CEEB'; 
-        ctx.fillRect(-2000, -10000, WORLD_WIDTH + 4000, 10000 + SEA_LEVEL);
+        ctx.fillRect(-5000, -10000, WORLD_WIDTH + 10000, 10000 + SEA_LEVEL);
 
 
         // --- KATMAN 1: GÖKYÜZÜ RESMİ ---
-        // Artık silinmeyecek çünkü silgiyi başka katmanda kullanacağız.
         if (assets.gok) {
             ctx.drawImage(assets.gok, 0, 0, 3010, 500); 
         }
 
 
-        // --- KATMAN 1.5: SU YÜZEYİ (HAYALET KATMAN TEKNİĞİ) ---
+        // --- KATMAN 1.5: SU YÜZEYİ (HAYALET KATMAN) ---
         if (assets.su) {
             const distFromSurface = Math.max(0, camera.y - SEA_LEVEL);
             const lidHeight = Math.max(20, Math.min(500, distFromSurface * 0.6));
 
             if (lidHeight > 2) { 
-                const upPart = lidHeight * 0.95; // %95 Havada
+                const upPart = lidHeight * 0.95; 
                 const drawY = SEA_LEVEL - upPart; 
 
-                // A) Önce Geçici Tuvali Temizle
                 this.tempCtx.clearRect(0, 0, w, h);
                 this.tempCtx.save();
                 this.tempCtx.translate(-camera.x + w / 2, -camera.y + h / 2);
 
-                // B) Suyu Geçici Tuvale Çiz (Tam Netlikte)
                 const imgW = 592; 
                 const shift = this.surfaceOffset % imgW;
                 const count = Math.ceil(WORLD_WIDTH / imgW) + 2; 
@@ -96,24 +97,16 @@ export class GameRenderer {
                     }
                 }
 
-                // C) SİLGİ İŞLEMİ (Sadece Geçici Tuvalde!)
-                // Üst tarafı silikleştir, altı net bırak.
                 this.tempCtx.globalCompositeOperation = 'destination-in';
-                
                 const fadeGradient = this.tempCtx.createLinearGradient(0, drawY, 0, drawY + lidHeight);
-                // ÜST (Ufuk): %10 Görünürlük (Çok şeffaf)
                 fadeGradient.addColorStop(0, 'rgba(0, 0, 0, 0.1)'); 
-                // ORTA: %70 Görünürlük
                 fadeGradient.addColorStop(0.4, 'rgba(0, 0, 0, 0.7)'); 
-                // ALT (Deniz): %100 Görünürlük (Tam Net)
                 fadeGradient.addColorStop(1, 'rgba(0, 0, 0, 1.0)'); 
                 
                 this.tempCtx.fillStyle = fadeGradient;
                 this.tempCtx.fillRect(camera.x - w, drawY, w * 3, lidHeight);
                 this.tempCtx.restore();
 
-                // D) HAZIRLANMIŞ SUYU ANA EKRANA YAPIŞTIR
-                // Artık gökyüzünü silmez, sadece üstüne biner.
                 ctx.drawImage(this.tempCanvas, camera.x - w / 2, camera.y - h / 2);
             }
         }
@@ -130,42 +123,54 @@ export class GameRenderer {
         });
 
 
-        // --- KATMAN 3: DERİN SU PERDESİ (FERAH GÜNDÜZ MODU) ---
+        // --- KATMAN 3: OLUŞTURULAN DİKEY DENİZ ARKA PLANI ---
+        
+        // 1. ADIM: Zemin Rengi (Base)
+        // Önce tüm denizi "su_doku"nun koyu bir tonuyla boyuyoruz.
         ctx.globalCompositeOperation = 'source-over';
-        const deepGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
         
-        // Üst taraf: Kristal Mavi (%5)
-        deepGradient.addColorStop(0, 'rgba(0, 180, 255, 0.05)'); 
-        // Orta taraf: Okyanus Mavisi (Daha açık)
-        deepGradient.addColorStop(0.5, 'rgba(0, 120, 220, 0.3)'); 
-        // Dip taraf: Lacivert (Zifiri siyah değil!)
-        deepGradient.addColorStop(1, 'rgba(0, 60, 140, 0.85)');    
+        const baseGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
+        // Üst: Koyu Turkuaz (Teal) - Aydınlık
+        baseGradient.addColorStop(0, '#008B8B'); 
+        // Alt: Çok Koyu Petrol Yeşili/Mavisi - Derinlik
+        baseGradient.addColorStop(1, '#004d4d'); 
         
-        ctx.fillStyle = deepGradient;
+        ctx.fillStyle = baseGradient;
         ctx.fillRect(0, SEA_LEVEL, WORLD_WIDTH, WORLD_HEIGHT - SEA_LEVEL);
 
 
-        // --- KATMAN 3.5: TANRISAL IŞIKLAR ---
-        ctx.save();
-        ctx.globalCompositeOperation = 'overlay'; 
-        const rayGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
-        rayGradient.addColorStop(0, 'rgba(255, 255, 255, 0.25)'); // Biraz daha parlak
-        rayGradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');   
-        ctx.fillStyle = rayGradient;
-        this.rays.forEach((ray, index) => {
-            if (ray.x > camera.x - w && ray.x < camera.x + w) {
-                const sway = Math.sin(this.lightTimer * ray.speed + index) * 50; 
-                const slant = 300; 
+        // 2. ADIM: Asimetrik Sütunlar (Doku)
+        // Üstüne, oluşturduğumuz rastgele sütunları çiziyoruz.
+        // "overlay" veya "soft-light" moduyla zemine kaynaştırıyoruz.
+        ctx.globalCompositeOperation = 'soft-light';
+
+        this.columns.forEach(col => {
+            // Sadece ekranda görünenleri çiz (Performans için)
+            if (col.x + col.w > camera.x - w && col.x < camera.x + w) {
+                
+                // Her sütun kendi içinde yukarıdan aşağıya kararan bir gradyana sahip
+                const colGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
+                
+                // Üst: Daha parlak (Işık hüzmesi gibi)
+                colGradient.addColorStop(0, `rgba(255, 255, 255, ${col.alpha})`);
+                // Alt: Yok oluyor (Derinliğe karışıyor)
+                colGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                
+                ctx.fillStyle = colGradient;
+                ctx.fillRect(col.x, SEA_LEVEL, col.w, WORLD_HEIGHT - SEA_LEVEL);
+                
+                // Sütunların kenarlarına ince çizgiler ekleyerek "1.png"deki dikey bant etkisini güçlendiriyoruz
                 ctx.beginPath();
-                ctx.moveTo(ray.x, SEA_LEVEL); 
-                ctx.lineTo(ray.x + ray.w, SEA_LEVEL); 
-                ctx.lineTo(ray.x + ray.w + slant + sway, WORLD_HEIGHT); 
-                ctx.lineTo(ray.x + slant + sway, WORLD_HEIGHT); 
-                ctx.closePath();
-                ctx.fill();
+                ctx.moveTo(col.x, SEA_LEVEL);
+                ctx.lineTo(col.x, WORLD_HEIGHT);
+                ctx.strokeStyle = `rgba(0, 40, 60, 0.1)`; // Hafif koyu çizgi
+                ctx.lineWidth = 2;
+                ctx.stroke();
             }
         });
-        ctx.restore();
+        
+        // Normal çizim moduna dön
+        ctx.globalCompositeOperation = 'source-over';
 
 
         // --- KATMAN 4: BALIK ---
@@ -197,7 +202,7 @@ export class GameRenderer {
         });
 
 
-        // --- SÜSLER (YÜZEY ÇİZGİSİ) ---
+        // --- SÜSLER ---
         ctx.beginPath();
         ctx.moveTo(0, SEA_LEVEL);
         ctx.lineTo(WORLD_WIDTH, SEA_LEVEL);
@@ -211,8 +216,8 @@ export class GameRenderer {
         ctx.save();
         ctx.translate(-camera.x + w / 2, -camera.y + h / 2);
         ctx.fillStyle = '#000';
-        ctx.fillRect(-2000, -2000, 2000, WORLD_HEIGHT + 4000); 
-        ctx.fillRect(WORLD_WIDTH, -2000, 2000, WORLD_HEIGHT + 4000); 
+        ctx.fillRect(-6000, -2000, 4000, WORLD_HEIGHT + 4000); 
+        ctx.fillRect(WORLD_WIDTH, -2000, 4000, WORLD_HEIGHT + 4000); 
         ctx.restore();
     }
 }
