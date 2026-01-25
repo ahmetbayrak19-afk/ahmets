@@ -1,9 +1,12 @@
 // Physics.ts
 
-// DÜNYA AYARLARI (Genişlik sınırlı, yükseklik sınırlı)
+// DÜNYA AYARLARI
 export const WORLD_WIDTH = 3000; 
 export const WORLD_HEIGHT = 1500; 
-export const SEA_LEVEL = 500;
+
+// DİKKAT: Resim yüksekliği 500 olduğu için Deniz Seviyesini de 500 yapıyoruz.
+// Böylece resim (0 ile 500 arası) tam sığacak.
+export const SEA_LEVEL = 500; 
 
 export interface FishState {
     x: number;
@@ -14,18 +17,17 @@ export interface FishState {
     scaleX: number;
     scaleY: number;
     
-    // Animasyon Durumları
     frame: number;
     timer: number;
     state: 'SWIM' | 'TURN_LEFT' | 'EAT';
-    lastDirection: 1 | -1; // 1: Sağ, -1: Sol
+    lastDirection: 1 | -1; 
 }
 
 export class PhysicsEngine {
     updateFish(fish: FishState, targetX: number, targetY: number) {
         const inWater = fish.y > SEA_LEVEL;
 
-        // 1. HAREKET (FİZİK)
+        // 1. HAREKET
         if (inWater) {
             const dx = targetX - fish.x;
             const dy = targetY - fish.y;
@@ -33,10 +35,9 @@ export class PhysicsEngine {
             fish.vx += dx * 0.0008;
             fish.vy += dy * 0.0008;
             
-            fish.vx *= 0.95; // Sürtünme
+            fish.vx *= 0.95; 
             fish.vy *= 0.95;
 
-            // Hız Limiti
             const speed = Math.sqrt(fish.vx**2 + fish.vy**2);
             if (speed > 10) {
                 const ratio = 10 / speed;
@@ -52,34 +53,32 @@ export class PhysicsEngine {
         fish.x += fish.vx;
         fish.y += fish.vy;
 
-        // 2. DUVARLAR (Sınırlar - Akvaryum Mantığı)
+        // 2. SINIRLAR
         if (fish.x < 100) { fish.x = 100; fish.vx = 0; }
         if (fish.x > WORLD_WIDTH - 100) { fish.x = WORLD_WIDTH - 100; fish.vx = 0; }
         
         if (fish.y > WORLD_HEIGHT - 100) { fish.y = WORLD_HEIGHT - 100; fish.vy = 0; }
-        if (fish.y < SEA_LEVEL - 300) { fish.y = SEA_LEVEL - 300; fish.vy += 1; }
+        
+        // Zıplama sınırı (Çok uçmasın)
+        if (fish.y < SEA_LEVEL - 200) { fish.y = SEA_LEVEL - 200; fish.vy += 1; }
 
-        // 3. ANİMASYON MANTIĞI
+        // 3. ANİMASYON
         fish.timer++;
         const animSpeed = 4; 
 
         const currentDir = fish.vx > 0.1 ? 1 : (fish.vx < -0.1 ? -1 : fish.lastDirection);
 
-        // A. DÖNÜŞ KONTROLÜ
         if (fish.state === 'SWIM') {
             if (fish.lastDirection === 1 && currentDir === -1) {
-                // Sağdan Sola -> Animasyonlu
                 fish.state = 'TURN_LEFT';
                 fish.frame = 0;
             } else if (fish.lastDirection === -1 && currentDir === 1) {
-                // Soldan Sağa -> Anında (Tak diye)
                 fish.lastDirection = 1;
             } else {
                 fish.lastDirection = currentDir;
             }
         }
 
-        // B. FRAME GÜNCELLEME
         if (fish.timer > animSpeed) {
             fish.frame++;
             fish.timer = 0;
@@ -93,7 +92,6 @@ export class PhysicsEngine {
             }
         }
 
-        // 4. GÖRSEL DÖNÜŞ
         if (fish.state === 'TURN_LEFT') {
             fish.rotation = 0;
             fish.scaleX = 1; 
