@@ -18,6 +18,7 @@ import y4 from './balik/y4.png';
 import geceImg from './gece.png';
 import anazemin from './anazemin.png'; 
 import zemin from './zemin.png';
+import suDokuImg from './su_doku.png'; // <--- İŞTE BU EKSİKTİ, EKLENDİ.
 
 // LİSTELER
 const SWIM_SRCS = [d1, d2, d3, d4, d3, d2, d1, d5, d6, d7, d8, d7, d6, d5];
@@ -30,6 +31,7 @@ export type AssetLibrary = {
     eat: HTMLImageElement[];
     gece: HTMLImageElement | null;
     zeminler: HTMLImageElement[]; // [anazemin, zemin]
+    su: HTMLImageElement | null;  // <--- TİP TANIMI EKLENDİ
 };
 
 export const loadAssets = async (): Promise<AssetLibrary> => {
@@ -44,16 +46,24 @@ export const loadAssets = async (): Promise<AssetLibrary> => {
     });
 
     try {
-        const [swim, turnLeft, eat, gece, anazeminImg, zeminImg] = await Promise.all([
+        const [swim, turnLeft, eat, gece, anazeminImg, zeminImg, suImg] = await Promise.all([
             Promise.all(SWIM_SRCS.map((s, i) => loadImage(s, `swim_${i}`))),
             Promise.all(TURN_LEFT_SRCS.map((s, i) => loadImage(s, `turn_${i}`))),
             Promise.all(EAT_SRCS.map((s, i) => loadImage(s, `eat_${i}`))),
             loadImage(geceImg, 'gece'),
             loadImage(anazemin, 'anazemin'),
-            loadImage(zemin, 'zemin')
+            loadImage(zemin, 'zemin'),
+            loadImage(suDokuImg, 'su_doku') // <--- YÜKLEME EKLENDİ
         ]);
 
-        return { swim, turnLeft, eat, gece, zeminler: [anazeminImg, zeminImg] };
+        return { 
+            swim, 
+            turnLeft, 
+            eat, 
+            gece, 
+            zeminler: [anazeminImg, zeminImg],
+            su: suImg // <--- PAKETE DAHİL EDİLDİ
+        };
     } catch (e) {
         console.error("Asset Hatası:", e);
         throw e;
