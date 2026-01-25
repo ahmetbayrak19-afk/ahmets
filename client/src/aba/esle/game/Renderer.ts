@@ -103,11 +103,13 @@ export class GameRenderer {
         });
 
 
-        // --- KATMAN 4: SU YÜZEYİ DOKUSU (YERİ DEĞİŞTİ!) ---
-        // Balıktan ÖNCE çiziyoruz ki balık bunun üstüne gelsin.
+        // --- KATMAN 4: SU YÜZEYİ DOKUSU (GÜNCELLENDİ: OPTİMUM BOYUT) ---
         if (assets.su) {
             const distFromSurface = Math.max(0, camera.y - SEA_LEVEL);
-            const lidHeight = Math.max(20, Math.min(500, distFromSurface * 0.6));
+            
+            // DÜZELTME: 1.4 yerine 0.9 (Daha dengeli uzama)
+            // Maksimum boy: 750px (Ekranı yutmaz)
+            const lidHeight = Math.max(50, Math.min(750, distFromSurface * 0.9));
 
             if (lidHeight > 2) { 
                 const upPart = lidHeight * 0.95; 
@@ -143,7 +145,7 @@ export class GameRenderer {
         }
 
 
-        // --- KATMAN 5: BALIK (ARTIK YÜZEYİN ÜSTÜNDE) ---
+        // --- KATMAN 5: BALIK ---
         ctx.save();
         ctx.translate(fish.x, fish.y);
         ctx.rotate((fish.rotation * Math.PI) / 180);
@@ -161,8 +163,7 @@ export class GameRenderer {
         ctx.restore();
 
 
-        // --- KATMAN 6: OTLAR (BALIĞIN ÜSTÜNDE) ---
-        // Balık otların arkasında kalıp saklanabilsin diye balıktan SONRA çiziyoruz.
+        // --- KATMAN 6: OTLAR ---
         const grassMap = ['ot1', null, 'ot2', 'ot1', null];
         grassMap.forEach((grassType, index) => {
             if (!grassType) return; 
@@ -173,14 +174,11 @@ export class GameRenderer {
         });
 
 
-        // --- KATMAN 7: SU ATMOSFERİ CİLASI (TINT - EN ÜSTTE) ---
-        // Zemin, Otlar, Balık ve Yüzeyin bir kısmı bu cilanın altında kalır.
-        // Hepsine "suyun içi" havası verir.
+        // --- KATMAN 7: SU ATMOSFERİ CİLASI ---
         ctx.globalCompositeOperation = 'source-over';
         const tintGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
-        
-        tintGradient.addColorStop(0, 'rgba(0, 80, 120, 0.05)'); // Yüzeyde çok az
-        tintGradient.addColorStop(1, 'rgba(0, 30, 70, 0.5)');   // Dipte yoğun
+        tintGradient.addColorStop(0, 'rgba(0, 80, 120, 0.05)'); 
+        tintGradient.addColorStop(1, 'rgba(0, 30, 70, 0.5)');   
         
         ctx.fillStyle = tintGradient;
         ctx.fillRect(camera.x - w, SEA_LEVEL, w * 3, WORLD_HEIGHT - SEA_LEVEL);
