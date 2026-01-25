@@ -6,11 +6,10 @@ export class GameRenderer {
     private width = 0;
     private height = 0;
     
-    // Geçici tuval (Su yüzeyi yumuşatma işlemleri için)
     private tempCanvas: HTMLCanvasElement;
     private tempCtx: CanvasRenderingContext2D;
     
-    // Arka Plan Sütunları (Bir kere oluşturup saklayacağız, her karede hesaplamasın)
+    // Sütunları sakladığımız dizi
     private columns: { x: number, w: number, alpha: number }[] = [];
     
     private surfaceOffset = 0; 
@@ -22,17 +21,18 @@ export class GameRenderer {
         this.tempCanvas = document.createElement('canvas');
         this.tempCtx = this.tempCanvas.getContext('2d')!;
 
-        // --- ASİMETRİK SÜTUNLARI OLUŞTURMA ---
-        // Dünyanın başından sonuna kadar rastgele genişlikte şeritler oluşturuyoruz.
-        let currentX = -2000; // Ekranın solundan biraz geriden başla
+        // --- SIKLAŞTIRILMIŞ SÜTUNLAR ---
+        let currentX = -2000; 
         while (currentX < WORLD_WIDTH + 2000) {
-            // Sütun genişliği: 100px ile 400px arası rastgele (Simetrik olmasın diye)
-            const w = 100 + Math.random() * 300;
-            // Görünürlük (Alpha): Bazıları silik, bazıları net olsun (0.05 - 0.2 arası)
-            const alpha = 0.05 + Math.random() * 0.15;
+            // DÜZELTME 2: Genişliği azalttık (Daha sık sütunlar)
+            // Eskiden: 100-400px idi. Şimdi: 40-120px arası.
+            const w = 40 + Math.random() * 80;
+            
+            // Görünürlük ayarı (Bazıları çok belirgin, bazıları silik)
+            const alpha = 0.03 + Math.random() * 0.12;
             
             this.columns.push({ x: currentX, w: w, alpha: alpha });
-            currentX += w; // Bir sonraki sütuna geç
+            currentX += w; 
         }
     }
 
@@ -123,53 +123,49 @@ export class GameRenderer {
         });
 
 
-        // --- KATMAN 3: OLUŞTURULAN DİKEY DENİZ ARKA PLANI ---
+        // --- KATMAN 3: DİKEY ARKA PLAN (MAVİ TONLAR) ---
         
-        // 1. ADIM: Zemin Rengi (Base)
-        // Önce tüm denizi "su_doku"nun koyu bir tonuyla boyuyoruz.
+        // 1. ADIM: Zemin Rengi (DÜZELTME 1: YEŞİL YOK, SAF MAVİ VAR)
         ctx.globalCompositeOperation = 'source-over';
         
         const baseGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
-        // Üst: Koyu Turkuaz (Teal) - Aydınlık
-        baseGradient.addColorStop(0, '#008B8B'); 
-        // Alt: Çok Koyu Petrol Yeşili/Mavisi - Derinlik
-        baseGradient.addColorStop(1, '#004d4d'); 
+        // Üst: Parlak Okyanus Mavisi (Yeşil yok)
+        baseGradient.addColorStop(0, '#0077be'); 
+        // Orta: Derin Deniz Mavisi
+        baseGradient.addColorStop(0.6, '#004488'); 
+        // Alt: Gece Mavisi / Lacivert (Hafif morumsu koyuluk, yeşil değil)
+        baseGradient.addColorStop(1, '#002244'); 
         
         ctx.fillStyle = baseGradient;
         ctx.fillRect(0, SEA_LEVEL, WORLD_WIDTH, WORLD_HEIGHT - SEA_LEVEL);
 
 
-        // 2. ADIM: Asimetrik Sütunlar (Doku)
-        // Üstüne, oluşturduğumuz rastgele sütunları çiziyoruz.
-        // "overlay" veya "soft-light" moduyla zemine kaynaştırıyoruz.
-        ctx.globalCompositeOperation = 'soft-light';
+        // 2. ADIM: Asimetrik Sütunlar (DÜZELTME 2: DAHA SIK)
+        ctx.globalCompositeOperation = 'soft-light'; // Işıklandırma modu
 
         this.columns.forEach(col => {
-            // Sadece ekranda görünenleri çiz (Performans için)
             if (col.x + col.w > camera.x - w && col.x < camera.x + w) {
                 
-                // Her sütun kendi içinde yukarıdan aşağıya kararan bir gradyana sahip
                 const colGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
                 
-                // Üst: Daha parlak (Işık hüzmesi gibi)
-                colGradient.addColorStop(0, `rgba(255, 255, 255, ${col.alpha})`);
-                // Alt: Yok oluyor (Derinliğe karışıyor)
-                colGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                // Işık hüzmesi rengi (Beyazımsı mavi)
+                colGradient.addColorStop(0, `rgba(200, 240, 255, ${col.alpha})`);
+                colGradient.addColorStop(1, 'rgba(200, 240, 255, 0)');
                 
                 ctx.fillStyle = colGradient;
                 ctx.fillRect(col.x, SEA_LEVEL, col.w, WORLD_HEIGHT - SEA_LEVEL);
                 
-                // Sütunların kenarlarına ince çizgiler ekleyerek "1.png"deki dikey bant etkisini güçlendiriyoruz
+                // Çizgiler (Detay)
                 ctx.beginPath();
                 ctx.moveTo(col.x, SEA_LEVEL);
                 ctx.lineTo(col.x, WORLD_HEIGHT);
-                ctx.strokeStyle = `rgba(0, 40, 60, 0.1)`; // Hafif koyu çizgi
-                ctx.lineWidth = 2;
+                // Çizgi rengi de hafif mavi, siyah değil
+                ctx.strokeStyle = `rgba(0, 50, 100, 0.15)`; 
+                ctx.lineWidth = 1; // Daha ince, daha zarif
                 ctx.stroke();
             }
         });
         
-        // Normal çizim moduna dön
         ctx.globalCompositeOperation = 'source-over';
 
 
