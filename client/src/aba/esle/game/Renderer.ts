@@ -36,8 +36,7 @@ export class GameRenderer {
         this.surfaceOffset += 1.0; 
         this.lightTimer += 1;
 
-        // 1. TEMİZLİK (Gök Mavisi)
-        // Burası sadece resmin olmadığı en uç noktalar için güvenlik rengi.
+        // 1. TEMİZLİK (Arka plan Gök Mavisi)
         ctx.fillStyle = '#87CEEB'; 
         ctx.fillRect(0, 0, w, h);
 
@@ -46,50 +45,55 @@ export class GameRenderer {
         ctx.translate(-camera.x + w / 2, -camera.y + h / 2);
 
 
-        // --- KATMAN 1: GÖKYÜZÜ (BULUTLAR) ---
-        // HATA DÜZELTİLDİ: Artık bunun önüne mavi perde çekmiyoruz.
+        // --- KATMAN 1: GÖKYÜZÜ ---
         if (assets.gok) {
-            // Resmi olduğu gibi çiziyoruz. Arkası şeffaf değil, resim neyse o.
             ctx.drawImage(assets.gok, 0, 0, 3010, 500); 
         }
 
 
-        // --- KATMAN 1.5: SU YÜZEYİ (BİRLEŞİM YERİ) ---
+        // --- KATMAN 1.5: SU YÜZEYİ (DOKU) ---
         if (assets.su) {
             const distFromSurface = Math.max(0, camera.y - SEA_LEVEL);
-            const lidHeight = Math.min(400, distFromSurface * 0.5);
-            
-            // "Su dokusu üstüne gelmesin" dedin, overlap'i azalttım.
-            const overlap = 20; 
-            const drawY = SEA_LEVEL - overlap; 
+            // Boyutlandırma (Derinliğe göre uzayıp kısalma)
+            const lidHeight = Math.min(500, distFromSurface * 0.6);
 
             if (lidHeight > 2) { 
+                // İSTEĞİN: %90'ı YUKARIDA OLSUN
+                // Hesap: Toplam boyun %90'ını bul, o kadar yukarı (eksi Y) git.
+                const upPart = lidHeight * 0.90; 
+                const drawY = SEA_LEVEL - upPart; 
+
                 ctx.save();
                 
-                // BULUTLARI GÖRMEK İÇİN KRİTİK AYAR:
-                // Opacity: 0.5 (Yarı yarıya şeffaf, arkadaki bulut görünsün)
-                // Mod: source-over (Normal karışım, ekranı patlatmasın)
-                ctx.globalAlpha = 0.5; 
-                ctx.globalCompositeOperation = 'source-over'; 
+                // MAVİ KATMAN YOK. Sadece Texture.
+                // Bulutları görmek için hafif şeffaflık şart (0.7 iyidir, çok silik olmasın)
+                ctx.globalAlpha = 0.7; 
+                ctx.globalCompositeOperation = 'source-over'; // Normal çizim (Maviye boyamaz)
                 
                 const imgW = 592; 
                 const shift = this.surfaceOffset % imgW;
                 const count = Math.ceil(WORLD_WIDTH / imgW) + 2; 
 
+                // Resmi Çiz
                 for (let i = 0; i < count; i++) {
                     const drawX = (i * imgW) - shift;
                     if (drawX < WORLD_WIDTH && drawX + imgW > -500) {
-                        ctx.drawImage(assets.su, drawX, drawY, imgW, lidHeight + overlap);
+                        ctx.drawImage(assets.su, drawX, drawY, imgW, lidHeight);
                     }
                 }
                 
-                // Alt taraftaki keskin çizgiyi yumuşatma (Yine sadece alt uca)
-                const blendGradient = ctx.createLinearGradient(0, drawY + lidHeight - 100, 0, drawY + lidHeight + overlap);
-                blendGradient.addColorStop(0, 'rgba(0, 60, 120, 0.0)'); 
-                blendGradient.addColorStop(1, 'rgba(0, 60, 120, 0.6)'); 
+                // MASKELEME (Texture'ın üstünü ve altını yumuşatma)
+                // Bu kısım texture'ı maviye boyamaz, sadece "kesip" yumuşatır.
+                ctx.globalCompositeOperation = 'destination-in'; 
                 
-                ctx.fillStyle = blendGradient;
-                ctx.fillRect(camera.x - w, drawY + lidHeight - 100, w * 3, 200);
+                const maskGradient = ctx.createLinearGradient(0, drawY, 0, drawY + lidHeight);
+                maskGradient.addColorStop(0, 'rgba(0,0,0,0.0)');   // EN ÜST: Tam Şeffaf (Bulutlar net)
+                maskGradient.addColorStop(0.2, 'rgba(0,0,0,1.0)'); // ORTA ÜST: Tam Görünür
+                maskGradient.addColorStop(0.8, 'rgba(0,0,0,1.0)'); // ORTA ALT: Tam Görünür
+                maskGradient.addColorStop(1, 'rgba(0,0,0,0.0)');   // EN ALT: Tam Şeffaf (Suya karışır)
+                
+                ctx.fillStyle = maskGradient;
+                ctx.fillRect(camera.x - w, drawY, w * 3, lidHeight);
 
                 ctx.restore();
             }
@@ -107,22 +111,16 @@ export class GameRenderer {
         });
 
 
-        // --- KATMAN 3: DERİN SU PERDESİ (DÜZELTİLEN YER) ---
+        // --- KATMAN 3: DERİN SU PERDESİ ---
         ctx.globalCompositeOperation = 'source-over';
 
-        // "O katmanın boyunu kısalt" dediğin yer burası!
-        // Eskiden -5000'den başlatıyordum, göğü kapatıyordu.
-        // ŞİMDİ: Tam SEA_LEVEL'dan (500) başlatıyorum. 
-        // Böylece 0-500 arasındaki GÖKYÜZÜNE DOKUNMUYORUZ.
         const deepGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
-        
-        // Başlangıcı çok şeffaf yapıyoruz ki su yüzeyindeki bulutlar net görünsün
-        deepGradient.addColorStop(0, 'rgba(0, 150, 255, 0.1)'); // %10 Opacity (Neredeyse yok)
-        deepGradient.addColorStop(0.3, 'rgba(0, 100, 200, 0.4)'); // Biraz derinleşince mavileşiyor
-        deepGradient.addColorStop(1, 'rgba(0, 10, 50, 0.9)');    // Dip karanlık
+        // Üst kısım çok çok açık (%5) -> Aşağısı koyu
+        deepGradient.addColorStop(0, 'rgba(0, 150, 255, 0.05)'); 
+        deepGradient.addColorStop(0.4, 'rgba(0, 100, 200, 0.4)');
+        deepGradient.addColorStop(1, 'rgba(0, 10, 50, 0.9)');    
         
         ctx.fillStyle = deepGradient;
-        // Çizime tam SEA_LEVEL'dan başlıyoruz! Yukarı taşmıyor.
         ctx.fillRect(0, SEA_LEVEL, WORLD_WIDTH, WORLD_HEIGHT - SEA_LEVEL);
 
 
@@ -182,13 +180,9 @@ export class GameRenderer {
         });
 
 
-        // --- KATMAN 6: YÜZEY CİLASI ---
-        const surfaceGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
-        surfaceGradient.addColorStop(0, 'rgba(0, 100, 200, 0.05)'); // Çok hafif cila
-        surfaceGradient.addColorStop(1, 'rgba(0, 50, 100, 0.3)'); 
-        ctx.fillStyle = surfaceGradient;
-        ctx.fillRect(0, SEA_LEVEL, WORLD_WIDTH, WORLD_HEIGHT - SEA_LEVEL);
-
+        // --- KATMAN 6: YÜZEY CİLASI (İPTAL EDİLDİ) ---
+        // "Mavi opak katman gelmesin" dediğin için burayı kaldırdım.
+        // Artık su yüzeyi tertemiz texture renginde.
 
         // --- SÜSLER ---
         ctx.beginPath();
