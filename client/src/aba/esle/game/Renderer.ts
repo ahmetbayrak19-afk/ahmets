@@ -36,7 +36,7 @@ export class GameRenderer {
         this.surfaceOffset += 1.0; 
         this.lightTimer += 1;
 
-        // 1. TEMİZLİK (Arka plan Gök Mavisi)
+        // 1. TEMİZLİK
         ctx.fillStyle = '#87CEEB'; 
         ctx.fillRect(0, 0, w, h);
 
@@ -45,36 +45,36 @@ export class GameRenderer {
         ctx.translate(-camera.x + w / 2, -camera.y + h / 2);
 
 
-        // --- KATMAN 1: GÖKYÜZÜ ---
+        // --- KATMAN 0: SONSUZ GÖKYÜZÜ ASTARI ---
+        ctx.fillStyle = '#87CEEB'; 
+        ctx.fillRect(-2000, -10000, WORLD_WIDTH + 4000, 10000 + SEA_LEVEL);
+
+
+        // --- KATMAN 1: GÖKYÜZÜ RESMİ ---
         if (assets.gok) {
             ctx.drawImage(assets.gok, 0, 0, 3010, 500); 
         }
 
 
-        // --- KATMAN 1.5: SU YÜZEYİ (DOKU) ---
+        // --- KATMAN 1.5: SU YÜZEYİ (GRADYANLI FADE) ---
         if (assets.su) {
             const distFromSurface = Math.max(0, camera.y - SEA_LEVEL);
-            // Boyutlandırma (Derinliğe göre uzayıp kısalma)
-            const lidHeight = Math.min(500, distFromSurface * 0.6);
+            const lidHeight = Math.max(20, Math.min(500, distFromSurface * 0.6));
 
             if (lidHeight > 2) { 
-                // İSTEĞİN: %90'ı YUKARIDA OLSUN
-                // Hesap: Toplam boyun %90'ını bul, o kadar yukarı (eksi Y) git.
-                const upPart = lidHeight * 0.90; 
+                const upPart = lidHeight * 0.95; // %95 Havada
                 const drawY = SEA_LEVEL - upPart; 
 
                 ctx.save();
                 
-                // MAVİ KATMAN YOK. Sadece Texture.
-                // Bulutları görmek için hafif şeffaflık şart (0.7 iyidir, çok silik olmasın)
-                ctx.globalAlpha = 0.7; 
-                ctx.globalCompositeOperation = 'source-over'; // Normal çizim (Maviye boyamaz)
+                // 1. Resmi Çiziyoruz (Normal Mod)
+                ctx.globalAlpha = 0.9; // Temel görünürlük yüksek
+                ctx.globalCompositeOperation = 'source-over'; 
                 
                 const imgW = 592; 
                 const shift = this.surfaceOffset % imgW;
                 const count = Math.ceil(WORLD_WIDTH / imgW) + 2; 
 
-                // Resmi Çiz
                 for (let i = 0; i < count; i++) {
                     const drawX = (i * imgW) - shift;
                     if (drawX < WORLD_WIDTH && drawX + imgW > -500) {
@@ -82,17 +82,20 @@ export class GameRenderer {
                     }
                 }
                 
-                // MASKELEME (Texture'ın üstünü ve altını yumuşatma)
-                // Bu kısım texture'ı maviye boyamaz, sadece "kesip" yumuşatır.
-                ctx.globalCompositeOperation = 'destination-in'; 
+                // 2. MASKELEME (İSTEĞİN OLAN KISIM)
+                // "destination-in" modu, var olan çizimi maskeler (keser/siler).
+                // Gradyan ile üst tarafı siliyoruz, alt tarafı tutuyoruz.
+                ctx.globalCompositeOperation = 'destination-in';
                 
-                const maskGradient = ctx.createLinearGradient(0, drawY, 0, drawY + lidHeight);
-                maskGradient.addColorStop(0, 'rgba(0,0,0,0.0)');   // EN ÜST: Tam Şeffaf (Bulutlar net)
-                maskGradient.addColorStop(0.2, 'rgba(0,0,0,1.0)'); // ORTA ÜST: Tam Görünür
-                maskGradient.addColorStop(0.8, 'rgba(0,0,0,1.0)'); // ORTA ALT: Tam Görünür
-                maskGradient.addColorStop(1, 'rgba(0,0,0,0.0)');   // EN ALT: Tam Şeffaf (Suya karışır)
+                const fadeGradient = ctx.createLinearGradient(0, drawY, 0, drawY + lidHeight);
+                // ÜST (Ufuk): Opacity 0.1 (Çok silik, Gökyüzü görünüyor)
+                fadeGradient.addColorStop(0, 'rgba(0, 0, 0, 0.1)'); 
+                // ORTA: Opacity 0.6 (Belirginleşiyor)
+                fadeGradient.addColorStop(0.4, 'rgba(0, 0, 0, 0.6)'); 
+                // ALT (Deniz): Opacity 1.0 (Tam Net)
+                fadeGradient.addColorStop(1, 'rgba(0, 0, 0, 1.0)'); 
                 
-                ctx.fillStyle = maskGradient;
+                ctx.fillStyle = fadeGradient;
                 ctx.fillRect(camera.x - w, drawY, w * 3, lidHeight);
 
                 ctx.restore();
@@ -111,15 +114,12 @@ export class GameRenderer {
         });
 
 
-        // --- KATMAN 3: DERİN SU PERDESİ ---
+        // --- KATMAN 3: DERİN SU PERDESİ (GÜNDÜZ) ---
         ctx.globalCompositeOperation = 'source-over';
-
         const deepGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
-        // Üst kısım çok çok açık (%5) -> Aşağısı koyu
-        deepGradient.addColorStop(0, 'rgba(0, 150, 255, 0.05)'); 
-        deepGradient.addColorStop(0.4, 'rgba(0, 100, 200, 0.4)');
-        deepGradient.addColorStop(1, 'rgba(0, 10, 50, 0.9)');    
-        
+        deepGradient.addColorStop(0, 'rgba(0, 180, 255, 0.05)'); 
+        deepGradient.addColorStop(0.5, 'rgba(0, 100, 200, 0.3)'); 
+        deepGradient.addColorStop(1, 'rgba(0, 40, 100, 0.85)');    
         ctx.fillStyle = deepGradient;
         ctx.fillRect(0, SEA_LEVEL, WORLD_WIDTH, WORLD_HEIGHT - SEA_LEVEL);
 
@@ -127,11 +127,9 @@ export class GameRenderer {
         // --- KATMAN 3.5: TANRISAL IŞIKLAR ---
         ctx.save();
         ctx.globalCompositeOperation = 'overlay'; 
-        
         const rayGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
-        rayGradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)'); 
+        rayGradient.addColorStop(0, 'rgba(255, 255, 255, 0.2)'); 
         rayGradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)');   
-
         ctx.fillStyle = rayGradient;
         this.rays.forEach((ray, index) => {
             if (ray.x > camera.x - w && ray.x < camera.x + w) {
@@ -154,12 +152,10 @@ export class GameRenderer {
         ctx.translate(fish.x, fish.y);
         ctx.rotate((fish.rotation * Math.PI) / 180);
         ctx.scale(fish.scaleX, fish.scaleY);
-
         let img = assets.swim[0]; 
         if (fish.state === 'TURN_LEFT') img = assets.turnLeft[fish.frame % assets.turnLeft.length];
         else if (fish.state === 'EAT') img = assets.eat[fish.frame % assets.eat.length];
         else img = assets.swim[fish.frame % assets.swim.length];
-
         if (img) {
             ctx.shadowColor = 'rgba(0,0,0,0.5)';
             ctx.shadowBlur = 20;
@@ -180,10 +176,6 @@ export class GameRenderer {
         });
 
 
-        // --- KATMAN 6: YÜZEY CİLASI (İPTAL EDİLDİ) ---
-        // "Mavi opak katman gelmesin" dediğin için burayı kaldırdım.
-        // Artık su yüzeyi tertemiz texture renginde.
-
         // --- SÜSLER ---
         ctx.beginPath();
         ctx.moveTo(0, SEA_LEVEL);
@@ -191,7 +183,6 @@ export class GameRenderer {
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
         ctx.lineWidth = 2;
         ctx.stroke();
-
         ctx.restore(); 
         
         // Duvarlar
