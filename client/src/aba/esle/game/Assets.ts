@@ -14,8 +14,7 @@ import y4 from './balik/y4.png';
 import gokImg from './gok.png'; 
 import anazemin from './anazemin.png'; 
 import zemin from './zemin.png';
-import suDokuImg from './su_doku.png'; 
-// kaya.png SİLİNDİ
+import suDokuImg from './su_doku.png'; // <--- GERİ GELDİ
 import ot1Img from './ot1.png'; 
 import ot2Img from './ot2.png'; 
 
@@ -29,8 +28,7 @@ export type AssetLibrary = {
     eat: HTMLImageElement[];
     gok: HTMLImageElement | null;
     zeminler: HTMLImageElement[];
-    su: HTMLImageElement | null;
-    // kaya SİLİNDİ
+    su: HTMLImageElement | null; // <--- TİP GERİ GELDİ
     otlar: { ot1: HTMLImageElement | null; ot2: HTMLImageElement | null }; 
 };
 
@@ -46,7 +44,6 @@ export const loadAssets = async (): Promise<AssetLibrary> => {
     });
 
     try {
-        // Promise listesinden kayaImg çıkarıldı
         const [swim, turnLeft, eat, gok, anazeminImg, zeminImg, suImg, ot1, ot2] = await Promise.all([
             Promise.all(SWIM_SRCS.map((s, i) => loadImage(s, `swim_${i}`))),
             Promise.all(TURN_LEFT_SRCS.map((s, i) => loadImage(s, `turn_${i}`))),
@@ -54,8 +51,7 @@ export const loadAssets = async (): Promise<AssetLibrary> => {
             loadImage(gokImg, 'gok'),
             loadImage(anazemin, 'anazemin'),
             loadImage(zemin, 'zemin'),
-            loadImage(suDokuImg, 'su_doku'),
-            // kaya yükleme satırı SİLİNDİ
+            loadImage(suDokuImg, 'su_doku'), // <--- YÜKLENİYOR
             loadImage(ot1Img, 'ot1'), 
             loadImage(ot2Img, 'ot2')  
         ]);
@@ -64,8 +60,7 @@ export const loadAssets = async (): Promise<AssetLibrary> => {
             swim, turnLeft, eat, 
             gok, 
             zeminler: [anazeminImg, zeminImg],
-            su: suImg,
-            // kaya return SİLİNDİ
+            su: suImg, // <--- PAKETE DAHİL
             otlar: { ot1, ot2 } 
         };
     } catch (e) {
