@@ -25,8 +25,7 @@ export class GameRenderer {
         const w = this.width;
         const h = this.height;
 
-        // Her karede suyun kayma miktarını artır (Hız: 1.5 birim)
-        this.surfaceOffset += 1.5;
+        this.surfaceOffset += 1.0; // Akış hızı biraz daha sakin
 
         // 1. TEMİZLİK
         ctx.fillStyle = '#87CEEB'; 
@@ -43,44 +42,46 @@ export class GameRenderer {
         }
 
 
-        // --- KATMAN 1.5: SU KAPAĞI (AKAN + ŞEFFAF) ---
+        // --- KATMAN 1.5: SU YÜZEYİ (IŞIK HÜZMESİ VERSİYONU) ---
         if (assets.su) {
             const distFromSurface = Math.max(0, camera.y - SEA_LEVEL);
-            // Yükseklik yine perspektife göre değişiyor
-            const lidHeight = Math.min(600, distFromSurface * 0.5);
+            
+            // Yüksekliği biraz daha kısıtladım (Max 400). Çok uzamasın.
+            const lidHeight = Math.min(400, distFromSurface * 0.5);
 
-            if (lidHeight > 1) { 
+            if (lidHeight > 2) { 
                 ctx.save();
                 
-                // --- ŞEFFAFLIK AYARI ---
-                // "Hafif gökyüzü görünsün ama az" dediğin yer burası.
-                // 1.0 = Beton gibi (arkası görünmez)
-                // 0.0 = Görünmez
-                // 0.55 = Tam kararında (Su net, ama arkadaki bulut hayal meyal belli)
-                ctx.globalAlpha = 0.55; 
-                
-                // Karıştırma modu: Normal (source-over) yaparak gökyüzüyle doğal karışmasını sağladım.
-                // Overlay yaparsak çok parlıyordu, bu daha doğal.
-                ctx.globalCompositeOperation = 'source-over'; 
+                // CRITICAL 1: SCREEN MODU (Işık gibi davranır, parlar)
+                ctx.globalCompositeOperation = 'screen'; 
+                ctx.globalAlpha = 0.6; 
                 
                 const imgW = 592; 
-                // Kayma miktarı (Modülüs alıyoruz ki sayı sonsuza gitmesin)
                 const shift = this.surfaceOffset % imgW;
-                
-                // Ekranı doldurmak için kaç tane lazım? (+2 diyerek kenarlardaki boşluk riskini alıyoruz)
                 const count = Math.ceil(WORLD_WIDTH / imgW) + 2; 
 
+                // Önce resimleri çiziyoruz (Yan yana ve ezilmiş olarak)
                 for (let i = 0; i < count; i++) {
-                    // X Hesabı: (Sıra * Genişlik) - (Kayma Miktarı)
-                    // Böylece hepsi sola doğru kayar.
                     const drawX = (i * imgW) - shift;
-                    
-                    // Sadece ekranda görünenleri çiz (Performans)
                     if (drawX < WORLD_WIDTH && drawX + imgW > -500) {
                         ctx.drawImage(assets.su, drawX, SEA_LEVEL, imgW, lidHeight);
                     }
                 }
                 
+                // CRITICAL 2: FADE OUT (ALT TARAFI SİLME)
+                // Resmin üzerine, "şeffaftan -> koyu maviye" giden bir gradyan çiziyoruz.
+                // Bu sayede resmin alt kenarı yumuşakça kayboluyor.
+                ctx.globalCompositeOperation = 'destination-in'; // Sadece kesişen yerleri tut
+                
+                const fadeGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, SEA_LEVEL + lidHeight);
+                fadeGradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)'); // Üst taraf TAM GÖRÜNÜR
+                fadeGradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.5)'); // Orta YARI ŞEFFAF
+                fadeGradient.addColorStop(1, 'rgba(255, 255, 255, 0.0)'); // Alt taraf GÖRÜNMEZ (Silinir)
+                
+                ctx.fillStyle = fadeGradient;
+                // Maskeyi tüm su yüzeyi alanına uyguluyoruz
+                ctx.fillRect(camera.x - w, SEA_LEVEL, w * 3, lidHeight);
+
                 ctx.restore();
             }
         }
@@ -98,6 +99,9 @@ export class GameRenderer {
 
 
         // --- KATMAN 3: DERİN SU PERDESİ (GRADYANLI) ---
+        // Normal moda geri dön (Yukarıda screen yapmıştık, karışmasın)
+        ctx.globalCompositeOperation = 'source-over';
+
         const deepGradient = ctx.createLinearGradient(0, SEA_LEVEL, 0, WORLD_HEIGHT);
         deepGradient.addColorStop(0, 'rgba(0, 150, 255, 0.3)'); 
         deepGradient.addColorStop(1, 'rgba(0, 10, 50, 0.6)');   
