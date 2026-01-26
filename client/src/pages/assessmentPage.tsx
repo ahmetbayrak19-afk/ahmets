@@ -4,7 +4,7 @@ import { useStudentData } from '@/hooks/useStudentData';
 import { Button } from '@/components/ui/button';
 import { 
   ArrowLeft, BookOpen, Activity, ClipboardList, 
-  BrainCircuit, Baby, MessageSquare, CheckCircle, ChevronRight, PlayCircle
+  BrainCircuit, MessageSquare, CheckCircle, ChevronRight, PenTool
 } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 
@@ -14,7 +14,8 @@ const ASSESSMENT_TYPES = [
   { id: 'aba', title: 'ABA', subtitle: 'Değerlendirme', icon: Activity, color: 'text-green-400', border: 'border-green-500/20', bg: 'bg-green-500/5', activeBorder: 'border-green-500', activeBg: 'bg-green-500/20' },
   { id: 'ema', title: 'EMA', subtitle: 'Değerlendirme', icon: ClipboardList, color: 'text-orange-400', border: 'border-orange-500/20', bg: 'bg-orange-500/5', activeBorder: 'border-orange-500', activeBg: 'bg-orange-500/20' },
   { id: 'dil', title: 'Dil', subtitle: 'Becerileri', icon: MessageSquare, color: 'text-purple-400', border: 'border-purple-500/20', bg: 'bg-purple-500/5', activeBorder: 'border-purple-500', activeBg: 'bg-purple-500/20' },
-  { id: 'gelisim', title: 'Gelişimsel', subtitle: 'Tarama', icon: Baby, color: 'text-pink-400', border: 'border-pink-500/20', bg: 'bg-pink-500/5', activeBorder: 'border-pink-500', activeBg: 'bg-pink-500/20' },
+  // Değişiklik burada yapıldı: Gelişimsel Tarama -> Okuma Yazma Becerileri
+  { id: 'okuma-yazma', title: 'Okuma Yazma', subtitle: 'Becerileri', icon: PenTool, color: 'text-pink-400', border: 'border-pink-500/20', bg: 'bg-pink-500/5', activeBorder: 'border-pink-500', activeBg: 'bg-pink-500/20' },
   { id: 'bilissel', title: 'Bilişsel', subtitle: 'Beceriler', icon: BrainCircuit, color: 'text-yellow-400', border: 'border-yellow-500/20', bg: 'bg-yellow-500/5', activeBorder: 'border-yellow-500', activeBg: 'bg-yellow-500/20' },
 ];
 
@@ -42,6 +43,9 @@ export default function AssessmentPage() {
   const handleNext = () => {
     if (selectedIds.length === 0) return;
     if (selectedIds.length === 1) {
+      // Eğer seçilen 'okuma-yazma' ise, yönlendirme URL'si buna göre olmalı
+      // Burada varsayılan olarak `/${id}-assessment/${studentId}` yapısını koruyoruz.
+      // Okuma yazma sayfası oluşturulduğunda route'u 'okuma-yazma-assessment' olarak tanımlamanız gerekecektir.
       setLocation(`/${selectedIds[0]}-assessment/${studentId}`);
     } else {
       setStep('start');
@@ -170,4 +174,5 @@ export default function AssessmentPage() {
       )}
     </div>
   );
-                                                                                                  }
+   }
+                 
