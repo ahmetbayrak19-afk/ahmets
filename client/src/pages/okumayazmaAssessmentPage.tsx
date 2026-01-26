@@ -78,13 +78,23 @@ export default function OkumayazmaAssessmentPage() {
     }
   };
 
-  // TIKLAMA YÖNETİMİ
+  // TIKLAMA YÖNETİMİ (GÜNCELLENDİ)
   const handleStageClick = (stageId: string) => {
-    console.log(`${stageId} seçildi. İçerik bekleniyor...`);
-    
-    // İleride buraya yönlendirmeleri ekleyeceğiz:
-    // if (stageId === 'assessment') setLocation(...)
-    // if (stageId === 'level-1') setLocation(...)
+    if (!studentId) return;
+
+    // İlgili sayfalara yönlendirme yapıyoruz
+    if (stageId === 'assessment') {
+        setLocation(`/okuyaz/degerlendirme/${studentId}`);
+    } 
+    else if (stageId === 'level-1') {
+        setLocation(`/okuyaz/seviye1/${studentId}`);
+    } 
+    else if (stageId === 'level-2') {
+        setLocation(`/okuyaz/seviye2/${studentId}`);
+    } 
+    else if (stageId === 'level-3') {
+        setLocation(`/okuyaz/seviye3/${studentId}`);
+    }
   };
 
   return (
@@ -174,4 +184,4 @@ export default function OkumayazmaAssessmentPage() {
       </div>
     </div>
   );
-              }
+}
