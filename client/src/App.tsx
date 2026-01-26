@@ -13,7 +13,9 @@ import WelcomeScreen from "@/pages/WelcomeScreen";
 // Parçaladığımız yeni sayfalar
 import AssessmentPage from "@/pages/assessmentPage";
 import AbaAssessmentPage from "@/pages/abaAssessmentPage";
-import KavramAssessmentPage from "@/pages/kavramAssessmentPage"; // Bunu eklemeyi unutma!
+import KavramAssessmentPage from "@/pages/kavramAssessmentPage"; 
+// YENİ EKLENEN IMPORT:
+import OkumayazmaAssessmentPage from "@/pages/okumayazmaAssessmentPage";
 
 export default function App() {
   return (
@@ -33,8 +35,11 @@ export default function App() {
           {/* 2. ABA Değerlendirme Sayfası */}
           <Route path="/aba-assessment/:id" component={AbaAssessmentPage} />
 
-          {/* 3. Kavram Değerlendirme Sayfası (Tüm o 200 importun olduğu yer) */}
+          {/* 3. Kavram Değerlendirme Sayfası */}
           <Route path="/kavram-assessment/:id" component={KavramAssessmentPage} />
+
+          {/* 4. Okuma Yazma Değerlendirme Sayfası (YENİ EKLENDİ) */}
+          <Route path="/okuma-yazma-assessment/:id" component={OkumayazmaAssessmentPage} />
 
           {/* Yanlış URL girilirse ana ekrana at */}
           <Route component={WelcomeScreen} />
@@ -42,4 +47,5 @@ export default function App() {
       </Router>
     </QueryClientProvider>
   );
-}
+      }
+            
