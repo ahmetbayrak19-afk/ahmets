@@ -1,24 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeft, ArrowRight, Eraser, Check, XCircle, 
-  Volume2, ChevronRight, Trophy, RefreshCcw, Pencil, Eye
+  Eraser, Check, XCircle, Volume2, ChevronRight, Trophy, RefreshCcw, Pencil, Eye
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { twMerge } from 'tailwind-merge';
 
-// --- SES DOSYALARI ---
-import aferin1 from './ses/aferin1.mp3';
-import bravo from './ses/bravo.mp3';
-import harika1 from './ses/harika1.mp3';
-import tekrardene1 from './ses/tekrardene1.mp3';
+// --- SES DOSYALARI (Yollar güncellendi & esledinbravo çıkarıldı) ---
+import aferin1 from '@/aba/esle/ses/aferin1.mp3';
+import bravo from '@/aba/esle/ses/bravo.mp3';
+import harika1 from '@/aba/esle/ses/harika1.mp3';
+import tekrardene1 from '@/aba/esle/ses/tekrardene1.mp3';
 
 // --- 1. ANIMALS (Video) ---
 import aslanVid from '@/animals/aslan.mp4';
 import ayiVid from '@/animals/ayi.mp4';
 import atVid from '@/animals/at.mp4';
-import kaplanVid from '@/animals/kaplan.mp4';
-import tavukVid from '@/animals/tavuk.mp4';
-import penguenVid from '@/animals/penguen.mp4';
 import kediVid from '@/animals/kedi.mp4';
 import kopekVid from '@/animals/kopek.mp4';
 import maymunVid from '@/animals/maymun.mp4';
@@ -27,56 +24,32 @@ import yilanVid from '@/animals/yilan.mp4';
 // --- 2. CLOTHES (Image) ---
 import ayakkabiImg from '@/clothes/ayakkabi.jpg';
 import atletImg from '@/clothes/atlet.jpg';
-import corapImg from '@/clothes/corap.jpg';
-import etekImg from '@/clothes/etek.jpg';
-import gomlekImg from '@/clothes/gomlek.jpg';
 import kazakImg from '@/clothes/kazak.jpg';
 import pantolonImg from '@/clothes/pantolon.jpg';
 import sapkaImg from '@/clothes/sapka.jpg';
-import tshirtImg from '@/clothes/tshirt.jpg';
-import kabanImg from '@/clothes/kaban.jpg';
 
 // --- 3. FRUITS (Image) ---
 import ananasImg from '@/fruits/ananas.jpg';
 import armutImg from '@/fruits/armut.jpg';
-import cilekImg from '@/fruits/cilek.jpg';
 import elmaImg from '@/fruits/elma.jpg';
 import karpuzImg from '@/fruits/karpuz.jpg';
-import kirazImg from '@/fruits/kiraz.jpg';
 import muzImg from '@/fruits/muz.jpg';
-import narImg from '@/fruits/nar.jpg';
-import portakalImg from '@/fruits/portakal.jpg';
-import uzumImg from '@/fruits/uzum.jpg';
 
 // --- 4. VEGETABLES (Image) ---
 import biberImg from '@/vegetables/biber.jpg';
-import brokoliImg from '@/vegetables/brokoli.jpg';
-import domatesImg from '@/vegetables/domates.jpg';
 import havucImg from '@/vegetables/havuc.jpg';
-import kabakImg from '@/vegetables/kabak.jpg';
-import mantarImg from '@/vegetables/mantar.jpg';
-import misirImg from '@/vegetables/misir.jpg';
-import patatesImg from '@/vegetables/patates.jpg';
-import patlicanImg from '@/vegetables/patlican.jpg';
-import salatalikImg from '@/vegetables/salatalik.jpg';
-import soganImg from '@/vegetables/sogan.jpg';
 
 // --- 5. VEHICLES (Video) ---
 import arabaVid from '@/vehicles/araba.mp4';
-import bisikletVid from '@/vehicles/bisiklet.mp4';
-import gemiVid from '@/vehicles/gemi.mp4';
-import helikopterVid from '@/vehicles/helikopter.mp4';
-import kamyonVid from '@/vehicles/kamyon.mp4';
-import kepceVid from '@/vehicles/kepce.mp4';
-import motosikletVid from '@/vehicles/motosiklet.mp4';
 import otobusVid from '@/vehicles/otobus.mp4';
 import trenVid from '@/vehicles/tren.mp4';
 import ucakVid from '@/vehicles/ucak.mp4';
 
-const POSITIVE_SOUNDS = [aferin1, bravo, harika1];
+// --- SES HAVUZLARI ---
+const POSITIVE_SOUNDS = [aferin1, bravo, harika1]; // esledinbravo YOK
 const NEGATIVE_SOUNDS = [tekrardene1];
 
-// --- HAVUZ OLUŞTURMA (Video/Resim Ayrımı ile) ---
+// --- VERİ HAVUZU ---
 const POOL = [
   // A İle Başlayanlar (DOĞRULAR)
   { id: 'aslan', src: aslanVid, type: 'video', startsWithA: true },
@@ -88,7 +61,7 @@ const POOL = [
   { id: 'armut', src: armutImg, type: 'image', startsWithA: true },
   { id: 'araba', src: arabaVid, type: 'video', startsWithA: true },
 
-  // Çeldiriciler (Video & Resim)
+  // Çeldiriciler
   { id: 'kedi', src: kediVid, type: 'video', startsWithA: false },
   { id: 'kopek', src: kopekVid, type: 'video', startsWithA: false },
   { id: 'maymun', src: maymunVid, type: 'video', startsWithA: false },
@@ -96,7 +69,7 @@ const POOL = [
   { id: 'kazak', src: kazakImg, type: 'image', startsWithA: false },
   { id: 'pantolon', src: pantolonImg, type: 'image', startsWithA: false },
   { id: 'sapka', src: sapkaImg, type: 'image', startsWithA: false },
-  { id: 'elma', src: elmaImg, type: 'image', startsWithA: false }, // E ile başlar (Güçlü çeldirici)
+  { id: 'elma', src: elmaImg, type: 'image', startsWithA: false }, 
   { id: 'muz', src: muzImg, type: 'image', startsWithA: false },
   { id: 'karpuz', src: karpuzImg, type: 'image', startsWithA: false },
   { id: 'havuc', src: havucImg, type: 'image', startsWithA: false },
@@ -106,30 +79,15 @@ const POOL = [
   { id: 'otobus', src: otobusVid, type: 'video', startsWithA: false },
 ];
 
-// --- SORULAR (KARIŞIK MEDYA) ---
+// --- SORULAR ---
 const QUESTIONS = [
-  // Soru 1: Videolar Arasında (Aslan vs Kedi vs Köpek)
   { targetId: 'aslan', options: ['aslan', 'kedi', 'kopek'] },
-  
-  // Soru 2: Resimler Arasında (Ananas vs Muz vs Karpuz)
   { targetId: 'ananas', options: ['ananas', 'muz', 'karpuz'] },
-  
-  // Soru 3: Videolar Arasında (Araba vs Uçak vs Tren)
   { targetId: 'araba', options: ['araba', 'ucak', 'tren'] },
-  
-  // Soru 4: Resimler (Kıyafet) (Ayakkabı vs Kazak vs Şapka)
   { targetId: 'ayakkabi', options: ['sapka', 'ayakkabi', 'kazak'] },
-
-  // Soru 5: Karışık (Ayı vs Havuç vs Elma)
   { targetId: 'ayi', options: ['havuc', 'elma', 'ayi'] },
-  
-  // Soru 6: Resimler (Armut vs Elma vs Biber)
   { targetId: 'armut', options: ['biber', 'armut', 'elma'] },
-  
-  // Soru 7: Videolar (At vs Yılan vs Maymun)
   { targetId: 'at', options: ['yilan', 'maymun', 'at'] },
-  
-  // Soru 8: Karışık (Atlet vs Otobüs vs Pantolon)
   { targetId: 'atlet', options: ['pantolon', 'atlet', 'otobus'] },
 ];
 
@@ -146,10 +104,10 @@ export default function SesliHarfEtkinlikleri() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans select-none overflow-hidden">
       
-      {/* --- YENİ ÜST BAR (NAVİGASYON) --- */}
+      {/* --- ÜST BAR (NAVİGASYON) --- */}
       <div className="bg-white px-4 py-3 shadow-md flex justify-between items-center sticky top-0 z-50 border-b border-slate-100">
         
-        {/* SOL: Etkinlik Değiştirme Butonları (Küçük ve Öğretmen için) */}
+        {/* SOL: Etkinlik Değiştirme Butonları */}
         <div className="flex gap-2">
             <button 
               onClick={() => setActiveTab('cizim')}
@@ -198,7 +156,7 @@ export default function SesliHarfEtkinlikleri() {
 }
 
 // ---------------------------------------------------------------------------
-// 1. ETKİNLİK: ÇİZİM (Canvas) - (Değişmedi, aynı mantık)
+// 1. ETKİNLİK: ÇİZİM (Canvas)
 // ---------------------------------------------------------------------------
 function CizimEtkinligi() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -218,7 +176,7 @@ function CizimEtkinligi() {
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.strokeStyle = '#f97316'; 
-            ctx.lineWidth = 20; // Çocuklar için daha kalın
+            ctx.lineWidth = 20; 
         }
     };
     resizeCanvas();
@@ -459,5 +417,5 @@ function FarkindalikEtkinligi({ playSound }: { playSound: (t: 'success' | 'fail'
         </div>
     </div>
   );
-  }
-  
+    }
+      
