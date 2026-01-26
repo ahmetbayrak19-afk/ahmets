@@ -14,8 +14,13 @@ import WelcomeScreen from "@/pages/WelcomeScreen";
 import AssessmentPage from "@/pages/assessmentPage";
 import AbaAssessmentPage from "@/pages/abaAssessmentPage";
 import KavramAssessmentPage from "@/pages/kavramAssessmentPage"; 
-// YENİ EKLENEN IMPORT:
 import OkumayazmaAssessmentPage from "@/pages/okumayazmaAssessmentPage";
+
+// --- YENİ EKLENEN OKUMA YAZMA ALT SAYFALARI ---
+import HeceOkuyazDegerlendir from "@/pages/okuyaz/heceokuyazdegerlendir";
+import Seviye1 from "@/pages/okuyaz/seviye1";
+import Seviye2 from "@/pages/okuyaz/seviye2";
+import Seviye3 from "@/pages/okuyaz/seviye3";
 
 export default function App() {
   return (
@@ -38,8 +43,14 @@ export default function App() {
           {/* 3. Kavram Değerlendirme Sayfası */}
           <Route path="/kavram-assessment/:id" component={KavramAssessmentPage} />
 
-          {/* 4. Okuma Yazma Değerlendirme Sayfası (YENİ EKLENDİ) */}
+          {/* 4. Okuma Yazma ANA GİRİŞ Sayfası */}
           <Route path="/okuma-yazma-assessment/:id" component={OkumayazmaAssessmentPage} />
+
+          {/* --- OKUMA YAZMA ALT SAYFALARI (YENİ) --- */}
+          <Route path="/okuyaz/degerlendirme/:id" component={HeceOkuyazDegerlendir} />
+          <Route path="/okuyaz/seviye1/:id" component={Seviye1} />
+          <Route path="/okuyaz/seviye2/:id" component={Seviye2} />
+          <Route path="/okuyaz/seviye3/:id" component={Seviye3} />
 
           {/* Yanlış URL girilirse ana ekrana at */}
           <Route component={WelcomeScreen} />
@@ -47,5 +58,4 @@ export default function App() {
       </Router>
     </QueryClientProvider>
   );
-      }
-            
+}
