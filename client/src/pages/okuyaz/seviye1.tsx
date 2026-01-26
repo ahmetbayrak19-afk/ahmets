@@ -29,9 +29,9 @@ export default function Seviye1() {
       {/* İÇERİK MENÜSÜ */}
       <div className="max-w-3xl mx-auto w-full grid gap-4">
         
-        {/* KART 1: SESLİ HARFLER */}
+        {/* KART 1: SESLİ HARFLER (LİNK EKLENDİ) */}
         <div 
-          onClick={() => console.log("Sesli Harflere Git")} // İlerde buraya link vereceğiz
+          onClick={() => setLocation(`/okuyaz/sesli/${studentId}`)} 
           className="group relative p-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-blue-500/50 hover:bg-slate-800/50 transition-all cursor-pointer overflow-hidden"
         >
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -52,7 +52,7 @@ export default function Seviye1() {
 
         {/* KART 2: HECE SETİ 1 */}
         <div 
-          onClick={() => console.log("Hecelere Git")} // İlerde buraya link vereceğiz
+          onClick={() => console.log("Hecelere Git")} // Burası sonra yapılacak
           className="group relative p-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-pink-500/50 hover:bg-slate-800/50 transition-all cursor-pointer overflow-hidden"
         >
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -74,5 +74,4 @@ export default function Seviye1() {
       </div>
     </div>
   );
-          }
-
+}
