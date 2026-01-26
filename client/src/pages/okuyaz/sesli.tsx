@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Eraser, Check, XCircle, Volume2, ChevronRight, Trophy, RefreshCcw, Pencil, Eye
+  Eraser, Check, XCircle, Volume2, ChevronRight, ChevronLeft, Trophy, RefreshCcw, Pencil, Eye
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
-// --- SES DOSYALARI (Yollar güncellendi & esledinbravo çıkarıldı) ---
+// --- SES DOSYALARI ---
 import aferin1 from '@/aba/esle/ses/aferin1.mp3';
 import bravo from '@/aba/esle/ses/bravo.mp3';
 import harika1 from '@/aba/esle/ses/harika1.mp3';
@@ -46,7 +46,7 @@ import trenVid from '@/vehicles/tren.mp4';
 import ucakVid from '@/vehicles/ucak.mp4';
 
 // --- SES HAVUZLARI ---
-const POSITIVE_SOUNDS = [aferin1, bravo, harika1]; // esledinbravo YOK
+const POSITIVE_SOUNDS = [aferin1, bravo, harika1];
 const NEGATIVE_SOUNDS = [tekrardene1];
 
 // --- VERİ HAVUZU ---
@@ -105,51 +105,72 @@ export default function SesliHarfEtkinlikleri() {
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans select-none overflow-hidden">
       
       {/* --- ÜST BAR (NAVİGASYON) --- */}
-      <div className="bg-white px-4 py-3 shadow-md flex justify-between items-center sticky top-0 z-50 border-b border-slate-100">
+      <div className="bg-white px-6 py-4 shadow-sm flex justify-between items-center sticky top-0 z-50 border-b border-slate-100 h-20">
         
-        {/* SOL: Etkinlik Değiştirme Butonları */}
-        <div className="flex gap-2">
-            <button 
-              onClick={() => setActiveTab('cizim')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                activeTab === 'cizim' 
-                  ? 'bg-orange-100 text-orange-600 border-orange-200' 
-                  : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <Pencil size={14} />
-              <span>Çizim</span>
-            </button>
+        {/* SOL: Önceki Ses */}
+        <button className="flex items-center gap-2 bg-slate-50 text-slate-500 px-4 py-2 rounded-xl text-sm font-bold border border-slate-200 hover:bg-slate-100 transition-colors">
+          <ChevronLeft size={18} />
+          <span>Önceki (Yok)</span>
+        </button>
 
-            <button 
-              onClick={() => setActiveTab('farkindalik')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                activeTab === 'farkindalik' 
-                  ? 'bg-orange-100 text-orange-600 border-orange-200' 
-                  : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <Eye size={14} />
-              <span>Farkındalık</span>
-            </button>
+        {/* ORTA: Etkinlik Adı */}
+        <div className="flex flex-col items-center">
+             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Etkinlik</span>
+             <h2 className="text-xl font-black text-slate-800">
+                {activeTab === 'cizim' ? 'Çizim Çalışması' : 'Farkındalık Oyunu'}
+             </h2>
         </div>
-
-        {/* ORTA: Başlık */}
-        <h1 className="absolute left-1/2 -translate-x-1/2 text-2xl font-black text-slate-800 tracking-wider">
-          A SESİ
-        </h1>
         
         {/* SAĞ: Sonraki Ses */}
-        <button className="flex items-center gap-1 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-100 hover:bg-blue-100 transition-colors">
+        <button className="flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-2 rounded-xl text-sm font-bold border border-blue-100 hover:bg-blue-100 transition-colors">
           <span>Sonraki (E)</span>
-          <ChevronRight size={14} />
+          <ChevronRight size={18} />
         </button>
       </div>
 
-      {/* --- İÇERİK ALANI --- */}
-      <div className="flex-1 relative">
-        {activeTab === 'cizim' && <CizimEtkinligi />}
-        {activeTab === 'farkindalik' && <FarkindalikEtkinligi playSound={playSound} />}
+      {/* --- ANA İÇERİK ALANI (ORTALANMIŞ) --- */}
+      <div className="flex-1 flex flex-col items-center justify-center p-4">
+        
+        {/* Başlık ve Tab Seçimi */}
+        <div className="flex flex-col items-center mb-6 animate-in slide-in-from-top-10 duration-700">
+            <h1 className="text-6xl font-black text-orange-500 tracking-wider drop-shadow-sm mb-4">
+              A SESİ
+            </h1>
+
+            {/* TAB SEÇİMİ */}
+            <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-100">
+                <button 
+                  onClick={() => setActiveTab('cizim')}
+                  className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-bold transition-all ${
+                    activeTab === 'cizim' 
+                      ? 'bg-orange-500 text-white shadow-md' 
+                      : 'text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  <Pencil size={16} />
+                  <span>Çizim</span>
+                </button>
+
+                <button 
+                  onClick={() => setActiveTab('farkindalik')}
+                  className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-bold transition-all ${
+                    activeTab === 'farkindalik' 
+                      ? 'bg-orange-500 text-white shadow-md' 
+                      : 'text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  <Eye size={16} />
+                  <span>Farkındalık</span>
+                </button>
+            </div>
+        </div>
+
+        {/* ETKİNLİK ALANI (justify-center ile dikey ortalama eklendi) */}
+        <div className="w-full max-w-4xl flex-1 flex flex-col items-center justify-center min-h-[400px]">
+           {activeTab === 'cizim' && <CizimEtkinligi />}
+           {activeTab === 'farkindalik' && <FarkindalikEtkinligi playSound={playSound} />}
+        </div>
+
       </div>
     </div>
   );
@@ -176,7 +197,7 @@ function CizimEtkinligi() {
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.strokeStyle = '#f97316'; 
-            ctx.lineWidth = 20; 
+            ctx.lineWidth = 25; 
         }
     };
     resizeCanvas();
@@ -230,13 +251,13 @@ function CizimEtkinligi() {
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-[url('https://www.transparenttextures.com/patterns/graphy.png')]">
-      <div className="bg-white rounded-[2rem] shadow-xl w-full max-w-lg aspect-[4/5] sm:aspect-square relative border-4 border-slate-100 overflow-hidden">
+    <div className="w-full h-full flex flex-col items-center justify-center">
+      <div className="bg-white rounded-[2rem] shadow-xl w-full max-w-md aspect-square relative border-4 border-slate-100 overflow-hidden">
         
         {/* REHBER HARFLER */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-[0.15] select-none">
-             <span className="text-[200px] leading-none font-sans font-bold text-slate-900">A</span>
-             <span className="text-[180px] leading-none font-sans font-bold text-slate-900 mt-4">a</span>
+             <span className="text-[220px] leading-none font-sans font-bold text-slate-900">A</span>
+             <span className="text-[180px] leading-none font-sans font-bold text-slate-900 mt-[-20px]">a</span>
         </div>
 
         <canvas
@@ -260,15 +281,15 @@ function CizimEtkinligi() {
             </button>
         </div>
       </div>
-      <p className="mt-4 text-slate-400 font-bold text-center text-sm uppercase tracking-widest animate-pulse">
-        Hadi Çizelim
+      <p className="mt-6 text-slate-400 font-bold text-center text-sm uppercase tracking-widest animate-pulse">
+        Parmağınla harfleri çiz
       </p>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// 2. ETKİNLİK: FARKINDALIK (VİDEO VE RESİM DESTEKLİ)
+// 2. ETKİNLİK: FARKINDALIK (ORTALANDI)
 // ---------------------------------------------------------------------------
 function FarkindalikEtkinligi({ playSound }: { playSound: (t: 'success' | 'fail') => void }) {
   const [qIndex, setQIndex] = useState(0);
@@ -311,8 +332,8 @@ function FarkindalikEtkinligi({ playSound }: { playSound: (t: 'success' | 'fail'
 
   if (isFinished) {
     return (
-        <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-slate-50">
-            <div className="bg-white p-10 rounded-[3rem] shadow-2xl flex flex-col items-center">
+        <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center">
+            <div className="bg-white p-10 rounded-[3rem] shadow-2xl flex flex-col items-center animate-in zoom-in duration-500">
                 <Trophy size={80} className="text-yellow-500 mb-4 animate-bounce" />
                 <h2 className="text-3xl font-black text-slate-800 mb-2">HARİKASIN!</h2>
                 <p className="text-slate-400 mb-8">Tüm "A" seslerini başarıyla buldun.</p>
@@ -328,18 +349,19 @@ function FarkindalikEtkinligi({ playSound }: { playSound: (t: 'success' | 'fail'
   }
 
   return (
-    <div className="w-full h-full flex flex-col items-center pt-6 px-4">
+    // BURASI GÜNCELLENDİ: justify-center eklendi
+    <div className="w-full h-full flex flex-col items-center justify-center px-4">
         
         {/* Yönerge */}
-        <div className="bg-white px-6 py-3 rounded-2xl shadow-sm border border-slate-100 mb-6 flex items-center gap-3 animate-in slide-in-from-top-4">
+        <div className="bg-white px-8 py-4 rounded-2xl shadow-sm border border-slate-100 mb-8 flex items-center gap-3">
             <div className="bg-blue-100 p-2 rounded-full text-blue-600">
-                <Volume2 size={20} />
+                <Volume2 size={24} />
             </div>
-            <span className="text-lg font-bold text-slate-700">"A" ile başlayanı bul!</span>
+            <span className="text-xl font-bold text-slate-700">"A" ile başlayanı bul!</span>
         </div>
 
         {/* Seçenekler Alanı */}
-        <div className="grid grid-cols-3 gap-3 sm:gap-6 w-full max-w-2xl h-[50vh] sm:h-auto">
+        <div className="grid grid-cols-3 gap-4 sm:gap-8 w-full max-w-4xl">
             <AnimatePresence mode='popLayout'>
                 {currentOptions.map((item) => {
                     const isCorrect = item.id === currentQ.targetId;
@@ -357,7 +379,7 @@ function FarkindalikEtkinligi({ playSound }: { playSound: (t: 'success' | 'fail'
                             exit={{ scale: 0, opacity: 0 }}
                             onClick={() => handleSelect(item)}
                             className={twMerge(
-                                "relative aspect-square bg-white rounded-2xl shadow-sm border-2 flex items-center justify-center cursor-pointer overflow-hidden transition-all",
+                                "relative aspect-square bg-white rounded-3xl shadow-sm border-2 flex items-center justify-center cursor-pointer overflow-hidden transition-all",
                                 showSuccess ? 'border-green-500 ring-4 ring-green-100 z-10' : 'border-slate-100 hover:border-blue-200',
                                 isWrong ? 'cursor-not-allowed grayscale' : 'active:scale-95'
                             )}
@@ -386,14 +408,14 @@ function FarkindalikEtkinligi({ playSound }: { playSound: (t: 'success' | 'fail'
                                     initial={{ scale: 0 }} animate={{ scale: 1 }}
                                     className="absolute inset-0 bg-green-500/20 flex items-center justify-center backdrop-blur-[1px]"
                                 >
-                                    <div className="bg-green-500 text-white p-3 rounded-full shadow-lg">
-                                        <Check size={32} strokeWidth={4} />
+                                    <div className="bg-green-500 text-white p-4 rounded-full shadow-lg">
+                                        <Check size={40} strokeWidth={4} />
                                     </div>
                                 </motion.div>
                             )}
                              {isWrong && (
                                 <div className="absolute inset-0 bg-slate-100/50 flex items-center justify-center">
-                                    <XCircle size={40} className="text-slate-400 opacity-50" />
+                                    <XCircle size={48} className="text-slate-400 opacity-50" />
                                 </div>
                             )}
                         </motion.div>
@@ -403,12 +425,12 @@ function FarkindalikEtkinligi({ playSound }: { playSound: (t: 'success' | 'fail'
         </div>
 
         {/* İlerleme Çubuğu */}
-        <div className="absolute bottom-8 w-full max-w-xs px-4">
-            <div className="flex justify-between text-xs font-bold text-slate-400 mb-1">
+        <div className="w-full max-w-md mt-10">
+            <div className="flex justify-between text-xs font-bold text-slate-400 mb-2">
                 <span>İlerleme</span>
                 <span>{qIndex + 1} / {QUESTIONS.length}</span>
             </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
                 <div 
                     className="h-full bg-orange-500 transition-all duration-500" 
                     style={{ width: `${((qIndex + (isSuccess ? 1 : 0)) / QUESTIONS.length) * 100}%` }}
@@ -417,5 +439,4 @@ function FarkindalikEtkinligi({ playSound }: { playSound: (t: 'success' | 'fail'
         </div>
     </div>
   );
-    }
-      
+                                   }
