@@ -4,19 +4,22 @@ import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, R
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
-// --- RAKAM RESİMLERİ (client/src/aba/esle) ---
-import birImg from './aba/esle/bir.png';
-import ikiImg from './aba/esle/iki.png';
-import ucImg from './aba/esle/uc.png';
-import dortImg from './aba/esle/dort.png';
-import besImg from './aba/esle/bes.png';
-import altiImg from './aba/esle/alti.png';
-import yediImg from './aba/esle/yedi.png';
-import sekizImg from './aba/esle/sekiz.png';
-import dokuzImg from './aba/esle/dokuz.png';
-import sifirImg from './aba/esle/sifir.png';
+// --- RAKAM RESİMLERİ ---
+// Resimler bu dosya ile AYNI klasörde olduğu için direkt ismini yazıyoruz.
+import birImg from './bir.png';
+import ikiImg from './iki.png';
+import ucImg from './uc.png';
+import dortImg from './dort.png';
+import besImg from './bes.png';
+import altiImg from './alti.png';
+import yediImg from './yedi.png';
+import sekizImg from './sekiz.png';
+import dokuzImg from './dokuz.png';
+import sifirImg from './sifir.png';
 
 // --- SES DOSYALARI ---
+// Ses dosyaları muhtemelen bir üst klasördeki 'ses' klasöründe veya aynı yerdeki 'ses' klasöründe.
+// Eğer hata verirse burayı kontrol et: '../ses/...' veya './ses/...'
 import arkaplanMusic from './ses/arkaplanmusic.mp3';
 import aferin1 from './ses/aferin1.mp3';
 import aferin2 from './ses/aferin2.mp3';
