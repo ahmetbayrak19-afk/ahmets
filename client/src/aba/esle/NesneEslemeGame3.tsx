@@ -71,12 +71,10 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
   const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
-  // Ses referansı
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
 
   // Arkaplan Müziği ve Scroll Reset
   useEffect(() => {
-    // 1. ÖNLEM: Sayfayı en başa sar (Kaydırma sorununu çözer)
     window.scrollTo(0, 0);
 
     bgMusicRef.current = new Audio(arkaplanMusic);
@@ -105,7 +103,6 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
     }
   }, [isMuted]);
 
-  // Efekt Sesi
   const playSoundEffect = (type: 'success' | 'fail') => {
     let soundSrc;
     if (type === 'success') {
@@ -120,14 +117,13 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
     audio.play().catch(e => console.log("Ses oynatılamadı", e));
   };
 
-  // Scroll kilitleme
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = originalStyle; };
   }, []);
 
-  // --- SORU ÜRETME VE LEVEL MANTIĞI ---
+  // --- SORU ÜRETME ---
   const generateQuestion = () => {
     const randomTarget = OBJECTS[Math.floor(Math.random() * OBJECTS.length)];
     
@@ -152,17 +148,14 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
 
   useEffect(() => { generateQuestion(); }, [level]);
 
-  // --- GARANTİLİ SÜRÜKLE BIRAK MANTIĞI (GPS SİSTEMİ) ---
   const handleDragEnd = (event: any, info: any, droppedItem: typeof OBJECTS[0]) => {
     if (isModeling || isMatched) return;
 
     const dropZone = dropZoneRef.current;
     if (!dropZone) return;
     
-    // 1. Kutunun Sınırları
     const dropRect = dropZone.getBoundingClientRect();
     
-    // 2. Garantili Koordinat
     let clientX = 0;
     let clientY = 0;
 
@@ -177,7 +170,6 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
         clientY = info.point.y;
     }
 
-    // 3. İçine Bırakıldı mı? (+40px Tolerans)
     const isInside = 
         clientX >= dropRect.left - 40 && 
         clientX <= dropRect.right + 40 &&
@@ -208,14 +200,12 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
     }
 
     setTimeout(() => {
-       // Level Sistemi (Sadece Öğretimde)
+       // Level Sistemi
        if (mode === 'instruction') {
         const nextQ = questionIndex + 1;
         setQuestionIndex(nextQ);
 
-        if (nextQ === 3) setLevel(2);
-        else if (nextQ === 6) setLevel(3);
-        
+        // Soru geçişi, manuel butonlar olduğu için otomatik level atlama yok
         generateQuestion();
     } else {
       const nextCount = assessmentCount + 1;
@@ -278,10 +268,17 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
     }
   }, [assessmentCount, assessmentScore, mode]);
 
+  // Grid Stili
+  const getGridClass = () => {
+      if (level === 1) return "grid-cols-3";
+      if (level === 2) return "grid-cols-2 max-w-[300px]"; 
+      if (level === 3) return "grid-cols-3";
+      return "grid-cols-3";
+  };
+
   return (
     <div className={twMerge(
         "fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
-        // LEVEL 3 ARKAPLAN
         (level === 3 && mode === 'instruction') 
             ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" 
             : "bg-slate-50"
@@ -294,11 +291,23 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
         </button>
         
         <div className="flex items-center gap-3">
-             {/* Seviye Göstergesi */}
+             
+             {/* --- GÜNCELLENEN KISIM: LVL BUTONLARI --- */}
              {mode === 'instruction' && (
-                 <div className="flex gap-1 mr-2">
+                 <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 items-center">
                      {[1, 2, 3].map(l => (
-                         <div key={l} className={twMerge("w-3 h-3 rounded-full transition-colors", level >= l ? "bg-orange-500" : "bg-slate-200")}></div>
+                         <button 
+                            key={l}
+                            onClick={() => setLevel(l)} 
+                            className={twMerge(
+                                "px-4 py-1.5 text-xs font-bold rounded-full transition-all",
+                                level === l 
+                                    ? "bg-white text-blue-600 shadow-sm" 
+                                    : "text-slate-400 hover:text-slate-600"
+                            )}
+                         >
+                            LVL {l}
+                         </button>
                      ))}
                  </div>
             )}
@@ -312,7 +321,7 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
                     {mode === 'assessment' ? `TEST: ${Math.min(assessmentCount + 1, 10)}/10` : "ÖĞRETİM"}
                 </span>
             </div>
-
+            
             {/* Ses Butonu */}
             <button onClick={() => setIsMuted(!isMuted)} className="p-2 bg-white border rounded-full shadow-sm active:scale-95">
                  {isMuted ? <VolumeX size={20} className="text-slate-400"/> : <Volume2 size={20} className="text-blue-500"/>}
@@ -333,7 +342,7 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
                     isMatched ? "border-green-500 bg-green-50 border-solid" : "border-slate-300"
                 )}
             >
-               {/* 2. ÖNLEM: pointer-events-none */}
+               {/* pointer-events-none */}
                <img 
                  src={targetItem.src} 
                  alt={targetItem.name} 
@@ -347,8 +356,8 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
           </div>
 
           <div className={twMerge(
-              "grid gap-2 w-full px-1 justify-items-center",
-              level === 3 ? "grid-cols-3" : "grid-cols-3"
+              "grid gap-3 w-full px-1 justify-items-center mx-auto",
+              getGridClass() 
           )}>
             {options.map((item) => {
               const isCorrectItem = item.id === targetItem.id;
@@ -393,7 +402,6 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
                       (flashCorrect && isCorrectItem) ? "border-green-500 shadow-green-100" : "border-slate-100"
                     )}
                   >
-                    {/* Resim tıklamayı engellemesin */}
                     <img src={item.src} alt={item.name} className="w-20 h-20 object-contain pointer-events-none" />
                     
                     {isModeling && isCorrectItem && (
@@ -464,4 +472,4 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
       </AnimatePresence>
     </div>
   );
-   }
+}
