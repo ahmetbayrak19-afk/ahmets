@@ -96,12 +96,10 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
   const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
-  // Ses referansı
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
 
-  // Arkaplan Müziği ve Scroll Reset
+  // Arkaplan Müziği
   useEffect(() => {
-    // 1. ÖNLEM: Sayfayı en başa sar (Kaydırma sorununu çözer)
     window.scrollTo(0, 0);
 
     bgMusicRef.current = new Audio(arkaplanMusic);
@@ -130,7 +128,6 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
     }
   }, [isMuted]);
 
-  // Efekt Sesi
   const playSoundEffect = (type: 'success' | 'fail') => {
     let soundSrc;
     if (type === 'success') {
@@ -145,25 +142,33 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
     audio.play().catch(e => console.log("Ses oynatılamadı", e));
   };
 
-  // Scroll kilitleme
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = originalStyle; };
   }, []);
 
-  // --- SORU ÜRETME VE LEVEL MANTIĞI ---
+  const getBaseId = (id: string) => {
+    return id.replace(/[0-9]/g, ''); 
+  };
+
+  // --- SORU ÜRETME ---
   const generateQuestion = () => {
     const randomTarget = OBJECTS[Math.floor(Math.random() * OBJECTS.length)];
     
-    // Level'a göre seçenek sayısı
     let optionCount = 3; 
     if (level === 2) optionCount = 4;
     if (level === 3) optionCount = 6;
 
-    const distractors = OBJECTS.filter(item => item.id !== randomTarget.id)
-                             .sort(() => 0.5 - Math.random())
-                             .slice(0, optionCount - 1); 
+    const targetBase = getBaseId(randomTarget.id);
+
+    // ÇAKIŞMA ÖNLEME: Aynı türden olan diğerlerini (örn: anahtar3) filtrele
+    const distractors = OBJECTS.filter(item => {
+        const itemBase = getBaseId(item.id);
+        return item.id !== randomTarget.id && itemBase !== targetBase;
+    })
+    .sort(() => 0.5 - Math.random())
+    .slice(0, optionCount - 1); 
 
     setTargetItem(randomTarget);
     setOptions([randomTarget, ...distractors].sort(() => 0.5 - Math.random()));
@@ -177,17 +182,14 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
 
   useEffect(() => { generateQuestion(); }, [level]);
 
-  // --- GARANTİLİ SÜRÜKLE BIRAK MANTIĞI ---
   const handleDragEnd = (event: any, info: any, droppedItem: typeof OBJECTS[0]) => {
     if (isModeling || isMatched) return;
 
     const dropZone = dropZoneRef.current;
     if (!dropZone) return;
     
-    // 1. Kutunun Sınırları
     const dropRect = dropZone.getBoundingClientRect();
     
-    // 2. Garantili Koordinat (GPS)
     let clientX = 0;
     let clientY = 0;
 
@@ -202,7 +204,6 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
         clientY = info.point.y;
     }
 
-    // 3. İçine Bırakıldı mı? (+40px Tolerans)
     const isInside = 
         clientX >= dropRect.left - 40 && 
         clientX <= dropRect.right + 40 &&
@@ -233,14 +234,9 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
     }
 
     setTimeout(() => {
-      // Level Sistemi (Sadece Öğretimde)
+      // Soru Geçişi
       if (mode === 'instruction') {
-          const nextQ = questionIndex + 1;
-          setQuestionIndex(nextQ);
-
-          if (nextQ === 3) setLevel(2);
-          else if (nextQ === 6) setLevel(3);
-          
+          setQuestionIndex(prev => prev + 1);
           generateQuestion();
       } else {
         const nextCount = assessmentCount + 1;
@@ -303,10 +299,16 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
     }
   }, [assessmentCount, assessmentScore, mode]);
 
+  const getGridClass = () => {
+      if (level === 1) return "grid-cols-3";
+      if (level === 2) return "grid-cols-2 max-w-[300px]"; 
+      if (level === 3) return "grid-cols-3";
+      return "grid-cols-3";
+  };
+
   return (
     <div className={twMerge(
         "fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
-        // LEVEL 3 ARKAPLAN
         (level === 3 && mode === 'instruction') 
             ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" 
             : "bg-slate-50"
@@ -319,11 +321,23 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
         </button>
         
         <div className="flex items-center gap-3">
-             {/* Seviye Göstergesi */}
+             
+             {/* --- GÜNCELLENEN KISIM: LVL BUTONLARI --- */}
              {mode === 'instruction' && (
-                 <div className="flex gap-1 mr-2">
+                 <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 items-center">
                      {[1, 2, 3].map(l => (
-                         <div key={l} className={twMerge("w-3 h-3 rounded-full transition-colors", level >= l ? "bg-orange-500" : "bg-slate-200")}></div>
+                         <button 
+                            key={l}
+                            onClick={() => setLevel(l)} 
+                            className={twMerge(
+                                "px-4 py-1.5 text-xs font-bold rounded-full transition-all",
+                                level === l 
+                                    ? "bg-white text-blue-600 shadow-sm" 
+                                    : "text-slate-400 hover:text-slate-600"
+                            )}
+                         >
+                            LVL {l}
+                         </button>
                      ))}
                  </div>
             )}
@@ -337,7 +351,7 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
                     {mode === 'assessment' ? `TEST: ${Math.min(assessmentCount + 1, 10)}/10` : "ÖĞRETİM"}
                 </span>
             </div>
-
+            
             {/* Ses Butonu */}
             <button onClick={() => setIsMuted(!isMuted)} className="p-2 bg-white border rounded-full shadow-sm active:scale-95">
                  {isMuted ? <VolumeX size={20} className="text-slate-400"/> : <Volume2 size={20} className="text-blue-500"/>}
@@ -358,7 +372,6 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
                     isMatched ? "border-green-500 bg-green-50 border-solid" : "border-slate-300"
                 )}
             >
-               {/* 2. ÖNLEM: pointer-events-none */}
                <img 
                  src={targetItem.src} 
                  alt={targetItem.name} 
@@ -372,8 +385,8 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
           </div>
 
           <div className={twMerge(
-              "grid gap-2 w-full px-1 justify-items-center",
-              level === 3 ? "grid-cols-3" : "grid-cols-3"
+              "grid gap-3 w-full px-1 justify-items-center mx-auto",
+              getGridClass() 
           )}>
             {options.map((item) => {
               const isCorrectItem = item.id === targetItem.id;
@@ -382,7 +395,7 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
               const canDrag = !isModeling && !isLocked && !isMatched;
 
               return (
-                <div key={item.id} className="relative flex justify-center items-center h-32 w-full">
+                <div key={item.id} className="relative flex justify-center items-center h-28 w-full">
                   <motion.div
                     drag={canDrag}
                     dragConstraints={false}
@@ -412,14 +425,13 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
                     }
 
                     className={twMerge(
-                      "w-28 h-28 bg-white rounded-3xl shadow-[0_8px_0_0_#e2e8f0] flex items-center justify-center border-2 touch-none relative z-10",
+                      "w-24 h-24 bg-white rounded-2xl shadow-[0_6px_0_0_#e2e8f0] flex items-center justify-center border-2 touch-none relative z-10",
                       canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed",
                       (isModeling && isCorrectItem) ? "border-blue-400 shadow-blue-100 shadow-xl" : 
                       (flashCorrect && isCorrectItem) ? "border-green-500 shadow-green-100" : "border-slate-100"
                     )}
                   >
-                    {/* Resim tıklamayı engellemesin */}
-                    <img src={item.src} alt={item.name} className="w-20 h-20 object-contain pointer-events-none" />
+                    <img src={item.src} alt={item.name} className="w-16 h-16 object-contain pointer-events-none" />
                     
                     {isModeling && isCorrectItem && (
                         <motion.div 
@@ -427,7 +439,7 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
                            transition={{ times: [0, 0.1, 0.8, 1], duration: 2 }}
                            className="absolute -bottom-2 -right-2 text-blue-600 bg-white rounded-full p-2 shadow-lg border border-blue-100"
                         >
-                            <MousePointer2 size={32} fill="currentColor" />
+                            <MousePointer2 size={24} fill="currentColor" />
                         </motion.div>
                     )}
                   </motion.div>
