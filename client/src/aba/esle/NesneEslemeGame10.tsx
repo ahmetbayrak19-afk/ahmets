@@ -4,16 +4,18 @@ import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, R
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
-// --- ŞEKİL RESİMLERİ (client/src/aba/esle) ---
-import daireImg from './aba/esle/sekildaire.jpg';
-import dikdortgenImg from './aba/esle/sekildikdortgen.jpg';
-import kalpImg from './aba/esle/sekilkalp.jpg';
-import kareImg from './aba/esle/sekilkare.jpg';
-import ucgenImg from './aba/esle/sekilucgen.jpg';
-import yamukImg from './aba/esle/sekilyamuk.jpg';
-import yildizImg from './aba/esle/sekilyildiz.jpg';
+// --- ŞEKİL RESİMLERİ ---
+// Resimler ve bu kod dosyası AYNI klasörde (client/src/aba/esle) olduğu için:
+import daireImg from './sekildaire.jpg';
+import dikdortgenImg from './sekildikdortgen.jpg';
+import kalpImg from './sekilkalp.jpg';
+import kareImg from './sekilkare.jpg';
+import ucgenImg from './sekilucgen.jpg';
+import yamukImg from './sekilyamuk.jpg';
+import yildizImg from './sekilyildiz.jpg';
 
 // --- SES DOSYALARI ---
+// Ses klasörü muhtemelen bir üstte veya yanında. Hata alırsan burayı kontrol et.
 import arkaplanMusic from './ses/arkaplanmusic.mp3';
 import aferin1 from './ses/aferin1.mp3';
 import aferin2 from './ses/aferin2.mp3';
@@ -286,7 +288,7 @@ export default function NesneEslemeGame10({ mode, onClose, onComplete }: GamePro
         
         <div className="flex items-center gap-3">
              
-             {/* --- LEVEL BUTONLARI (KAPSÜL TASARIM) --- */}
+             {/* --- LEVEL BUTONLARI --- */}
              {mode === 'instruction' && (
                  <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 items-center">
                      {[1, 2, 3].map(l => (
