@@ -15,8 +15,13 @@ import NesneEslemeGame4 from '@/aba/esle/NesneEslemeGame4';
 import NesneEslemeGame13 from '@/aba/esle/NesneEslemeGame13';
 import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16';
 
-// --- YENİ DENİZALTI OYUNU ---
-// Dikkat: Burada .png importları YOK. Sadece oyun dosyasını çağırıyoruz.
+// --- YENİ EKLENEN OYUNLAR ---
+import NesneEslemeGame9 from '@/aba/esle/NesneEslemeGame9';  // Renk Eşleme
+import NesneEslemeGame10 from '@/aba/esle/NesneEslemeGame10'; // Şekil Eşleme
+import NesneEslemeGame11 from '@/aba/esle/NesneEslemeGame11'; // Rakam Eşleme
+import NesneEslemeGame12 from '@/aba/esle/NesneEslemeGame12'; // Harf Eşleme
+
+// --- DENİZALTI OYUNU ---
 import EslemeGame from '@/aba/esle/game/eslemegame'; 
 
 interface EslemePageProps {
@@ -94,22 +99,28 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       
       {/* --- OYUN GÖSTERİM ALANI (MODAL) --- */}
       {activeGameMode && activeGameItem && (
-         <>
-            {/* DİĞER OYUNLAR... */}
+          <>
+            {/* EB.1.1: Nesne Eşleme 1 */}
             {activeGameItem.startsWith("EB.1.1") && (
                 <NesneEslemeGame1 mode={activeGameMode} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
             )}
+            
+            {/* EB.1.2: Nesne Eşleme 2 */}
             {activeGameItem.startsWith("EB.1.2") && (
                 <NesneEslemeGame2 mode={activeGameMode} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
             )}
+            
+            {/* EB.1.3: Eylem (Resim) Eşleme */}
             {activeGameItem.startsWith("EB.1.3") && (
                 <NesneEslemeGame3 mode={activeGameMode} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
             )}
+            
+            {/* EB.1.4: Ses Eşleme */}
             {activeGameItem.startsWith("EB.1.4") && (
                 <NesneEslemeGame4 mode={activeGameMode} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
             )}
             
-            {/* --- EB.2.1 İÇİN BALIK OYUNU BURADA --- */}
+            {/* EB.2.1: Balık Oyunu (İlişkili Nesne) */}
             {activeGameItem.startsWith("EB.2.1") && (
                 <div className="fixed inset-0 z-[100] bg-white">
                     <EslemeGame 
@@ -121,13 +132,43 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                 </div>
             )}
 
+            {/* --- YENİ EKLENENLER --- */}
+
+            {/* EB.3.1: Renk Eşleme */}
+            {activeGameItem.startsWith("EB.3.1") && (
+                <NesneEslemeGame9 mode={activeGameMode} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
+            )}
+
+            {/* EB.3.2: Şekil Eşleme */}
+            {activeGameItem.startsWith("EB.3.2") && (
+                <NesneEslemeGame10 mode={activeGameMode} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
+            )}
+
+            {/* EB.3.3: Rakam Eşleme */}
+            {activeGameItem.startsWith("EB.3.3") && (
+                <NesneEslemeGame11 mode={activeGameMode} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
+            )}
+
+            {/* EB.3.4: Harf Eşleme (ESKİ OYUN YERİNE YENİSİ Mİ? Yoksa EB.4.1 Mİ?) */}
+            {/* Not: EB.3.4 aslında "Nesne-Resim Eşleme" olabilir. Senin kodunda Game13 vardı. */}
+            {/* Eğer Game13'ü kullanacaksan onu aç. Ama Harf Eşleme genelde EB.4.1'dir. */}
+            {/* Aşağıda senin istediğin Harf Eşleme'yi (Game12) EB.4.1'e bağladım. */}
+            
             {activeGameItem.startsWith("EB.3.4") && (
                 <NesneEslemeGame13 mode={activeGameMode} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
             )}
+
+            {/* EB.4.1: Harf Eşleme (YENİ OYUN) */}
+            {activeGameItem.startsWith("EB.4.1") && (
+                <NesneEslemeGame12 mode={activeGameMode} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
+            )}
+
+            {/* EB.4.2: Kelime Eşleme */}
             {activeGameItem.startsWith("EB.4.2") && (
                 <NesneEslemeGame16 mode={activeGameMode} onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }} onComplete={handleGameComplete} />
             )}
-         </>
+
+          </>
       )}
 
       {/* HEADER */}
@@ -154,13 +195,18 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             const isCompleted = status === true;
             
             // --- OYUN BUTONU KONTROLÜ ---
+            // Hangi maddelerde oyun butonu çıkacağını belirliyoruz
             const hasGame = item.startsWith("EB.1.1") || 
-                          item.startsWith("EB.1.2") || 
-                          item.startsWith("EB.1.3") || 
-                          item.startsWith("EB.1.4") ||
-                          item.startsWith("EB.2.1") || 
-                          item.startsWith("EB.3.4") || 
-                          item.startsWith("EB.4.2"); 
+                            item.startsWith("EB.1.2") || 
+                            item.startsWith("EB.1.3") || 
+                            item.startsWith("EB.1.4") ||
+                            item.startsWith("EB.2.1") || 
+                            item.startsWith("EB.3.1") || // Renk
+                            item.startsWith("EB.3.2") || // Şekil
+                            item.startsWith("EB.3.3") || // Rakam
+                            item.startsWith("EB.3.4") || // Nesne-Resim (Mevcut)
+                            item.startsWith("EB.4.1") || // Harf
+                            item.startsWith("EB.4.2");   // Kelime
             
             const firstSpaceIndex = item.indexOf(' ');
             const code = item.substring(0, firstSpaceIndex);
@@ -210,4 +256,4 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       </div>
     </div>
   );
-      }
+}
