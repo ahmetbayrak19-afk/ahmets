@@ -56,12 +56,12 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  // 1. SCROLL KİLİTLEME VE ÇIKIŞTA TEMİZLİK
+  // 1. SCROLL KİLİTLEME
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = 'auto';
-      stopCameraStream(); // Çıkarken kamerayı kapat
+      stopCameraStream();
     };
   }, []);
 
@@ -81,7 +81,6 @@ export default function AliciGame4({ onClose }: GameProps) {
     if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
 
-  // --- YARDIMCI: TEMİZLİK FONKSİYONU ---
   const resetEditor = () => {
       stopCameraStream();
       setIsCameraActive(false);
@@ -98,10 +97,10 @@ export default function AliciGame4({ onClose }: GameProps) {
       window.speechSynthesis.speak(utterance);
   };
 
-  // --- RESİM İŞLEME (Resizer & Compressor) ---
+  // --- RESİM İŞLEME ---
   const processImage = (imageSource: HTMLVideoElement | HTMLImageElement): string => {
       const canvas = document.createElement('canvas');
-      const size = 512; // Hedef boyut
+      const size = 512;
       canvas.width = size;
       canvas.height = size;
       const ctx = canvas.getContext('2d');
@@ -117,7 +116,6 @@ export default function AliciGame4({ onClose }: GameProps) {
       const offsetY = (size - newH) / 2;
 
       ctx.drawImage(imageSource, offsetX, offsetY, newW, newH);
-      // JPEG ve 0.8 kalite (WhatsApp tarzı sıkıştırma)
       return canvas.toDataURL('image/jpeg', 0.8);
   };
 
@@ -135,7 +133,7 @@ export default function AliciGame4({ onClose }: GameProps) {
         videoRef.current.play();
       }
     } catch (err) {
-      toast.error("Kamera hatası (İzinleri kontrol edin).");
+      toast.error("Kamera hatası.");
       setIsCameraActive(false);
     }
   };
@@ -177,7 +175,7 @@ export default function AliciGame4({ onClose }: GameProps) {
   const savePerson = () => {
       const currentCategoryCount = profiles.filter(p => p.category === selectedCategory).length;
       if (currentCategoryCount >= 10) {
-          toast.error("Bu kategori doldu (Maksimum 10).");
+          toast.error("Bu kategori doldu (Max 10).");
           return;
       }
       if (!newPersonName || !tempImage) {
@@ -250,17 +248,6 @@ export default function AliciGame4({ onClose }: GameProps) {
   return (
     <div className="fixed inset-0 z-[500] bg-slate-950 flex flex-col font-sans text-slate-100 touch-none">
       
-      {/* BU INPUT ARTIK GÖRÜNMEZ DEĞİL, SADECE EKRANDAN SAKLI.
-         ETİKET (LABEL) İLE ÇALIŞACAK.
-      */}
-      <input 
-          id="native-file-upload"
-          type="file" 
-          className="hidden"
-          accept="image/*" 
-          onChange={handleFileUpload} 
-      />
-
       {/* ÜST BAR */}
       <div className="bg-slate-900 border-b border-slate-800 p-3 flex justify-between items-center z-10 shrink-0">
         <div className="flex items-center gap-3">
@@ -268,7 +255,7 @@ export default function AliciGame4({ onClose }: GameProps) {
                 onClick={() => {
                     if (view === 'menu') onClose();
                     else {
-                        resetEditor(); // Geri tuşuna basınca sıfırla
+                        resetEditor();
                         setView('menu');
                     }
                 }} 
@@ -364,16 +351,23 @@ export default function AliciGame4({ onClose }: GameProps) {
                                       <Camera size={16} className="mr-2"/> Kamera
                                   </Button>
                                   
-                                  {/* YÜKLE BUTONU -> ARTIK LABEL (ETİKET).
-                                     JavaScript tıklaması yok. Native HTML davranışı.
-                                     Zorunlu olarak dosya seçiciyi açar.
+                                  {/* --- FİNAL ÇÖZÜM: GÖRÜNMEZ INPUT --- 
+                                      Butonun üzerinde görünmez bir input var.
+                                      Tıkladığın an input'a tıklamış oluyorsun.
+                                      Referans, Label vb. gerek kalmaz.
                                   */}
-                                  <label 
-                                    htmlFor="native-file-upload" 
-                                    className="h-10 border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center rounded-md cursor-pointer hover:bg-slate-700 hover:text-white transition-colors text-sm font-medium"
-                                  >
-                                      <Upload size={16} className="mr-2"/> Yükle
-                                  </label>
+                                  <div className="relative">
+                                      <Button variant="outline" className="h-10 w-full border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700">
+                                          <Upload size={16} className="mr-2"/> Yükle
+                                      </Button>
+                                      <input 
+                                          type="file" 
+                                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                          accept="image/*" 
+                                          onChange={handleFileUpload}
+                                      />
+                                  </div>
+
                               </div>
                           )}
 
@@ -405,7 +399,7 @@ export default function AliciGame4({ onClose }: GameProps) {
               </div>
           </div>
       )}
-
+      
       {/* --- 3. OYUN --- */}
       {view === 'game' && (
           <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-950 relative">
