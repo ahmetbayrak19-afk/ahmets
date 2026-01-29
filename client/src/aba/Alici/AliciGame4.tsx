@@ -47,9 +47,6 @@ export default function AliciGame4({ onClose }: GameProps) {
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  
-  // Dosya Yükleme Referansı (KRİTİK NOKTA)
-  const hiddenFileInputRef = useRef<HTMLInputElement>(null);
 
   // Oyun State'leri
   const [gameQuestions, setGameQuestions] = useState<PersonProfile[]>([]);
@@ -156,17 +153,13 @@ export default function AliciGame4({ onClose }: GameProps) {
     setIsCameraActive(false);
   };
 
-  // --- DOSYA YÜKLEME (DOĞRUDAN TETİKLEME) ---
-  const triggerFileUpload = () => {
-    // Referans varsa tıkla. Bu kadar basit.
-    if (hiddenFileInputRef.current) {
-        hiddenFileInputRef.current.click();
-    }
-  };
-
+  // --- DOSYA YÜKLEME ---
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Toast ile geri bildirim verelim ki dosya seçildiğini anlayalım
+    toast.info("Resim işleniyor...");
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -175,6 +168,7 @@ export default function AliciGame4({ onClose }: GameProps) {
             const optimizedImage = processImage(img);
             setTempImage(optimizedImage);
             setIsCameraActive(false);
+            toast.dismiss(); // İşlem bitince toast'ı kapat
         };
         img.src = event.target?.result as string;
     };
@@ -361,15 +355,24 @@ export default function AliciGame4({ onClose }: GameProps) {
                                       <Camera size={16} className="mr-2"/> Kamera
                                   </Button>
                                   
-                                  {/* --- FİNAL YÖNTEM: MANUEL TETİKLEME --- 
-                                      Button bileşeni değil, düz DIV kullandım.
-                                      onClick doğrudan JS fonksiyonunu çağırıyor.
+                                  {/* *** TEK GERÇEK ÇÖZÜM: GÖRÜNMEZ AMA VAR OLAN INPUT ***
+                                      - Burada 'hidden' veya 'display:none' KULLANILMADI.
+                                      - 'opacity-0' kullanıldı. Yani input orada ve tıklanabilir.
+                                      - z-50 ile en üstte.
                                   */}
-                                  <div 
-                                    onClick={triggerFileUpload}
-                                    className="h-10 border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center rounded-md cursor-pointer hover:bg-slate-700 hover:text-white transition-colors text-sm font-medium"
-                                  >
-                                      <Upload size={16} className="mr-2"/> Yükle
+                                  <div className="relative h-10 w-full group">
+                                      {/* Görsel Süs (Arkada) */}
+                                      <div className="absolute inset-0 border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center rounded-md text-sm font-medium group-hover:bg-slate-700 transition-colors">
+                                          <Upload size={16} className="mr-2"/> Yükle
+                                      </div>
+                                      
+                                      {/* GERÇEK INPUT (Önde, Görünmez) */}
+                                      <input 
+                                          type="file" 
+                                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-[100]" 
+                                          accept="image/*" 
+                                          onChange={handleFileUpload} 
+                                      />
                                   </div>
 
                               </div>
@@ -442,16 +445,6 @@ export default function AliciGame4({ onClose }: GameProps) {
               )}
           </div>
       )}
-
-      {/* --- GİZLİ INPUT (SAYFANIN EN ALTINDA) --- */}
-      <input 
-          type="file" 
-          ref={hiddenFileInputRef}
-          style={{ display: 'none' }} // className="hidden" bazen tailwind config yüzünden ezilebiliyor
-          accept="image/*" 
-          onChange={handleFileUpload} 
-      />
-
     </div>
   );
 }
