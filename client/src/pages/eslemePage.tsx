@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 
-// --- OYUN IMPORTLARI ---
+// --- MEVCUT OYUN DOSYALARI ---
 import NesneEslemeGame1 from '@/aba/esle/NesneEslemeGame1';   // EB.1.1
 import NesneEslemeGame2 from '@/aba/esle/NesneEslemeGame2';   // EB.1.2
 import NesneEslemeGame3 from '@/aba/esle/NesneEslemeGame3';   // EB.1.3
@@ -17,7 +17,7 @@ import NesneEslemeGame10 from '@/aba/esle/NesneEslemeGame10'; // EB.3.1 (Şekil)
 import NesneEslemeGame11 from '@/aba/esle/NesneEslemeGame11'; // EB.3.2 (Rakam)
 import NesneEslemeGame12 from '@/aba/esle/NesneEslemeGame12'; // EB.3.3 (Harf)
 import NesneEslemeGame13 from '@/aba/esle/NesneEslemeGame13'; // EB.3.4 (Gölge)
-import NesneEslemeGame15 from '@/aba/esle/NesneEslemeGame15'; // EB.4.1 (Kelime-Kelime) -> YENİ BAĞLANDI
+import NesneEslemeGame15 from '@/aba/esle/NesneEslemeGame15'; // EB.4.1 (Kelime-Kelime)
 import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16'; // EB.4.2 (Klavye/Harf)
 
 // --- GEÇİCİ/EK OYUN (EB.2.1 için) ---
@@ -110,15 +110,9 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             {activeGameItem.startsWith("EB.3.2") && <NesneEslemeGame11 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.3.3") && <NesneEslemeGame12 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.3.4") && <NesneEslemeGame13 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
-
-            {/* --- GÜNCELLENEN KISIM: EB.4.1 -> Game15 --- */}
-            {activeGameItem.startsWith("EB.4.1") && (
-                <NesneEslemeGame15 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
-            )}
-
-            {activeGameItem.startsWith("EB.4.2") && (
-                <NesneEslemeGame16 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
-            )}
+            
+            {activeGameItem.startsWith("EB.4.1") && <NesneEslemeGame15 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
+            {activeGameItem.startsWith("EB.4.2") && <NesneEslemeGame16 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
           </>
       )}
 
@@ -152,8 +146,9 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                 item.startsWith("EB.2.1") || item.startsWith("EB.2.5") ||
                 item.startsWith("EB.3.1") || item.startsWith("EB.3.2") ||
                 item.startsWith("EB.3.3") || item.startsWith("EB.3.4") ||
-                item.startsWith("EB.4.1") || // Game15 Bağlı
-                item.startsWith("EB.4.2");   // Game16 Bağlı
+                item.startsWith("EB.4.1") || // Game15 (Kelime)
+                item.startsWith("EB.4.2");   // Game16 (Klavye)
+                // EB.4.10 BURADAN ÇIKARILDI (Gruplama)
             
             const firstSpaceIndex = item.indexOf(' ');
             const code = item.substring(0, firstSpaceIndex);
@@ -189,4 +184,4 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       </div>
     </div>
   );
-}
+              }
