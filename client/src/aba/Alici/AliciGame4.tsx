@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Upload, Trash2, Save, ArrowLeft, Check, Play, Settings, User, Users, GraduationCap, Heart, X, Plus } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Camera, Upload, Trash2, ArrowLeft, Check, Play, Settings, User, Users, GraduationCap, Heart, X, Plus, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
@@ -15,12 +15,12 @@ interface PersonProfile {
   imageUrl: string;
 }
 
-// --- KATEGORİ TANIMLARI (KOYU TEMA İÇİN RENKLER GÜNCELLENDİ) ---
+// --- KATEGORİLER ---
 const CATEGORIES: { id: Category; label: string; icon: any; color: string; iconColor: string }[] = [
-  { id: 'ogretmen', label: 'Öğretmenlerim', icon: GraduationCap, color: 'bg-blue-950/30 border-blue-900', iconColor: 'text-blue-400' },
-  { id: 'aile', label: 'Ailem', icon: Heart, color: 'bg-red-950/30 border-red-900', iconColor: 'text-red-400' },
-  { id: 'arkadas', label: 'Arkadaşlarım', icon: Users, color: 'bg-green-950/30 border-green-900', iconColor: 'text-green-400' },
-  { id: 'tanidik', label: 'Tanıdıklarım', icon: User, color: 'bg-orange-950/30 border-orange-900', iconColor: 'text-orange-400' },
+  { id: 'ogretmen', label: 'Öğretmenlerim', icon: GraduationCap, color: 'border-blue-900 bg-blue-950/20', iconColor: 'text-blue-400' },
+  { id: 'aile', label: 'Ailem', icon: Heart, color: 'border-red-900 bg-red-950/20', iconColor: 'text-red-400' },
+  { id: 'arkadas', label: 'Arkadaşlarım', icon: Users, color: 'border-green-900 bg-green-950/20', iconColor: 'text-green-400' },
+  { id: 'tanidik', label: 'Tanıdıklarım', icon: User, color: 'border-orange-900 bg-orange-950/20', iconColor: 'text-orange-400' },
 ];
 
 interface GameProps {
@@ -32,21 +32,22 @@ export default function AliciGame4({ onClose }: GameProps) {
   const [view, setView] = useState<'menu' | 'edit' | 'game'>('menu');
   const [selectedCategory, setSelectedCategory] = useState<Category>('ogretmen');
   
-  // PROFİLLERİ GÜVENLİ YÜKLE
+  // PROFİLLERİ YÜKLE (Hata riskine karşı güvenli yükleme - v4)
   const [profiles, setProfiles] = useState<PersonProfile[]>(() => {
     try {
-      const saved = localStorage.getItem('insan-tanima-profiller-dark');
+      const saved = localStorage.getItem('insan-tanima-v4');
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
 
   // Editör State'leri
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
   const [newPersonName, setNewPersonName] = useState('');
   const [tempImage, setTempImage] = useState<string | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // Oyun State'leri
   const [gameQuestions, setGameQuestions] = useState<PersonProfile[]>([]);
@@ -57,10 +58,21 @@ export default function AliciGame4({ onClose }: GameProps) {
   // Ses
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
+  // 1. SCROLL KİLİTLEME (Arka sayfa kaymasın diye)
   useEffect(() => {
-    localStorage.setItem('insan-tanima-profiller-dark', JSON.stringify(profiles));
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'auto';
+      stopCameraStream(); // Çıkarken kamerayı kapat
+    };
+  }, []);
+
+  // 2. VERİ KAYDETME
+  useEffect(() => {
+    localStorage.setItem('insan-tanima-v4', JSON.stringify(profiles));
   }, [profiles]);
 
+  // 3. SESLERİ YÜKLE
   useEffect(() => {
     const loadVoices = () => {
         if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -81,25 +93,37 @@ export default function AliciGame4({ onClose }: GameProps) {
       window.speechSynthesis.speak(utterance);
   };
 
-  // --- KAMERA / UPLOAD ---
+  // --- KAMERA FONKSİYONLARI ---
   const startCamera = async () => {
-    setIsCameraOpen(true);
+    setTempImage(null);
+    setIsCameraActive(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'user', width: { ideal: 512 }, height: { ideal: 512 } } 
+      });
+      streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
       }
     } catch (err) {
-      toast.error("Kamera hatası.");
-      setIsCameraOpen(false);
+      console.error(err);
+      toast.error("Kameraya erişilemedi. İzinleri kontrol edin.");
+      setIsCameraActive(false);
+    }
+  };
+
+  const stopCameraStream = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
     }
   };
 
   const capturePhoto = () => {
     if (!videoRef.current) return;
     const canvas = document.createElement('canvas');
-    // Kare Kırpma Basitleştirilmiş
+    // Kare Kırpma (Otomatik ortalar)
     const size = Math.min(videoRef.current.videoWidth, videoRef.current.videoHeight);
     canvas.width = size;
     canvas.height = size;
@@ -109,12 +133,11 @@ export default function AliciGame4({ onClose }: GameProps) {
         const startX = (videoRef.current.videoWidth - size) / 2;
         const startY = (videoRef.current.videoHeight - size) / 2;
         ctx.drawImage(videoRef.current, startX, startY, size, size, 0, 0, size, size);
-        setTempImage(canvas.toDataURL('image/jpeg'));
+        setTempImage(canvas.toDataURL('image/jpeg', 0.8));
     }
     
-    const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-    tracks.forEach(t => t.stop());
-    setIsCameraOpen(false);
+    stopCameraStream();
+    setIsCameraActive(false);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -122,16 +145,15 @@ export default function AliciGame4({ onClose }: GameProps) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
-        // Yüklenen resmi kare yapma işlemi canvas ile yapılabilir ama
-        // şimdilik siyah ekran riskini azaltmak için direkt alıyorum.
         setTempImage(event.target?.result as string);
+        setIsCameraActive(false);
     };
     reader.readAsDataURL(file);
   };
 
   const savePerson = () => {
       if (!newPersonName || !tempImage) {
-          toast.warning("İsim ve fotoğraf gerekli.");
+          toast.warning("İsim yazın ve fotoğraf ekleyin.");
           return;
       }
       const newProfile: PersonProfile = {
@@ -143,17 +165,17 @@ export default function AliciGame4({ onClose }: GameProps) {
       setProfiles([...profiles, newProfile]);
       setNewPersonName('');
       setTempImage(null);
+      stopCameraStream();
+      setIsCameraActive(false);
       toast.success("Kişi eklendi!");
   };
 
-  // --- OYUN BAŞLATMA (KARIŞIK) ---
+  // --- OYUN MANTIĞI ---
   const startMixedGame = () => {
-      // Tüm kategorilerden kişileri al
       if (profiles.length < 2) {
-          toast.error("Oyun için toplamda en az 2 kişi eklemelisiniz.");
+          toast.error("Oynamak için en az 2 kişi eklemelisiniz.");
           return;
       }
-
       const questions = [...profiles].sort(() => 0.5 - Math.random());
       setGameQuestions(questions);
       setCurrentQuestionIndex(0);
@@ -164,20 +186,17 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   const generateOptions = (target: PersonProfile, pool: PersonProfile[]) => {
       const other = pool.filter(p => p.id !== target.id).sort(() => 0.5 - Math.random());
-      // Maksimum 4 seçenek
       const distractors = other.slice(0, Math.min(3, other.length));
       const opts = [target, ...distractors].sort(() => 0.5 - Math.random());
       setOptions(opts);
-      
-      setTimeout(() => speak(`Hadi bana, ${target.name}, kişisini göster.`), 500);
+      setTimeout(() => speak(`Bana ${target.name} kişisini göster.`), 500);
   };
 
   const handleAnswer = (selected: PersonProfile) => {
       const target = gameQuestions[currentQuestionIndex];
       if (selected.id === target.id) {
-          // Doğru
           setGamePhase('success');
-          speak("Aferin!");
+          speak("Harikasın!");
           setTimeout(() => {
               const next = currentQuestionIndex + 1;
               if (next < gameQuestions.length) {
@@ -186,63 +205,56 @@ export default function AliciGame4({ onClose }: GameProps) {
                   generateOptions(gameQuestions[next], profiles);
               } else {
                   setGamePhase('complete');
-                  speak("Oyun bitti!");
+                  speak("Tebrikler bitti!");
                   confetti();
               }
           }, 1500);
       } else {
-          // Yanlış
           setGamePhase('fail');
-          speak(`Hayır. Bana ${target.name} kişisini göster.`);
+          speak(`Hayır, bu değil. Bana ${target.name} kişisini göster.`);
           setTimeout(() => setGamePhase('playing'), 1500);
       }
   };
 
   // --- RENDER ---
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col font-sans overflow-hidden text-slate-100">
+    <div className="fixed inset-0 z-[500] bg-slate-950 flex flex-col font-sans text-slate-100 touch-none">
       
       {/* ÜST BAR */}
-      <div className="bg-slate-900/50 border-b border-slate-800 p-4 flex justify-between items-center backdrop-blur-md z-10">
+      <div className="bg-slate-900 border-b border-slate-800 p-3 flex justify-between items-center z-10 shrink-0">
         <div className="flex items-center gap-3">
-            <button onClick={view === 'menu' ? onClose : () => setView('menu')} className="p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors">
+            <button onClick={view === 'menu' ? onClose : () => setView('menu')} className="p-2 bg-slate-800 rounded-full active:scale-95">
                 <ArrowLeft size={20} className="text-slate-300"/>
             </button>
-            <h1 className="text-lg font-bold text-slate-100">
-                {view === 'menu' ? 'İnsan Tanıma' : view === 'edit' ? 'Kişi Ekleme' : 'Oyun'}
+            <h1 className="text-lg font-bold">
+                {view === 'menu' ? 'İnsan Tanıma' : view === 'edit' ? 'Kişi Ekle' : 'Oyun'}
             </h1>
         </div>
       </div>
 
-      {/* --- 1. MENÜ (KATEGORİLER + BAŞLA) --- */}
+      {/* --- 1. MENÜ --- */}
       {view === 'menu' && (
-          <div className="flex-1 flex flex-col">
-              <div className="flex-1 p-6 overflow-y-auto">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-4xl mx-auto">
+          <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Scrollable İçerik */}
+              <div className="flex-1 overflow-y-auto p-4 overscroll-contain">
+                  <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
                       {CATEGORIES.map(cat => {
                           const count = profiles.filter(p => p.category === cat.id).length;
                           return (
-                              <div key={cat.id} className={`p-5 rounded-2xl border ${cat.color} bg-slate-900/40 relative group`}>
-                                  <div className="flex justify-between items-start mb-2">
-                                      <div className={`p-3 rounded-xl bg-slate-900 border border-slate-800 ${cat.iconColor}`}>
-                                          <cat.icon size={28} />
-                                      </div>
-                                      <div className="text-right">
-                                          <span className="text-2xl font-black block leading-none">{count}</span>
-                                          <span className="text-[10px] uppercase font-bold opacity-50">Kişi</span>
-                                      </div>
+                              <div key={cat.id} className={`p-4 rounded-xl border ${cat.color} bg-slate-900/50 flex flex-col gap-2 relative`}>
+                                  <div className={`self-start p-2 rounded-lg bg-slate-900 border border-slate-800 ${cat.iconColor}`}>
+                                      <cat.icon size={24} />
                                   </div>
-                                  
-                                  <div className="mb-4">
-                                      <h3 className="text-lg font-bold text-white">{cat.label}</h3>
+                                  <div>
+                                      <span className="text-2xl font-black block">{count}</span>
+                                      <span className="text-xs font-bold text-slate-400">{cat.label}</span>
                                   </div>
-
                                   <Button 
                                     size="sm" 
                                     onClick={() => { setSelectedCategory(cat.id); setView('edit'); }}
-                                    className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300"
+                                    className="w-full mt-auto bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs h-8"
                                   >
-                                      <Plus size={16} className="mr-2"/> EKLE / DÜZENLE
+                                      <Settings size={14} className="mr-1"/> EKLE
                                   </Button>
                               </div>
                           );
@@ -250,82 +262,81 @@ export default function AliciGame4({ onClose }: GameProps) {
                   </div>
               </div>
 
-              {/* ALTTA GİRİŞ BUTONU */}
-              <div className="p-6 bg-slate-900 border-t border-slate-800 safe-area-bottom">
+              {/* SABİT ALT BUTON */}
+              <div className="p-4 bg-slate-900 border-t border-slate-800 shrink-0">
                   <Button 
                     size="lg" 
                     onClick={startMixedGame}
                     disabled={profiles.length < 2}
-                    className="w-full py-8 text-xl font-black rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-xl shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full py-6 text-lg font-black rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                      <Play size={28} className="mr-3 fill-white" />
+                      <Play size={24} className="mr-2 fill-white" />
                       OYUNA BAŞLA
                   </Button>
-                  {profiles.length < 2 && (
-                      <p className="text-center text-xs text-slate-500 mt-3">
-                          Oynamak için kategorilere girip toplam en az 2 kişi ekleyin.
-                      </p>
-                  )}
+                  {profiles.length < 2 && <p className="text-center text-[10px] text-slate-500 mt-2">En az 2 kişi eklemelisin.</p>}
               </div>
           </div>
       )}
 
-      {/* --- 2. DÜZENLEME (EKLEME) --- */}
+      {/* --- 2. EDİTÖR (EKLEME) --- */}
       {view === 'edit' && (
-          <div className="flex-1 flex flex-col sm:flex-row overflow-hidden bg-slate-950">
-              
-              {/* LİSTE */}
-              <div className="flex-1 p-6 overflow-y-auto border-r border-slate-800">
-                  <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-lg font-bold text-slate-300">
-                          {CATEGORIES.find(c => c.id === selectedCategory)?.label} Listesi
-                      </h2>
-                  </div>
+          <div className="flex-1 flex flex-col overflow-hidden bg-slate-950">
+              <div className="flex-1 overflow-y-auto p-4 overscroll-contain">
+                  <h2 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">
+                      {CATEGORIES.find(c => c.id === selectedCategory)?.label} Listesi
+                  </h2>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                      {profiles.filter(p => p.category === selectedCategory).map(person => (
-                          <div key={person.id} className="relative group bg-slate-900 p-2 rounded-xl border border-slate-800">
-                              <img src={person.imageUrl} className="w-full aspect-square object-cover rounded-lg bg-slate-800" />
-                              <p className="text-center font-bold text-sm mt-2 text-slate-300">{person.name}</p>
-                              <button onClick={() => setProfiles(profiles.filter(p => p.id !== person.id))} className="absolute -top-2 -right-2 bg-red-600 text-white p-1.5 rounded-full"><Trash2 size={14}/></button>
-                          </div>
-                      ))}
-                      
-                      {/* YENİ EKLEME KARTI */}
-                      <div className="bg-slate-900/50 border-2 border-dashed border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center gap-4 min-h-[200px]">
-                          {isCameraOpen ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+                      {/* EKLEME KARTI */}
+                      <div className="bg-slate-900 border-2 border-dashed border-slate-800 rounded-xl p-2 flex flex-col gap-2 min-h-[180px]">
+                          {isCameraActive ? (
                               <div className="relative w-full aspect-square bg-black rounded-lg overflow-hidden">
-                                  <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                                  <button onClick={capturePhoto} className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-white rounded-full p-2"><div className="w-8 h-8 bg-red-600 rounded-full"></div></button>
+                                  <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
+                                  <button onClick={capturePhoto} className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-white rounded-full p-2 active:scale-90 transition-transform">
+                                      <div className="w-6 h-6 bg-red-600 rounded-full border-2 border-white"></div>
+                                  </button>
                               </div>
                           ) : tempImage ? (
-                              <div className="relative w-full aspect-square">
-                                  <img src={tempImage} className="w-full h-full object-cover rounded-lg" />
-                                  <button onClick={() => setTempImage(null)} className="absolute top-1 right-1 bg-black/50 p-1 rounded-full"><X size={16}/></button>
+                              <div className="relative w-full aspect-square bg-black rounded-lg overflow-hidden">
+                                  <img src={tempImage} className="w-full h-full object-cover" />
+                                  <button onClick={() => setTempImage(null)} className="absolute top-1 right-1 bg-black/60 p-1 rounded-full text-white"><X size={14}/></button>
                               </div>
                           ) : (
-                              <div className="flex flex-col items-center gap-2">
-                                  <Button variant="outline" onClick={() => setIsCameraOpen(true)} className="w-full border-slate-700 text-slate-300 hover:bg-slate-800"><Camera className="mr-2 h-4 w-4"/> Kamera</Button>
-                                  <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full border-slate-700 text-slate-300 hover:bg-slate-800"><Upload className="mr-2 h-4 w-4"/> Yükle</Button>
+                              <div className="flex-1 flex flex-col justify-center gap-2">
+                                  <Button onClick={startCamera} variant="outline" className="h-10 border-slate-700 bg-slate-800 text-slate-300">
+                                      <Camera size={16} className="mr-2"/> Kamera
+                                  </Button>
+                                  <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="h-10 border-slate-700 bg-slate-800 text-slate-300">
+                                      <Upload size={16} className="mr-2"/> Yükle
+                                  </Button>
                                   <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleFileUpload} />
                               </div>
                           )}
 
-                          {!isCameraOpen && (
-                              <>
-                                <input 
+                          {!isCameraActive && (
+                              <div className="flex flex-col gap-2">
+                                  <input 
                                     type="text" 
                                     value={newPersonName}
                                     onChange={(e) => setNewPersonName(e.target.value)}
                                     placeholder="İsim Girin"
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-center text-white placeholder:text-slate-600 focus:border-blue-500 outline-none"
-                                />
-                                <Button onClick={savePerson} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold">KAYDET</Button>
-                              </>
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-md px-2 py-1.5 text-center text-sm text-white placeholder:text-slate-600 focus:border-blue-500 outline-none"
+                                  />
+                                  <Button onClick={savePerson} size="sm" className="w-full bg-green-600 hover:bg-green-500 font-bold">KAYDET</Button>
+                              </div>
                           )}
                           
-                          {isCameraOpen && <Button variant="ghost" onClick={() => setIsCameraOpen(false)} className="text-red-400">İptal</Button>}
+                          {isCameraActive && <Button variant="ghost" size="sm" onClick={() => { stopCameraStream(); setIsCameraActive(false); }} className="text-red-400 text-xs h-6">İptal</Button>}
                       </div>
+
+                      {/* MEVCUT KİŞİLER */}
+                      {profiles.filter(p => p.category === selectedCategory).map(person => (
+                          <div key={person.id} className="relative group bg-slate-900 p-2 rounded-xl border border-slate-800">
+                              <img src={person.imageUrl} className="w-full aspect-square object-cover rounded-lg bg-slate-800" />
+                              <p className="text-center font-bold text-xs mt-2 text-slate-300 truncate">{person.name}</p>
+                              <button onClick={() => setProfiles(profiles.filter(p => p.id !== person.id))} className="absolute -top-2 -right-2 bg-red-600 text-white p-1.5 rounded-full shadow-md active:scale-90"><Trash2 size={12}/></button>
+                          </div>
+                      ))}
                   </div>
               </div>
           </div>
@@ -337,16 +348,16 @@ export default function AliciGame4({ onClose }: GameProps) {
               {gamePhase === 'complete' ? (
                   <div className="text-center animate-in zoom-in">
                        <h2 className="text-4xl font-black text-white mb-6">TEBRİKLER!</h2>
-                       <Button onClick={() => setView('menu')} size="lg" className="bg-green-600 text-white px-10 py-6 text-xl rounded-2xl">BİTİR</Button>
+                       <Button onClick={() => setView('menu')} size="lg" className="bg-green-600 text-white px-10 py-4 text-xl rounded-2xl">ÇIKIŞ</Button>
                   </div>
               ) : (
                   <>
-                      <div className="mb-12 text-center">
-                          <h2 className="text-3xl font-bold text-white mb-4">Hadi bana <span className="text-blue-400">{gameQuestions[currentQuestionIndex]?.name}</span> kişisini göster</h2>
-                          <Button variant="outline" onClick={() => speak(`Hadi bana, ${gameQuestions[currentQuestionIndex]?.name}, kişisini göster`)} className="rounded-full border-slate-700 text-slate-300 hover:bg-slate-900"><Play size={20} className="mr-2"/> Tekrar Dinle</Button>
+                      <div className="mb-8 text-center w-full">
+                          <h2 className="text-2xl font-bold text-white mb-4">Hadi bana <span className="text-blue-400 underline decoration-wavy">{gameQuestions[currentQuestionIndex]?.name}</span> kişisini göster</h2>
+                          <Button variant="secondary" size="sm" onClick={() => speak(`Bana ${gameQuestions[currentQuestionIndex]?.name} kişisini göster`)} className="rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"><Play size={16} className="mr-2"/> Tekrar Dinle</Button>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-6 w-full max-w-2xl">
+                      <div className="grid grid-cols-2 gap-4 w-full max-w-md">
                           {options.map((opt) => (
                               <motion.div 
                                 key={opt.id} 
@@ -354,13 +365,13 @@ export default function AliciGame4({ onClose }: GameProps) {
                                 whileTap={{ scale: 0.95 }}
                                 className={`
                                     relative aspect-square rounded-2xl overflow-hidden border-4 cursor-pointer bg-slate-800
-                                    ${gamePhase === 'success' && opt.id === gameQuestions[currentQuestionIndex].id ? 'border-green-500' : 'border-slate-800 hover:border-slate-600'}
-                                    ${gamePhase === 'fail' && opt.id !== gameQuestions[currentQuestionIndex].id ? 'opacity-30' : ''}
+                                    ${gamePhase === 'success' && opt.id === gameQuestions[currentQuestionIndex].id ? 'border-green-500' : 'border-slate-700 hover:border-slate-500'}
+                                    ${gamePhase === 'fail' && opt.id !== gameQuestions[currentQuestionIndex].id ? 'opacity-30 grayscale' : ''}
                                 `}
                               >
                                   <img src={opt.imageUrl} className="w-full h-full object-cover" />
                                   {gamePhase === 'success' && opt.id === gameQuestions[currentQuestionIndex].id && 
-                                    <div className="absolute inset-0 bg-green-500/30 flex items-center justify-center"><Check size={64} className="text-white"/></div>
+                                    <div className="absolute inset-0 bg-green-500/40 flex items-center justify-center"><Check size={64} className="text-white drop-shadow-md"/></div>
                                   }
                               </motion.div>
                           ))}
@@ -371,4 +382,4 @@ export default function AliciGame4({ onClose }: GameProps) {
       )}
     </div>
   );
-}
+                        }
