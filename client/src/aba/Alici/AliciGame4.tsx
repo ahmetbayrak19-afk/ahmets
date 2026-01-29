@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Camera, Upload, Trash2, ArrowLeft, Check, Play, Settings, User, Users, GraduationCap, Heart, X, Plus, Image as ImageIcon } from 'lucide-react';
+import { Camera, Upload, Trash2, ArrowLeft, Check, Play, Settings, User, Users, GraduationCap, Heart, X, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
@@ -32,15 +32,13 @@ export default function AliciGame4({ onClose }: GameProps) {
   const [view, setView] = useState<'menu' | 'edit' | 'game'>('menu');
   const [selectedCategory, setSelectedCategory] = useState<Category>('ogretmen');
   
-  // PROFİLLERİ YÜKLE (Hata riskine karşı güvenli yükleme - v4)
   const [profiles, setProfiles] = useState<PersonProfile[]>(() => {
     try {
-      const saved = localStorage.getItem('insan-tanima-v4');
+      const saved = localStorage.getItem('insan-tanima-v5'); // Versiyonu v5 yaptım (Temiz başlangıç)
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
 
-  // Editör State'leri
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [newPersonName, setNewPersonName] = useState('');
   const [tempImage, setTempImage] = useState<string | null>(null);
@@ -55,24 +53,23 @@ export default function AliciGame4({ onClose }: GameProps) {
   const [options, setOptions] = useState<PersonProfile[]>([]);
   const [gamePhase, setGamePhase] = useState<'playing' | 'success' | 'fail' | 'complete'>('playing');
 
-  // Ses
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  // 1. SCROLL KİLİTLEME (Arka sayfa kaymasın diye)
+  // 1. SCROLL KİLİTLEME
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = 'auto';
-      stopCameraStream(); // Çıkarken kamerayı kapat
+      stopCameraStream();
     };
   }, []);
 
-  // 2. VERİ KAYDETME
+  // 2. KAYDETME
   useEffect(() => {
-    localStorage.setItem('insan-tanima-v4', JSON.stringify(profiles));
+    localStorage.setItem('insan-tanima-v5', JSON.stringify(profiles));
   }, [profiles]);
 
-  // 3. SESLERİ YÜKLE
+  // 3. SES
   useEffect(() => {
     const loadVoices = () => {
         if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -83,7 +80,6 @@ export default function AliciGame4({ onClose }: GameProps) {
     if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
 
-  // --- TTS ---
   const speak = (text: string) => {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
@@ -93,13 +89,41 @@ export default function AliciGame4({ onClose }: GameProps) {
       window.speechSynthesis.speak(utterance);
   };
 
-  // --- KAMERA FONKSİYONLARI ---
+  // --- RESİM İŞLEME MOTORU (Resizer) ---
+  const processImage = (imageSource: HTMLVideoElement | HTMLImageElement): string => {
+      const canvas = document.createElement('canvas');
+      // Hedef boyut: 512x512 piksel (Yeterince net ve küçük boyutlu)
+      const size = 512;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) return '';
+
+      // Kaynak boyutları
+      const srcW = imageSource instanceof HTMLVideoElement ? imageSource.videoWidth : imageSource.width;
+      const srcH = imageSource instanceof HTMLVideoElement ? imageSource.videoHeight : imageSource.height;
+
+      // "Cover" mantığı ile kare kırpma
+      const ratio = Math.max(size / srcW, size / srcH);
+      const newW = srcW * ratio;
+      const newH = srcH * ratio;
+      const offsetX = (size - newW) / 2;
+      const offsetY = (size - newH) / 2;
+
+      ctx.drawImage(imageSource, offsetX, offsetY, newW, newH);
+
+      // JPEG Sıkıştırma (%80 kalite) -> WhatsApp tarzı
+      return canvas.toDataURL('image/jpeg', 0.8);
+  };
+
+  // --- KAMERA ---
   const startCamera = async () => {
     setTempImage(null);
     setIsCameraActive(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user', width: { ideal: 512 }, height: { ideal: 512 } } 
+        video: { facingMode: 'user', width: { ideal: 640 } } 
       });
       streamRef.current = stream;
       if (videoRef.current) {
@@ -107,8 +131,7 @@ export default function AliciGame4({ onClose }: GameProps) {
         videoRef.current.play();
       }
     } catch (err) {
-      console.error(err);
-      toast.error("Kameraya erişilemedi. İzinleri kontrol edin.");
+      toast.error("Kamera açılamadı.");
       setIsCameraActive(false);
     }
   };
@@ -122,40 +145,56 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   const capturePhoto = () => {
     if (!videoRef.current) return;
-    const canvas = document.createElement('canvas');
-    // Kare Kırpma (Otomatik ortalar)
-    const size = Math.min(videoRef.current.videoWidth, videoRef.current.videoHeight);
-    canvas.width = size;
-    canvas.height = size;
-    
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-        const startX = (videoRef.current.videoWidth - size) / 2;
-        const startY = (videoRef.current.videoHeight - size) / 2;
-        ctx.drawImage(videoRef.current, startX, startY, size, size, 0, 0, size, size);
-        setTempImage(canvas.toDataURL('image/jpeg', 0.8));
-    }
-    
+    // Resmi işle ve sıkıştır
+    const optimizedImage = processImage(videoRef.current);
+    setTempImage(optimizedImage);
     stopCameraStream();
     setIsCameraActive(false);
+  };
+
+  // --- DOSYA YÜKLEME ---
+  const handleFileClick = () => {
+      // Input'u manuel tetikle
+      if (fileInputRef.current) {
+          fileInputRef.current.click();
+      }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = (event) => {
-        setTempImage(event.target?.result as string);
-        setIsCameraActive(false);
+        // Yüklenen resmi bir Image nesnesine dönüştür
+        const img = new Image();
+        img.onload = () => {
+            // Resmi işle ve sıkıştır (Resize & Compress)
+            const optimizedImage = processImage(img);
+            setTempImage(optimizedImage);
+            setIsCameraActive(false);
+        };
+        img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
+    
+    // Aynı dosyayı tekrar seçebilmek için input'u sıfırla
+    e.target.value = '';
   };
 
   const savePerson = () => {
+      // 10 KİŞİ SINIRI KONTROLÜ
+      const currentCategoryCount = profiles.filter(p => p.category === selectedCategory).length;
+      if (currentCategoryCount >= 10) {
+          toast.error("Bu kategori için maksimum 10 kişi ekleyebilirsiniz!");
+          return;
+      }
+
       if (!newPersonName || !tempImage) {
           toast.warning("İsim yazın ve fotoğraf ekleyin.");
           return;
       }
+
       const newProfile: PersonProfile = {
           id: Date.now().toString(),
           name: newPersonName,
@@ -165,15 +204,13 @@ export default function AliciGame4({ onClose }: GameProps) {
       setProfiles([...profiles, newProfile]);
       setNewPersonName('');
       setTempImage(null);
-      stopCameraStream();
-      setIsCameraActive(false);
-      toast.success("Kişi eklendi!");
+      toast.success("Kişi başarıyla eklendi!");
   };
 
-  // --- OYUN MANTIĞI ---
+  // --- OYUN ---
   const startMixedGame = () => {
       if (profiles.length < 2) {
-          toast.error("Oynamak için en az 2 kişi eklemelisiniz.");
+          toast.error("En az 2 kişi eklemelisiniz.");
           return;
       }
       const questions = [...profiles].sort(() => 0.5 - Math.random());
@@ -211,15 +248,23 @@ export default function AliciGame4({ onClose }: GameProps) {
           }, 1500);
       } else {
           setGamePhase('fail');
-          speak(`Hayır, bu değil. Bana ${target.name} kişisini göster.`);
+          speak(`Hayır. Bana ${target.name} kişisini göster.`);
           setTimeout(() => setGamePhase('playing'), 1500);
       }
   };
 
-  // --- RENDER ---
   return (
     <div className="fixed inset-0 z-[500] bg-slate-950 flex flex-col font-sans text-slate-100 touch-none">
       
+      {/* GİZLİ INPUT - EN GARANTİ YERDE */}
+      <input 
+          type="file" 
+          ref={fileInputRef} 
+          hidden 
+          accept="image/*" 
+          onChange={handleFileUpload} 
+      />
+
       {/* ÜST BAR */}
       <div className="bg-slate-900 border-b border-slate-800 p-3 flex justify-between items-center z-10 shrink-0">
         <div className="flex items-center gap-3">
@@ -235,7 +280,6 @@ export default function AliciGame4({ onClose }: GameProps) {
       {/* --- 1. MENÜ --- */}
       {view === 'menu' && (
           <div className="flex-1 flex flex-col overflow-hidden">
-              {/* Scrollable İçerik */}
               <div className="flex-1 overflow-y-auto p-4 overscroll-contain">
                   <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
                       {CATEGORIES.map(cat => {
@@ -246,7 +290,7 @@ export default function AliciGame4({ onClose }: GameProps) {
                                       <cat.icon size={24} />
                                   </div>
                                   <div>
-                                      <span className="text-2xl font-black block">{count}</span>
+                                      <span className="text-2xl font-black block">{count}/10</span>
                                       <span className="text-xs font-bold text-slate-400">{cat.label}</span>
                                   </div>
                                   <Button 
@@ -254,7 +298,7 @@ export default function AliciGame4({ onClose }: GameProps) {
                                     onClick={() => { setSelectedCategory(cat.id); setView('edit'); }}
                                     className="w-full mt-auto bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs h-8"
                                   >
-                                      <Settings size={14} className="mr-1"/> EKLE
+                                      <Settings size={14} className="mr-1"/> DÜZENLE
                                   </Button>
                               </div>
                           );
@@ -262,7 +306,6 @@ export default function AliciGame4({ onClose }: GameProps) {
                   </div>
               </div>
 
-              {/* SABİT ALT BUTON */}
               <div className="p-4 bg-slate-900 border-t border-slate-800 shrink-0">
                   <Button 
                     size="lg" 
@@ -273,18 +316,22 @@ export default function AliciGame4({ onClose }: GameProps) {
                       <Play size={24} className="mr-2 fill-white" />
                       OYUNA BAŞLA
                   </Button>
-                  {profiles.length < 2 && <p className="text-center text-[10px] text-slate-500 mt-2">En az 2 kişi eklemelisin.</p>}
               </div>
           </div>
       )}
 
-      {/* --- 2. EDİTÖR (EKLEME) --- */}
+      {/* --- 2. EDİTÖR --- */}
       {view === 'edit' && (
           <div className="flex-1 flex flex-col overflow-hidden bg-slate-950">
               <div className="flex-1 overflow-y-auto p-4 overscroll-contain">
-                  <h2 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">
-                      {CATEGORIES.find(c => c.id === selectedCategory)?.label} Listesi
-                  </h2>
+                  <div className="flex justify-between items-center mb-4">
+                      <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">
+                          {CATEGORIES.find(c => c.id === selectedCategory)?.label}
+                      </h2>
+                      <span className="text-xs font-bold text-slate-500 bg-slate-900 px-2 py-1 rounded">
+                          {profiles.filter(p => p.category === selectedCategory).length} / 10
+                      </span>
+                  </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
                       {/* EKLEME KARTI */}
@@ -306,10 +353,9 @@ export default function AliciGame4({ onClose }: GameProps) {
                                   <Button onClick={startCamera} variant="outline" className="h-10 border-slate-700 bg-slate-800 text-slate-300">
                                       <Camera size={16} className="mr-2"/> Kamera
                                   </Button>
-                                  <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="h-10 border-slate-700 bg-slate-800 text-slate-300">
+                                  <Button onClick={handleFileClick} variant="outline" className="h-10 border-slate-700 bg-slate-800 text-slate-300">
                                       <Upload size={16} className="mr-2"/> Yükle
                                   </Button>
-                                  <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleFileUpload} />
                               </div>
                           )}
 
@@ -329,7 +375,7 @@ export default function AliciGame4({ onClose }: GameProps) {
                           {isCameraActive && <Button variant="ghost" size="sm" onClick={() => { stopCameraStream(); setIsCameraActive(false); }} className="text-red-400 text-xs h-6">İptal</Button>}
                       </div>
 
-                      {/* MEVCUT KİŞİLER */}
+                      {/* LİSTE */}
                       {profiles.filter(p => p.category === selectedCategory).map(person => (
                           <div key={person.id} className="relative group bg-slate-900 p-2 rounded-xl border border-slate-800">
                               <img src={person.imageUrl} className="w-full aspect-square object-cover rounded-lg bg-slate-800" />
@@ -382,4 +428,4 @@ export default function AliciGame4({ onClose }: GameProps) {
       )}
     </div>
   );
-                        }
+}
