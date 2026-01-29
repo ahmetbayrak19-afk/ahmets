@@ -111,8 +111,14 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             {activeGameItem.startsWith("EB.3.3") && <NesneEslemeGame12 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.3.4") && <NesneEslemeGame13 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             
-            {activeGameItem.startsWith("EB.4.1") && <NesneEslemeGame15 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
-            {activeGameItem.startsWith("EB.4.2") && <NesneEslemeGame16 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
+            {/* DÜZELTME: Sona nokta koyarak 4.10 ile karışmasını engelledik */}
+            {activeGameItem.startsWith("EB.4.1.") && (
+                <NesneEslemeGame15 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
+            )}
+            
+            {activeGameItem.startsWith("EB.4.2.") && (
+                <NesneEslemeGame16 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
+            )}
           </>
       )}
 
@@ -140,15 +146,15 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             const isCompleted = status === true;
             
             // --- OYUN BUTONU KONTROLÜ ---
+            // DÜZELTME: 4.1 kontrolüne nokta eklendi.
             const hasGame = 
                 item.startsWith("EB.1.1") || item.startsWith("EB.1.2") || 
                 item.startsWith("EB.1.3") || item.startsWith("EB.1.4") ||
                 item.startsWith("EB.2.1") || item.startsWith("EB.2.5") ||
                 item.startsWith("EB.3.1") || item.startsWith("EB.3.2") ||
                 item.startsWith("EB.3.3") || item.startsWith("EB.3.4") ||
-                item.startsWith("EB.4.1") || // Game15 (Kelime)
-                item.startsWith("EB.4.2");   // Game16 (Klavye)
-                // EB.4.10 BURADAN ÇIKARILDI (Gruplama)
+                item.startsWith("EB.4.1.") || // Nokta eklendi, böylece 4.10'u görmez
+                item.startsWith("EB.4.2");   
             
             const firstSpaceIndex = item.indexOf(' ');
             const code = item.substring(0, firstSpaceIndex);
@@ -184,4 +190,4 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       </div>
     </div>
   );
-              }
+      }
