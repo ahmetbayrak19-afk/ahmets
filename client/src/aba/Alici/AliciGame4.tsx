@@ -4,20 +4,19 @@ import { Camera, Upload, Trash2, Save, ArrowLeft, Check, Play, Settings, User, U
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
-import { twMerge } from 'tailwind-merge';
 
 // --- VARSAYILAN KİŞİLER (YEDEK OYUNCULAR) ---
-// Resimlerin bu dosya ile AYNI klasörde olduğunu varsayıyoruz.
-import kisi1 from './kisi1.png';
-import kisi2 from './kisi2.png';
-import kisi3 from './kisi3.png';
-import kisi4 from './kisi4.png';
-import kisi5 from './kisi5.png';
-import kisi6 from './kisi6.png';
-import kisi7 from './kisi7.png';
-import kisi8 from './kisi8.png';
-import kisi9 from './kisi9.png';
-import kisi10 from './kisi10.png';
+// DÜZELTME: Uzantılar .jpg yapıldı
+import kisi1 from './kisi1.jpg';
+import kisi2 from './kisi2.jpg';
+import kisi3 from './kisi3.jpg';
+import kisi4 from './kisi4.jpg';
+import kisi5 from './kisi5.jpg';
+import kisi6 from './kisi6.jpg';
+import kisi7 from './kisi7.jpg';
+import kisi8 from './kisi8.jpg';
+import kisi9 from './kisi9.jpg';
+import kisi10 from './kisi10.jpg';
 
 const DEFAULT_PEOPLE = [
   { id: 'def1', name: 'Bu Kişi', imageUrl: kisi1 },
@@ -433,7 +432,6 @@ export default function AliciGame4({ onClose }: GameProps) {
           </div>
       )}
 
-
       {/* --- 3. CROP (FOTOĞRAF AYARLAMA) --- */}
       {view === 'crop' && rawImage && (
           <div className="flex-1 flex flex-col items-center justify-center bg-slate-900 p-4 relative overflow-y-auto">
@@ -567,4 +565,4 @@ export default function AliciGame4({ onClose }: GameProps) {
 
     </div>
   );
-}
+    }
