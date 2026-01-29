@@ -11,16 +11,15 @@ import { ABA_MODULES } from '@/shared/abaData';
 import NesneEslemeGame1 from '@/aba/esle/NesneEslemeGame1';   // EB.1.1
 import NesneEslemeGame2 from '@/aba/esle/NesneEslemeGame2';   // EB.1.2
 import NesneEslemeGame3 from '@/aba/esle/NesneEslemeGame3';   // EB.1.3
-import NesneEslemeGame4 from '@/aba/esle/NesneEslemeGame4';   // EB.1.4 ve EB.3.5 (Ses)
+import NesneEslemeGame4 from '@/aba/esle/NesneEslemeGame4';   // EB.1.4
 import NesneEslemeGame9 from '@/aba/esle/NesneEslemeGame9';   // EB.2.5 (Renk)
 import NesneEslemeGame10 from '@/aba/esle/NesneEslemeGame10'; // EB.3.1 (Şekil)
 import NesneEslemeGame11 from '@/aba/esle/NesneEslemeGame11'; // EB.3.2 (Rakam)
 import NesneEslemeGame12 from '@/aba/esle/NesneEslemeGame12'; // EB.3.3 (Harf)
 import NesneEslemeGame13 from '@/aba/esle/NesneEslemeGame13'; // EB.3.4 (Gölge)
-import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16'; // EB.4.1 (Kelime)
-import NesneEslemeGame15 from '@/aba/esle/NesneEslemeGame15'; // EB.4.2 (Klavye)
+import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16'; // EB.4.2'ye kaydırıldı
 
-// --- GEÇİCİ/EK OYUN (EB.2.1 - 5. Sırada) ---
+// --- GEÇİCİ/EK OYUN (EB.2.1 için) ---
 import EslemeGame from '@/aba/esle/game/eslemegame'; 
 
 interface EslemePageProps {
@@ -146,25 +145,21 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                 <NesneEslemeGame12 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
 
-            {/* EB.3.4 Gölge Eşleme (Game13) */}
+            {/* EB.3.4 Gölge Eşleme */}
             {activeGameItem.startsWith("EB.3.4") && (
                 <NesneEslemeGame13 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
 
-            {/* EB.3.5 Ses Eşleme (Game4 Sesli olduğu için tekrar kullanabiliriz) */}
-            {activeGameItem.startsWith("EB.3.5") && (
-                <NesneEslemeGame4 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
-            )}
+            {/* NOT: EB.3.5 (Ses) Kaldırıldı */}
 
-            {/* EB.4.1 Kelime-Kelime Eşleme (Game16) */}
-            {activeGameItem.startsWith("EB.4.1") && (
+            {/* NOT: EB.4.1 (Kelime-Kelime) Kaldırıldı (Swap yapıldı) */}
+
+            {/* EB.4.2 Klavyede Harf Eşleme -> Game16 (İçerik değiştiği için buraya bağlandı) */}
+            {activeGameItem.startsWith("EB.4.2") && (
                 <NesneEslemeGame16 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
-
-            {/* EB.4.2 Klavyede Harf Eşleme (Game15) */}
-            {activeGameItem.startsWith("EB.4.2") && (
-                <NesneEslemeGame15 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
-            )}
+            
+            {/* NOT: EB.4.10 (Grup) Kaldırıldı */}
           </>
       )}
 
@@ -191,7 +186,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             const status = formData[item];
             const isCompleted = status === true;
             
-            // --- OYUN BUTONU KONTROLÜ (HANGİ MADDELERDE VAR?) ---
+            // --- OYUN BUTONU KONTROLÜ ---
             const hasGame = 
                 item.startsWith("EB.1.1") || 
                 item.startsWith("EB.1.2") || 
@@ -203,9 +198,9 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                 item.startsWith("EB.3.2") ||
                 item.startsWith("EB.3.3") || 
                 item.startsWith("EB.3.4") ||
-                item.startsWith("EB.3.5") ||
-                item.startsWith("EB.4.1") || 
-                item.startsWith("EB.4.2");
+                // item.startsWith("EB.3.5") || // Kaldırıldı
+                // item.startsWith("EB.4.1") || // Kaldırıldı (Swap sonrası boş)
+                item.startsWith("EB.4.2");   // Game16 buraya geldi
             
             const firstSpaceIndex = item.indexOf(' ');
             const code = item.substring(0, firstSpaceIndex);
@@ -241,5 +236,5 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       </div>
     </div>
   );
-                }
-                
+    }
+    
