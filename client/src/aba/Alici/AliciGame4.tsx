@@ -32,7 +32,7 @@ export default function AliciGame4({ onClose }: GameProps) {
   const [view, setView] = useState<'menu' | 'edit' | 'game'>('menu');
   const [selectedCategory, setSelectedCategory] = useState<Category>('ogretmen');
   
-  // PROFİLLERİ YÜKLE (v5)
+  // PROFİLLERİ YÜKLE
   const [profiles, setProfiles] = useState<PersonProfile[]>(() => {
     try {
       const saved = localStorage.getItem('insan-tanima-v5');
@@ -47,6 +47,9 @@ export default function AliciGame4({ onClose }: GameProps) {
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  
+  // Dosya Yükleme Referansı (KRİTİK NOKTA)
+  const hiddenFileInputRef = useRef<HTMLInputElement>(null);
 
   // Oyun State'leri
   const [gameQuestions, setGameQuestions] = useState<PersonProfile[]>([]);
@@ -56,7 +59,7 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  // 1. SCROLL KİLİTLEME (touch-none KALDIRILDI, sadece overflow:hidden yeterli)
+  // 1. SCROLL KİLİTLEME
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => {
@@ -153,7 +156,14 @@ export default function AliciGame4({ onClose }: GameProps) {
     setIsCameraActive(false);
   };
 
-  // --- DOSYA YÜKLEME ---
+  // --- DOSYA YÜKLEME (DOĞRUDAN TETİKLEME) ---
+  const triggerFileUpload = () => {
+    // Referans varsa tıkla. Bu kadar basit.
+    if (hiddenFileInputRef.current) {
+        hiddenFileInputRef.current.click();
+    }
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -246,7 +256,6 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   // --- RENDER ---
   return (
-    // DÜZELTME 1: "touch-none" KALDIRILDI.
     <div className="fixed inset-0 z-[500] bg-slate-950 flex flex-col font-sans text-slate-100">
       
       {/* ÜST BAR */}
@@ -352,21 +361,15 @@ export default function AliciGame4({ onClose }: GameProps) {
                                       <Camera size={16} className="mr-2"/> Kamera
                                   </Button>
                                   
-                                  {/* --- DÜZELTME 2: Z-INDEX VE POINTER-EVENTS GÜNCELLEMESİ ---
-                                      touch-none kalktı, şimdi input z-50 ile en üstte.
+                                  {/* --- FİNAL YÖNTEM: MANUEL TETİKLEME --- 
+                                      Button bileşeni değil, düz DIV kullandım.
+                                      onClick doğrudan JS fonksiyonunu çağırıyor.
                                   */}
-                                  <div className="relative h-10 w-full">
-                                      {/* Görsel Buton */}
-                                      <div className="absolute inset-0 border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center rounded-md text-sm font-medium hover:bg-slate-700 hover:text-white transition-colors pointer-events-none">
-                                          <Upload size={16} className="mr-2"/> Yükle
-                                      </div>
-                                      {/* Gerçek Input (Görünmez ve En Üstte) */}
-                                      <input 
-                                          type="file" 
-                                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50"
-                                          accept="image/*" 
-                                          onChange={handleFileUpload} 
-                                      />
+                                  <div 
+                                    onClick={triggerFileUpload}
+                                    className="h-10 border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center rounded-md cursor-pointer hover:bg-slate-700 hover:text-white transition-colors text-sm font-medium"
+                                  >
+                                      <Upload size={16} className="mr-2"/> Yükle
                                   </div>
 
                               </div>
@@ -439,6 +442,16 @@ export default function AliciGame4({ onClose }: GameProps) {
               )}
           </div>
       )}
+
+      {/* --- GİZLİ INPUT (SAYFANIN EN ALTINDA) --- */}
+      <input 
+          type="file" 
+          ref={hiddenFileInputRef}
+          style={{ display: 'none' }} // className="hidden" bazen tailwind config yüzünden ezilebiliyor
+          accept="image/*" 
+          onChange={handleFileUpload} 
+      />
+
     </div>
   );
 }
