@@ -4,17 +4,30 @@ import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, R
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
-// --- EYLEM RESİMLERİ ---
-import disfircalaImg from './disfircala.png';
-import elmayeImg from './elmaye.png';
-import elyikaImg from './elyika.png';
-import kitapokuImg from './kitapoku.png';
-import kosImg from './kos.png';
-import resimyapImg from './resimyap.png';
-import sallanImg from './sallan.png';
-import suicImg from './suic.png';
-import topoynaImg from './topoyna.png';
-import uyuImg from './uyu.png';
+// --- EYLEM VİDEOLARI (IMPORT) ---
+// Not: Dosya yolunu 'client/src/aba/esle/eylemesle/' olarak varsayarak import ediyorum.
+// Bu dosya 'client/src/aba/esle/' içindeyse './eylemesle/...' doğrudur.
+
+import disfircalaVid from './eylemesle/disfircala.mp4';
+import disfircala1Vid from './eylemesle/disfircala1.mp4';
+import elmayeVid from './eylemesle/elmaye.mp4';
+import elmaye1Vid from './eylemesle/elmaye1.mp4';
+import elyikaVid from './eylemesle/elyika.mp4';
+import elyika1Vid from './eylemesle/elyika1.mp4';
+import gitarcalVid from './eylemesle/gitarcal.mp4';
+import gitarcal1Vid from './eylemesle/gitarcal1.mp4';
+import kitapokuVid from './eylemesle/kitapoku.mp4';
+import kitapoku1Vid from './eylemesle/kitapoku1.mp4';
+import kosVid from './eylemesle/kos.mp4';
+import kos1Vid from './eylemesle/kos1.mp4';
+import resimyapVid from './eylemesle/resimyap.mp4';
+import resimyap1Vid from './eylemesle/resimyap1.mp4';
+import sallanVid from './eylemesle/salincaksallan.mp4';
+import sallan1Vid from './eylemesle/salincaksallan1.mp4';
+import suicVid from './eylemesle/suic.mp4';
+import suic1Vid from './eylemesle/suic1.mp4';
+import topoynaVid from './eylemesle/topoyna.mp4';
+import topoyna1Vid from './eylemesle/topoyna1.mp4';
 
 // --- SES DOSYALARI ---
 import arkaplanMusic from './ses/arkaplanmusic.mp3';
@@ -31,17 +44,41 @@ import tekrardene2 from './ses/tekrardene2.mp3';
 const POSITIVE_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
 const NEGATIVE_SOUNDS = [tekrardene1, tekrardene2];
 
+// --- VİDEO VERİ YAPISI ---
+// id: Benzersiz kimlik
+// groupId: Eşleşme grubu (Örn: 'kos' grubu). Seçeneklerde çakışmayı önlemek için.
+// name: Eylem adı
+// src: Video dosyası
 const OBJECTS = [
-  { id: 'disfircala', name: 'Diş Fırçala', src: disfircalaImg },
-  { id: 'elmaye', name: 'Elma Ye', src: elmayeImg },
-  { id: 'elyika', name: 'El Yıka', src: elyikaImg },
-  { id: 'kitapoku', name: 'Kitap Oku', src: kitapokuImg },
-  { id: 'kos', name: 'Koş', src: kosImg },
-  { id: 'resimyap', name: 'Resim Yap', src: resimyapImg },
-  { id: 'sallan', name: 'Sallan', src: sallanImg },
-  { id: 'suic', name: 'Su İç', src: suicImg },
-  { id: 'topoyna', name: 'Top Oyna', src: topoynaImg },
-  { id: 'uyu', name: 'Uyu', src: uyuImg },
+  { id: 'disfircala', groupId: 'disfircala', name: 'Diş Fırçala', src: disfircalaVid },
+  { id: 'disfircala1', groupId: 'disfircala', name: 'Diş Fırçala', src: disfircala1Vid },
+  
+  { id: 'elmaye', groupId: 'elmaye', name: 'Elma Ye', src: elmayeVid },
+  { id: 'elmaye1', groupId: 'elmaye', name: 'Elma Ye', src: elmaye1Vid },
+  
+  { id: 'elyika', groupId: 'elyika', name: 'El Yıka', src: elyikaVid },
+  { id: 'elyika1', groupId: 'elyika', name: 'El Yıka', src: elyika1Vid },
+  
+  { id: 'gitarcal', groupId: 'gitarcal', name: 'Gitar Çal', src: gitarcalVid },
+  { id: 'gitarcal1', groupId: 'gitarcal', name: 'Gitar Çal', src: gitarcal1Vid },
+  
+  { id: 'kitapoku', groupId: 'kitapoku', name: 'Kitap Oku', src: kitapokuVid },
+  { id: 'kitapoku1', groupId: 'kitapoku', name: 'Kitap Oku', src: kitapoku1Vid },
+  
+  { id: 'kos', groupId: 'kos', name: 'Koş', src: kosVid },
+  { id: 'kos1', groupId: 'kos', name: 'Koş', src: kos1Vid },
+  
+  { id: 'resimyap', groupId: 'resimyap', name: 'Resim Yap', src: resimyapVid },
+  { id: 'resimyap1', groupId: 'resimyap', name: 'Resim Yap', src: resimyap1Vid },
+  
+  { id: 'sallan', groupId: 'sallan', name: 'Sallan', src: sallanVid },
+  { id: 'sallan1', groupId: 'sallan', name: 'Sallan', src: sallan1Vid },
+  
+  { id: 'suic', groupId: 'suic', name: 'Su İç', src: suicVid },
+  { id: 'suic1', groupId: 'suic', name: 'Su İç', src: suic1Vid },
+  
+  { id: 'topoyna', groupId: 'topoyna', name: 'Top Oyna', src: topoynaVid },
+  { id: 'topoyna1', groupId: 'topoyna', name: 'Top Oyna', src: topoyna1Vid },
 ];
 
 interface GameProps {
@@ -51,7 +88,7 @@ interface GameProps {
 }
 
 export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProps) {
-  // GAME STATES (Level ve Mute)
+  // GAME STATES
   const [level, setLevel] = useState(1); 
   const [questionIndex, setQuestionIndex] = useState(0); 
   const [isMuted, setIsMuted] = useState(false);
@@ -123,8 +160,9 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
     return () => { document.body.style.overflow = originalStyle; };
   }, []);
 
-  // --- SORU ÜRETME ---
+  // --- SORU ÜRETME MANTIĞI (GÜNCELLENDİ) ---
   const generateQuestion = () => {
+    // 1. Rastgele bir hedef video seç
     const randomTarget = OBJECTS[Math.floor(Math.random() * OBJECTS.length)];
     
     // Level'a göre seçenek sayısı
@@ -132,10 +170,15 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
     if (level === 2) optionCount = 4;
     if (level === 3) optionCount = 6;
 
-    const distractors = OBJECTS.filter(item => item.id !== randomTarget.id)
-                             .sort(() => 0.5 - Math.random())
-                             .slice(0, optionCount - 1); 
+    // 2. Çeldiricileri seçerken AYNI GRUPTA OLANLARI (groupId) hariç tut.
+    // Yani hedef 'kos.mp4' ise seçeneklerde 'kos1.mp4' OLMAYACAK.
+    const potentialDistractors = OBJECTS.filter(item => item.groupId !== randomTarget.groupId);
 
+    const distractors = potentialDistractors
+                         .sort(() => 0.5 - Math.random())
+                         .slice(0, optionCount - 1); 
+
+    // 3. Hedefi ve çeldiricileri karıştır
     setTargetItem(randomTarget);
     setOptions([randomTarget, ...distractors].sort(() => 0.5 - Math.random()));
     
@@ -178,6 +221,7 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
 
     if (!isInside) return;
 
+    // Sadece tam kimlik eşleşmesi (ID'ler aynı olmalı)
     const isCorrect = droppedItem.id === targetItem.id;
 
     if (isCorrect) {
@@ -204,8 +248,6 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
        if (mode === 'instruction') {
         const nextQ = questionIndex + 1;
         setQuestionIndex(nextQ);
-
-        // Soru geçişi, manuel butonlar olduğu için otomatik level atlama yok
         generateQuestion();
     } else {
       const nextCount = assessmentCount + 1;
@@ -291,8 +333,7 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
         </button>
         
         <div className="flex items-center gap-3">
-             
-             {/* --- GÜNCELLENEN KISIM: LVL BUTONLARI --- */}
+             {/* LVL BUTONLARI */}
              {mode === 'instruction' && (
                  <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 items-center">
                      {[1, 2, 3].map(l => (
@@ -334,25 +375,28 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
         <div className="flex-1 flex flex-col justify-around w-full max-w-md h-full">
           
           <div className="flex flex-col items-center">
-            {/* HEDEF KUTU */}
+            {/* HEDEF KUTU (DROP ZONE) */}
             <div 
                 ref={dropZoneRef}
                 className={twMerge(
-                    "w-72 h-72 bg-white rounded-[3rem] border-4 border-dashed flex items-center justify-center shadow-inner relative z-0 transition-all duration-300",
-                    isMatched ? "border-green-500 bg-green-50 border-solid" : "border-slate-300"
+                    "w-72 h-56 bg-black rounded-[2rem] border-4 border-dashed flex items-center justify-center shadow-inner relative z-0 transition-all duration-300 overflow-hidden",
+                    isMatched ? "border-green-500 border-solid" : "border-slate-300"
                 )}
             >
-               {/* pointer-events-none */}
-               <img 
+               {/* HEDEF VİDEO */}
+               <video 
                  src={targetItem.src} 
-                 alt={targetItem.name} 
+                 autoPlay 
+                 loop 
+                 muted 
+                 playsInline
                  className={twMerge(
-                    "object-contain transition-all duration-500 pointer-events-none",
-                    isMatched ? "w-56 h-56 opacity-100 scale-110 drop-shadow-2xl" : "w-48 h-48 opacity-90"
+                    "w-full h-full object-cover pointer-events-none transition-all duration-500",
+                    isMatched ? "opacity-100 scale-100" : "opacity-90"
                  )} 
                />
             </div>
-            {!isMatched && <p className="mt-4 text-slate-400 font-bold text-xs tracking-widest uppercase animate-pulse">Eşini Üzerine Bırak</p>}
+            {!isMatched && <p className="mt-4 text-slate-400 font-bold text-xs tracking-widest uppercase animate-pulse">Aynısını Üzerine Bırak</p>}
           </div>
 
           <div className={twMerge(
@@ -381,7 +425,7 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
                         ? { opacity: 0, scale: 0 }
                         : (isModeling && isCorrectItem) 
                         ? { 
-                            y: [0, -380, -380, 0], 
+                            y: [0, -320, -320, 0], // Hedefe gitme animasyonu
                             scale: [1, 1.2, 1.2, 1],
                             x: 0
                           } 
@@ -396,13 +440,21 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
                     }
 
                     className={twMerge(
-                      "w-28 h-28 bg-white rounded-3xl shadow-[0_8px_0_0_#e2e8f0] flex items-center justify-center border-2 touch-none relative z-10",
+                      "w-28 h-24 bg-black rounded-xl shadow-[0_4px_0_0_#334155] flex items-center justify-center border-2 touch-none relative z-10 overflow-hidden",
                       canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed",
                       (isModeling && isCorrectItem) ? "border-blue-400 shadow-blue-100 shadow-xl" : 
-                      (flashCorrect && isCorrectItem) ? "border-green-500 shadow-green-100" : "border-slate-100"
+                      (flashCorrect && isCorrectItem) ? "border-green-500 shadow-green-100" : "border-slate-800"
                     )}
                   >
-                    <img src={item.src} alt={item.name} className="w-20 h-20 object-contain pointer-events-none" />
+                    {/* SEÇENEK VİDEOSU */}
+                    <video 
+                        src={item.src} 
+                        autoPlay 
+                        loop 
+                        muted 
+                        playsInline
+                        className="w-full h-full object-cover pointer-events-none" 
+                    />
                     
                     {isModeling && isCorrectItem && (
                         <motion.div 
