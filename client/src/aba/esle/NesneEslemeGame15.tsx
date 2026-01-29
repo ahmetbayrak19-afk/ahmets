@@ -515,4 +515,10 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
                     </>
                 )}
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
      
