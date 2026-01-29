@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Camera, Upload, Trash2, ArrowLeft, Check, Play, Settings, User, Users, GraduationCap, Heart, X } from 'lucide-react';
-import { Button } from '@/components/ui/button'; // Sadece diğer yerlerde kullanacağız, yüklemede DEĞİL
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
 
@@ -56,12 +56,12 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  // 1. SCROLL KİLİTLEME VE ÇIKIŞTA TEMİZLİK
+  // 1. SCROLL KİLİTLEME (touch-none KALDIRILDI, sadece overflow:hidden yeterli)
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = 'auto';
-      stopCameraStream(); // Çıkarken kamerayı kapat
+      stopCameraStream(); 
     };
   }, []);
 
@@ -97,7 +97,7 @@ export default function AliciGame4({ onClose }: GameProps) {
       window.speechSynthesis.speak(utterance);
   };
 
-  // --- RESİM İŞLEME (Resizer & Compressor) ---
+  // --- RESİM İŞLEME ---
   const processImage = (imageSource: HTMLVideoElement | HTMLImageElement): string => {
       const canvas = document.createElement('canvas');
       const size = 512;
@@ -116,7 +116,6 @@ export default function AliciGame4({ onClose }: GameProps) {
       const offsetY = (size - newH) / 2;
 
       ctx.drawImage(imageSource, offsetX, offsetY, newW, newH);
-      // JPEG ve 0.8 kalite (WhatsApp tarzı sıkıştırma)
       return canvas.toDataURL('image/jpeg', 0.8);
   };
 
@@ -170,7 +169,7 @@ export default function AliciGame4({ onClose }: GameProps) {
         img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
-    e.target.value = ''; // Inputu sıfırla
+    e.target.value = ''; 
   };
 
   const savePerson = () => {
@@ -247,7 +246,8 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   // --- RENDER ---
   return (
-    <div className="fixed inset-0 z-[500] bg-slate-950 flex flex-col font-sans text-slate-100 touch-none">
+    // DÜZELTME 1: "touch-none" KALDIRILDI.
+    <div className="fixed inset-0 z-[500] bg-slate-950 flex flex-col font-sans text-slate-100">
       
       {/* ÜST BAR */}
       <div className="bg-slate-900 border-b border-slate-800 p-3 flex justify-between items-center z-10 shrink-0">
@@ -352,22 +352,22 @@ export default function AliciGame4({ onClose }: GameProps) {
                                       <Camera size={16} className="mr-2"/> Kamera
                                   </Button>
                                   
-                                  {/* BURASI DEĞİŞTİ -> ARTIK BUTTON DEĞİL, LABEL.
-                                      HTML STANDARDI GEREĞİ BU KESİN ÇALIŞIR.
-                                      Button bileşeni etkileşimi yutamaz çünkü Button yok.
+                                  {/* --- DÜZELTME 2: Z-INDEX VE POINTER-EVENTS GÜNCELLEMESİ ---
+                                      touch-none kalktı, şimdi input z-50 ile en üstte.
                                   */}
-                                  <label 
-                                    className="h-10 border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center rounded-md cursor-pointer hover:bg-slate-700 hover:text-white transition-colors text-sm font-medium"
-                                  >
-                                      <Upload size={16} className="mr-2"/> 
-                                      Yükle
+                                  <div className="relative h-10 w-full">
+                                      {/* Görsel Buton */}
+                                      <div className="absolute inset-0 border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center rounded-md text-sm font-medium hover:bg-slate-700 hover:text-white transition-colors pointer-events-none">
+                                          <Upload size={16} className="mr-2"/> Yükle
+                                      </div>
+                                      {/* Gerçek Input (Görünmez ve En Üstte) */}
                                       <input 
                                           type="file" 
-                                          className="hidden" // Görünmez ama çalışır
+                                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50"
                                           accept="image/*" 
                                           onChange={handleFileUpload} 
                                       />
-                                  </label>
+                                  </div>
 
                               </div>
                           )}
