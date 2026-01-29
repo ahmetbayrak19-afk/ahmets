@@ -5,9 +5,6 @@ import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
 // --- EYLEM VİDEOLARI (IMPORT) ---
-// Not: Dosya yolunu 'client/src/aba/esle/eylemesle/' olarak varsayarak import ediyorum.
-// Bu dosya 'client/src/aba/esle/' içindeyse './eylemesle/...' doğrudur.
-
 import disfircalaVid from './eylemesle/disfircala.mp4';
 import disfircala1Vid from './eylemesle/disfircala1.mp4';
 import elmayeVid from './eylemesle/elmaye.mp4';
@@ -45,10 +42,6 @@ const POSITIVE_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2
 const NEGATIVE_SOUNDS = [tekrardene1, tekrardene2];
 
 // --- VİDEO VERİ YAPISI ---
-// id: Benzersiz kimlik
-// groupId: Eşleşme grubu (Örn: 'kos' grubu). Seçeneklerde çakışmayı önlemek için.
-// name: Eylem adı
-// src: Video dosyası
 const OBJECTS = [
   { id: 'disfircala', groupId: 'disfircala', name: 'Diş Fırçala', src: disfircalaVid },
   { id: 'disfircala1', groupId: 'disfircala', name: 'Diş Fırçala', src: disfircala1Vid },
@@ -110,18 +103,15 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
 
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
 
-  // Arkaplan Müziği ve Scroll Reset
+  // Arkaplan Müziği
   useEffect(() => {
     window.scrollTo(0, 0);
-
     bgMusicRef.current = new Audio(arkaplanMusic);
     bgMusicRef.current.loop = true; 
     bgMusicRef.current.volume = 0.15; 
     
     if (!isMuted) {
-        bgMusicRef.current.play().catch(error => {
-            console.log("Otomatik oynatma engellendi.", error);
-        });
+        bgMusicRef.current.play().catch(error => console.log("Otomatik oynatma engellendi.", error));
     }
 
     return () => {
@@ -132,7 +122,6 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
     };
   }, []);
 
-  // Mute dinleyicisi
   useEffect(() => {
     if (bgMusicRef.current) {
         if (isMuted) bgMusicRef.current.pause();
@@ -160,28 +149,42 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
     return () => { document.body.style.overflow = originalStyle; };
   }, []);
 
-  // --- SORU ÜRETME MANTIĞI (GÜNCELLENDİ) ---
+  // --- SORU ÜRETME MANTIĞI (DÜZELTİLDİ: TEKİL GRUP SEÇİMİ) ---
   const generateQuestion = () => {
     // 1. Rastgele bir hedef video seç
     const randomTarget = OBJECTS[Math.floor(Math.random() * OBJECTS.length)];
     
-    // Level'a göre seçenek sayısı
+    // Level'a göre çeldirici sayısı
     let optionCount = 3; 
     if (level === 2) optionCount = 4;
     if (level === 3) optionCount = 6;
+    const distractorCount = optionCount - 1;
 
-    // 2. Çeldiricileri seçerken AYNI GRUPTA OLANLARI (groupId) hariç tut.
-    // Yani hedef 'kos.mp4' ise seçeneklerde 'kos1.mp4' OLMAYACAK.
-    const potentialDistractors = OBJECTS.filter(item => item.groupId !== randomTarget.groupId);
+    // 2. TÜM BENZERSİZ GRUPLARI BUL (groupId'ye göre)
+    // Örneğin: ['kos', 'gitarcal', 'elmaye'...]
+    const allGroupIds = Array.from(new Set(OBJECTS.map(item => item.groupId)));
 
-    const distractors = potentialDistractors
-                         .sort(() => 0.5 - Math.random())
-                         .slice(0, optionCount - 1); 
+    // 3. Hedefin grubunu bu listeden çıkar (Hedefin aynısı veya kardeşi seçeneklere girmesin diye)
+    const availableGroups = allGroupIds.filter(id => id !== randomTarget.groupId);
 
-    // 3. Hedefi ve çeldiricileri karıştır
+    // 4. Kalan grupları karıştır ve ihtiyaç kadar grup seç
+    const selectedDistractorGroups = availableGroups
+        .sort(() => 0.5 - Math.random())
+        .slice(0, distractorCount);
+
+    // 5. Seçilen her gruptan RASTGELE BİR VİDEO al
+    const distractors = selectedDistractorGroups.map(groupId => {
+        // Bu gruba ait videoları bul (Örn: gitarcal ve gitarcal1)
+        const videosInGroup = OBJECTS.filter(item => item.groupId === groupId);
+        // Aralarından birini rastgele seç
+        return videosInGroup[Math.floor(Math.random() * videosInGroup.length)];
+    });
+
+    // 6. Hedefi ve çeldiricileri birleştirip karıştır
     setTargetItem(randomTarget);
     setOptions([randomTarget, ...distractors].sort(() => 0.5 - Math.random()));
     
+    // Sıfırlamalar
     setShowFeedback(null);
     setIsModeling(false);
     setFlashCorrect(false);
@@ -221,7 +224,6 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
 
     if (!isInside) return;
 
-    // Sadece tam kimlik eşleşmesi (ID'ler aynı olmalı)
     const isCorrect = droppedItem.id === targetItem.id;
 
     if (isCorrect) {
@@ -244,7 +246,6 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
     }
 
     setTimeout(() => {
-       // Level Sistemi
        if (mode === 'instruction') {
         const nextQ = questionIndex + 1;
         setQuestionIndex(nextQ);
@@ -310,7 +311,6 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
     }
   }, [assessmentCount, assessmentScore, mode]);
 
-  // Grid Stili
   const getGridClass = () => {
       if (level === 1) return "grid-cols-3";
       if (level === 2) return "grid-cols-2 max-w-[300px]"; 
@@ -333,7 +333,6 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
         </button>
         
         <div className="flex items-center gap-3">
-             {/* LVL BUTONLARI */}
              {mode === 'instruction' && (
                  <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 items-center">
                      {[1, 2, 3].map(l => (
@@ -342,9 +341,7 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
                             onClick={() => setLevel(l)} 
                             className={twMerge(
                                 "px-4 py-1.5 text-xs font-bold rounded-full transition-all",
-                                level === l 
-                                    ? "bg-white text-blue-600 shadow-sm" 
-                                    : "text-slate-400 hover:text-slate-600"
+                                level === l ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
                             )}
                          >
                             LVL {l}
@@ -363,7 +360,6 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
                 </span>
             </div>
             
-            {/* Ses Butonu */}
             <button onClick={() => setIsMuted(!isMuted)} className="p-2 bg-white border rounded-full shadow-sm active:scale-95">
                  {isMuted ? <VolumeX size={20} className="text-slate-400"/> : <Volume2 size={20} className="text-blue-500"/>}
             </button>
@@ -375,7 +371,7 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
         <div className="flex-1 flex flex-col justify-around w-full max-w-md h-full">
           
           <div className="flex flex-col items-center">
-            {/* HEDEF KUTU (DROP ZONE) */}
+            {/* HEDEF KUTU */}
             <div 
                 ref={dropZoneRef}
                 className={twMerge(
@@ -383,13 +379,9 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
                     isMatched ? "border-green-500 border-solid" : "border-slate-300"
                 )}
             >
-               {/* HEDEF VİDEO */}
                <video 
                  src={targetItem.src} 
-                 autoPlay 
-                 loop 
-                 muted 
-                 playsInline
+                 autoPlay loop muted playsInline
                  className={twMerge(
                     "w-full h-full object-cover pointer-events-none transition-all duration-500",
                     isMatched ? "opacity-100 scale-100" : "opacity-90"
@@ -399,10 +391,7 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
             {!isMatched && <p className="mt-4 text-slate-400 font-bold text-xs tracking-widest uppercase animate-pulse">Aynısını Üzerine Bırak</p>}
           </div>
 
-          <div className={twMerge(
-              "grid gap-3 w-full px-1 justify-items-center mx-auto",
-              getGridClass() 
-          )}>
+          <div className={twMerge("grid gap-3 w-full px-1 justify-items-center mx-auto", getGridClass())}>
             {options.map((item) => {
               const isCorrectItem = item.id === targetItem.id;
               const isLocked = mode === 'instruction' && instructionMistakeCount >= 2 && !isCorrectItem;
@@ -419,26 +408,13 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
                     dragMomentum={false}
                     onDragEnd={(e, info) => handleDragEnd(e, info, item)}
                     whileDrag={{ scale: 1.1, zIndex: 100 }}
-                    
                     animate={
-                        isHidden
-                        ? { opacity: 0, scale: 0 }
-                        : (isModeling && isCorrectItem) 
-                        ? { 
-                            y: [0, -320, -320, 0], // Hedefe gitme animasyonu
-                            scale: [1, 1.2, 1.2, 1],
-                            x: 0
-                          } 
-                        : (flashCorrect && isCorrectItem)
-                        ? { scale: [1, 1.1, 1], borderColor: ["#e2e8f0", "#22c55e", "#e2e8f0"], borderWidth: [2, 4, 2] }
+                        isHidden ? { opacity: 0, scale: 0 }
+                        : (isModeling && isCorrectItem) ? { y: [0, -320, -320, 0], scale: [1, 1.2, 1.2, 1], x: 0 } 
+                        : (flashCorrect && isCorrectItem) ? { scale: [1, 1.1, 1], borderColor: ["#e2e8f0", "#22c55e", "#e2e8f0"], borderWidth: [2, 4, 2] }
                         : { scale: 1, opacity: isLocked ? 0.3 : 1 }
                     }
-                    transition={
-                        (isModeling && isCorrectItem)
-                        ? { duration: 2, times: [0, 0.4, 0.7, 1], ease: "easeInOut" }
-                        : { duration: 0.3 }
-                    }
-
+                    transition={(isModeling && isCorrectItem) ? { duration: 2, times: [0, 0.4, 0.7, 1], ease: "easeInOut" } : { duration: 0.3 }}
                     className={twMerge(
                       "w-28 h-24 bg-black rounded-xl shadow-[0_4px_0_0_#334155] flex items-center justify-center border-2 touch-none relative z-10 overflow-hidden",
                       canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed",
@@ -446,16 +422,7 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
                       (flashCorrect && isCorrectItem) ? "border-green-500 shadow-green-100" : "border-slate-800"
                     )}
                   >
-                    {/* SEÇENEK VİDEOSU */}
-                    <video 
-                        src={item.src} 
-                        autoPlay 
-                        loop 
-                        muted 
-                        playsInline
-                        className="w-full h-full object-cover pointer-events-none" 
-                    />
-                    
+                    <video src={item.src} autoPlay loop muted playsInline className="w-full h-full object-cover pointer-events-none" />
                     {isModeling && isCorrectItem && (
                         <motion.div 
                            animate={{ opacity: [0, 1, 1, 0] }}
@@ -499,25 +466,11 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
         </div>
       )}
 
-      {/* FEEDBACK OVERLAY */}
       <AnimatePresence>
         {showFeedback && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[110] flex flex-col items-center justify-start pt-32 pointer-events-none"
-          >
-            <div className={`
-                px-10 py-5 rounded-full shadow-2xl flex items-center gap-4
-                ${showFeedback === 'correct' ? 'bg-green-500' : 'bg-red-500'}
-            `}>
-                {showFeedback === 'correct' ? (
-                    <Check size={48} className="text-white"/> 
-                ) : (
-                    <>
-                        <XCircle size={36} className="text-white"/>
-                        <span className="text-white text-3xl font-black tracking-widest">HAYIR</span>
-                    </>
-                )}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[110] flex flex-col items-center justify-start pt-32 pointer-events-none">
+            <div className={`px-10 py-5 rounded-full shadow-2xl flex items-center gap-4 ${showFeedback === 'correct' ? 'bg-green-500' : 'bg-red-500'}`}>
+                {showFeedback === 'correct' ? <Check size={48} className="text-white"/> : <><XCircle size={36} className="text-white"/><span className="text-white text-3xl font-black tracking-widest">HAYIR</span></>}
             </div>
           </motion.div>
         )}
