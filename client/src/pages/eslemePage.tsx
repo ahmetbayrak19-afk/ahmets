@@ -7,18 +7,21 @@ import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 
-// --- OYUN IMPORTLARI ---
-import NesneEslemeGame1 from '@/aba/esle/NesneEslemeGame1';
-import NesneEslemeGame2 from '@/aba/esle/NesneEslemeGame2';
-import NesneEslemeGame3 from '@/aba/esle/NesneEslemeGame3';
-import NesneEslemeGame4 from '@/aba/esle/NesneEslemeGame4';
-import NesneEslemeGame9 from '@/aba/esle/NesneEslemeGame9';  // Renk
-import NesneEslemeGame10 from '@/aba/esle/NesneEslemeGame10'; // Şekil
-import NesneEslemeGame11 from '@/aba/esle/NesneEslemeGame11'; // Rakam
-import NesneEslemeGame12 from '@/aba/esle/NesneEslemeGame12'; // Harf
-import NesneEslemeGame15 from '@/aba/esle/NesneEslemeGame15'; // Klavye Harf
-import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16'; // Kelime
-import EslemeGame from '@/aba/esle/game/eslemegame';         // Balık Oyunu
+// --- MEVCUT OYUN DOSYALARI ---
+import NesneEslemeGame1 from '@/aba/esle/NesneEslemeGame1';   // EB.1.1
+import NesneEslemeGame2 from '@/aba/esle/NesneEslemeGame2';   // EB.1.2
+import NesneEslemeGame3 from '@/aba/esle/NesneEslemeGame3';   // EB.1.3
+import NesneEslemeGame4 from '@/aba/esle/NesneEslemeGame4';   // EB.1.4 ve EB.3.5 (Ses)
+import NesneEslemeGame9 from '@/aba/esle/NesneEslemeGame9';   // EB.2.5 (Renk)
+import NesneEslemeGame10 from '@/aba/esle/NesneEslemeGame10'; // EB.3.1 (Şekil)
+import NesneEslemeGame11 from '@/aba/esle/NesneEslemeGame11'; // EB.3.2 (Rakam)
+import NesneEslemeGame12 from '@/aba/esle/NesneEslemeGame12'; // EB.3.3 (Harf)
+import NesneEslemeGame13 from '@/aba/esle/NesneEslemeGame13'; // EB.3.4 (Gölge)
+import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16'; // EB.4.1 (Kelime)
+import NesneEslemeGame15 from '@/aba/esle/NesneEslemeGame15'; // EB.4.2 (Klavye)
+
+// --- GEÇİCİ/EK OYUN (EB.2.1 - 5. Sırada) ---
+import EslemeGame from '@/aba/esle/game/eslemegame'; 
 
 interface EslemePageProps {
   studentId: string;
@@ -28,9 +31,11 @@ interface EslemePageProps {
 export default function EslemePage({ studentId, onBack }: EslemePageProps) {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
+  
   const [activeGameMode, setActiveGameMode] = useState<'assessment' | 'instruction' | null>(null);
   const [activeGameItem, setActiveGameItem] = useState<string | null>(null);
 
+  // Modül Verisi
   const moduleData = ABA_MODULES.find(m => m.name.includes("EŞLEME BECERİLERİ"));
   const items = moduleData ? moduleData.achievements : [];
 
@@ -91,43 +96,72 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
   return (
     <div className="space-y-6 relative">
       
+      {/* --- OYUN MODALLARI --- */}
       {activeGameMode && activeGameItem && (
           <>
+            {/* 1. Nesne-Nesne (Aynı) */}
             {activeGameItem.startsWith("EB.1.1") && (
                 <NesneEslemeGame1 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
+            
+            {/* 2. Nesne Resimleri (Aynı) */}
             {activeGameItem.startsWith("EB.1.2") && (
                 <NesneEslemeGame2 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
+            
+            {/* 3. Eylem Resimleri (Aynı) */}
             {activeGameItem.startsWith("EB.1.3") && (
                 <NesneEslemeGame3 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
+            
+            {/* 4. Şekil Kutusu */}
             {activeGameItem.startsWith("EB.1.4") && (
                 <NesneEslemeGame4 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
+            
+            {/* 5. Nesne-Nesne (Farklı) -> GEÇİCİ OYUN (Balık Oyunu) */}
             {activeGameItem.startsWith("EB.2.1") && (
                 <div className="fixed inset-0 z-[100] bg-white">
                     <EslemeGame onClose={() => setActiveGameMode(null)} />
                 </div>
             )}
+
+            {/* EB.2.5 Renk Eşleme */}
             {activeGameItem.startsWith("EB.2.5") && (
                 <NesneEslemeGame9 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
+
+            {/* EB.3.1 Şekil Eşleme */}
             {activeGameItem.startsWith("EB.3.1") && (
                 <NesneEslemeGame10 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
+
+            {/* EB.3.2 Rakam Eşleme */}
             {activeGameItem.startsWith("EB.3.2") && (
                 <NesneEslemeGame11 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
+
+            {/* EB.3.3 Harf Eşleme */}
             {activeGameItem.startsWith("EB.3.3") && (
                 <NesneEslemeGame12 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
+
+            {/* EB.3.4 Gölge Eşleme (Game13) */}
+            {activeGameItem.startsWith("EB.3.4") && (
+                <NesneEslemeGame13 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
+            )}
+
+            {/* EB.3.5 Ses Eşleme (Game4 Sesli olduğu için tekrar kullanabiliriz) */}
             {activeGameItem.startsWith("EB.3.5") && (
                 <NesneEslemeGame4 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
+
+            {/* EB.4.1 Kelime-Kelime Eşleme (Game16) */}
             {activeGameItem.startsWith("EB.4.1") && (
                 <NesneEslemeGame16 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
+
+            {/* EB.4.2 Klavyede Harf Eşleme (Game15) */}
             {activeGameItem.startsWith("EB.4.2") && (
                 <NesneEslemeGame15 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
@@ -157,12 +191,21 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             const status = formData[item];
             const isCompleted = status === true;
             
-            const hasGame = item.startsWith("EB.1.1") || item.startsWith("EB.1.2") || 
-                            item.startsWith("EB.1.3") || item.startsWith("EB.1.4") ||
-                            item.startsWith("EB.2.1") || item.startsWith("EB.2.5") ||
-                            item.startsWith("EB.3.1") || item.startsWith("EB.3.2") ||
-                            item.startsWith("EB.3.3") || item.startsWith("EB.3.5") ||
-                            item.startsWith("EB.4.1") || item.startsWith("EB.4.2");
+            // --- OYUN BUTONU KONTROLÜ (HANGİ MADDELERDE VAR?) ---
+            const hasGame = 
+                item.startsWith("EB.1.1") || 
+                item.startsWith("EB.1.2") || 
+                item.startsWith("EB.1.3") || 
+                item.startsWith("EB.1.4") ||
+                item.startsWith("EB.2.1") || 
+                item.startsWith("EB.2.5") ||
+                item.startsWith("EB.3.1") || 
+                item.startsWith("EB.3.2") ||
+                item.startsWith("EB.3.3") || 
+                item.startsWith("EB.3.4") ||
+                item.startsWith("EB.3.5") ||
+                item.startsWith("EB.4.1") || 
+                item.startsWith("EB.4.2");
             
             const firstSpaceIndex = item.indexOf(' ');
             const code = item.substring(0, firstSpaceIndex);
@@ -198,5 +241,5 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       </div>
     </div>
   );
-}
-  
+                }
+                
