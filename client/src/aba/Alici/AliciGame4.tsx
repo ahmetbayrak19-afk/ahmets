@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Camera, Upload, Trash2, ArrowLeft, Check, Play, Settings, User, Users, GraduationCap, Heart, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/button'; // Sadece diğer yerlerde kullanacağız, yüklemede DEĞİL
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
 
@@ -56,12 +56,12 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  // 1. SCROLL KİLİTLEME
+  // 1. SCROLL KİLİTLEME VE ÇIKIŞTA TEMİZLİK
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = 'auto';
-      stopCameraStream();
+      stopCameraStream(); // Çıkarken kamerayı kapat
     };
   }, []);
 
@@ -97,7 +97,7 @@ export default function AliciGame4({ onClose }: GameProps) {
       window.speechSynthesis.speak(utterance);
   };
 
-  // --- RESİM İŞLEME ---
+  // --- RESİM İŞLEME (Resizer & Compressor) ---
   const processImage = (imageSource: HTMLVideoElement | HTMLImageElement): string => {
       const canvas = document.createElement('canvas');
       const size = 512;
@@ -116,6 +116,7 @@ export default function AliciGame4({ onClose }: GameProps) {
       const offsetY = (size - newH) / 2;
 
       ctx.drawImage(imageSource, offsetX, offsetY, newW, newH);
+      // JPEG ve 0.8 kalite (WhatsApp tarzı sıkıştırma)
       return canvas.toDataURL('image/jpeg', 0.8);
   };
 
@@ -351,22 +352,22 @@ export default function AliciGame4({ onClose }: GameProps) {
                                       <Camera size={16} className="mr-2"/> Kamera
                                   </Button>
                                   
-                                  {/* --- FİNAL ÇÖZÜM: GÖRÜNMEZ INPUT --- 
-                                      Butonun üzerinde görünmez bir input var.
-                                      Tıkladığın an input'a tıklamış oluyorsun.
-                                      Referans, Label vb. gerek kalmaz.
+                                  {/* BURASI DEĞİŞTİ -> ARTIK BUTTON DEĞİL, LABEL.
+                                      HTML STANDARDI GEREĞİ BU KESİN ÇALIŞIR.
+                                      Button bileşeni etkileşimi yutamaz çünkü Button yok.
                                   */}
-                                  <div className="relative">
-                                      <Button variant="outline" className="h-10 w-full border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700">
-                                          <Upload size={16} className="mr-2"/> Yükle
-                                      </Button>
+                                  <label 
+                                    className="h-10 border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center rounded-md cursor-pointer hover:bg-slate-700 hover:text-white transition-colors text-sm font-medium"
+                                  >
+                                      <Upload size={16} className="mr-2"/> 
+                                      Yükle
                                       <input 
                                           type="file" 
-                                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                          className="hidden" // Görünmez ama çalışır
                                           accept="image/*" 
-                                          onChange={handleFileUpload}
+                                          onChange={handleFileUpload} 
                                       />
-                                  </div>
+                                  </label>
 
                               </div>
                           )}
@@ -399,7 +400,7 @@ export default function AliciGame4({ onClose }: GameProps) {
               </div>
           </div>
       )}
-      
+
       {/* --- 3. OYUN --- */}
       {view === 'game' && (
           <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-950 relative">
