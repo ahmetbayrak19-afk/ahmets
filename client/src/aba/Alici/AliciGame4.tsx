@@ -16,7 +16,7 @@ import tekrardene1 from '../esle/ses/tekrardene1.mp3';
 import tekrardene2 from '../esle/ses/tekrardene2.mp3';
 import arkaplanmusic from '../esle/ses/arkaplanmusic.mp3';
 
-// --- RESİM DOSYALARI ---
+// --- RESİM DOSYALARI (ESKİ ÇALIŞAN HALİ: IMPORT) ---
 import kisi1 from './kisi1.jpg';
 import kisi2 from './kisi2.jpg';
 import kisi3 from './kisi3.jpg';
@@ -30,6 +30,8 @@ import kisi10 from './kisi10.jpg';
 
 const SUCCESS_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
 const ERROR_SOUNDS = [tekrardene1, tekrardene2];
+
+// Resim listesi
 const IMPORTED_IMAGES = [kisi1, kisi2, kisi3, kisi4, kisi5, kisi6, kisi7, kisi8, kisi9, kisi10];
 
 type Category = 'ogretmen' | 'aile' | 'tanidik' | 'arkadas';
@@ -58,6 +60,7 @@ const QUESTION_TEMPLATES = [
     (name: string) => `Hadi parmağınla ${name} resmine dokun.` 
 ];
 
+// --- YEDEK OYUNCULAR (Import edilen resimlerden) ---
 const DUMMY_PROFILES: PersonProfile[] = IMPORTED_IMAGES.map((imgSrc, i) => ({
     id: `dummy-${i + 1}`,
     name: '',
@@ -86,8 +89,11 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   const [profiles, setProfiles] = useState<PersonProfile[]>(() => {
     try {
-      const saved = localStorage.getItem('insan-tanima-v5');
-      return saved ? JSON.parse(saved) : [];
+      if (typeof window !== 'undefined') {
+          const saved = localStorage.getItem('insan-tanima-v5');
+          return saved ? JSON.parse(saved) : [];
+      }
+      return [];
     } catch { return []; }
   });
 
@@ -103,24 +109,28 @@ export default function AliciGame4({ onClose }: GameProps) {
   const [gamePhase, setGamePhase] = useState<'playing' | 'success' | 'complete'>('playing');
   const [wrongCount, setWrongCount] = useState(0);
   
-  // 🔥 SES GARANTİSİ İÇİN REF 🔥
+  // Ses Referansı (Android'de silinmesin diye)
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   useEffect(() => {
-    // Sayfa açıldığında sesleri yüklemeye zorla (Android için kritik)
-    const loadVoices = () => { window.speechSynthesis.getVoices(); };
-    loadVoices();
-    window.speechSynthesis.onvoiceschanged = loadVoices;
+    // Sesleri yükle
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.getVoices();
+    }
 
     return () => {
       stopCameraStream();
       stopBackgroundMusic();
-      window.speechSynthesis.cancel();
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+          window.speechSynthesis.cancel();
+      }
     };
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('insan-tanima-v5', JSON.stringify(profiles));
+    if (typeof window !== 'undefined') {
+        localStorage.setItem('insan-tanima-v5', JSON.stringify(profiles));
+    }
   }, [profiles]);
 
   const resetEditor = () => {
@@ -131,26 +141,32 @@ export default function AliciGame4({ onClose }: GameProps) {
   };
 
   const playSuccessSound = () => {
-      const randomSound = SUCCESS_SOUNDS[Math.floor(Math.random() * SUCCESS_SOUNDS.length)];
-      const audio = new Audio(randomSound);
-      audio.volume = 1.0;
-      audio.play().catch(e => console.log("Ses hatası:", e));
+      try {
+          const randomSound = SUCCESS_SOUNDS[Math.floor(Math.random() * SUCCESS_SOUNDS.length)];
+          const audio = new Audio(randomSound);
+          audio.volume = 1.0;
+          audio.play().catch(e => console.log("Ses çalınamadı:", e));
+      } catch (e) { console.log("Ses hatası"); }
   };
 
   const playErrorSound = () => {
-      const randomSound = ERROR_SOUNDS[Math.floor(Math.random() * ERROR_SOUNDS.length)];
-      const audio = new Audio(randomSound);
-      audio.volume = 1.0;
-      audio.play().catch(e => console.log("Ses hatası:", e));
+      try {
+          const randomSound = ERROR_SOUNDS[Math.floor(Math.random() * ERROR_SOUNDS.length)];
+          const audio = new Audio(randomSound);
+          audio.volume = 1.0;
+          audio.play().catch(e => console.log("Ses çalınamadı:", e));
+      } catch (e) { console.log("Ses hatası"); }
   };
 
   const playBackgroundMusic = () => {
-      if (!bgMusicRef.current) {
-          bgMusicRef.current = new Audio(arkaplanmusic);
-          bgMusicRef.current.loop = true;
-          bgMusicRef.current.volume = 0.1; 
-      }
-      bgMusicRef.current.play().catch(e => console.log("Müzik hatası:", e));
+      try {
+          if (!bgMusicRef.current) {
+              bgMusicRef.current = new Audio(arkaplanmusic);
+              bgMusicRef.current.loop = true;
+              bgMusicRef.current.volume = 0.1; 
+          }
+          bgMusicRef.current.play().catch(e => console.log("Müzik hatası:", e));
+      } catch (e) { console.log("Müzik yüklenemedi"); }
   };
 
   const stopBackgroundMusic = () => {
@@ -160,21 +176,16 @@ export default function AliciGame4({ onClose }: GameProps) {
       }
   };
 
-  // --- 🔥 GARANTİ SORU OKUMA MOTORU (TAMİR EDİLDİ) 🔥 ---
+  // --- SORU OKUMA (Ref Korumalı) ---
   const speakQuestion = (text: string) => {
-      if (!window.speechSynthesis) return;
+      if (typeof window === 'undefined' || !window.speechSynthesis) return;
       
-      // Öncekini sustur
       window.speechSynthesis.cancel();
       
       const utterance = new SpeechSynthesisUtterance(text);
-      
-      // 1. Android Hafıza Kaybını Önle: Objesi Ref'e ata
-      speechRef.current = utterance;
+      speechRef.current = utterance; // KORUMA BURADA
 
-      // 2. Ses Seçimi (Daha Basit ve Garanti)
       const voices = window.speechSynthesis.getVoices();
-      // Türkçe ses varsa al, yoksa ilk geleni al (Hiç yoktan iyidir)
       const trVoice = voices.find(v => v.lang.includes('tr')) || voices[0];
       
       if (trVoice) utterance.voice = trVoice;
@@ -183,10 +194,8 @@ export default function AliciGame4({ onClose }: GameProps) {
       utterance.rate = 0.9;
       utterance.volume = 1.0;
       
-      // Konuşma bitince Ref'i temizle
       utterance.onend = () => { speechRef.current = null; };
       
-      // Konuştur
       window.speechSynthesis.speak(utterance);
   };
 
@@ -197,9 +206,7 @@ export default function AliciGame4({ onClose }: GameProps) {
       }
 
       playBackgroundMusic();
-
-      // Motoru ısıtmak için boş konuşma
-      speakQuestion(" ");
+      speakQuestion(" "); // Motoru ısıt
 
       const questions = shuffleArray([...profiles]);
       
@@ -236,7 +243,7 @@ export default function AliciGame4({ onClose }: GameProps) {
       const finalOptions = shuffleArray([target, ...selectedRealDistractors, ...selectedDummies]);
       setOptions(finalOptions);
 
-      // Soruyu sor (Hafif gecikmeli ki resimler gelince sorsun)
+      // Soruyu sor
       const randomTemplate = QUESTION_TEMPLATES[Math.floor(Math.random() * QUESTION_TEMPLATES.length)];
       setTimeout(() => speakQuestion(randomTemplate(target.name)), 800);
   };
@@ -287,7 +294,6 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   const getGridClass = () => "grid grid-cols-2 gap-4 w-full"; 
 
-  // --- STANDART FONKSİYONLAR ---
   const processImage = (s:any) => {
     const c = document.createElement('canvas'); const z=512; c.width=z; c.height=z;
     const x = c.getContext('2d'); if(!x)return'';
@@ -482,4 +488,4 @@ export default function AliciGame4({ onClose }: GameProps) {
       )}
     </div>
   );
-}
+  }
