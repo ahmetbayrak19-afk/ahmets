@@ -28,6 +28,7 @@ interface GameProps {
 }
 
 export default function AliciGame4({ onClose }: GameProps) {
+  // --- STATE'LER ---
   const [view, setView] = useState<'menu' | 'edit' | 'game'>('menu');
   const [selectedCategory, setSelectedCategory] = useState<Category>('ogretmen');
   
@@ -45,7 +46,6 @@ export default function AliciGame4({ onClose }: GameProps) {
   const [tempImage, setTempImage] = useState<string | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
-  // Input Ref'i kaldırdım, doğrudan HTML kullanacağız.
 
   // Oyun State'leri
   const [gameQuestions, setGameQuestions] = useState<PersonProfile[]>([]);
@@ -55,10 +55,9 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  // 1. SCROLL KİLİTLEME
+  // 1. SCROLL KİLİTLEME - (Geçici olarak devre dışı bıraktım, belki etkileşimi bu bozuyordur)
   useEffect(() => {
-    // Mobil tarayıcılarda sorun çıkarabileceği için overflow kilidini geçici olarak kaldırdım
-    // document.body.style.overflow = 'hidden'; 
+    // document.body.style.overflow = 'hidden';
     return () => {
       // document.body.style.overflow = 'auto';
       stopCameraStream(); 
@@ -138,7 +137,6 @@ export default function AliciGame4({ onClose }: GameProps) {
   };
 
   const stopCameraStream = () => {
-    // Basit stream durdurma
     const videoEl = document.querySelector('video');
     if (videoEl && videoEl.srcObject) {
         const stream = videoEl.srcObject as MediaStream;
@@ -156,9 +154,7 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   // --- DOSYA YÜKLEME ---
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Eğer buraya gelirse input çalışmış demektir
-    toast.success("Dosya seçildi, işleniyor...");
-    
+    toast.info("Resim işleniyor...", { position: 'top-center' }); // Tepki testi
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -169,6 +165,7 @@ export default function AliciGame4({ onClose }: GameProps) {
             const optimizedImage = processImage(img);
             setTempImage(optimizedImage);
             setIsCameraActive(false);
+            toast.dismiss();
         };
         img.src = event.target?.result as string;
     };
@@ -252,6 +249,18 @@ export default function AliciGame4({ onClose }: GameProps) {
   return (
     <div className="fixed inset-0 z-[500] bg-slate-950 flex flex-col font-sans text-slate-100">
       
+      {/* 1. INPUT'U SAYFANIN EN DIŞINA, SABİT OLARAK KOYUYORUZ.
+          2. display: none (hidden) YERİNE, width: 0, height: 0 kullanıyoruz ki "var" olsun.
+          3. ID: "the-real-file-input"
+      */}
+      <input 
+          id="the-real-file-input"
+          type="file" 
+          accept="image/*" 
+          onChange={handleFileUpload}
+          style={{ width: '0.1px', height: '0.1px', opacity: 0, position: 'absolute', zIndex: -1 }}
+      />
+
       {/* ÜST BAR */}
       <div className="bg-slate-900 border-b border-slate-800 p-3 flex justify-between items-center z-10 shrink-0">
         <div className="flex items-center gap-3">
@@ -350,35 +359,24 @@ export default function AliciGame4({ onClose }: GameProps) {
                                   <button onClick={() => setTempImage(null)} className="absolute top-1 right-1 bg-black/60 p-1 rounded-full text-white"><X size={14}/></button>
                               </div>
                           ) : (
-                              <div className="flex-1 flex flex-col justify-center gap-2">
-                                  <Button onClick={startCamera} variant="outline" className="h-10 border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700">
+                              <div className="flex-1 flex flex-col justify-center gap-2 relative">
+                                  <Button onClick={startCamera} variant="outline" className="h-10 border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 relative z-20">
                                       <Camera size={16} className="mr-2"/> Kamera
                                   </Button>
                                   
-                                  {/* --- ÇÖZÜM: NATIVE HTML INPUT --- 
-                                      1. "accept" özelliğini SİLDİM. Bazı cihazlarda bu özellik galeriyi kitliyor.
-                                      2. "opacity: 0" ile görünmez yapıp, arkadaki "Yükle" yazısının üzerine serdim.
-                                      3. Tıklanınca çalışıp çalışmadığını anlamak için onClick'e Toast koydum.
+                                  {/* --- ÇÖZÜM: ULTRA GÜVENLİ LABEL --- 
+                                      1. pointer-events-auto: Tıklamayı zorla açar.
+                                      2. z-index: 50: Butonun üstünde durmasını sağlar.
+                                      3. cursor-pointer: Telefoan dokunmatik olduğunu bildirir.
+                                      4. htmlFor="the-real-file-input": En üstteki input'u tetikler.
                                   */}
-                                  <div className="relative h-10 w-full group">
-                                      {/* Görsel Süs */}
-                                      <div className="absolute inset-0 border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center rounded-md text-sm font-medium group-hover:bg-slate-700 transition-colors">
-                                          <Upload size={16} className="mr-2"/> Yükle
-                                      </div>
-                                      
-                                      {/* GÖRÜNMEZ INPUT */}
-                                      <input 
-                                          type="file"
-                                          // accept="image/*"  <-- BU SATIRI BİLEREK SİLDİM (Sorun kaynağı olabilir)
-                                          onClick={(e) => {
-                                              // Tıklama algılanıyor mu kontrolü
-                                              toast.info("Dosya seçici tetiklendi...", { duration: 1000 });
-                                              e.stopPropagation(); // Üst katmanlara tıklamayı yayma
-                                          }}
-                                          onChange={handleFileUpload} 
-                                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50"
-                                      />
-                                  </div>
+                                  <label 
+                                    htmlFor="the-real-file-input"
+                                    className="h-10 border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center rounded-md cursor-pointer hover:bg-slate-700 hover:text-white transition-colors text-sm font-medium w-full select-none pointer-events-auto relative z-20"
+                                  >
+                                      <Upload size={16} className="mr-2"/> 
+                                      Yükle
+                                  </label>
 
                               </div>
                           )}
