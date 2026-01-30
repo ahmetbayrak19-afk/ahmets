@@ -18,10 +18,11 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.webkit.WebResourceRequest;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
 import org.json.JSONObject;
 
 import java.util.ArrayList;
@@ -31,66 +32,72 @@ import java.util.Locale;
 public class MainActivity extends AppCompatActivity {
 
     private WebView webView;
+
     private NfcAdapter nfcAdapter;
     private PendingIntent pendingIntent;
     private IntentFilter[] intentFiltersArray;
-    
-    // Native Ses Değişkenleri
+
     private TextToSpeech tts;
     private boolean ttsReady = false;
 
-    // Dosya Seçici Değişkenleri
     private ValueCallback<Uri[]> mUploadMessage;
-    public static final int FILECHOOSER_RESULTCODE = 1;
+
+    private static final int FILECHOOSER_RESULTCODE = 1;
     private static final int PERMISSION_REQUEST_CODE = 1001;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 1. İZİNLERİ BAŞTA İSTİYORUZ (Galeri rahat açılsın diye)
+        // 1) İzinler (sadece donanım)
         checkAndRequestPermissions();
 
-        // 2. NFC AYARLARI
+        // 2) NFC - Foreground dispatch
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
-        Intent intent = new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            flags |= PendingIntent.FLAG_MUTABLE;
-        }
-        pendingIntent = PendingIntent.getActivity(this, 0, intent, flags);
-        IntentFilter ndef = new IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED);
-        intentFiltersArray = new IntentFilter[] {ndef};
+        Intent nfcIntent = new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
 
-        // 3. NATIVE TTS BAŞLAT
+        int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            piFlags |= PendingIntent.FLAG_MUTABLE;
+        }
+        pendingIntent = PendingIntent.getActivity(this, 0, nfcIntent, piFlags);
+
+        // Foreground dispatch'te en stabil: TAG + TECH
+        intentFiltersArray = new IntentFilter[] {
+                new IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED),
+                new IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED)
+        };
+
+        // 3) Native TTS
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
-                int result = tts.setLanguage(new Locale("tr", "TR"));
-                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    ttsReady = false;
+                int lang = tts.setLanguage(new Locale("tr", "TR"));
+                if (lang != TextToSpeech.LANG_MISSING_DATA && lang != TextToSpeech.LANG_NOT_SUPPORTED) {
+                    tts.setSpeechRate(0.9f);
+                    ttsReady = true;
                 } else {
-                    tts.setSpeechRate(0.9f); 
-                    ttsReady = true; 
+                    ttsReady = false;
                 }
             } else {
                 ttsReady = false;
             }
         });
 
-        // 4. WEBVIEW AYARLARI
+        // 4) WebView
         webView = new WebView(this);
         setContentView(webView);
 
         WebSettings settings = webView.getSettings();
-        settings.setJavaScriptEnabled(true);        
-        settings.setDomStorageEnabled(true);        
-        settings.setAllowFileAccess(true);           
-        settings.setAllowContentAccess(true);
-        settings.setAllowFileAccessFromFileURLs(true);
-        settings.setAllowUniversalAccessFromFileURLs(true);
-        settings.setMediaPlaybackRequiresUserGesture(false); 
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
 
-        // Javascript Köprüsü
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+
+        // Ses için gesture istemesin
+        settings.setMediaPlaybackRequiresUserGesture(false);
+
+        // JS -> Native köprü (TTS)
         webView.addJavascriptInterface(new Object() {
             @JavascriptInterface
             public void speak(String text) {
@@ -101,75 +108,86 @@ public class MainActivity extends AppCompatActivity {
 
             @JavascriptInterface
             public void stop() {
-                if (tts != null) tts.stop();
+                if (tts == null) return;
+                tts.stop();
             }
-        }, "AndroidTTS"); 
+        }, "AndroidTTS");
 
-        // 5. WEBCHROMECLIENT
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
+                // Sadece kamera/mikrofon taleplerini ver, diğerlerini reddet
+                List<String> grants = new ArrayList<>();
                 for (String r : request.getResources()) {
                     if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r) ||
-                        PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(r)) {
-                        request.grant(request.getResources());
-                        return;
+                            PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(r)) {
+                        grants.add(r);
                     }
                 }
-                request.deny();
+                if (!grants.isEmpty()) {
+                    request.grant(grants.toArray(new String[0]));
+                } else {
+                    request.deny();
+                }
             }
 
             @Override
-            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
+            public boolean onShowFileChooser(WebView view,
+                                             ValueCallback<Uri[]> filePathCallback,
+                                             FileChooserParams fileChooserParams) {
                 if (mUploadMessage != null) {
                     mUploadMessage.onReceiveValue(null);
                 }
                 mUploadMessage = filePathCallback;
 
-                // 🔥 ESKİ VE GÜZEL GALERİ YÖNTEMİ 🔥
-                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-                intent.addCategory(Intent.CATEGORY_OPENABLE);
-                intent.setType("image/*"); 
-                
+                // Galeri izni istemeyen sistem seçici
+                Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
+                pick.addCategory(Intent.CATEGORY_OPENABLE);
+                pick.setType("image/*");
+
                 try {
-                    startActivityForResult(Intent.createChooser(intent, "Resim Seçiniz"), FILECHOOSER_RESULTCODE);
+                    startActivityForResult(Intent.createChooser(pick, "Resim Seç"), FILECHOOSER_RESULTCODE);
+                    return true;
                 } catch (Exception e) {
                     mUploadMessage = null;
                     return false;
                 }
-                return true;
             }
         });
 
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return false; 
-            }
-        });
-        
+        webView.setWebViewClient(new WebViewClient());
         webView.loadUrl("file:///android_asset/index.html");
     }
 
-    @Override
-    protected void onDestroy() {
-        if (tts != null) {
-            tts.stop();
-            tts.shutdown();
+    private void checkAndRequestPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            // Kamera gerçekten kullanılıyorsa kalsın. Sadece galeriden seçiyorsan CAMERA'yı kaldırabilirsin.
+            String[] permissions = new String[] {
+                    Manifest.permission.CAMERA,
+                    Manifest.permission.RECORD_AUDIO,
+                    Manifest.permission.NFC
+            };
+
+            List<String> toRequest = new ArrayList<>();
+            for (String p : permissions) {
+                if (ContextCompat.checkSelfPermission(this, p) != PackageManager.PERMISSION_GRANTED) {
+                    toRequest.add(p);
+                }
+            }
+
+            if (!toRequest.isEmpty()) {
+                ActivityCompat.requestPermissions(this, toRequest.toArray(new String[0]), PERMISSION_REQUEST_CODE);
+            }
         }
-        super.onDestroy();
     }
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == FILECHOOSER_RESULTCODE) {
             if (mUploadMessage == null) return;
-            Uri result = data == null || resultCode != RESULT_OK ? null : data.getData();
-            if (result != null) {
-                mUploadMessage.onReceiveValue(new Uri[]{result});
-            } else {
-                mUploadMessage.onReceiveValue(null);
-            }
+
+            Uri result = (data == null || resultCode != RESULT_OK) ? null : data.getData();
+            mUploadMessage.onReceiveValue(result != null ? new Uri[]{result} : null);
             mUploadMessage = null;
         } else {
             super.onActivityResult(requestCode, resultCode, data);
@@ -195,10 +213,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(intent.getAction()) || 
-            NfcAdapter.ACTION_NDEF_DISCOVERED.equals(intent.getAction()) ||
-            NfcAdapter.ACTION_TECH_DISCOVERED.equals(intent.getAction())) {
-            
+
+        String action = intent.getAction();
+        if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(action) ||
+                NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action) ||
+                NfcAdapter.ACTION_TECH_DISCOVERED.equals(action)) {
+
             Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
             if (tag != null) {
                 String nfcId = bytesToHex(tag.getId());
@@ -210,45 +230,24 @@ public class MainActivity extends AppCompatActivity {
 
     private String bytesToHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            sb.append(String.format("%02X", b));
-        }
+        for (byte b : bytes) sb.append(String.format("%02X", b));
         return sb.toString();
     }
 
-    // 🔥 İZİNLERİ İSTEYEN BÖLÜM (Galeri Dahil) 🔥
-    private void checkAndRequestPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            List<String> permissions = new ArrayList<>();
-            permissions.add(Manifest.permission.CAMERA);
-            permissions.add(Manifest.permission.RECORD_AUDIO);
-            permissions.add(Manifest.permission.MODIFY_AUDIO_SETTINGS);
-            permissions.add(Manifest.permission.VIBRATE);
-            permissions.add(Manifest.permission.NFC);
-
-            // Galeri İzinlerini EKLEDİK
-            if (Build.VERSION.SDK_INT >= 33) { 
-                permissions.add(Manifest.permission.READ_MEDIA_IMAGES);
-            } else {
-                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+    @Override
+    protected void onDestroy() {
+        try {
+            if (tts != null) {
+                tts.stop();
+                tts.shutdown();
             }
-
-            List<String> permissionsToRequest = new ArrayList<>();
-            for (String permission : permissions) {
-                if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
-                    permissionsToRequest.add(permission);
-                }
-            }
-
-            if (!permissionsToRequest.isEmpty()) {
-                ActivityCompat.requestPermissions(this, permissionsToRequest.toArray(new String[0]), PERMISSION_REQUEST_CODE);
-            }
-        }
+        } catch (Exception ignored) {}
+        super.onDestroy();
     }
-    
+
     @Override
     public void onBackPressed() {
-        if (webView.canGoBack()) {
+        if (webView != null && webView.canGoBack()) {
             webView.goBack();
         } else {
             super.onBackPressed();
