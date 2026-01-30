@@ -10,8 +10,8 @@ import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.os.Build;
 import android.os.Bundle;
-import android.speech.tts.TextToSpeech; // 🔥 EKLENDİ
-import android.webkit.JavascriptInterface; // 🔥 EKLENDİ
+import android.speech.tts.TextToSpeech;
+import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -26,7 +26,7 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale; // 🔥 EKLENDİ
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -35,8 +35,9 @@ public class MainActivity extends AppCompatActivity {
     private PendingIntent pendingIntent;
     private IntentFilter[] intentFiltersArray;
     
-    // 🔥 NATIVE SES MOTORU 🔥
+    // Native Ses Değişkenleri
     private TextToSpeech tts;
+    private boolean ttsReady = false;
 
     // Dosya Seçici Değişkenleri
     private ValueCallback<Uri[]> mUploadMessage;
@@ -47,10 +48,10 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 1. İZİNLER
+        // 1. İZİNLERİ EN BAŞTA İSTE (Senin İstediğin Gibi)
         checkAndRequestPermissions();
 
-        // 2. NFC BAŞLAT
+        // 2. NFC AYARLARI
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
         Intent intent = new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
@@ -61,22 +62,22 @@ public class MainActivity extends AppCompatActivity {
         IntentFilter ndef = new IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED);
         intentFiltersArray = new IntentFilter[] {ndef};
 
-        // 3. 🔥 NATIVE TTS MOTORUNU BAŞLAT 🔥
+        // 3. NATIVE TTS BAŞLAT
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
-                // Türkçe dilini ayarla
                 int result = tts.setLanguage(new Locale("tr", "TR"));
                 if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    System.out.println("TTS: Türkçe dili desteklenmiyor veya yüklü değil.");
+                    ttsReady = false;
                 } else {
-                    tts.setSpeechRate(0.9f); // Konuşma hızı
+                    tts.setSpeechRate(0.9f); 
+                    ttsReady = true; 
                 }
             } else {
-                System.out.println("TTS: Başlatılamadı!");
+                ttsReady = false;
             }
         });
 
-        // 4. WEBVIEW KURULUMU
+        // 4. WEBVIEW AYARLARI
         webView = new WebView(this);
         setContentView(webView);
 
@@ -89,12 +90,11 @@ public class MainActivity extends AppCompatActivity {
         settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setMediaPlaybackRequiresUserGesture(false); 
 
-        // 🔥 JAVASCRIPT KÖPRÜSÜ (REACT -> ANDROID) 🔥
+        // Javascript Köprüsü
         webView.addJavascriptInterface(new Object() {
             @JavascriptInterface
             public void speak(String text) {
-                if (tts == null || text == null) return;
-                // Öncekini sustur ve yenisini oku
+                if (tts == null || !ttsReady || text == null) return;
                 tts.stop();
                 tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "AndroidTTSID");
             }
@@ -103,9 +103,9 @@ public class MainActivity extends AppCompatActivity {
             public void stop() {
                 if (tts != null) tts.stop();
             }
-        }, "AndroidTTS"); // JS tarafında window.AndroidTTS olarak görünecek
+        }, "AndroidTTS"); 
 
-        // 5. WEBCHROMECLIENT
+        // 5. WEBCHROMECLIENT (GALERİ VE KAMERA)
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
@@ -116,6 +116,7 @@ public class MainActivity extends AppCompatActivity {
                         return;
                     }
                 }
+                request.deny();
             }
 
             @Override
@@ -125,10 +126,17 @@ public class MainActivity extends AppCompatActivity {
                 }
                 mUploadMessage = filePathCallback;
 
+                // ESKİ VE SAĞLAM YÖNTEM (İzin varsa direkt galeriyi açar)
                 Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intent.setType("image/*"); 
-                startActivityForResult(Intent.createChooser(intent, "Resim Seçiniz"), FILECHOOSER_RESULTCODE);
+                
+                try {
+                    startActivityForResult(Intent.createChooser(intent, "Resim Seçiniz"), FILECHOOSER_RESULTCODE);
+                } catch (Exception e) {
+                    mUploadMessage = null;
+                    return false;
+                }
                 return true;
             }
         });
@@ -143,7 +151,6 @@ public class MainActivity extends AppCompatActivity {
         webView.loadUrl("file:///android_asset/index.html");
     }
 
-    // 🔥 UYGULAMA KAPANINCA SES MOTORUNU TEMİZLE 🔥
     @Override
     protected void onDestroy() {
         if (tts != null) {
@@ -153,7 +160,6 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
-    // ... (Kalan kısımlar: onActivityResult, onNewIntent, izinler aynı) ...
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == FILECHOOSER_RESULTCODE) {
@@ -210,6 +216,7 @@ public class MainActivity extends AppCompatActivity {
         return sb.toString();
     }
 
+    // 🔥 BAŞLANGIÇTA İZİNLERİ İSTEYEN KOD 🔥
     private void checkAndRequestPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             List<String> permissions = new ArrayList<>();
@@ -219,6 +226,7 @@ public class MainActivity extends AppCompatActivity {
             permissions.add(Manifest.permission.VIBRATE);
             permissions.add(Manifest.permission.NFC);
 
+            // GALERİ İZİNLERİNİ TEKRAR EKLEDİK
             if (Build.VERSION.SDK_INT >= 33) { 
                 permissions.add(Manifest.permission.READ_MEDIA_IMAGES);
             } else {
