@@ -14,6 +14,7 @@
     "@capacitor/ios": "^6.0.0",
     "regexparam": "^2.0.2",
     "@tanstack/query-core": "^5.60.5",
+    "@radix-ui/react-compose-refs": "^1.1.0",
     "canvas-confetti": "^1.9.2",
     "@hello-pangea/dnd": "^17.0.0",
     "@hookform/resolvers": "^3.10.0",
