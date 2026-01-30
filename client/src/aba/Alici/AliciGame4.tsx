@@ -28,7 +28,6 @@ interface GameProps {
 }
 
 export default function AliciGame4({ onClose }: GameProps) {
-  // --- STATE'LER ---
   const [view, setView] = useState<'menu' | 'edit' | 'game'>('menu');
   const [selectedCategory, setSelectedCategory] = useState<Category>('ogretmen');
   
@@ -55,11 +54,11 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  // 1. SCROLL KİLİTLEME - (Geçici olarak devre dışı bıraktım, belki etkileşimi bu bozuyordur)
+  // 🔴 ÖNEMLİ DEĞİŞİKLİK: SCROLL KİLİDİNİ KALDIRDIM
+  // document.body.style.overflow = 'hidden'; SATIRI SİLİNDİ.
+  // Bu satır mobilde native inputların açılmasını engelleyebiliyor.
   useEffect(() => {
-    // document.body.style.overflow = 'hidden';
     return () => {
-      // document.body.style.overflow = 'auto';
       stopCameraStream(); 
     };
   }, []);
@@ -154,7 +153,9 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   // --- DOSYA YÜKLEME ---
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    toast.info("Resim işleniyor...", { position: 'top-center' }); // Tepki testi
+    // BURAYA GELİRSE SORUN ÇÖZÜLMÜŞ DEMEKTİR
+    toast.success("Dosya alındı, işleniyor..."); 
+    
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -165,7 +166,6 @@ export default function AliciGame4({ onClose }: GameProps) {
             const optimizedImage = processImage(img);
             setTempImage(optimizedImage);
             setIsCameraActive(false);
-            toast.dismiss();
         };
         img.src = event.target?.result as string;
     };
@@ -249,18 +249,6 @@ export default function AliciGame4({ onClose }: GameProps) {
   return (
     <div className="fixed inset-0 z-[500] bg-slate-950 flex flex-col font-sans text-slate-100">
       
-      {/* 1. INPUT'U SAYFANIN EN DIŞINA, SABİT OLARAK KOYUYORUZ.
-          2. display: none (hidden) YERİNE, width: 0, height: 0 kullanıyoruz ki "var" olsun.
-          3. ID: "the-real-file-input"
-      */}
-      <input 
-          id="the-real-file-input"
-          type="file" 
-          accept="image/*" 
-          onChange={handleFileUpload}
-          style={{ width: '0.1px', height: '0.1px', opacity: 0, position: 'absolute', zIndex: -1 }}
-      />
-
       {/* ÜST BAR */}
       <div className="bg-slate-900 border-b border-slate-800 p-3 flex justify-between items-center z-10 shrink-0">
         <div className="flex items-center gap-3">
@@ -364,19 +352,24 @@ export default function AliciGame4({ onClose }: GameProps) {
                                       <Camera size={16} className="mr-2"/> Kamera
                                   </Button>
                                   
-                                  {/* --- ÇÖZÜM: ULTRA GÜVENLİ LABEL --- 
-                                      1. pointer-events-auto: Tıklamayı zorla açar.
-                                      2. z-index: 50: Butonun üstünde durmasını sağlar.
-                                      3. cursor-pointer: Telefoan dokunmatik olduğunu bildirir.
-                                      4. htmlFor="the-real-file-input": En üstteki input'u tetikler.
+                                  {/* --- ÇÖZÜM: TEST BUTONU --- 
+                                      1. Scroll kilitlenmesi kaldırıldı.
+                                      2. Input görünmez ama tıklanabilir durumda.
+                                      3. Tıklanınca ekrana "TIKLAMA BAŞARILI" diye uyarı verecek.
                                   */}
-                                  <label 
-                                    htmlFor="the-real-file-input"
-                                    className="h-10 border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center rounded-md cursor-pointer hover:bg-slate-700 hover:text-white transition-colors text-sm font-medium w-full select-none pointer-events-auto relative z-20"
-                                  >
-                                      <Upload size={16} className="mr-2"/> 
-                                      Yükle
-                                  </label>
+                                  <div className="relative h-10 w-full group">
+                                      <div className="absolute inset-0 border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center rounded-md text-sm font-medium group-hover:bg-slate-700 transition-colors pointer-events-none">
+                                          <Upload size={16} className="mr-2"/> Yükle
+                                      </div>
+                                      
+                                      <input 
+                                          type="file" 
+                                          onClick={() => alert('TIKLAMA BAŞARILI: Galeri açılmazsa izin yok!')}
+                                          onChange={handleFileUpload} 
+                                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50"
+                                          // accept özelliğini sildim, bazı telefonları kilitliyor.
+                                      />
+                                  </div>
 
                               </div>
                           )}
