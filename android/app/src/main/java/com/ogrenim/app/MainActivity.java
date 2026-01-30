@@ -35,7 +35,7 @@ public class MainActivity extends AppCompatActivity {
     private PendingIntent pendingIntent;
     private IntentFilter[] intentFiltersArray;
     
-    // 🔥 NATIVE SES DEĞİŞKENLERİ
+    // Native Ses Değişkenleri
     private TextToSpeech tts;
     private boolean ttsReady = false;
 
@@ -48,7 +48,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 1. İZİNLERİ EN BAŞTA İSTİYORUZ (Garanti Yöntem)
+        // 1. İZİNLERİ BAŞTA İSTE (Ama Sadece Donanım Olanları)
         checkAndRequestPermissions();
 
         // 2. NFC AYARLARI
@@ -105,10 +105,12 @@ public class MainActivity extends AppCompatActivity {
             }
         }, "AndroidTTS"); 
 
-        // 5. WEBCHROMECLIENT (GALERİ VE KAMERA)
+        // 5. WEBCHROMECLIENT
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
+                // Kamera/Mikrofon için web sitesi izin istediğinde otomatik onayla
+                // (Çünkü zaten başta Android iznini almıştık)
                 for (String r : request.getResources()) {
                     if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r) ||
                         PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(r)) {
@@ -126,8 +128,10 @@ public class MainActivity extends AppCompatActivity {
                 }
                 mUploadMessage = filePathCallback;
 
-                // ESKİ VE SAĞLAM YÖNTEM
-                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                // 🔥 MODERN YÖNTEM (SAF Picker) 🔥
+                // ACTION_OPEN_DOCUMENT kullanıyoruz.
+                // Bu yöntem "Galeri İzni" gerektirmez, sistem kendi seçicisini açar.
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intent.setType("image/*"); 
                 
@@ -160,12 +164,22 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
+    // 🔥 DOSYA SEÇİM SONUCU VE KALICI İZİN 🔥
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == FILECHOOSER_RESULTCODE) {
             if (mUploadMessage == null) return;
             Uri result = data == null || resultCode != RESULT_OK ? null : data.getData();
+            
             if (result != null) {
+                // Seçilen dosyaya "kalıcı" erişim izni alıyoruz.
+                // Böylece uygulama kapansa bile WebView o dosyayı okuyabilir.
+                try {
+                    final int takeFlags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    getContentResolver().takePersistableUriPermission(result, takeFlags);
+                } catch (Exception e) {
+                    // Bazı durumlarda flag dönmeyebilir, kritik değil.
+                }
                 mUploadMessage.onReceiveValue(new Uri[]{result});
             } else {
                 mUploadMessage.onReceiveValue(null);
@@ -216,23 +230,20 @@ public class MainActivity extends AppCompatActivity {
         return sb.toString();
     }
 
-    // 🔥 BURADA HEPSİNİ İSTİYORUZ Kİ "GARANTİ" OLSUN 🔥
+    // 🔥 SADECE DONANIM İZİNLERİNİ İSTEYEN KOD 🔥
     private void checkAndRequestPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             List<String> permissions = new ArrayList<>();
+            // Sadece donanım (Kamera/Mikrofon/NFC) izinlerini başta istiyoruz.
             permissions.add(Manifest.permission.CAMERA);
             permissions.add(Manifest.permission.RECORD_AUDIO);
             permissions.add(Manifest.permission.MODIFY_AUDIO_SETTINGS);
             permissions.add(Manifest.permission.VIBRATE);
             permissions.add(Manifest.permission.NFC);
 
-            // Android 13+ (Yeni)
-            if (Build.VERSION.SDK_INT >= 33) { 
-                permissions.add(Manifest.permission.READ_MEDIA_IMAGES);
-            } else {
-                // Eski Androidler
-                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
-            }
+            // DİKKAT: Burada READ_EXTERNAL_STORAGE veya READ_MEDIA_IMAGES İSTEMİYORUZ.
+            // Çünkü onShowFileChooser içinde ACTION_OPEN_DOCUMENT kullandık.
+            // Bu sayede galeri izni sormadan kullanıcı dosya seçebilecek.
 
             List<String> permissionsToRequest = new ArrayList<>();
             for (String permission : permissions) {
