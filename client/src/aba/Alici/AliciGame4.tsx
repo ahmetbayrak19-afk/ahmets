@@ -16,7 +16,7 @@ import tekrardene1 from '../esle/ses/tekrardene1.mp3';
 import tekrardene2 from '../esle/ses/tekrardene2.mp3';
 import arkaplanmusic from '../esle/ses/arkaplanmusic.mp3';
 
-// --- RESİM DOSYALARI (ESKİ ÇALIŞAN HALİ: IMPORT) ---
+// --- RESİM DOSYALARI (IMPORT) ---
 import kisi1 from './kisi1.jpg';
 import kisi2 from './kisi2.jpg';
 import kisi3 from './kisi3.jpg';
@@ -30,8 +30,6 @@ import kisi10 from './kisi10.jpg';
 
 const SUCCESS_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
 const ERROR_SOUNDS = [tekrardene1, tekrardene2];
-
-// Resim listesi
 const IMPORTED_IMAGES = [kisi1, kisi2, kisi3, kisi4, kisi5, kisi6, kisi7, kisi8, kisi9, kisi10];
 
 type Category = 'ogretmen' | 'aile' | 'tanidik' | 'arkadas';
@@ -60,7 +58,6 @@ const QUESTION_TEMPLATES = [
     (name: string) => `Hadi parmağınla ${name} resmine dokun.` 
 ];
 
-// --- YEDEK OYUNCULAR (Import edilen resimlerden) ---
 const DUMMY_PROFILES: PersonProfile[] = IMPORTED_IMAGES.map((imgSrc, i) => ({
     id: `dummy-${i + 1}`,
     name: '',
@@ -109,21 +106,24 @@ export default function AliciGame4({ onClose }: GameProps) {
   const [gamePhase, setGamePhase] = useState<'playing' | 'success' | 'complete'>('playing');
   const [wrongCount, setWrongCount] = useState(0);
   
-  // Ses Referansı (Android'de silinmesin diye)
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
+  // --- SESLERİ YÜKLEMEYE ZORLA ---
   useEffect(() => {
-    // Sesleri yükle
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.getVoices();
-    }
+    const initVoices = () => {
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+            console.log("Sesler yüklendi:", voices.length);
+        }
+    };
+    
+    initVoices();
+    window.speechSynthesis.onvoiceschanged = initVoices;
 
     return () => {
       stopCameraStream();
       stopBackgroundMusic();
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-          window.speechSynthesis.cancel();
-      }
+      window.speechSynthesis.cancel();
     };
   }, []);
 
@@ -176,25 +176,53 @@ export default function AliciGame4({ onClose }: GameProps) {
       }
   };
 
-  // --- SORU OKUMA (Ref Korumalı) ---
-  const speakQuestion = (text: string) => {
-      if (typeof window === 'undefined' || !window.speechSynthesis) return;
+  // --- 🔥 TAMİR EDİLEN VE DEBUG EKLENEN SORU MOTORU 🔥 ---
+  const speakQuestion = (text: string, retryCount = 0) => {
+      if (typeof window === 'undefined' || !window.speechSynthesis) {
+          toast.error("Tablet ses özelliği kapalı!");
+          return;
+      }
       
+      // Öncekini sustur
       window.speechSynthesis.cancel();
+
+      // Sesleri al
+      let voices = window.speechSynthesis.getVoices();
+
+      // 🔥 EĞER SES LİSTESİ BOŞSA BEKLE VE TEKRAR DENE 🔥
+      if (voices.length === 0) {
+          if (retryCount < 5) { // 5 kereye kadar dene
+              setTimeout(() => speakQuestion(text, retryCount + 1), 200); // 200ms bekle tekrar dene
+              return;
+          } else {
+              // 5 kere denedi hala yoksa varsayılanı kullan (Riskli ama sessizlikten iyidir)
+              // toast.error("Ses listesi yüklenemedi!"); // Kullanıcıyı panikletmemek için kapattım
+          }
+      }
       
       const utterance = new SpeechSynthesisUtterance(text);
-      speechRef.current = utterance; // KORUMA BURADA
+      speechRef.current = utterance; // Çöp toplayıcı koruması
 
-      const voices = window.speechSynthesis.getVoices();
-      const trVoice = voices.find(v => v.lang.includes('tr')) || voices[0];
+      // En iyi Türkçe sesi bul
+      const trVoice = voices.find(v => v.lang.includes('tr-TR')) || 
+                      voices.find(v => v.lang.includes('tr')) || 
+                      voices[0]; // Hiçbiri yoksa ilk bulduğunu al
       
-      if (trVoice) utterance.voice = trVoice;
+      if (trVoice) {
+          utterance.voice = trVoice;
+          // Test amaçlı ekrana yaz (Sonra kaldırabilirsin)
+          // toast.success(`Ses: ${trVoice.name}`); 
+      }
 
       utterance.lang = 'tr-TR'; 
       utterance.rate = 0.9;
       utterance.volume = 1.0;
       
       utterance.onend = () => { speechRef.current = null; };
+      utterance.onerror = (e) => { 
+          console.log("TTS Hatası:", e);
+          // toast.error("Ses motoru hatası!"); 
+      };
       
       window.speechSynthesis.speak(utterance);
   };
@@ -206,7 +234,9 @@ export default function AliciGame4({ onClose }: GameProps) {
       }
 
       playBackgroundMusic();
-      speakQuestion(" "); // Motoru ısıt
+      
+      // Motoru ısıt
+      speakQuestion(" ");
 
       const questions = shuffleArray([...profiles]);
       
@@ -216,6 +246,7 @@ export default function AliciGame4({ onClose }: GameProps) {
       setWrongCount(0);
       setView('game');
       
+      // Biraz bekle ki oyun sahnesi yüklensin
       setTimeout(() => {
           generateOptions(questions[0], profiles);
       }, 500);
@@ -415,6 +446,7 @@ export default function AliciGame4({ onClose }: GameProps) {
                   </div>
               ) : (
                   <>
+                      {/* SORU TEKRAR BUTONU */}
                       <div className="pt-6 pb-2 px-4 text-center shrink-0">
                           <Button variant="secondary" size="lg" 
                             onClick={() => {
@@ -488,4 +520,4 @@ export default function AliciGame4({ onClose }: GameProps) {
       )}
     </div>
   );
-  }
+      }
