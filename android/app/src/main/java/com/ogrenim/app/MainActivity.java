@@ -35,7 +35,7 @@ public class MainActivity extends AppCompatActivity {
     private PendingIntent pendingIntent;
     private IntentFilter[] intentFiltersArray;
     
-    // Native Ses Değişkenleri
+    // 🔥 NATIVE SES DEĞİŞKENLERİ
     private TextToSpeech tts;
     private boolean ttsReady = false;
 
@@ -48,7 +48,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 1. İZİNLERİ EN BAŞTA İSTE (Senin İstediğin Gibi)
+        // 1. İZİNLERİ EN BAŞTA İSTİYORUZ (Garanti Yöntem)
         checkAndRequestPermissions();
 
         // 2. NFC AYARLARI
@@ -126,7 +126,7 @@ public class MainActivity extends AppCompatActivity {
                 }
                 mUploadMessage = filePathCallback;
 
-                // ESKİ VE SAĞLAM YÖNTEM (İzin varsa direkt galeriyi açar)
+                // ESKİ VE SAĞLAM YÖNTEM
                 Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intent.setType("image/*"); 
@@ -216,7 +216,7 @@ public class MainActivity extends AppCompatActivity {
         return sb.toString();
     }
 
-    // 🔥 BAŞLANGIÇTA İZİNLERİ İSTEYEN KOD 🔥
+    // 🔥 BURADA HEPSİNİ İSTİYORUZ Kİ "GARANTİ" OLSUN 🔥
     private void checkAndRequestPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             List<String> permissions = new ArrayList<>();
@@ -226,10 +226,11 @@ public class MainActivity extends AppCompatActivity {
             permissions.add(Manifest.permission.VIBRATE);
             permissions.add(Manifest.permission.NFC);
 
-            // GALERİ İZİNLERİNİ TEKRAR EKLEDİK
+            // Android 13+ (Yeni)
             if (Build.VERSION.SDK_INT >= 33) { 
                 permissions.add(Manifest.permission.READ_MEDIA_IMAGES);
             } else {
+                // Eski Androidler
                 permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
             }
 
