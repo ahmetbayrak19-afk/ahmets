@@ -28,6 +28,7 @@ interface GameProps {
 }
 
 export default function AliciGame4({ onClose }: GameProps) {
+  // --- STATE'LER ---
   const [view, setView] = useState<'menu' | 'edit' | 'game'>('menu');
   const [selectedCategory, setSelectedCategory] = useState<Category>('ogretmen');
   
@@ -54,9 +55,7 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  // 🔴 ÖNEMLİ DEĞİŞİKLİK: SCROLL KİLİDİNİ KALDIRDIM
-  // document.body.style.overflow = 'hidden'; SATIRI SİLİNDİ.
-  // Bu satır mobilde native inputların açılmasını engelleyebiliyor.
+  // 1. SCROLL KİLİTLEME - (Kaldırıldı, sorun yaratmasın diye)
   useEffect(() => {
     return () => {
       stopCameraStream(); 
@@ -153,8 +152,8 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   // --- DOSYA YÜKLEME ---
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // BURAYA GELİRSE SORUN ÇÖZÜLMÜŞ DEMEKTİR
-    toast.success("Dosya alındı, işleniyor..."); 
+    // Alert kalktı, sadece Toast kaldı (Bu engellemez)
+    toast.info("Yükleniyor...", { duration: 1000 });
     
     const file = e.target.files?.[0];
     if (!file) return;
@@ -249,6 +248,11 @@ export default function AliciGame4({ onClose }: GameProps) {
   return (
     <div className="fixed inset-0 z-[500] bg-slate-950 flex flex-col font-sans text-slate-100">
       
+      {/* ALERT KODUNU SİLDİM!
+         Artık araya giren hiçbir şey yok.
+         Tıklama doğrudan input'a gidecek ve galeri açılacak.
+      */}
+
       {/* ÜST BAR */}
       <div className="bg-slate-900 border-b border-slate-800 p-3 flex justify-between items-center z-10 shrink-0">
         <div className="flex items-center gap-3">
@@ -352,22 +356,20 @@ export default function AliciGame4({ onClose }: GameProps) {
                                       <Camera size={16} className="mr-2"/> Kamera
                                   </Button>
                                   
-                                  {/* --- ÇÖZÜM: TEST BUTONU --- 
-                                      1. Scroll kilitlenmesi kaldırıldı.
-                                      2. Input görünmez ama tıklanabilir durumda.
-                                      3. Tıklanınca ekrana "TIKLAMA BAŞARILI" diye uyarı verecek.
+                                  {/* --- FİNAL ÇÖZÜM: ALERT YOK, ENGEL YOK --- 
+                                      1. Tıklama gerçekleştiğini kanıtladık.
+                                      2. Alert'ü kaldırdık ki galeri açılışını kesmesin.
+                                      3. Input görünmez ama en üstte (z-50).
                                   */}
                                   <div className="relative h-10 w-full group">
                                       <div className="absolute inset-0 border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center rounded-md text-sm font-medium group-hover:bg-slate-700 transition-colors pointer-events-none">
                                           <Upload size={16} className="mr-2"/> Yükle
                                       </div>
-                                      
                                       <input 
                                           type="file" 
-                                          onClick={() => alert('TIKLAMA BAŞARILI: Galeri açılmazsa izin yok!')}
+                                          // onClick kaldırıldı (Engeli kaldırdık)
                                           onChange={handleFileUpload} 
                                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50"
-                                          // accept özelliğini sildim, bazı telefonları kilitliyor.
                                       />
                                   </div>
 
