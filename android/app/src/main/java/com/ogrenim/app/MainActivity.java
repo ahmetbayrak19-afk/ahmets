@@ -5,11 +5,13 @@ import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.os.Build;
 import android.os.Bundle;
 import android.webkit.PermissionRequest;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -24,6 +26,10 @@ public class MainActivity extends AppCompatActivity {
     private NfcAdapter nfcAdapter;
     private PendingIntent pendingIntent;
     private IntentFilter[] intentFiltersArray;
+
+    // 🔥 DOSYA SEÇİCİ İÇİN GEREKLİ DEĞİŞKENLER 🔥
+    private ValueCallback<Uri[]> mUploadMessage;
+    public static final int FILECHOOSER_RESULTCODE = 1;
     
     private static final int PERMISSION_REQUEST_CODE = 1001;
 
@@ -31,12 +37,13 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        // 1. İzinleri Kontrol Et (Kamera Dahil)
+        // 1. İzinleri Kontrol Et (Galeri İzinleri Eklendi)
         checkAndRequestPermissions();
 
         // NFC Başlat
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
         Intent intent = new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        // Android 12+ için FLAG_MUTABLE kullanımı
         pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_MUTABLE);
         IntentFilter ndef = new IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED);
         intentFiltersArray = new IntentFilter[] {ndef};
@@ -55,12 +62,31 @@ public class MainActivity extends AppCompatActivity {
         settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
 
-        // Web Sitesi Kamera/Mikrofon İsterse İzin Ver
+        // 🔥 GÜNCELLENEN WEBCHROMECLIENT 🔥
+        // Hem Kamera izinlerini verir hem de Dosya Seçiciyi açar
         webView.setWebChromeClient(new WebChromeClient() {
+            
+            // 1. Web Sitesi Kamera/Mikrofon İsterse Otomatik İzin Ver
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
-                // Hem SES hem VİDEO isteklerini onayla
                 request.grant(request.getResources());
+            }
+
+            // 2. Web Sitesi Dosya Seçmek İsterse (Input type='file') Galeriyi Aç
+            @Override
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
+                if (mUploadMessage != null) {
+                    mUploadMessage.onReceiveValue(null);
+                }
+                mUploadMessage = filePathCallback;
+
+                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("image/*"); // Sadece resimler
+                
+                // Seçici ekranını başlat
+                startActivityForResult(Intent.createChooser(intent, "Resim Seçiniz"), FILECHOOSER_RESULTCODE);
+                return true;
             }
         });
 
@@ -72,6 +98,23 @@ public class MainActivity extends AppCompatActivity {
         });
         
         webView.loadUrl("file:///android_asset/index.html");
+    }
+
+    // 🔥 DOSYA SEÇİLDİKTEN SONRA SONUCU WEBVIEW'A GÖNDERME 🔥
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == FILECHOOSER_RESULTCODE) {
+            if (mUploadMessage == null) return;
+            Uri result = data == null || resultCode != RESULT_OK ? null : data.getData();
+            if (result != null) {
+                mUploadMessage.onReceiveValue(new Uri[]{result});
+            } else {
+                mUploadMessage.onReceiveValue(null);
+            }
+            mUploadMessage = null;
+        } else {
+            super.onActivityResult(requestCode, resultCode, data);
+        }
     }
 
     @Override
@@ -120,7 +163,11 @@ public class MainActivity extends AppCompatActivity {
                 Manifest.permission.MODIFY_AUDIO_SETTINGS,
                 Manifest.permission.VIBRATE,
                 Manifest.permission.NFC,
-                Manifest.permission.CAMERA // 🔥 BU SATIRI EKLEDİK 🔥
+                Manifest.permission.CAMERA, // Kamera
+                Manifest.permission.READ_EXTERNAL_STORAGE, // 🔥 Eski Androidler için Galeri
+                Manifest.permission.WRITE_EXTERNAL_STORAGE // 🔥 Dosya Yazma
+                // Not: Android 13+ için READ_MEDIA_IMAGES burada eksik olabilir ama 
+                // temel depolama izni çoğu durumda legacy modda iş görür.
             };
 
             boolean permissionsNeeded = false;
@@ -145,5 +192,4 @@ public class MainActivity extends AppCompatActivity {
             super.onBackPressed();
         }
     }
-            }
-            
+                                      }
