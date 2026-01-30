@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
 
-// --- SES DOSYALARI (MP3) ---
+// --- SES DOSYALARI ---
 import aferin1 from '../esle/ses/aferin1.mp3';
 import aferin2 from '../esle/ses/aferin2.mp3';
 import bravo from '../esle/ses/bravo.mp3';
@@ -108,15 +108,16 @@ export default function AliciGame4({ onClose }: GameProps) {
   const [gamePhase, setGamePhase] = useState<'playing' | 'success' | 'complete'>('playing');
   const [wrongCount, setWrongCount] = useState(0);
   
-  // --- STATE VE REF (Konuşma Sistemi İçin) ---
+  // --- YENİLENMİŞ STATE VE REFERANSLAR ---
   const [questionText, setQuestionText] = useState<string>("");
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const speakSeqRef = useRef(0); // Çağrı sırasını takip eden sayaç (Sequence ID)
 
-  // --- EFFECT: SORU METNİ DEĞİŞTİĞİNDE TETİKLENİR ---
+  // --- EFFECT: SORU METNİ DEĞİŞTİĞİNDE ---
   useEffect(() => {
     if (!questionText) return;
     
-    // UI render olduktan sonra konuşması için minik bir gecikme (100ms)
+    // UI render olduktan sonra konuşması için minik bir gecikme
     const timer = setTimeout(() => {
         speakQuestion(questionText);
     }, 100); 
@@ -185,50 +186,76 @@ export default function AliciGame4({ onClose }: GameProps) {
       }
   };
 
-  // --- 🔥 GÜÇLENDİRİLMİŞ KONUŞMA FONKSİYONU (CHATGPT ÖNERİSİ) 🔥 ---
+  // --- 🔥 TANK GİBİ SAĞLAM KONUŞMA FONKSİYONU 🔥 ---
   const speakQuestion = (text: string) => {
       try {
           if (typeof window === 'undefined' || !window.speechSynthesis) return;
 
-          // 1. Öncekini sustur
+          // 1. Yeni bir "fiş numarası" al (Sequence ID)
+          const mySeq = ++speakSeqRef.current;
+
+          // 2. Önceki konuşmayı iptal et
           window.speechSynthesis.cancel();
 
-          // 2. Asıl konuşma işini yapan iç fonksiyon
+          // 3. Konuşmayı başlatan fonksiyon
           const run = () => {
-              const utterance = new SpeechSynthesisUtterance(text);
-              speechRef.current = utterance; // Referans tut (GC engellemek için)
+              // Eğer biz beklerken yeni bir soru geldiyse (fiş numarası değiştiyse) iptal et
+              if (mySeq !== speakSeqRef.current) return;
 
-              const voices = window.speechSynthesis.getVoices();
-              // Türkçe sesi bulmak için daha agresif bir arama
-              const trVoice = 
+              const utterance = new SpeechSynthesisUtterance(text);
+              speechRef.current = utterance;
+
+              const voices = window.speechSynthesis.getVoices() || [];
+              const trVoice =
                 voices.find(v => v.lang === 'tr-TR') ||
-                voices.find(v => v.lang?.toLowerCase().includes('tr')) ||
-                voices[0]; // Hiçbiri yoksa varsayılan
+                voices.find(v => (v.lang || '').toLowerCase().includes('tr')) ||
+                voices[0];
 
               if (trVoice) utterance.voice = trVoice;
-
-              utterance.lang = 'tr-TR'; 
+              utterance.lang = 'tr-TR';
               utterance.rate = 0.9;
               utterance.volume = 1.0;
-              
-              // Android'de konuşma bitince referansı temizle
-              utterance.onend = () => { speechRef.current = null; };
+
+              utterance.onend = () => {
+                if (speechRef.current === utterance) speechRef.current = null;
+              };
 
               window.speechSynthesis.speak(utterance);
           };
 
-          // 3. Sesler Yüklü mü Kontrol Et (Android için Kritik Nokta)
-          const voicesNow = window.speechSynthesis.getVoices();
-          if (!voicesNow || voicesNow.length === 0) {
-              // Sesler henüz yüklenmemiş, yüklenince konuş (Android WebView sorunu çözümü)
-              window.speechSynthesis.onvoiceschanged = () => {
+          // 4. Sesleri Bekleyen ve Deneyen Fonksiyon (Retry Mechanism)
+          const waitForVoices = (attempt = 0) => {
+              // Yeni istek geldiyse beklemeyi bırak
+              if (mySeq !== speakSeqRef.current) return;
+
+              const voicesNow = window.speechSynthesis.getVoices();
+              if (voicesNow && voicesNow.length > 0) {
+                  // Sesler geldiyse çalıştır
+                  setTimeout(run, 50);
+                  return;
+              }
+
+              // Bazı WebView'larda onvoiceschanged hiç gelmeyebilir -> 6 kere dene (toplam ~1 saniye)
+              if (attempt >= 6) {
+                  // Son çare: Ses listesi boş olsa bile şansını dene
+                  setTimeout(run, 50);
+                  return;
+              }
+
+              // 150ms sonra tekrar dene
+              setTimeout(() => waitForVoices(attempt + 1), 150);
+          };
+
+          // 5. Olay dinleyici + Manuel deneme (Hibrit Yöntem)
+          if (window.speechSynthesis.onvoiceschanged !== undefined) {
+             window.speechSynthesis.onvoiceschanged = () => {
                   window.speechSynthesis.onvoiceschanged = null;
-                  setTimeout(run, 50); // Yüklendikten sonra minik bekleme
+                  waitForVoices(0);
               };
-          } else {
-              // Sesler zaten var, minik gecikmeyle konuş (cancel çakışmasını önler)
-              setTimeout(run, 50);
           }
+          
+          // Her ihtimale karşı manuel başlat
+          waitForVoices(0);
 
       } catch (e) {
           console.error("Konuşma hatası:", e);
@@ -243,7 +270,7 @@ export default function AliciGame4({ onClose }: GameProps) {
 
       playBackgroundMusic();
       
-      // Motoru uyandırmak için boş tetikleme
+      // Motoru uyandırmak için
       speakQuestion(" ");
 
       const questions = shuffleArray([...profiles]);
@@ -254,7 +281,6 @@ export default function AliciGame4({ onClose }: GameProps) {
       setWrongCount(0);
       setView('game');
       
-      // İlk soruyu başlat
       setTimeout(() => {
           generateOptions(questions[0], profiles);
       }, 500);
@@ -282,7 +308,7 @@ export default function AliciGame4({ onClose }: GameProps) {
       const finalOptions = shuffleArray([target, ...selectedRealDistractors, ...selectedDummies]);
       setOptions(finalOptions);
 
-      // --- STATE GÜNCELLEME (useEffect konuşmayı tetikleyecek) ---
+      // --- STATE GÜNCELLEME (useEffect tetikleyecek) ---
       const randomTemplate = QUESTION_TEMPLATES[Math.floor(Math.random() * QUESTION_TEMPLATES.length)];
       setQuestionText(randomTemplate(target.name)); 
   };
