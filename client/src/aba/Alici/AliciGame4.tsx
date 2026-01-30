@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
 
-// --- SES DOSYALARI ---
+// --- SES DOSYALARI (MP3) ---
 import aferin1 from '../esle/ses/aferin1.mp3';
 import aferin2 from '../esle/ses/aferin2.mp3';
 import bravo from '../esle/ses/bravo.mp3';
@@ -16,7 +16,7 @@ import tekrardene1 from '../esle/ses/tekrardene1.mp3';
 import tekrardene2 from '../esle/ses/tekrardene2.mp3';
 import arkaplanmusic from '../esle/ses/arkaplanmusic.mp3';
 
-// --- RESİM DOSYALARI (IMPORT) ---
+// --- RESİM DOSYALARI ---
 import kisi1 from './kisi1.jpg';
 import kisi2 from './kisi2.jpg';
 import kisi3 from './kisi3.jpg';
@@ -55,7 +55,9 @@ const QUESTION_TEMPLATES = [
     (name: string) => `Bana ${name} olanı bul.`,
     (name: string) => `Peki, ${name} hangisi acaba?`,
     (name: string) => `Hani ${name}, görebiliyor musun?`,
-    (name: string) => `Hadi parmağınla ${name} resmine dokun.` 
+    (name: string) => `Hadi parmağınla ${name} resmine dokun.`,
+    (name: string) => `Dikkatli bak, ${name} hangisi?`,
+    (name: string) => `${name} resmini bulabilir misin?`
 ];
 
 const DUMMY_PROFILES: PersonProfile[] = IMPORTED_IMAGES.map((imgSrc, i) => ({
@@ -106,16 +108,23 @@ export default function AliciGame4({ onClose }: GameProps) {
   const [gamePhase, setGamePhase] = useState<'playing' | 'success' | 'complete'>('playing');
   const [wrongCount, setWrongCount] = useState(0);
   
-  // Ses Referansı (Koruma amaçlı - SADECE WEB API)
+  // --- STATE VE REF (Konuşma Sistemi İçin) ---
+  const [questionText, setQuestionText] = useState<string>("");
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
+  // --- EFFECT: SORU METNİ DEĞİŞTİĞİNDE TETİKLENİR ---
   useEffect(() => {
-    try {
-        if (typeof window !== 'undefined' && window.speechSynthesis) {
-            window.speechSynthesis.getVoices();
-        }
-    } catch (e) { console.error(e); }
+    if (!questionText) return;
+    
+    // UI render olduktan sonra konuşması için minik bir gecikme (100ms)
+    const timer = setTimeout(() => {
+        speakQuestion(questionText);
+    }, 100); 
 
+    return () => clearTimeout(timer);
+  }, [questionText]);
+
+  useEffect(() => {
     return () => {
       stopCameraStream();
       stopBackgroundMusic();
@@ -176,27 +185,51 @@ export default function AliciGame4({ onClose }: GameProps) {
       }
   };
 
-  // --- STANDART SORU OKUMA (Hiçbir eklenti kullanmaz) ---
+  // --- 🔥 GÜÇLENDİRİLMİŞ KONUŞMA FONKSİYONU (CHATGPT ÖNERİSİ) 🔥 ---
   const speakQuestion = (text: string) => {
       try {
           if (typeof window === 'undefined' || !window.speechSynthesis) return;
 
+          // 1. Öncekini sustur
           window.speechSynthesis.cancel();
-          
-          const utterance = new SpeechSynthesisUtterance(text);
-          speechRef.current = utterance; // Koruma
 
-          const voices = window.speechSynthesis.getVoices();
-          const trVoice = voices.find(v => v.lang.includes('tr')) || voices[0];
-          if (trVoice) utterance.voice = trVoice;
+          // 2. Asıl konuşma işini yapan iç fonksiyon
+          const run = () => {
+              const utterance = new SpeechSynthesisUtterance(text);
+              speechRef.current = utterance; // Referans tut (GC engellemek için)
 
-          utterance.lang = 'tr-TR'; 
-          utterance.rate = 0.9;
-          utterance.volume = 1.0;
-          
-          utterance.onend = () => { speechRef.current = null; };
-          
-          window.speechSynthesis.speak(utterance);
+              const voices = window.speechSynthesis.getVoices();
+              // Türkçe sesi bulmak için daha agresif bir arama
+              const trVoice = 
+                voices.find(v => v.lang === 'tr-TR') ||
+                voices.find(v => v.lang?.toLowerCase().includes('tr')) ||
+                voices[0]; // Hiçbiri yoksa varsayılan
+
+              if (trVoice) utterance.voice = trVoice;
+
+              utterance.lang = 'tr-TR'; 
+              utterance.rate = 0.9;
+              utterance.volume = 1.0;
+              
+              // Android'de konuşma bitince referansı temizle
+              utterance.onend = () => { speechRef.current = null; };
+
+              window.speechSynthesis.speak(utterance);
+          };
+
+          // 3. Sesler Yüklü mü Kontrol Et (Android için Kritik Nokta)
+          const voicesNow = window.speechSynthesis.getVoices();
+          if (!voicesNow || voicesNow.length === 0) {
+              // Sesler henüz yüklenmemiş, yüklenince konuş (Android WebView sorunu çözümü)
+              window.speechSynthesis.onvoiceschanged = () => {
+                  window.speechSynthesis.onvoiceschanged = null;
+                  setTimeout(run, 50); // Yüklendikten sonra minik bekleme
+              };
+          } else {
+              // Sesler zaten var, minik gecikmeyle konuş (cancel çakışmasını önler)
+              setTimeout(run, 50);
+          }
+
       } catch (e) {
           console.error("Konuşma hatası:", e);
       }
@@ -210,7 +243,7 @@ export default function AliciGame4({ onClose }: GameProps) {
 
       playBackgroundMusic();
       
-      // Motoru ısıt
+      // Motoru uyandırmak için boş tetikleme
       speakQuestion(" ");
 
       const questions = shuffleArray([...profiles]);
@@ -221,6 +254,7 @@ export default function AliciGame4({ onClose }: GameProps) {
       setWrongCount(0);
       setView('game');
       
+      // İlk soruyu başlat
       setTimeout(() => {
           generateOptions(questions[0], profiles);
       }, 500);
@@ -248,9 +282,9 @@ export default function AliciGame4({ onClose }: GameProps) {
       const finalOptions = shuffleArray([target, ...selectedRealDistractors, ...selectedDummies]);
       setOptions(finalOptions);
 
-      // Soruyu sor
+      // --- STATE GÜNCELLEME (useEffect konuşmayı tetikleyecek) ---
       const randomTemplate = QUESTION_TEMPLATES[Math.floor(Math.random() * QUESTION_TEMPLATES.length)];
-      setTimeout(() => speakQuestion(randomTemplate(target.name)), 800);
+      setQuestionText(randomTemplate(target.name)); 
   };
 
   const handleAnswer = (selected: PersonProfile) => {
@@ -420,13 +454,12 @@ export default function AliciGame4({ onClose }: GameProps) {
                   </div>
               ) : (
                   <>
-                      {/* SORU TEKRAR BUTONU */}
+                      {/* SORU TEKRAR BUTONU (State'i tetikler) */}
                       <div className="pt-6 pb-2 px-4 text-center shrink-0">
                           <Button variant="secondary" size="lg" 
                             onClick={() => {
-                                const target = gameQuestions[currentQuestionIndex];
-                                const randomTemplate = QUESTION_TEMPLATES[Math.floor(Math.random() * QUESTION_TEMPLATES.length)];
-                                speakQuestion(randomTemplate(target.name));
+                                // Mevcut soru metnini tekrar tetikle
+                                speakQuestion(questionText);
                             }} 
                             className="rounded-full bg-slate-800 text-slate-300 border border-slate-700 px-8 py-4 text-lg active:scale-95 transition-transform">
                               <Play size={28} className="mr-2 text-blue-400 fill-blue-400"/> Tekrar Dinle
