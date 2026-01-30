@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Upload, Trash2, ArrowLeft, Check, Play, Settings, User, Users, GraduationCap, Heart, X, RotateCcw } from 'lucide-react';
+import { Camera, Upload, Trash2, ArrowLeft, Check, Play, Settings, User, Users, GraduationCap, Heart, X, RotateCcw, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
 
-// --- SES DOSYALARI (Senin verdiğin yollar) ---
+// --- SES DOSYALARI ---
 import aferin1 from '../esle/ses/aferin1.mp3';
 import aferin2 from '../esle/ses/aferin2.mp3';
 import bravo from '../esle/ses/bravo.mp3';
@@ -19,7 +19,6 @@ import arkaplanmusic from '../esle/ses/arkaplanmusic.mp3';
 const SUCCESS_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
 const ERROR_SOUNDS = [tekrardene1, tekrardene2];
 
-// --- TİPLER ---
 type Category = 'ogretmen' | 'aile' | 'tanidik' | 'arkadas';
 
 interface PersonProfile {
@@ -30,7 +29,6 @@ interface PersonProfile {
   isDummy?: boolean;
 }
 
-// --- KATEGORİLER ---
 const CATEGORIES: { id: Category; label: string; icon: any; color: string; iconColor: string }[] = [
   { id: 'ogretmen', label: 'Öğretmenlerim', icon: GraduationCap, color: 'border-blue-900 bg-blue-950/20', iconColor: 'text-blue-400' },
   { id: 'aile', label: 'Ailem', icon: Heart, color: 'border-red-900 bg-red-950/20', iconColor: 'text-red-400' },
@@ -38,7 +36,6 @@ const CATEGORIES: { id: Category; label: string; icon: any; color: string; iconC
   { id: 'tanidik', label: 'Tanıdıklarım', icon: User, color: 'border-orange-900 bg-orange-950/20', iconColor: 'text-orange-400' },
 ];
 
-// --- SORU KALIPLARI ---
 const QUESTION_TEMPLATES = [
     (name: string) => `Hadi göster bakalım, ${name} nerede?`,
     (name: string) => `Hangisi ${name}?`,
@@ -48,16 +45,14 @@ const QUESTION_TEMPLATES = [
     (name: string) => `Hadi parmağınla ${name} resmine dokun.` 
 ];
 
-// YEDEK OYUNCULAR (public klasöründe kisi1.png ... kisi10.png)
 const DUMMY_PROFILES: PersonProfile[] = Array.from({ length: 10 }).map((_, i) => ({
     id: `dummy-${i + 1}`,
     name: '',
     category: 'tanidik',
-    imageUrl: `/kisi${i + 1}.png`,
+    imageUrl: `/kisi${i + 1}.jpg`,
     isDummy: true
 }));
 
-// Karıştırma Fonksiyonu
 function shuffleArray<T>(array: T[]): T[] {
     const newArr = [...array];
     for (let i = newArr.length - 1; i > 0; i--) {
@@ -72,10 +67,12 @@ interface GameProps {
 }
 
 export default function AliciGame4({ onClose }: GameProps) {
-  // --- STATE'LER ---
   const [view, setView] = useState<'menu' | 'edit' | 'game'>('menu');
   const [selectedCategory, setSelectedCategory] = useState<Category>('ogretmen');
   
+  // 🔥 SEVİYE SEÇİMİ (1, 2 veya 3) 🔥
+  const [selectedLevel, setSelectedLevel] = useState<1 | 2 | 3>(1);
+
   const [profiles, setProfiles] = useState<PersonProfile[]>(() => {
     try {
       const saved = localStorage.getItem('insan-tanima-v5');
@@ -96,7 +93,6 @@ export default function AliciGame4({ onClose }: GameProps) {
   const [wrongCount, setWrongCount] = useState(0);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  // Cleanup
   useEffect(() => {
     return () => {
       stopCameraStream();
@@ -108,7 +104,6 @@ export default function AliciGame4({ onClose }: GameProps) {
     localStorage.setItem('insan-tanima-v5', JSON.stringify(profiles));
   }, [profiles]);
 
-  // Sesleri Yükle (TTS)
   useEffect(() => {
     const loadVoices = () => {
         if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -126,7 +121,6 @@ export default function AliciGame4({ onClose }: GameProps) {
       setNewPersonName('');
   };
 
-  // --- SES FONKSİYONLARI ---
   const playSuccessSound = () => {
       const randomSound = SUCCESS_SOUNDS[Math.floor(Math.random() * SUCCESS_SOUNDS.length)];
       const audio = new Audio(randomSound);
@@ -145,7 +139,7 @@ export default function AliciGame4({ onClose }: GameProps) {
       if (!bgMusicRef.current) {
           bgMusicRef.current = new Audio(arkaplanmusic);
           bgMusicRef.current.loop = true;
-          bgMusicRef.current.volume = 0.1; // Müzik sesi kısık (Soruyu bastırmasın)
+          bgMusicRef.current.volume = 0.1; 
       }
       bgMusicRef.current.play().catch(e => console.log("Müzik hatası:", e));
   };
@@ -157,25 +151,18 @@ export default function AliciGame4({ onClose }: GameProps) {
       }
   };
 
-  // --- GÜÇLENDİRİLMİŞ TTS (Daha Doğal Ses İçin) ---
   const speakQuestion = (text: string) => {
       if (!window.speechSynthesis) return;
       window.speechSynthesis.cancel();
       
       const utterance = new SpeechSynthesisUtterance(text);
-      
-      // HEDEF: Google Türkçe sesini bul
       const allVoices = window.speechSynthesis.getVoices();
       let selectedVoice = allVoices.find(v => v.lang.includes('tr') && v.name.includes('Google'));
-      
-      // Bulamazsa herhangi bir Türkçe ses
       if (!selectedVoice) selectedVoice = allVoices.find(v => v.lang.includes('tr'));
-
       if (selectedVoice) utterance.voice = selectedVoice;
 
       utterance.lang = 'tr-TR';
       utterance.rate = 0.9; 
-      
       window.speechSynthesis.speak(utterance);
   };
 
@@ -196,34 +183,45 @@ export default function AliciGame4({ onClose }: GameProps) {
       setView('game');
       
       setTimeout(() => {
-          generateOptions(questions[0], profiles, 0);
+          generateOptions(questions[0], profiles);
       }, 500);
   };
 
-  const generateOptions = (target: PersonProfile, pool: PersonProfile[], questionIndex: number) => {
+  // 🔥 YENİLENEN SEÇENEK OLUŞTURMA (SEVİYE ODAKLI) 🔥
+  const generateOptions = (target: PersonProfile, pool: PersonProfile[]) => {
       setWrongCount(0); 
       
-      // SEVİYE MANTIĞI
-      let requiredCount = 3; 
-      if (questionIndex >= 2) requiredCount = 4; // 3. soru
-      if (questionIndex >= 5) requiredCount = 6; // 6. soru
+      // 1. SEÇİLEN SEVİYEYE GÖRE SAYI BELİRLE
+      // Seviye 1: 3 Resim
+      // Seviye 2: 4 Resim
+      // Seviye 3: 6 Resim
+      let requiredCount = 3;
+      if (selectedLevel === 2) requiredCount = 4;
+      if (selectedLevel === 3) requiredCount = 6;
 
+      // 2. Havuzdan gerçek kişileri al (Hedef hariç)
       const realOthers = pool.filter(p => p.id !== target.id);
-      const neededDistractors = requiredCount - 1;
       
+      // 3. Kaç tane gerçek çeldiriciye ihtiyacımız var?
+      const neededDistractors = requiredCount - 1; // Hedef (1) çıktığı için
+      
+      // 4. Gerçekleri karıştır ve alabileceğini al
       const shuffledRealOthers = shuffleArray(realOthers);
       const selectedRealDistractors = shuffledRealOthers.slice(0, neededDistractors);
+      
+      // 5. Eksik kaldı mı? (Senin senaryon: 2 kişi yükledim, 6 lazım. Eksik = 4)
       const missingCount = neededDistractors - selectedRealDistractors.length;
 
+      // 6. Eksikleri DUMMY ile doldur
       let selectedDummies: PersonProfile[] = [];
       if (missingCount > 0) {
           selectedDummies = shuffleArray([...DUMMY_PROFILES]).slice(0, missingCount);
       }
 
+      // 7. Hepsini birleştir ve karıştır
       const finalOptions = shuffleArray([target, ...selectedRealDistractors, ...selectedDummies]);
       setOptions(finalOptions);
 
-      // Soruyu oku
       const randomTemplate = QUESTION_TEMPLATES[Math.floor(Math.random() * QUESTION_TEMPLATES.length)];
       setTimeout(() => speakQuestion(randomTemplate(target.name)), 600);
   };
@@ -234,7 +232,6 @@ export default function AliciGame4({ onClose }: GameProps) {
       const target = gameQuestions[currentQuestionIndex];
 
       if (selected.id === target.id) {
-          // --- DOĞRU ---
           setGamePhase('success');
           playSuccessSound();
           confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
@@ -244,7 +241,7 @@ export default function AliciGame4({ onClose }: GameProps) {
               if (next < gameQuestions.length) {
                   setCurrentQuestionIndex(next);
                   setGamePhase('playing');
-                  generateOptions(gameQuestions[next], profiles, next);
+                  generateOptions(gameQuestions[next], profiles);
               } else {
                   setGamePhase('complete');
                   stopBackgroundMusic();
@@ -253,20 +250,16 @@ export default function AliciGame4({ onClose }: GameProps) {
               }
           }, 2500); 
       } else {
-          // --- YANLIŞ ---
           setWrongCount(prev => prev + 1);
           playErrorSound();
       }
   };
 
-  // --- STİL VE DÜZEN ---
   const getOptionStyle = (opt: PersonProfile, isTarget: boolean) => {
       if (gamePhase === 'success') {
           return isTarget ? "scale-105 border-green-500 shadow-[0_0_30px_green] z-20 ring-4 ring-green-400" : "opacity-20 scale-90 grayscale";
       }
-
       if (wrongCount === 0) return "border-slate-700 active:scale-95"; 
-
       if (isTarget) {
           if (wrongCount >= 1) return "animate-pulse border-blue-500 shadow-[0_0_20px_blue] scale-105 z-10"; 
           if (wrongCount >= 2) return "animate-bounce border-green-500 shadow-[0_0_40px_green] scale-110 z-20"; 
@@ -277,12 +270,8 @@ export default function AliciGame4({ onClose }: GameProps) {
       return "border-slate-700 opacity-60";
   };
 
-  const getGridClass = (count: number) => {
-      // 3 Kişiyken Piramit düzeni için grid yerine özel ayar
-      if (count === 3) return "grid grid-cols-2 gap-4 place-items-center w-full"; 
-      if (count === 4) return "grid grid-cols-2 gap-4 w-full";
-      return "grid grid-cols-2 gap-3 w-full"; 
-  };
+  // Grid yapısı her zaman 2 kolon, düzen içeride ayarlanıyor.
+  const getGridClass = () => "grid grid-cols-2 gap-4 w-full"; 
 
   // --- STANDART FONKSİYONLAR ---
   const processImage = (s:any) => {
@@ -309,11 +298,7 @@ export default function AliciGame4({ onClose }: GameProps) {
         <div className="flex items-center gap-3">
             <button onClick={() => { 
                 if (view === 'menu') onClose(); 
-                else { 
-                    resetEditor(); 
-                    stopBackgroundMusic(); 
-                    setView('menu'); 
-                } 
+                else { resetEditor(); stopBackgroundMusic(); setView('menu'); } 
             }} className="p-2 bg-slate-800 rounded-full active:scale-95">
                 <ArrowLeft size={20} className="text-slate-300"/>
             </button>
@@ -323,17 +308,50 @@ export default function AliciGame4({ onClose }: GameProps) {
 
       {view === 'menu' && (
           <div className="flex-1 flex flex-col p-4">
-              <div className="grid grid-cols-2 gap-3 max-w-md mx-auto flex-1 content-start">
+              <div className="grid grid-cols-2 gap-4 max-w-md mx-auto flex-1 content-start w-full">
                   {CATEGORIES.map(cat => (
-                      <div key={cat.id} className={`p-4 rounded-xl border ${cat.color} bg-slate-900/50 flex flex-col gap-2`}>
-                          <cat.icon size={24} className={cat.iconColor} />
-                          <span className="text-2xl font-black">{profiles.filter(p => p.category === cat.id).length}/10</span>
-                          <span className="text-xs font-bold text-slate-400">{cat.label}</span>
-                          <Button size="sm" onClick={() => { resetEditor(); setSelectedCategory(cat.id); setView('edit'); }} className="mt-auto bg-slate-800 text-xs">DÜZENLE</Button>
+                      <div key={cat.id} className={`p-4 rounded-2xl border-2 ${cat.color} bg-slate-900/60 flex flex-col items-center justify-center gap-3 aspect-square shadow-lg`}>
+                          <div className={`p-3 rounded-full bg-slate-900 border border-slate-800 ${cat.iconColor}`}>
+                              <cat.icon size={32} />
+                          </div>
+                          <div className="text-center">
+                              <span className="text-3xl font-black block text-white">{profiles.filter(p => p.category === cat.id).length}/10</span>
+                              <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">{cat.label}</span>
+                          </div>
+                          <Button size="sm" onClick={() => { resetEditor(); setSelectedCategory(cat.id); setView('edit'); }} className="mt-2 bg-slate-800 hover:bg-slate-700 text-xs px-4 h-8 rounded-full border border-slate-700">
+                              <Settings size={14} className="mr-1"/> DÜZENLE
+                          </Button>
                       </div>
                   ))}
               </div>
-              <Button size="lg" onClick={startMixedGame} className="w-full py-6 text-lg font-black bg-blue-600 rounded-xl mt-4"><Play size={24} className="mr-2"/> OYUNA BAŞLA</Button>
+
+              {/* 🔥 SEVİYE SEÇME BUTONLARI 🔥 */}
+              <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 mt-4">
+                  <p className="text-center text-xs text-slate-400 font-bold mb-2 uppercase tracking-widest">Zorluk Seviyesi</p>
+                  <div className="flex gap-2">
+                      {[1, 2, 3].map((lvl) => (
+                          <button
+                              key={lvl}
+                              onClick={() => setSelectedLevel(lvl as 1|2|3)}
+                              className={`
+                                  flex-1 py-3 rounded-xl font-black text-lg transition-all active:scale-95 border-b-4
+                                  ${selectedLevel === lvl 
+                                      ? 'bg-blue-600 text-white border-blue-800 shadow-blue-900/50 shadow-lg translate-y-0' 
+                                      : 'bg-slate-800 text-slate-400 border-slate-950 hover:bg-slate-700'}
+                              `}
+                          >
+                              {lvl}. SEVİYE
+                              <span className="block text-[10px] font-normal opacity-70">
+                                  {lvl === 1 ? '3 Resim' : lvl === 2 ? '4 Resim' : '6 Resim'}
+                              </span>
+                          </button>
+                      ))}
+                  </div>
+              </div>
+
+              <Button size="lg" onClick={startMixedGame} className="w-full py-6 text-xl font-black bg-green-600 hover:bg-green-500 rounded-2xl mt-4 shadow-xl border-b-4 border-green-800 active:border-b-0 active:translate-y-1 transition-all">
+                  <Play size={28} className="mr-3 fill-white"/> OYUNA BAŞLA
+              </Button>
           </div>
       )}
 
@@ -384,58 +402,65 @@ export default function AliciGame4({ onClose }: GameProps) {
                                 const randomTemplate = QUESTION_TEMPLATES[Math.floor(Math.random() * QUESTION_TEMPLATES.length)];
                                 speakQuestion(randomTemplate(target.name));
                             }} 
-                            className="rounded-full bg-slate-800 text-slate-300 border border-slate-700 px-8 py-6 text-xl">
-                              <Play size={32} className="mr-2 text-blue-400 fill-blue-400"/> Tekrar Dinle
+                            className="rounded-full bg-slate-800 text-slate-300 border border-slate-700 px-8 py-4 text-lg active:scale-95 transition-transform">
+                              <Play size={28} className="mr-2 text-blue-400 fill-blue-400"/> Tekrar Dinle
                           </Button>
                       </div>
 
                       <div className="flex-1 flex items-center justify-center p-4">
-                          <div className={`max-w-md ${getGridClass(options.length)}`}>
+                          <div className={`max-w-md ${getGridClass()}`}>
                               
                               {options.map((opt, index) => {
                                   const isTarget = opt.id === gameQuestions[currentQuestionIndex]?.id;
                                   const styleClass = getOptionStyle(opt, isTarget);
 
-                                  // --- PİRAMİT DÜZENİ ---
-                                  // Seviye 1 (3 Kişi) ise:
-                                  // 0 ve 1. resimler üstte, 2. resim altta ortada ve büyük
-                                  let layoutClass = "";
+                                  // --- PİRAMİT DÜZENİ (SEVİYE 1) ---
+                                  let containerClass = "";
+                                  let innerClass = ""; 
+
+                                  // Sadece 3 resim varsa (Seviye 1) özel düzen uygula
                                   if (options.length === 3) {
                                       if (index === 2) {
-                                          layoutClass = "col-span-2 w-3/4 mx-auto aspect-square"; // 3. resim (Altta Ortada)
+                                          containerClass = "col-span-2 flex justify-center"; 
+                                          innerClass = "w-1/2 aspect-square"; // Diğerleriyle eşit boy
                                       } else {
-                                          layoutClass = "aspect-square"; // Üstteki 2 resim
+                                          containerClass = "";
+                                          innerClass = "w-full aspect-square";
                                       }
                                   } else {
-                                      layoutClass = "aspect-square"; // Diğer seviyeler
+                                      // Seviye 2 ve 3 (4 veya 6 resim) -> Hepsi standart
+                                      containerClass = "";
+                                      innerClass = "w-full aspect-square";
                                   }
 
                                   return (
-                                      <motion.div 
-                                        key={opt.id} 
-                                        layout
-                                        onClick={() => handleAnswer(opt)}
-                                        whileTap={{ scale: 0.95 }}
-                                        className={`
-                                            relative rounded-3xl overflow-hidden border-[6px] cursor-pointer bg-slate-800 transition-all duration-300
-                                            ${styleClass} ${layoutClass}
-                                        `}
-                                      >
-                                          <img src={opt.imageUrl} className="w-full h-full object-cover pointer-events-none" />
-                                          {!opt.isDummy && (
-                                              <div className="absolute bottom-0 inset-x-0 bg-black/40 text-center py-2">
-                                                  <span className="text-sm font-black text-white px-1 drop-shadow-md">{opt.name}</span>
-                                              </div>
-                                          )}
-                                          
-                                          <AnimatePresence>
-                                            {gamePhase === 'success' && isTarget && (
-                                                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute inset-0 bg-green-500/40 flex items-center justify-center">
-                                                    <Check size={90} className="text-white drop-shadow-[0_5px_5px_rgba(0,0,0,0.5)]" strokeWidth={5}/>
-                                                </motion.div>
-                                            )}
-                                          </AnimatePresence>
-                                      </motion.div>
+                                      <div key={opt.id} className={containerClass}>
+                                          <motion.div 
+                                            layout
+                                            onClick={() => handleAnswer(opt)}
+                                            whileTap={{ scale: 0.95 }}
+                                            className={`
+                                                ${innerClass}
+                                                relative rounded-3xl overflow-hidden border-[6px] cursor-pointer bg-slate-800 transition-all duration-300
+                                                ${styleClass}
+                                            `}
+                                          >
+                                              <img src={opt.imageUrl} className="w-full h-full object-cover pointer-events-none" />
+                                              {!opt.isDummy && (
+                                                  <div className="absolute bottom-0 inset-x-0 bg-black/40 text-center py-2">
+                                                      <span className="text-sm font-black text-white px-1 drop-shadow-md">{opt.name}</span>
+                                                  </div>
+                                              )}
+                                              
+                                              <AnimatePresence>
+                                                {gamePhase === 'success' && isTarget && (
+                                                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute inset-0 bg-green-500/40 flex items-center justify-center">
+                                                        <Check size={90} className="text-white drop-shadow-[0_5px_5px_rgba(0,0,0,0.5)]" strokeWidth={5}/>
+                                                    </motion.div>
+                                                )}
+                                              </AnimatePresence>
+                                          </motion.div>
+                                      </div>
                                   );
                               })}
                           </div>
@@ -446,4 +471,4 @@ export default function AliciGame4({ onClose }: GameProps) {
       )}
     </div>
   );
-}
+    }
