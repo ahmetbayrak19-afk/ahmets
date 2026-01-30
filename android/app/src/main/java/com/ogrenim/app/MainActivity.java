@@ -10,6 +10,8 @@ import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.os.Build;
 import android.os.Bundle;
+import android.speech.tts.TextToSpeech; // 🔥 EKLENDİ
+import android.webkit.JavascriptInterface; // 🔥 EKLENDİ
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -20,59 +22,102 @@ import android.webkit.WebResourceRequest;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale; // 🔥 EKLENDİ
 
 public class MainActivity extends AppCompatActivity {
+
     private WebView webView;
     private NfcAdapter nfcAdapter;
     private PendingIntent pendingIntent;
     private IntentFilter[] intentFiltersArray;
+    
+    // 🔥 NATIVE SES MOTORU 🔥
+    private TextToSpeech tts;
 
-    // 🔥 DOSYA SEÇİCİ İÇİN GEREKLİ DEĞİŞKENLER 🔥
+    // Dosya Seçici Değişkenleri
     private ValueCallback<Uri[]> mUploadMessage;
     public static final int FILECHOOSER_RESULTCODE = 1;
-    
     private static final int PERMISSION_REQUEST_CODE = 1001;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
-        // 1. İzinleri Kontrol Et (Galeri İzinleri Eklendi)
+
+        // 1. İZİNLER
         checkAndRequestPermissions();
 
-        // NFC Başlat
+        // 2. NFC BAŞLAT
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
         Intent intent = new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        // Android 12+ için FLAG_MUTABLE kullanımı
-        pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_MUTABLE);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            flags |= PendingIntent.FLAG_MUTABLE;
+        }
+        pendingIntent = PendingIntent.getActivity(this, 0, intent, flags);
         IntentFilter ndef = new IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED);
         intentFiltersArray = new IntentFilter[] {ndef};
 
+        // 3. 🔥 NATIVE TTS MOTORUNU BAŞLAT 🔥
+        tts = new TextToSpeech(this, status -> {
+            if (status == TextToSpeech.SUCCESS) {
+                // Türkçe dilini ayarla
+                int result = tts.setLanguage(new Locale("tr", "TR"));
+                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    System.out.println("TTS: Türkçe dili desteklenmiyor veya yüklü değil.");
+                } else {
+                    tts.setSpeechRate(0.9f); // Konuşma hızı
+                }
+            } else {
+                System.out.println("TTS: Başlatılamadı!");
+            }
+        });
+
+        // 4. WEBVIEW KURULUMU
         webView = new WebView(this);
         setContentView(webView);
 
         WebSettings settings = webView.getSettings();
-        
-        // Ayarlar
         settings.setJavaScriptEnabled(true);        
-        settings.setDomStorageEnabled(true);       
-        settings.setAllowFileAccess(true);          
+        settings.setDomStorageEnabled(true);        
+        settings.setAllowFileAccess(true);           
         settings.setAllowContentAccess(true);
         settings.setAllowFileAccessFromFileURLs(true);
         settings.setAllowUniversalAccessFromFileURLs(true);
-        settings.setMediaPlaybackRequiresUserGesture(false);
+        settings.setMediaPlaybackRequiresUserGesture(false); 
 
-        // 🔥 GÜNCELLENEN WEBCHROMECLIENT 🔥
-        // Hem Kamera izinlerini verir hem de Dosya Seçiciyi açar
-        webView.setWebChromeClient(new WebChromeClient() {
-            
-            // 1. Web Sitesi Kamera/Mikrofon İsterse Otomatik İzin Ver
-            @Override
-            public void onPermissionRequest(final PermissionRequest request) {
-                request.grant(request.getResources());
+        // 🔥 JAVASCRIPT KÖPRÜSÜ (REACT -> ANDROID) 🔥
+        webView.addJavascriptInterface(new Object() {
+            @JavascriptInterface
+            public void speak(String text) {
+                if (tts == null || text == null) return;
+                // Öncekini sustur ve yenisini oku
+                tts.stop();
+                tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "AndroidTTSID");
             }
 
-            // 2. Web Sitesi Dosya Seçmek İsterse (Input type='file') Galeriyi Aç
+            @JavascriptInterface
+            public void stop() {
+                if (tts != null) tts.stop();
+            }
+        }, "AndroidTTS"); // JS tarafında window.AndroidTTS olarak görünecek
+
+        // 5. WEBCHROMECLIENT
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onPermissionRequest(final PermissionRequest request) {
+                for (String r : request.getResources()) {
+                    if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r) ||
+                        PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(r)) {
+                        request.grant(request.getResources());
+                        return;
+                    }
+                }
+            }
+
             @Override
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
                 if (mUploadMessage != null) {
@@ -82,9 +127,7 @@ public class MainActivity extends AppCompatActivity {
 
                 Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
-                intent.setType("image/*"); // Sadece resimler
-                
-                // Seçici ekranını başlat
+                intent.setType("image/*"); 
                 startActivityForResult(Intent.createChooser(intent, "Resim Seçiniz"), FILECHOOSER_RESULTCODE);
                 return true;
             }
@@ -100,7 +143,17 @@ public class MainActivity extends AppCompatActivity {
         webView.loadUrl("file:///android_asset/index.html");
     }
 
-    // 🔥 DOSYA SEÇİLDİKTEN SONRA SONUCU WEBVIEW'A GÖNDERME 🔥
+    // 🔥 UYGULAMA KAPANINCA SES MOTORUNU TEMİZLE 🔥
+    @Override
+    protected void onDestroy() {
+        if (tts != null) {
+            tts.stop();
+            tts.shutdown();
+        }
+        super.onDestroy();
+    }
+
+    // ... (Kalan kısımlar: onActivityResult, onNewIntent, izinler aynı) ...
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == FILECHOOSER_RESULTCODE) {
@@ -143,7 +196,8 @@ public class MainActivity extends AppCompatActivity {
             Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
             if (tag != null) {
                 String nfcId = bytesToHex(tag.getId());
-                webView.evaluateJavascript("window.handleNfcScan('" + nfcId + "')", null);
+                String safeJs = "window.handleNfcScan(" + JSONObject.quote(nfcId) + ")";
+                webView.evaluateJavascript(safeJs, null);
             }
         }
     }
@@ -158,28 +212,28 @@ public class MainActivity extends AppCompatActivity {
 
     private void checkAndRequestPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            String[] permissions = {
-                Manifest.permission.RECORD_AUDIO,
-                Manifest.permission.MODIFY_AUDIO_SETTINGS,
-                Manifest.permission.VIBRATE,
-                Manifest.permission.NFC,
-                Manifest.permission.CAMERA, // Kamera
-                Manifest.permission.READ_EXTERNAL_STORAGE, // 🔥 Eski Androidler için Galeri
-                Manifest.permission.WRITE_EXTERNAL_STORAGE // 🔥 Dosya Yazma
-                // Not: Android 13+ için READ_MEDIA_IMAGES burada eksik olabilir ama 
-                // temel depolama izni çoğu durumda legacy modda iş görür.
-            };
+            List<String> permissions = new ArrayList<>();
+            permissions.add(Manifest.permission.CAMERA);
+            permissions.add(Manifest.permission.RECORD_AUDIO);
+            permissions.add(Manifest.permission.MODIFY_AUDIO_SETTINGS);
+            permissions.add(Manifest.permission.VIBRATE);
+            permissions.add(Manifest.permission.NFC);
 
-            boolean permissionsNeeded = false;
+            if (Build.VERSION.SDK_INT >= 33) { 
+                permissions.add(Manifest.permission.READ_MEDIA_IMAGES);
+            } else {
+                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+            }
+
+            List<String> permissionsToRequest = new ArrayList<>();
             for (String permission : permissions) {
                 if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
-                    permissionsNeeded = true;
-                    break;
+                    permissionsToRequest.add(permission);
                 }
             }
 
-            if (permissionsNeeded) {
-                ActivityCompat.requestPermissions(this, permissions, PERMISSION_REQUEST_CODE);
+            if (!permissionsToRequest.isEmpty()) {
+                ActivityCompat.requestPermissions(this, permissionsToRequest.toArray(new String[0]), PERMISSION_REQUEST_CODE);
             }
         }
     }
@@ -192,4 +246,4 @@ public class MainActivity extends AppCompatActivity {
             super.onBackPressed();
         }
     }
-                                      }
+}
