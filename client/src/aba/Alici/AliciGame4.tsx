@@ -106,7 +106,7 @@ export default function AliciGame4({ onClose }: GameProps) {
   const [gamePhase, setGamePhase] = useState<'playing' | 'success' | 'complete'>('playing');
   const [wrongCount, setWrongCount] = useState(0);
   
-  // Ses Referansı (Koruma amaçlı)
+  // Ses Referansı (Koruma amaçlı - SADECE WEB API)
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   useEffect(() => {
@@ -176,7 +176,7 @@ export default function AliciGame4({ onClose }: GameProps) {
       }
   };
 
-  // --- STANDART SORU OKUMA ---
+  // --- STANDART SORU OKUMA (Hiçbir eklenti kullanmaz) ---
   const speakQuestion = (text: string) => {
       try {
           if (typeof window === 'undefined' || !window.speechSynthesis) return;
