@@ -28,7 +28,6 @@ interface GameProps {
 }
 
 export default function AliciGame4({ onClose }: GameProps) {
-  // --- STATE'LER ---
   const [view, setView] = useState<'menu' | 'edit' | 'game'>('menu');
   const [selectedCategory, setSelectedCategory] = useState<Category>('ogretmen');
   
@@ -46,7 +45,7 @@ export default function AliciGame4({ onClose }: GameProps) {
   const [tempImage, setTempImage] = useState<string | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  // Input Ref'i kaldırdım, doğrudan HTML kullanacağız.
 
   // Oyun State'leri
   const [gameQuestions, setGameQuestions] = useState<PersonProfile[]>([]);
@@ -58,9 +57,10 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   // 1. SCROLL KİLİTLEME
   useEffect(() => {
-    document.body.style.overflow = 'hidden';
+    // Mobil tarayıcılarda sorun çıkarabileceği için overflow kilidini geçici olarak kaldırdım
+    // document.body.style.overflow = 'hidden'; 
     return () => {
-      document.body.style.overflow = 'auto';
+      // document.body.style.overflow = 'auto';
       stopCameraStream(); 
     };
   }, []);
@@ -127,7 +127,6 @@ export default function AliciGame4({ onClose }: GameProps) {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'user', width: { ideal: 640 } } 
       });
-      streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
@@ -139,9 +138,11 @@ export default function AliciGame4({ onClose }: GameProps) {
   };
 
   const stopCameraStream = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
+    // Basit stream durdurma
+    const videoEl = document.querySelector('video');
+    if (videoEl && videoEl.srcObject) {
+        const stream = videoEl.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
     }
   };
 
@@ -155,10 +156,11 @@ export default function AliciGame4({ onClose }: GameProps) {
 
   // --- DOSYA YÜKLEME ---
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Eğer buraya gelirse input çalışmış demektir
+    toast.success("Dosya seçildi, işleniyor...");
+    
     const file = e.target.files?.[0];
     if (!file) return;
-
-    toast.info("Resim işleniyor...");
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -167,7 +169,6 @@ export default function AliciGame4({ onClose }: GameProps) {
             const optimizedImage = processImage(img);
             setTempImage(optimizedImage);
             setIsCameraActive(false);
-            toast.dismiss();
         };
         img.src = event.target?.result as string;
     };
@@ -354,24 +355,30 @@ export default function AliciGame4({ onClose }: GameProps) {
                                       <Camera size={16} className="mr-2"/> Kamera
                                   </Button>
                                   
-                                  {/* --- KESİN ÇÖZÜM: STANDART GÖRÜNÜR INPUT --- 
-                                      Hile yok. Bu bir Input.
-                                      Tailwind 'file:' sınıflarıyla şekillendirildi.
-                                      Buna basınca açılmaması imkansız.
+                                  {/* --- ÇÖZÜM: NATIVE HTML INPUT --- 
+                                      1. "accept" özelliğini SİLDİM. Bazı cihazlarda bu özellik galeriyi kitliyor.
+                                      2. "opacity: 0" ile görünmez yapıp, arkadaki "Yükle" yazısının üzerine serdim.
+                                      3. Tıklanınca çalışıp çalışmadığını anlamak için onClick'e Toast koydum.
                                   */}
-                                  <input
-                                      type="file"
-                                      accept="image/*"
-                                      onChange={handleFileUpload}
-                                      className="block w-full text-xs text-slate-400
-                                        file:mr-2 file:py-2 file:px-4
-                                        file:rounded-md file:border-0
-                                        file:text-sm file:font-semibold
-                                        file:bg-slate-800 file:text-slate-300
-                                        file:cursor-pointer hover:file:bg-slate-700
-                                        border border-slate-700 rounded-md p-1
-                                      "
-                                  />
+                                  <div className="relative h-10 w-full group">
+                                      {/* Görsel Süs */}
+                                      <div className="absolute inset-0 border border-slate-700 bg-slate-800 text-slate-300 flex items-center justify-center rounded-md text-sm font-medium group-hover:bg-slate-700 transition-colors">
+                                          <Upload size={16} className="mr-2"/> Yükle
+                                      </div>
+                                      
+                                      {/* GÖRÜNMEZ INPUT */}
+                                      <input 
+                                          type="file"
+                                          // accept="image/*"  <-- BU SATIRI BİLEREK SİLDİM (Sorun kaynağı olabilir)
+                                          onClick={(e) => {
+                                              // Tıklama algılanıyor mu kontrolü
+                                              toast.info("Dosya seçici tetiklendi...", { duration: 1000 });
+                                              e.stopPropagation(); // Üst katmanlara tıklamayı yayma
+                                          }}
+                                          onChange={handleFileUpload} 
+                                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50"
+                                      />
+                                  </div>
 
                               </div>
                           )}
