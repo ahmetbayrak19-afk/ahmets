@@ -108,16 +108,15 @@ export default function AliciGame4({ onClose }: GameProps) {
   const [gamePhase, setGamePhase] = useState<'playing' | 'success' | 'complete'>('playing');
   const [wrongCount, setWrongCount] = useState(0);
   
-  // --- YENİLENMİŞ STATE VE REFERANSLAR ---
+  // --- STATE VE REF ---
   const [questionText, setQuestionText] = useState<string>("");
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const speakSeqRef = useRef(0); // Çağrı sırasını takip eden sayaç (Sequence ID)
+  const speakSeqRef = useRef(0); 
 
-  // --- EFFECT: SORU METNİ DEĞİŞTİĞİNDE ---
+  // --- EFFECT: SORU METNİ DEĞİŞTİĞİNDE TETİKLENİR ---
   useEffect(() => {
     if (!questionText) return;
     
-    // UI render olduktan sonra konuşması için minik bir gecikme
     const timer = setTimeout(() => {
         speakQuestion(questionText);
     }, 100); 
@@ -186,20 +185,26 @@ export default function AliciGame4({ onClose }: GameProps) {
       }
   };
 
-  // --- 🔥 TANK GİBİ SAĞLAM KONUŞMA FONKSİYONU 🔥 ---
+  // --- 🔥 HİBRİT KONUŞMA SİSTEMİ (Android Native + Web Fallback) 🔥 ---
   const speakQuestion = (text: string) => {
       try {
+          // 1. ADIM: Android Native Köprüsü Kontrolü
+          // MainActivity.java içinde tanımladığımız "AndroidTTS" nesnesi burada mı?
+          const androidTTS = (window as any).AndroidTTS;
+          
+          if (androidTTS && typeof androidTTS.speak === "function") {
+              // Harika! Native Android ses motorunu kullan
+              androidTTS.speak(text);
+              return; // Fonksiyondan çık, gerisine gerek yok
+          }
+
+          // 2. ADIM: Web Tarayıcı Sesi (iOS veya Masaüstü için Yedek)
           if (typeof window === 'undefined' || !window.speechSynthesis) return;
 
-          // 1. Yeni bir "fiş numarası" al (Sequence ID)
           const mySeq = ++speakSeqRef.current;
-
-          // 2. Önceki konuşmayı iptal et
           window.speechSynthesis.cancel();
 
-          // 3. Konuşmayı başlatan fonksiyon
           const run = () => {
-              // Eğer biz beklerken yeni bir soru geldiyse (fiş numarası değiştiyse) iptal et
               if (mySeq !== speakSeqRef.current) return;
 
               const utterance = new SpeechSynthesisUtterance(text);
@@ -223,38 +228,28 @@ export default function AliciGame4({ onClose }: GameProps) {
               window.speechSynthesis.speak(utterance);
           };
 
-          // 4. Sesleri Bekleyen ve Deneyen Fonksiyon (Retry Mechanism)
           const waitForVoices = (attempt = 0) => {
-              // Yeni istek geldiyse beklemeyi bırak
               if (mySeq !== speakSeqRef.current) return;
 
               const voicesNow = window.speechSynthesis.getVoices();
               if (voicesNow && voicesNow.length > 0) {
-                  // Sesler geldiyse çalıştır
                   setTimeout(run, 50);
                   return;
               }
-
-              // Bazı WebView'larda onvoiceschanged hiç gelmeyebilir -> 6 kere dene (toplam ~1 saniye)
               if (attempt >= 6) {
-                  // Son çare: Ses listesi boş olsa bile şansını dene
                   setTimeout(run, 50);
                   return;
               }
-
-              // 150ms sonra tekrar dene
               setTimeout(() => waitForVoices(attempt + 1), 150);
           };
 
-          // 5. Olay dinleyici + Manuel deneme (Hibrit Yöntem)
           if (window.speechSynthesis.onvoiceschanged !== undefined) {
-             window.speechSynthesis.onvoiceschanged = () => {
-                  window.speechSynthesis.onvoiceschanged = null;
-                  waitForVoices(0);
+             const originalHandler = window.speechSynthesis.onvoiceschanged;
+             window.speechSynthesis.onvoiceschanged = (ev) => {
+                  if (originalHandler) originalHandler.call(window.speechSynthesis, ev);
+                  waitForVoices(0); 
               };
           }
-          
-          // Her ihtimale karşı manuel başlat
           waitForVoices(0);
 
       } catch (e) {
@@ -269,9 +264,7 @@ export default function AliciGame4({ onClose }: GameProps) {
       }
 
       playBackgroundMusic();
-      
-      // Motoru uyandırmak için
-      speakQuestion(" ");
+      speakQuestion(" "); // Motoru uyandır
 
       const questions = shuffleArray([...profiles]);
       
@@ -308,7 +301,7 @@ export default function AliciGame4({ onClose }: GameProps) {
       const finalOptions = shuffleArray([target, ...selectedRealDistractors, ...selectedDummies]);
       setOptions(finalOptions);
 
-      // --- STATE GÜNCELLEME (useEffect tetikleyecek) ---
+      // STATE GÜNCELLEME (useEffect tetikleyecek)
       const randomTemplate = QUESTION_TEMPLATES[Math.floor(Math.random() * QUESTION_TEMPLATES.length)];
       setQuestionText(randomTemplate(target.name)); 
   };
@@ -480,11 +473,10 @@ export default function AliciGame4({ onClose }: GameProps) {
                   </div>
               ) : (
                   <>
-                      {/* SORU TEKRAR BUTONU (State'i tetikler) */}
+                      {/* SORU TEKRAR BUTONU */}
                       <div className="pt-6 pb-2 px-4 text-center shrink-0">
                           <Button variant="secondary" size="lg" 
                             onClick={() => {
-                                // Mevcut soru metnini tekrar tetikle
                                 speakQuestion(questionText);
                             }} 
                             className="rounded-full bg-slate-800 text-slate-300 border border-slate-700 px-8 py-4 text-lg active:scale-95 transition-transform">
