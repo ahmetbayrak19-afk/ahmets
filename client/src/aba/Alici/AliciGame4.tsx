@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
 
-// --- SES DOSYALARI (Yollar Aynen Korundu) ---
+// --- SES DOSYALARI ---
 import aferin1 from '../esle/ses/aferin1.mp3';
 import aferin2 from '../esle/ses/aferin2.mp3';
 import bravo from '../esle/ses/bravo.mp3';
@@ -16,8 +16,7 @@ import tekrardene1 from '../esle/ses/tekrardene1.mp3';
 import tekrardene2 from '../esle/ses/tekrardene2.mp3';
 import arkaplanmusic from '../esle/ses/arkaplanmusic.mp3';
 
-// --- 🔥 RESİM DOSYALARI (ARTIK IMPORT EDİYORUZ) 🔥 ---
-// Dosyalar kodun olduğu klasörde (client/src/aba/Alici) olduğu için ./ kullanıyoruz
+// --- RESİM DOSYALARI ---
 import kisi1 from './kisi1.jpg';
 import kisi2 from './kisi2.jpg';
 import kisi3 from './kisi3.jpg';
@@ -31,8 +30,6 @@ import kisi10 from './kisi10.jpg';
 
 const SUCCESS_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
 const ERROR_SOUNDS = [tekrardene1, tekrardene2];
-
-// Resim Listesi (Döngü için)
 const IMPORTED_IMAGES = [kisi1, kisi2, kisi3, kisi4, kisi5, kisi6, kisi7, kisi8, kisi9, kisi10];
 
 type Category = 'ogretmen' | 'aile' | 'tanidik' | 'arkadas';
@@ -61,7 +58,6 @@ const QUESTION_TEMPLATES = [
     (name: string) => `Hadi parmağınla ${name} resmine dokun.` 
 ];
 
-// 🔥 DÜZELTME: Import edilen resimleri kullanıyoruz 🔥
 const DUMMY_PROFILES: PersonProfile[] = IMPORTED_IMAGES.map((imgSrc, i) => ({
     id: `dummy-${i + 1}`,
     name: '',
@@ -107,9 +103,15 @@ export default function AliciGame4({ onClose }: GameProps) {
   const [gamePhase, setGamePhase] = useState<'playing' | 'success' | 'complete'>('playing');
   const [wrongCount, setWrongCount] = useState(0);
   
-  // Voices state'ini kaldırdım, doğrudan window'dan çekeceğiz, daha garanti.
+  // 🔥 SES GARANTİSİ İÇİN REF 🔥
+  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   useEffect(() => {
+    // Sayfa açıldığında sesleri yüklemeye zorla (Android için kritik)
+    const loadVoices = () => { window.speechSynthesis.getVoices(); };
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+
     return () => {
       stopCameraStream();
       stopBackgroundMusic();
@@ -158,21 +160,32 @@ export default function AliciGame4({ onClose }: GameProps) {
       }
   };
 
-  // --- 🔥 TAMİR EDİLEN SORU OKUMA MOTORU 🔥 ---
+  // --- 🔥 GARANTİ SORU OKUMA MOTORU (TAMİR EDİLDİ) 🔥 ---
   const speakQuestion = (text: string) => {
       if (!window.speechSynthesis) return;
       
-      // Önceki konuşmayı kesin durdur
+      // Öncekini sustur
       window.speechSynthesis.cancel();
       
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'tr-TR'; // Sadece dil kodunu veriyoruz, motoru sistem seçsin
+      
+      // 1. Android Hafıza Kaybını Önle: Objesi Ref'e ata
+      speechRef.current = utterance;
+
+      // 2. Ses Seçimi (Daha Basit ve Garanti)
+      const voices = window.speechSynthesis.getVoices();
+      // Türkçe ses varsa al, yoksa ilk geleni al (Hiç yoktan iyidir)
+      const trVoice = voices.find(v => v.lang.includes('tr')) || voices[0];
+      
+      if (trVoice) utterance.voice = trVoice;
+
+      utterance.lang = 'tr-TR'; 
       utterance.rate = 0.9;
       utterance.volume = 1.0;
       
-      // Hata yakalama (Log için)
-      utterance.onerror = (e) => console.log("TTS Hatası:", e);
-
+      // Konuşma bitince Ref'i temizle
+      utterance.onend = () => { speechRef.current = null; };
+      
       // Konuştur
       window.speechSynthesis.speak(utterance);
   };
@@ -185,7 +198,7 @@ export default function AliciGame4({ onClose }: GameProps) {
 
       playBackgroundMusic();
 
-      // Motoru ısıt (Boş ses)
+      // Motoru ısıtmak için boş konuşma
       speakQuestion(" ");
 
       const questions = shuffleArray([...profiles]);
@@ -223,9 +236,9 @@ export default function AliciGame4({ onClose }: GameProps) {
       const finalOptions = shuffleArray([target, ...selectedRealDistractors, ...selectedDummies]);
       setOptions(finalOptions);
 
-      // Soruyu sor
+      // Soruyu sor (Hafif gecikmeli ki resimler gelince sorsun)
       const randomTemplate = QUESTION_TEMPLATES[Math.floor(Math.random() * QUESTION_TEMPLATES.length)];
-      setTimeout(() => speakQuestion(randomTemplate(target.name)), 600);
+      setTimeout(() => speakQuestion(randomTemplate(target.name)), 800);
   };
 
   const handleAnswer = (selected: PersonProfile) => {
@@ -396,11 +409,9 @@ export default function AliciGame4({ onClose }: GameProps) {
                   </div>
               ) : (
                   <>
-                      {/* SORU TEKRAR BUTONU */}
                       <div className="pt-6 pb-2 px-4 text-center shrink-0">
                           <Button variant="secondary" size="lg" 
                             onClick={() => {
-                                // Butona basınca kesin konuşsun
                                 const target = gameQuestions[currentQuestionIndex];
                                 const randomTemplate = QUESTION_TEMPLATES[Math.floor(Math.random() * QUESTION_TEMPLATES.length)];
                                 speakQuestion(randomTemplate(target.name));
@@ -417,24 +428,18 @@ export default function AliciGame4({ onClose }: GameProps) {
                                   const isTarget = opt.id === gameQuestions[currentQuestionIndex]?.id;
                                   const styleClass = getOptionStyle(opt, isTarget);
 
-                                  // --- PİRAMİT DÜZENİ (SEVİYE 1) ---
-                                  // Seviye 1 (3 Kişi) ise:
-                                  // 0 ve 1. resimler normal.
-                                  // 2. resim (3. eleman) col-span-2 ile tüm satırı kaplar ama
-                                  // içindeki div 'w-1/2 mx-auto' ile diğerleriyle AYNI BOYUTTA olur ve ortalanır.
                                   let containerClass = "";
-                                  let innerClass = ""; // Resmi saran iç div
+                                  let innerClass = ""; 
 
                                   if (options.length === 3) {
                                       if (index === 2) {
                                           containerClass = "col-span-2 flex justify-center"; 
-                                          innerClass = "w-1/2 aspect-square"; // Yarısı kadar (diğerleriyle aynı boy) ol
+                                          innerClass = "w-1/2 aspect-square"; 
                                       } else {
                                           containerClass = "";
                                           innerClass = "w-full aspect-square";
                                       }
                                   } else {
-                                      // 4 veya 6 kişi (Normal Grid)
                                       containerClass = "";
                                       innerClass = "w-full aspect-square";
                                   }
@@ -477,4 +482,4 @@ export default function AliciGame4({ onClose }: GameProps) {
       )}
     </div>
   );
-    }
+}
