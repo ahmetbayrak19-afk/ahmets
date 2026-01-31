@@ -9,7 +9,6 @@ import confetti from 'canvas-confetti';
 import aferin1 from '../esle/ses/aferin1.mp3';
 import aferin2 from '../esle/ses/aferin2.mp3';
 import bravo from '../esle/ses/bravo.mp3';
-import esledinbravo from '../esle/ses/esledinbravo.mp3';
 import harika1 from '../esle/ses/harika1.mp3';
 import harika2 from '../esle/ses/harika2.mp3';
 import tekrardene1 from '../esle/ses/tekrardene1.mp3';
@@ -28,7 +27,7 @@ import kisi8 from './kisi8.jpg';
 import kisi9 from './kisi9.jpg';
 import kisi10 from './kisi10.jpg';
 
-const SUCCESS_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
+const SUCCESS_SOUNDS = [aferin1, aferin2, bravo, harika1, harika2];
 const ERROR_SOUNDS = [tekrardene1, tekrardene2];
 const IMPORTED_IMAGES = [kisi1, kisi2, kisi3, kisi4, kisi5, kisi6, kisi7, kisi8, kisi9, kisi10];
 
@@ -50,14 +49,11 @@ const CATEGORIES: { id: Category; label: string; icon: any; color: string; iconC
 ];
 
 const QUESTION_TEMPLATES = [
-    (name: string) => `Hadi göster bakalım, ${name} nerede?`,
+    (name: string) => `${name} nerede?`,
     (name: string) => `Hangisi ${name}?`,
-    (name: string) => `Bana ${name} olanı bul.`,
-    (name: string) => `Peki, ${name} hangisi acaba?`,
-    (name: string) => `Hani ${name}, görebiliyor musun?`,
-    (name: string) => `Hadi parmağınla ${name} resmine dokun.`,
-    (name: string) => `Dikkatli bak, ${name} hangisi?`,
-    (name: string) => `${name} resmini bulabilir misin?`
+    (name: string) => `${name} olanı bul.`,
+    (name: string) => `Peki, ${name} hangisi?`,
+    (name: string) => `${name} resmini bul.`
 ];
 
 const DUMMY_PROFILES: PersonProfile[] = IMPORTED_IMAGES.map((imgSrc, i) => ({
