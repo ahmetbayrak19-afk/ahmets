@@ -20,6 +20,9 @@ import NesneEslemeGame13 from '@/aba/esle/NesneEslemeGame13'; // EB.3.4 (Gölge)
 import NesneEslemeGame15 from '@/aba/esle/NesneEslemeGame15'; // EB.4.1 (Kelime-Kelime)
 import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16'; // EB.4.2 (Klavye/Harf)
 
+// --- YENİ EKLENEN: ÖYKÜ EŞLEME ---
+import NesneEslemeGame23 from '@/aba/esle/NesneEslemeGame23'; // EB.4.10 (Öykü)
+
 // --- GEÇİCİ/EK OYUN (EB.2.1 için) ---
 import EslemeGame from '@/aba/esle/game/eslemegame'; 
 
@@ -99,7 +102,6 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       {/* --- OYUN MODALLARI --- */}
       {activeGameMode && activeGameItem && (
           <>
-            {/* ... Diğer oyunlar ... */}
             {activeGameItem.startsWith("EB.1.1") && <NesneEslemeGame1 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.1.2") && <NesneEslemeGame2 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.1.3") && <NesneEslemeGame3 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
@@ -111,13 +113,19 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             {activeGameItem.startsWith("EB.3.3") && <NesneEslemeGame12 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.3.4") && <NesneEslemeGame13 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             
-            {/* DÜZELTME: Sona nokta koyarak 4.10 ile karışmasını engelledik */}
             {activeGameItem.startsWith("EB.4.1.") && (
                 <NesneEslemeGame15 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
             
-            {activeGameItem.startsWith("EB.4.2.") && (
+            {activeGameItem.startsWith("EB.4.2") && (
                 <NesneEslemeGame16 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
+            )}
+
+            {/* 🔥 YENİ EKLENEN: EB.4.10 - Öykü Eşleme 🔥 */}
+            {activeGameItem.startsWith("EB.4.10") && (
+               <div className="fixed inset-0 z-[100] bg-white">
+                 <NesneEslemeGame23 onClose={() => setActiveGameMode(null)} />
+               </div>
             )}
           </>
       )}
@@ -146,15 +154,15 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             const isCompleted = status === true;
             
             // --- OYUN BUTONU KONTROLÜ ---
-            // DÜZELTME: 4.1 kontrolüne nokta eklendi.
             const hasGame = 
                 item.startsWith("EB.1.1") || item.startsWith("EB.1.2") || 
                 item.startsWith("EB.1.3") || item.startsWith("EB.1.4") ||
                 item.startsWith("EB.2.1") || item.startsWith("EB.2.5") ||
                 item.startsWith("EB.3.1") || item.startsWith("EB.3.2") ||
                 item.startsWith("EB.3.3") || item.startsWith("EB.3.4") ||
-                item.startsWith("EB.4.1.") || // Nokta eklendi, böylece 4.10'u görmez
-                item.startsWith("EB.4.2");   
+                item.startsWith("EB.4.1.") || 
+                item.startsWith("EB.4.2") ||
+                item.startsWith("EB.4.10"); // 🔥 4.10 eklendi
             
             const firstSpaceIndex = item.indexOf(' ');
             const code = item.substring(0, firstSpaceIndex);
@@ -190,4 +198,4 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       </div>
     </div>
   );
-      }
+}
