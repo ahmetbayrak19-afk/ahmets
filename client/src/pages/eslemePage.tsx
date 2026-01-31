@@ -20,8 +20,8 @@ import NesneEslemeGame13 from '@/aba/esle/NesneEslemeGame13'; // EB.3.4 (Gölge)
 import NesneEslemeGame15 from '@/aba/esle/NesneEslemeGame15'; // EB.4.1 (Kelime-Kelime)
 import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16'; // EB.4.2 (Klavye/Harf)
 
-// --- YENİ EKLENEN: ÖYKÜ EŞLEME ---
-import NesneEslemeGame23 from '@/aba/esle/NesneEslemeGame23'; // EB.4.10 (Öykü)
+// --- ÖYKÜ EŞLEME OYUNU ---
+import NesneEslemeGame23 from '@/aba/esle/NesneEslemeGame23'; // EB.4.9 (Öykü)
 
 // --- GEÇİCİ/EK OYUN (EB.2.1 için) ---
 import EslemeGame from '@/aba/esle/game/eslemegame'; 
@@ -113,16 +113,18 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             {activeGameItem.startsWith("EB.3.3") && <NesneEslemeGame12 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.3.4") && <NesneEslemeGame13 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             
+            {/* EB.4.1. Kelime-Kelime */}
             {activeGameItem.startsWith("EB.4.1.") && (
                 <NesneEslemeGame15 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
             
+            {/* EB.4.2. Klavye */}
             {activeGameItem.startsWith("EB.4.2") && (
                 <NesneEslemeGame16 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
 
-            {/* 🔥 YENİ EKLENEN: EB.4.10 - Öykü Eşleme 🔥 */}
-            {activeGameItem.startsWith("EB.4.10") && (
+            {/* 🔥 DÜZELTİLDİ: EB.4.9 - Öykü Eşleme 🔥 */}
+            {activeGameItem.startsWith("EB.4.9") && (
                <div className="fixed inset-0 z-[100] bg-white">
                  <NesneEslemeGame23 onClose={() => setActiveGameMode(null)} />
                </div>
@@ -162,7 +164,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                 item.startsWith("EB.3.3") || item.startsWith("EB.3.4") ||
                 item.startsWith("EB.4.1.") || 
                 item.startsWith("EB.4.2") ||
-                item.startsWith("EB.4.10"); // 🔥 4.10 eklendi
+                item.startsWith("EB.4.9"); // 🔥 Düzeltildi: EB.4.9
             
             const firstSpaceIndex = item.indexOf(' ');
             const code = item.substring(0, firstSpaceIndex);
