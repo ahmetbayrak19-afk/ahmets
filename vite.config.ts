@@ -6,10 +6,12 @@ import path from 'path';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   root: 'client',
-  base: '', // APK için en boş ve güvenli yol
   
-  // 🚀 KRİTİK EKLEME: .glb dosyalarını kod sanma, olduğu gibi paketle diyoruz.
-  assetsInclude: ['**/*.glb'], 
+  // 🟢 ÖNEMLİ: Android'de dosya yollarının başına '.' koyarak çalışmasını sağlar.
+  base: '', 
+
+  // Not: 'assetsInclude' satırını sildik çünkü artık public klasörünü kullanıyoruz.
+  // Vite, public klasöründeki her şeyi otomatik olarak ana dizine kopyalar.
 
   resolve: {
     alias: {
@@ -20,13 +22,13 @@ export default defineConfig({
   build: {
     outDir: '../dist',
     emptyOutDir: true,
-    assetsDir: '.', // Klasörleme yapma, her şeyi en üste koy
-    cssCodeSplit: false, // CSS'i tek dosya yap
+    assetsDir: 'assets', // Klasör düzeni standart kalsın
+    cssCodeSplit: false,
     rollupOptions: {
       input: path.resolve(__dirname, 'client/index.html'),
       output: {
-        // Dosya isimlerinden HASH'i kaldırıyoruz.
-        // Android'in dosyaları bulamama şansı kalmıyor.
+        // 🚀 Dosya isimlerini sabitleme (Hash kaldırma)
+        // Bu sayede Android, 'human.glb' veya script dosyalarını her zaman bulur.
         entryFileNames: 'assets/[name].js',
         chunkFileNames: 'assets/[name].js',
         assetFileNames: 'assets/[name].[ext]',
