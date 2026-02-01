@@ -7,8 +7,9 @@ import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 
-// --- OYUN IMPORTU ---
-import AliciGame4 from '@/aba/Alici/AliciGame4'; // ADB 2.1 - İnsan Tanıma
+// --- OYUN IMPORTLARI ---
+import AliciGame4 from '@/aba/Alici/AliciGame4';   // ADB 2.1 - İnsan Tanıma
+import AliciGame15 from '@/aba/Alici/AliciGame15'; // ADB 4.2 - Tüm Vücut Bölümlerini Tanıma (YENİ)
 
 interface AliciDilPageProps {
   studentId: string;
@@ -18,7 +19,7 @@ interface AliciDilPageProps {
 export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
-  
+   
   // Hangi oyunun açık olduğunu tutan state
   const [activeGameItem, setActiveGameItem] = useState<string | null>(null);
 
@@ -82,10 +83,17 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
       {/* --- OYUN GÖSTERİM ALANI (MODAL) --- */}
       {activeGameItem && (
           <div className="fixed inset-0 z-[100] bg-white">
-             {/* 2.1 İnsan Tanıma Oyununu Aç */}
+             
+             {/* OYUN 1: ADB 2.1 İnsan Tanıma */}
              {(activeGameItem.includes("2.1") || activeGameItem.includes("İnsan Tanıma")) && (
                  <AliciGame4 onClose={() => setActiveGameItem(null)} />
              )}
+
+             {/* OYUN 2: ADB 4.2 Tüm Vücut Bölümlerini Tanıma (YENİ EKLENDİ) */}
+             {(activeGameItem.includes("4.2") || activeGameItem.includes("Tüm Vücut")) && (
+                 <AliciGame15 onClose={() => setActiveGameItem(null)} />
+             )}
+
           </div>
       )}
 
@@ -122,9 +130,11 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
 
             const isCompleted = status === true;
 
-            // --- OYUN KONTROLÜ ---
-            // Sadece "2.1" kodlu maddede oyun var
-            const hasGame = item.includes("2.1") || item.includes("İnsan Tanıma");
+            // --- OYUN KONTROLÜ (GÜNCELLENDİ) ---
+            // Hem 2.1 hem de 4.2 için oyun butonu aktif olacak
+            const hasGame = 
+                (item.includes("2.1") || item.includes("İnsan Tanıma")) ||
+                (item.includes("4.2") || item.includes("Tüm Vücut"));
 
             return (
                 <div 
@@ -203,4 +213,3 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
     </div>
   );
 }
-  
