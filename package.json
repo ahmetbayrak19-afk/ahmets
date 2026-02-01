@@ -12,6 +12,7 @@
     "@capacitor/cli": "^6.0.0",
     "@capacitor/core": "^6.0.0",
     "@capacitor/ios": "^6.0.0",
+    "@google/model-viewer": "^3.4.0",
     "scheduler": "^0.23.0",
     "regexparam": "^2.0.2",
     "@tanstack/query-core": "^5.60.5",
