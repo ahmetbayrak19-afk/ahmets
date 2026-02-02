@@ -7,8 +7,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   root: 'client',
   
-  // 🟢 İŞTE ÇÖZÜM: Tırnak içi BOŞ değil, NOKTA ve BÖLÜ olacak.
-  base: './', 
+  // 🔴 DÜZELTME: Burayı tekrar BOŞ yapıyoruz. 
+  // './' yapmak router'ı bozdu.
+  base: '', 
 
   resolve: {
     alias: {
