@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import '@google/model-viewer'; 
 import { ArrowLeft, Loader2 } from 'lucide-react';
 
-// 🟢 KRİTİK NOKTA: Modeli import ediyoruz.
+// 🟢 MODELİ GARANTİ YÖNTEMLE ÇAĞIRIYORUZ
 // @ts-ignore
 import humanModelSrc from './human.glb';
 
