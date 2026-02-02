@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import '@google/model-viewer'; 
-import { ArrowLeft, Loader2, AlertTriangle, Wifi } from 'lucide-react';
+import { ArrowLeft, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+
+// ✅ DOSYAYI BURADA IMPORT EDİYORUZ
+// (Dosya AliciGame15.tsx ile aynı klasörde olmalı!)
+// @ts-ignore
+import humanModel from './human.glb';
 
 interface GameProps {
   onClose: () => void;
@@ -30,19 +35,20 @@ export default function AliciGame15({ onClose }: GameProps) {
         </button>
         
         <div className="px-4 py-2 bg-slate-800/80 backdrop-blur-md rounded-lg border border-slate-700 text-xs font-mono">
-            {loadStatus === 'loading' && <span className="text-yellow-400 flex items-center"><Loader2 className="animate-spin mr-2 h-3 w-3"/> İnternetten Çekiliyor...</span>}
-            {loadStatus === 'success' && <span className="text-green-400 flex items-center"><Wifi className="mr-2 h-3 w-3"/> Test Başarılı!</span>}
-            {loadStatus === 'error' && <span className="text-red-400 flex items-center"><AlertTriangle className="mr-2 h-3 w-3"/> Bağlantı Hatası</span>}
+            {loadStatus === 'loading' && <span className="text-yellow-400 flex items-center"><Loader2 className="animate-spin mr-2 h-3 w-3"/> Yükleniyor...</span>}
+            {loadStatus === 'success' && <span className="text-green-400 flex items-center"><CheckCircle2 className="mr-2 h-3 w-3"/> Hazır!</span>}
+            {loadStatus === 'error' && <span className="text-red-400 flex items-center"><AlertTriangle className="mr-2 h-3 w-3"/> Dosya Hatası</span>}
         </div>
       </div>
 
       {/* 3D MODEL ALANI */}
       <div className="w-full h-full bg-gradient-to-b from-slate-900 to-black flex items-center justify-center">
         
-        {/* TEST MODU: Google'ın sunucusundan astronot çekiyoruz */}
         <model-viewer
-          src="https://modelviewer.dev/shared-assets/models/Astronaut.glb"        
-          alt="3D Test Modeli"
+          // ✅ ARTIK IMPORT ETTİĞİMİZ DEĞİŞKENİ VERİYORUZ
+          src={humanModel}        
+          
+          alt="3D İnsan Modeli"
           camera-controls          
           auto-rotate              
           camera-target="auto"
@@ -58,18 +64,11 @@ export default function AliciGame15({ onClose }: GameProps) {
           style={{ width: '100%', height: '100%' }}
         >
              <div slot="poster" className="flex items-center justify-center w-full h-full text-slate-500">
-               Test Modeli Yükleniyor...
+               Yükleniyor...
             </div>
         </model-viewer>
 
       </div>
-
-      {/* Bilgilendirme */}
-      <div className="absolute bottom-10 left-0 right-0 text-center px-4 pointer-events-none">
-          <p className="text-xs text-slate-500 bg-black/50 p-2 rounded inline-block">
-              Bu test internet bağlantısı gerektirir.
-          </p>
-      </div>
     </div>
   );
-}
+      }
