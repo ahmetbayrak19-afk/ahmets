@@ -7,11 +7,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   root: 'client',
   
-  // 🟢 1. KRİTİK HAMLE: Burayı BOŞ bırakıyoruz. (Giriş Ekranı DÜZELECEK)
-  base: '', 
-
-  // 🟢 2. KRİTİK HAMLE: .glb dosyalarını tanıması için izin veriyoruz.
-  assetsInclude: ['**/*.glb'],
+  // 🟢 İŞTE ÇÖZÜM: Tırnak içi BOŞ değil, NOKTA ve BÖLÜ olacak.
+  base: './', 
 
   resolve: {
     alias: {
@@ -34,4 +31,4 @@ export default defineConfig({
     },
   },
 });
-        
+      
