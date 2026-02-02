@@ -7,10 +7,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   root: 'client',
   
-  // 🟢 UYGULAMANIN AÇILMASINI SAĞLAYAN AYAR (Dokunmadık)
+  // ✅ BU AYAR KALSIN (Uygulamanın açılmasını bu sağlıyor)
   base: './', 
 
-  // 🟢 YENİ EKLEME: Model dosyasını import etmemize izin verir.
+  // 🟢 YENİ EKLEME: Modeli import etmemize izin verir.
   assetsInclude: ['**/*.glb'],
 
   resolve: {
