@@ -7,8 +7,11 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   root: 'client',
   
-  // 🟢 İŞTE ÇÖZÜM: Tırnak içi BOŞ değil, NOKTA ve BÖLÜ olacak.
+  // 🟢 UYGULAMANIN AÇILMASINI SAĞLAYAN AYAR (Dokunmadık)
   base: './', 
+
+  // 🟢 YENİ EKLEME: Model dosyasını import etmemize izin verir.
+  assetsInclude: ['**/*.glb'],
 
   resolve: {
     alias: {
@@ -31,4 +34,3 @@ export default defineConfig({
     },
   },
 });
-      
