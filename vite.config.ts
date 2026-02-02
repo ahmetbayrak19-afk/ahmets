@@ -8,7 +8,7 @@ export default defineConfig({
   root: 'client',
   base: '', 
   
-  // 🟢 İŞTE BU SATIR: Vite'a "Bu dosyayı kod gibi okuma, paketle" diyoruz.
+  // 🟢 VITE'A EMRİ VERİYORUZ: .glb dosyalarını paketle!
   assetsInclude: ['**/*.glb'],
 
   resolve: {
@@ -32,3 +32,4 @@ export default defineConfig({
     },
   },
 });
+      
