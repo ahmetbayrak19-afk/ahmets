@@ -3,6 +3,7 @@ import "@google/model-viewer";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
 // 🟢 VITE URL IMPORT (En sağlam yöntem)
+// Dosya adının sonuna "?url" ekleyerek Vite'tan çalışan adresi alıyoruz.
 // @ts-ignore
 import humanModelUrl from "./human.glb?url";
 
@@ -10,30 +11,36 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const mvRef = useRef<any>(null);
   const [loadStatus, setLoadStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
-  const [debugInfo, setDebugInfo] = useState<string>(""); // Hata ayıklama için ek bilgi
+  const [debugInfo, setDebugInfo] = useState<string>(""); 
 
-  // 1. ADIM: Dosya gerçekten okunabiliyor mu testi (Konsola ve ekrana basacak)
+  // 1. ADIM: Dosya gerçekten okunabiliyor mu testi
   useEffect(() => {
-    console.log("Model URL'si:", humanModelUrl);
-    setDebugInfo(`URL: ${humanModelUrl}\n`);
+    console.log("Model URL:", humanModelUrl);
+    setDebugInfo(`Hedef URL: ${humanModelUrl}\n`);
 
     fetch(humanModelUrl)
       .then(async (r) => {
         console.log("Fetch Durumu:", r.status, r.statusText);
-        console.log("Dosya Tipi:", r.headers.get("content-type"));
         const buf = await r.arrayBuffer();
-        console.log("Dosya Boyutu (Byte):", buf.byteLength);
+        console.log("Dosya Boyutu:", buf.byteLength);
         
-        setDebugInfo(prev => prev + `Durum: ${r.status}\nBoyut: ${(buf.byteLength / 1024 / 1024).toFixed(2)} MB`);
+        // Ekrana teknik bilgiyi basalım
+        setDebugInfo(prev => prev + `Durum Kodu: ${r.status}\nBoyut: ${(buf.byteLength / 1024 / 1024).toFixed(2)} MB`);
+        
+        if (r.status !== 200 && r.status !== 0) {
+            setLoadStatus("error");
+            setErrorMsg(`Dosya Bulunamadı (Kod: ${r.status})`);
+        }
       })
       .catch((err) => {
-        console.error("Fetch Başarısız:", err);
+        console.error("Fetch Hatası:", err);
         setDebugInfo(prev => prev + `Fetch Hatası: ${err.message}`);
         setLoadStatus("error");
+        setErrorMsg("Dosyaya Erişilemiyor");
       });
   }, []);
 
-  // 2. ADIM: Model Viewer Olaylarını (Events) Doğru Yakalama
+  // 2. ADIM: Model Viewer Olaylarını (Events) Yakalama
   useEffect(() => {
     const el = mvRef.current;
     if (!el) return;
@@ -44,12 +51,13 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
     };
 
     const onError = (e: any) => {
-      console.log("model-viewer error event:", e);
+      console.log("model-viewer hatası:", e);
       setLoadStatus("error");
-      setErrorMsg(e?.detail?.type || e?.message || "Yükleme Hatası (Detay Yok)");
+      // Hata detayını yakalamaya çalışalım
+      const detay = e?.detail?.type || e?.type || "Bilinmeyen Hata";
+      setErrorMsg(detay);
     };
 
-    // React prop yerine listener ekliyoruz (En doğrusu bu)
     el.addEventListener("load", onLoad);
     el.addEventListener("error", onError);
 
@@ -84,8 +92,8 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
           <div slot="poster" className="flex flex-col items-center justify-center w-full h-full text-slate-500 gap-2">
             <Loader2 className="animate-spin w-8 h-8" />
             <span>Model Yükleniyor...</span>
-            {/* Ekranda hangi adrese gittiğini görelim */}
-            <pre className="text-[10px] opacity-60 bg-black/50 p-2 rounded max-w-[80%] overflow-hidden">
+            {/* Debug Bilgisi */}
+            <pre className="text-[10px] opacity-60 bg-black/50 p-2 rounded max-w-[80%] overflow-hidden text-center">
                 {debugInfo || "Bağlanıyor..."}
             </pre>
           </div>
@@ -107,4 +115,4 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
       )}
     </div>
   );
-             }
+        }
