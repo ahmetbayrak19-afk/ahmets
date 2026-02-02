@@ -7,9 +7,11 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   root: 'client',
   
-  // 🔴 DÜZELTME: Burayı tekrar BOŞ yapıyoruz. 
-  // './' yapmak router'ı bozdu.
+  // 🟢 1. KRİTİK HAMLE: Burayı BOŞ bırakıyoruz. (Giriş Ekranı DÜZELECEK)
   base: '', 
+
+  // 🟢 2. KRİTİK HAMLE: .glb dosyalarını tanıması için izin veriyoruz.
+  assetsInclude: ['**/*.glb'],
 
   resolve: {
     alias: {
@@ -32,3 +34,4 @@ export default defineConfig({
     },
   },
 });
+        
