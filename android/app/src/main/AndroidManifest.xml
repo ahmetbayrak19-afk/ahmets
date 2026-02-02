@@ -30,6 +30,7 @@
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
         android:requestLegacyExternalStorage="true" 
+        android:hardwareAccelerated="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
         
         <activity
@@ -46,3 +47,4 @@
     </application>
 
 </manifest>
+        
