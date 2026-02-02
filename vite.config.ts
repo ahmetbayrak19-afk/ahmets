@@ -6,10 +6,9 @@ import path from 'path';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   root: 'client',
-  base: '', 
   
-  // 🟢 VITE'A EMRİ VERİYORUZ: .glb dosyalarını paketle!
-  assetsInclude: ['**/*.glb'],
+  // 🟢 İŞTE ÇÖZÜM: Tırnak içi BOŞ değil, NOKTA ve BÖLÜ olacak.
+  base: './', 
 
   resolve: {
     alias: {
@@ -32,4 +31,3 @@ export default defineConfig({
     },
   },
 });
-      
