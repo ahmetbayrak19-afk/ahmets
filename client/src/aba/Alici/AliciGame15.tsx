@@ -2,12 +2,10 @@ import React, { useEffect, useRef, useState } from "react";
 import "@google/model-viewer";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
-// ❌ ESKİ HATALI IMPORT (Bunu sildik)
-// import humanModelUrl from "./human.glb?url";
-
-// ✅ YENİ YÖNTEM: Android WebView için sabit yol
-// Android'de assets klasörüne koyduğumuz dosyaya bu yolla erişilir.
-const ANDROID_ASSET_PATH = "file:///android_asset/human.glb";
+// ✅ YENİ ADRES:
+// Biz bu adresi Java tarafında yakalayacağız.
+// Gerçekte böyle bir site yok, biz "mış gibi" yapıyoruz.
+const ANDROID_ASSET_PATH = "https://assets/human.glb";
 
 export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const mvRef = useRef<any>(null);
@@ -15,19 +13,15 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const [errorMsg, setErrorMsg] = useState("");
   const [debugInfo, setDebugInfo] = useState<string>(""); 
 
-  // 1. ADIM: Dosya yolu kontrolü (Fetch testi)
+  // 1. ADIM: Bağlantı Testi
   useEffect(() => {
-    // Tarayıcıda (Chrome vs) test ediyorsan file:/// protokolü güvenlik nedeniyle çalışmaz.
-    // Bu kod asıl telefonda/tablette (APK içinde) çalışıp çalışmadığını gösterir.
     console.log("Hedef Model Yolu:", ANDROID_ASSET_PATH);
     setDebugInfo(`Hedef: ${ANDROID_ASSET_PATH}\n`);
 
     fetch(ANDROID_ASSET_PATH)
       .then(async (r) => {
-        // file:// protokolünde status bazen 0 dönebilir (başarılı olsa bile)
         console.log("Fetch Durumu:", r.status, r.statusText);
         
-        // Blob olarak almayı deneyelim
         const blob = await r.blob();
         console.log("Dosya Boyutu:", blob.size);
         
@@ -35,18 +29,16 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         
         if (blob.size < 100) {
             setLoadStatus("error");
-            setErrorMsg("Dosya boş veya bozuk (Sıkıştırma sorunu olabilir)");
+            setErrorMsg("Dosya boş veya bozuk");
         }
       })
       .catch((err) => {
         console.error("Fetch Hatası:", err);
-        // Tarayıcıda test ediyorsan buraya düşmesi normaldir (CORS/File protokolü engeli)
-        // Ama telefonda buraya düşmemesi lazım.
         setDebugInfo(prev => prev + `Fetch Hatası: ${err.message}`);
       });
   }, []);
 
-  // 2. ADIM: Model Viewer Event Dinleyicileri
+  // 2. ADIM: Model Viewer Eventleri
   useEffect(() => {
     const el = mvRef.current;
     if (!el) return;
@@ -95,12 +87,9 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
           environment-image="neutral"
           style={{ width: "100%", height: "100%" }}
         >
-          {/* Yükleniyor Ekranı (Poster slotu) */}
           <div slot="poster" className="flex flex-col items-center justify-center w-full h-full text-slate-500 gap-2 bg-slate-900">
             <Loader2 className="animate-spin w-10 h-10 text-blue-500" />
             <span className="text-sm font-medium">Model Yükleniyor...</span>
-            
-            {/* Debug Bilgisi (Geliştirme aşamasında ekranda görünsün) */}
             <pre className="text-[10px] opacity-60 bg-black/50 p-2 rounded max-w-[90%] overflow-hidden text-center mt-4 border border-slate-800">
                 {debugInfo || "Başlatılıyor..."}
             </pre>
@@ -123,4 +112,5 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
       )}
     </div>
   );
-        }
+            }
+        
