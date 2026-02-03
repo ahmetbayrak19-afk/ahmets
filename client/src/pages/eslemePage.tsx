@@ -13,10 +13,9 @@ import NesneEslemeGame2 from '@/aba/esle/NesneEslemeGame2';   // EB.1.2
 import NesneEslemeGame3 from '@/aba/esle/NesneEslemeGame3';   // EB.1.3
 import NesneEslemeGame4 from '@/aba/esle/NesneEslemeGame4';   // EB.1.4
 
-// --- YENİ EKLENEN OYUNLAR ---
 import NesneEslemeGame6 from '@/aba/esle/NesneEslemeGame6';   // EB.2.2 (Farklı Nesne)
 import NesneEslemeGame7 from '@/aba/esle/NesneEslemeGame7';   // EB.2.3 (Farklı Eylem)
-import NesneEslemeGame8 from '@/aba/esle/NesneEslemeGame8';   // 🔥 YENİ: EB.2.4 (Resim-Nesne)
+import NesneEslemeGame8 from '@/aba/esle/NesneEslemeGame8';   // EB.2.4 (Resim-Nesne)
 
 import NesneEslemeGame9 from '@/aba/esle/NesneEslemeGame9';   // EB.2.5 (Renk)
 import NesneEslemeGame10 from '@/aba/esle/NesneEslemeGame10'; // EB.3.1 (Şekil)
@@ -26,6 +25,9 @@ import NesneEslemeGame13 from '@/aba/esle/NesneEslemeGame13'; // EB.3.4 (Gölge)
 import NesneEslemeGame14 from '@/aba/esle/NesneEslemeGame14'; // EB.3.5 (Ses)
 import NesneEslemeGame15 from '@/aba/esle/NesneEslemeGame15'; // EB.4.1 (Kelime-Kelime)
 import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16'; // EB.4.2 (Klavye/Harf)
+
+// 🔥 YENİ EKLENEN: EB.4.3 (Sözcük-Nesne)
+import NesneEslemeGame17 from '@/aba/esle/NesneEslemeGame17'; 
 
 // --- ÖYKÜ EŞLEME OYUNU ---
 import NesneEslemeGame23 from '@/aba/esle/NesneEslemeGame23'; // EB.4.9 (Öykü)
@@ -117,13 +119,8 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             {/* EB.2.1 (Geçici) */}
             {activeGameItem.startsWith("EB.2.1") && <div className="fixed inset-0 z-[100] bg-white"><EslemeGame onClose={() => setActiveGameMode(null)} /></div>}
 
-            {/* EB.2.2 (Farklı Nesne) */}
             {activeGameItem.startsWith("EB.2.2") && <NesneEslemeGame6 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
-
-            {/* EB.2.3 (Farklı Eylem) */}
             {activeGameItem.startsWith("EB.2.3") && <NesneEslemeGame7 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
-
-            {/* 🔥 YENİ: EB.2.4 (Resim-Nesne) */}
             {activeGameItem.startsWith("EB.2.4") && <NesneEslemeGame8 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
 
             {activeGameItem.startsWith("EB.2.5") && <NesneEslemeGame9 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
@@ -145,6 +142,11 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             {/* EB.4.2. Klavye */}
             {activeGameItem.startsWith("EB.4.2") && (
                 <NesneEslemeGame16 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
+            )}
+
+            {/* 🔥 YENİ: EB.4.3 (Sözcük-Nesne) */}
+            {activeGameItem.startsWith("EB.4.3") && (
+                <NesneEslemeGame17 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
 
             {/* EB.4.9 - Öykü Eşleme */}
@@ -186,13 +188,14 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                 item.startsWith("EB.2.1") || 
                 item.startsWith("EB.2.2") || 
                 item.startsWith("EB.2.3") || 
-                item.startsWith("EB.2.4") || // 🔥 YENİ EKLENEN
+                item.startsWith("EB.2.4") ||
                 item.startsWith("EB.2.5") ||
                 item.startsWith("EB.3.1") || item.startsWith("EB.3.2") ||
                 item.startsWith("EB.3.3") || item.startsWith("EB.3.4") ||
                 item.startsWith("EB.3.5") || 
                 item.startsWith("EB.4.1.") || 
                 item.startsWith("EB.4.2") ||
+                item.startsWith("EB.4.3") || // 🔥 YENİ EKLENEN
                 item.startsWith("EB.4.9");
             
             const firstSpaceIndex = item.indexOf(' ');
@@ -229,5 +232,5 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       </div>
     </div>
   );
-    }
-            
+  }
+          
