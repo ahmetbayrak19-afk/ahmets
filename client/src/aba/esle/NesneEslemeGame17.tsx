@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Check, XCircle, Trophy, GraduationCap, ClipboardCheck, RefreshCcw, Volume2, VolumeX } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
-import { Button } from '@/components/ui/button';
 
 // --- RESİMLER (Hem 1. hem 2. setten karışık) ---
 import anahtarImg from './anahtar.png';
@@ -96,9 +95,21 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
   const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
 
+  // 🔥 KAYDIRMA ENGELLEME (SCROLL LOCK) 🔥
+  useEffect(() => {
+    // 1. Sayfa yüklendiğinde scroll'u kilitle
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none'; // Mobilde sürüklemeyi engeller
+
+    // 2. Sayfadan çıkıldığında serbest bırak
+    return () => {
+      document.body.style.overflow = 'auto';
+      document.body.style.touchAction = 'auto';
+    };
+  }, []);
+
   // Arkaplan Müziği
   useEffect(() => {
-    window.scrollTo(0, 0);
     bgMusicRef.current = new Audio(arkaplanMusic);
     bgMusicRef.current.loop = true; 
     bgMusicRef.current.volume = 0.15; 
@@ -137,24 +148,18 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
 
   // --- SORU ÜRETME ---
   const generateQuestion = () => {
-    // 1. Rastgele bir hedef görsel seç
     const randomTarget = TARGET_OBJECTS[Math.floor(Math.random() * TARGET_OBJECTS.length)];
     const correctWord = randomTarget.name;
 
-    // 2. Tüm kelime havuzunu oluştur (Mevcut nesne isimleri + Ekstra kelimeler)
-    // Set kullanarak tekrar edenleri (örn: 2 tane 'Anahtar' resmi var) temizle
     const objectNames = Array.from(new Set(TARGET_OBJECTS.map(o => o.name)));
     const allWords = [...objectNames, ...EXTRA_WORDS];
 
-    // 3. Doğru cevabı havuzdan çıkar
     const availableDistractors = allWords.filter(w => w !== correctWord);
 
-    // 4. Seviyeye göre seçenek sayısı
     let optionCount = 3; 
     if (level === 2) optionCount = 4;
     if (level === 3) optionCount = 6;
     
-    // 5. Çeldiricileri seç ve karıştır
     const selectedDistractors = availableDistractors
         .sort(() => 0.5 - Math.random())
         .slice(0, optionCount - 1);
@@ -162,7 +167,6 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
     setTargetItem(randomTarget);
     setOptions([correctWord, ...selectedDistractors].sort(() => 0.5 - Math.random()));
     
-    // Sıfırlamalar
     setShowFeedback(null);
     setWrongSelection(null);
     setInstructionMistakeCount(0);
@@ -172,10 +176,9 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
 
   // --- CEVAP KONTROLÜ ---
   const handleOptionClick = (selectedWord: string) => {
-    if (showFeedback === 'correct') return; // Zaten doğru bilindiyse bekle
+    if (showFeedback === 'correct') return; 
 
     if (selectedWord === targetItem.name) {
-        // DOĞRU
         playSoundEffect('success');
         if (mode === 'instruction') setShowFeedback('correct');
         if (mode === 'assessment') setAssessmentScore(prev => prev + 1);
@@ -190,7 +193,6 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
             }
         }, 1500);
     } else {
-        // YANLIŞ
         playSoundEffect('fail');
         setWrongSelection(selectedWord);
         
@@ -227,10 +229,11 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
   }, [assessmentCount, assessmentScore, mode]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-slate-50 font-sans select-none overflow-hidden">
+    // 🔥 CSS GÜNCELLEMESİ: touch-none, overscroll-none, overflow-hidden
+    <div className="fixed inset-0 z-[100] flex flex-col bg-slate-50 font-sans select-none overflow-hidden touch-none overscroll-none">
       
       {/* Üst Bar */}
-      <div className="p-4 flex justify-between items-center relative z-10">
+      <div className="p-4 flex justify-between items-center relative z-10 shrink-0">
         <button onClick={onClose} className="p-2 bg-white border border-slate-200 rounded-full shadow-sm">
           <XCircle size={24} className="text-slate-400" />
         </button>
@@ -271,10 +274,10 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
 
       {/* --- OYUN ALANI --- */}
       {phase === 'playing' && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-8 p-4">
+        <div className="flex-1 flex flex-col items-center justify-center gap-8 p-4 w-full max-w-4xl mx-auto">
           
           {/* HEDEF GÖRSEL */}
-          <div className="w-64 h-64 bg-white rounded-3xl border-4 border-slate-200 flex items-center justify-center shadow-xl p-6">
+          <div className="w-56 h-56 sm:w-64 sm:h-64 bg-white rounded-3xl border-4 border-slate-200 flex items-center justify-center shadow-xl p-6 shrink-0">
                <img 
                  src={targetItem.src} 
                  alt="Hedef" 
@@ -282,19 +285,18 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
                />
           </div>
 
-          <h2 className="text-slate-400 font-bold text-sm tracking-widest animate-pulse">BU NESNENİN İSMİ NEDİR?</h2>
+          <h2 className="text-slate-400 font-bold text-sm tracking-widest animate-pulse shrink-0">BU NESNENİN İSMİ NEDİR?</h2>
 
           {/* SEÇENEKLER (GRID) */}
           <div className={twMerge(
-              "grid gap-4 w-full max-w-2xl px-4",
-              level === 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2" // 3. seviyede 3 kolon olabilir
+              "grid gap-4 w-full px-4",
+              level === 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2" // 3. seviyede 3 kolon
           )}>
             {options.map((word, idx) => {
               const isCorrect = word === targetItem.name;
-              // Eğer öğretim modundaysak ve 2 kere yanlış yapıldıysa sadece doğruyu göster
               const isWrongAndHidden = mode === 'instruction' && instructionMistakeCount >= 2 && !isCorrect;
               
-              if (isWrongAndHidden) return <div key={idx} className="h-16"></div>; // Boş yer tutucu
+              if (isWrongAndHidden) return <div key={idx} className="h-16 sm:h-20"></div>; 
 
               return (
                 <motion.button
@@ -308,7 +310,7 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
                         ? { x: [-10, 10, -10, 10, 0], backgroundColor: "#ef4444", color: "#fff", borderColor: "#dc2626" }
                         : {}
                     }
-                    className="h-20 bg-white border-b-4 border-slate-200 rounded-2xl font-black text-xl text-slate-700 hover:bg-slate-50 hover:border-blue-200 hover:text-blue-600 transition-colors shadow-sm uppercase tracking-wide"
+                    className="h-16 sm:h-20 bg-white border-b-4 border-slate-200 rounded-2xl font-black text-lg sm:text-xl text-slate-700 hover:bg-slate-50 hover:border-blue-200 hover:text-blue-600 transition-colors shadow-sm uppercase tracking-wide flex items-center justify-center"
                 >
                     {word}
                 </motion.button>
@@ -367,4 +369,4 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
     </div>
   );
   }
-        
+    
