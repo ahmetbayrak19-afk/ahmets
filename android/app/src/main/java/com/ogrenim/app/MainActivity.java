@@ -23,6 +23,8 @@ import android.webkit.WebResourceResponse;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.activity.OnBackPressedCallback; // ✅ YENİ IMPORT
+
 import org.json.JSONObject;
 
 import java.io.InputStream;
@@ -73,6 +75,23 @@ public class MainActivity extends AppCompatActivity {
         webView = new WebView(this);
         setContentView(webView);
 
+        // 🔥 YENİ EKLENEN KISIM: GERİ TUŞU YÖNETİMİ 🔥
+        // Android'in geri tuşuna basıldığında ne olacağını belirliyoruz.
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                // Eğer WebView'da geriye gidilecek bir sayfa varsa (History varsa)
+                if (webView.canGoBack()) {
+                    webView.goBack(); // WebView içinde geri git
+                } else {
+                    // Geri gidilecek sayfa yoksa (Ana sayfadaysak)
+                    // Bu callback'i devre dışı bırak ve sistemin normal geri işlevini (kapatma/alta alma) çalıştır
+                    setEnabled(false);
+                    getOnBackPressedDispatcher().onBackPressed();
+                }
+            }
+        });
+
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -93,7 +112,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }, "AndroidTTS");
 
-        // 4. CHROME CLIENT (İzinler ve Dosya Seçici)
+        // 4. CHROME CLIENT
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
@@ -124,33 +143,25 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // 🔥 5. WEBVIEW CLIENT (MODEL DOSYASI YAKALAYICI) 🔥
+        // 5. WEBVIEW CLIENT (MODEL DOSYASI YAKALAYICI)
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
 
-                // Eğer "https://assets/human.glb" istenirse araya gir
-                if (url.contains("assets/human.glb")) {
+                if (url.equals("https://appassets.android/human.glb")) {
                     try {
-                        // Gerçek 'assets' klasöründen dosyayı aç
                         InputStream is = getAssets().open("human.glb");
-                        
-                        // CORS Başlıklarını ekle (Tarayıcı güvenliği için şart)
                         Map<String, String> headers = new HashMap<>();
                         headers.put("Access-Control-Allow-Origin", "*");
                         headers.put("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
                         headers.put("Access-Control-Allow-Headers", "*");
-                        
-                        // Dosyayı sunucu yanıtı gibi geri döndür
                         return new WebResourceResponse("model/gltf-binary", "UTF-8", 200, "OK", headers, is);
                     } catch (Exception e) {
                         e.printStackTrace();
-                        // Hata olursa boş döndür (Loglara bakmak gerekebilir)
                         return null;
                     }
                 }
-                // Diğer her şey normal devam etsin
                 return super.shouldInterceptRequest(view, request);
             }
         });
@@ -221,4 +232,4 @@ public class MainActivity extends AppCompatActivity {
         if (tts != null) { tts.stop(); tts.shutdown(); }
         super.onDestroy();
     }
-            }
+    }
