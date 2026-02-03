@@ -2,10 +2,12 @@ import React, { useEffect, useRef, useState } from "react";
 import "@google/model-viewer";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
-// 🟢 VITE URL IMPORT (En sağlam yöntem)
-// Dosya adının sonuna "?url" ekleyerek Vite'tan çalışan adresi alıyoruz.
-// @ts-ignore
-import humanModelUrl from "./human.glb?url";
+// ❌ ESKİ HATALI IMPORT (Bunu sildik)
+// import humanModelUrl from "./human.glb?url";
+
+// ✅ YENİ YÖNTEM: Android WebView için sabit yol
+// Android'de assets klasörüne koyduğumuz dosyaya bu yolla erişilir.
+const ANDROID_ASSET_PATH = "file:///android_asset/human.glb";
 
 export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const mvRef = useRef<any>(null);
@@ -13,34 +15,38 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const [errorMsg, setErrorMsg] = useState("");
   const [debugInfo, setDebugInfo] = useState<string>(""); 
 
-  // 1. ADIM: Dosya gerçekten okunabiliyor mu testi
+  // 1. ADIM: Dosya yolu kontrolü (Fetch testi)
   useEffect(() => {
-    console.log("Model URL:", humanModelUrl);
-    setDebugInfo(`Hedef URL: ${humanModelUrl}\n`);
+    // Tarayıcıda (Chrome vs) test ediyorsan file:/// protokolü güvenlik nedeniyle çalışmaz.
+    // Bu kod asıl telefonda/tablette (APK içinde) çalışıp çalışmadığını gösterir.
+    console.log("Hedef Model Yolu:", ANDROID_ASSET_PATH);
+    setDebugInfo(`Hedef: ${ANDROID_ASSET_PATH}\n`);
 
-    fetch(humanModelUrl)
+    fetch(ANDROID_ASSET_PATH)
       .then(async (r) => {
+        // file:// protokolünde status bazen 0 dönebilir (başarılı olsa bile)
         console.log("Fetch Durumu:", r.status, r.statusText);
-        const buf = await r.arrayBuffer();
-        console.log("Dosya Boyutu:", buf.byteLength);
         
-        // Ekrana teknik bilgiyi basalım
-        setDebugInfo(prev => prev + `Durum Kodu: ${r.status}\nBoyut: ${(buf.byteLength / 1024 / 1024).toFixed(2)} MB`);
+        // Blob olarak almayı deneyelim
+        const blob = await r.blob();
+        console.log("Dosya Boyutu:", blob.size);
         
-        if (r.status !== 200 && r.status !== 0) {
+        setDebugInfo(prev => prev + `Durum: ${r.status}\nBoyut: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+        
+        if (blob.size < 100) {
             setLoadStatus("error");
-            setErrorMsg(`Dosya Bulunamadı (Kod: ${r.status})`);
+            setErrorMsg("Dosya boş veya bozuk (Sıkıştırma sorunu olabilir)");
         }
       })
       .catch((err) => {
         console.error("Fetch Hatası:", err);
+        // Tarayıcıda test ediyorsan buraya düşmesi normaldir (CORS/File protokolü engeli)
+        // Ama telefonda buraya düşmemesi lazım.
         setDebugInfo(prev => prev + `Fetch Hatası: ${err.message}`);
-        setLoadStatus("error");
-        setErrorMsg("Dosyaya Erişilemiyor");
       });
   }, []);
 
-  // 2. ADIM: Model Viewer Olaylarını (Events) Yakalama
+  // 2. ADIM: Model Viewer Event Dinleyicileri
   useEffect(() => {
     const el = mvRef.current;
     if (!el) return;
@@ -48,12 +54,12 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
     const onLoad = () => {
         console.log("Model başarıyla yüklendi!");
         setLoadStatus("success");
+        setDebugInfo(prev => prev + "\n✅ Model Viewer Yüklendi!");
     };
 
     const onError = (e: any) => {
       console.log("model-viewer hatası:", e);
       setLoadStatus("error");
-      // Hata detayını yakalamaya çalışalım
       const detay = e?.detail?.type || e?.type || "Bilinmeyen Hata";
       setErrorMsg(detay);
     };
@@ -72,7 +78,7 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
       
       {/* Üst Bar */}
       <div className="absolute top-0 left-0 right-0 p-4 z-10 flex items-center justify-between pointer-events-none">
-        <button onClick={onClose} className="p-3 bg-slate-800 pointer-events-auto rounded-full">
+        <button onClick={onClose} className="p-3 bg-slate-800 pointer-events-auto rounded-full active:scale-95 transition-transform">
           <ArrowLeft size={24} className="text-white" />
         </button>
       </div>
@@ -81,7 +87,7 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
       <div className="w-full h-full bg-gradient-to-b from-slate-900 to-black flex items-center justify-center">
         <model-viewer
           ref={mvRef}
-          src={humanModelUrl}
+          src={ANDROID_ASSET_PATH} 
           alt="3D İnsan Modeli"
           camera-controls
           auto-rotate
@@ -89,12 +95,14 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
           environment-image="neutral"
           style={{ width: "100%", height: "100%" }}
         >
-          <div slot="poster" className="flex flex-col items-center justify-center w-full h-full text-slate-500 gap-2">
-            <Loader2 className="animate-spin w-8 h-8" />
-            <span>Model Yükleniyor...</span>
-            {/* Debug Bilgisi */}
-            <pre className="text-[10px] opacity-60 bg-black/50 p-2 rounded max-w-[80%] overflow-hidden text-center">
-                {debugInfo || "Bağlanıyor..."}
+          {/* Yükleniyor Ekranı (Poster slotu) */}
+          <div slot="poster" className="flex flex-col items-center justify-center w-full h-full text-slate-500 gap-2 bg-slate-900">
+            <Loader2 className="animate-spin w-10 h-10 text-blue-500" />
+            <span className="text-sm font-medium">Model Yükleniyor...</span>
+            
+            {/* Debug Bilgisi (Geliştirme aşamasında ekranda görünsün) */}
+            <pre className="text-[10px] opacity-60 bg-black/50 p-2 rounded max-w-[90%] overflow-hidden text-center mt-4 border border-slate-800">
+                {debugInfo || "Başlatılıyor..."}
             </pre>
           </div>
         </model-viewer>
@@ -102,11 +110,11 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
 
       {/* Hata Kutusu */}
       {loadStatus === "error" && (
-        <div className="absolute bottom-20 left-4 right-4 pointer-events-none">
-          <div className="bg-red-950/90 text-red-200 p-4 rounded-xl border border-red-800 text-center text-sm">
-            <p className="font-bold">Model Açılamadı!</p>
-            <p className="mt-1 text-xs opacity-80">Viewer Hatası: {errorMsg}</p>
-            <hr className="my-2 border-red-800/50"/>
+        <div className="absolute bottom-10 left-4 right-4 pointer-events-none flex justify-center">
+          <div className="bg-red-950/90 text-red-200 p-4 rounded-xl border border-red-800 text-center text-sm max-w-md shadow-2xl backdrop-blur-sm">
+            <p className="font-bold text-lg mb-1">Model Açılamadı 😔</p>
+            <p className="text-xs opacity-80 mb-2">Hata: {errorMsg}</p>
+            <div className="w-full h-px bg-red-800/50 my-2"/>
             <p className="text-[10px] font-mono text-left opacity-70 whitespace-pre-wrap">
                 {debugInfo}
             </p>
