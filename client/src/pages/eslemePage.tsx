@@ -13,8 +13,9 @@ import NesneEslemeGame2 from '@/aba/esle/NesneEslemeGame2';   // EB.1.2
 import NesneEslemeGame3 from '@/aba/esle/NesneEslemeGame3';   // EB.1.3
 import NesneEslemeGame4 from '@/aba/esle/NesneEslemeGame4';   // EB.1.4
 
-// 🔥 YENİ EKLENEN: EB.2.2 (Farklı Nesne Resimleri)
-import NesneEslemeGame6 from '@/aba/esle/NesneEslemeGame6'; 
+// --- YENİ EKLENEN OYUNLAR ---
+import NesneEslemeGame6 from '@/aba/esle/NesneEslemeGame6';   // EB.2.2 (Farklı Nesne)
+import NesneEslemeGame7 from '@/aba/esle/NesneEslemeGame7';   // 🔥 YENİ: EB.2.3 (Farklı Eylem)
 
 import NesneEslemeGame9 from '@/aba/esle/NesneEslemeGame9';   // EB.2.5 (Renk)
 import NesneEslemeGame10 from '@/aba/esle/NesneEslemeGame10'; // EB.3.1 (Şekil)
@@ -115,8 +116,11 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             {/* EB.2.1 (Geçici) */}
             {activeGameItem.startsWith("EB.2.1") && <div className="fixed inset-0 z-[100] bg-white"><EslemeGame onClose={() => setActiveGameMode(null)} /></div>}
 
-            {/* 🔥 YENİ EKLENEN: EB.2.2 (Farklı Nesne) */}
+            {/* EB.2.2 (Farklı Nesne) */}
             {activeGameItem.startsWith("EB.2.2") && <NesneEslemeGame6 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
+
+            {/* 🔥 YENİ: EB.2.3 (Farklı Eylem) */}
+            {activeGameItem.startsWith("EB.2.3") && <NesneEslemeGame7 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
 
             {activeGameItem.startsWith("EB.2.5") && <NesneEslemeGame9 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.3.1") && <NesneEslemeGame10 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
@@ -176,7 +180,8 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                 item.startsWith("EB.1.1") || item.startsWith("EB.1.2") || 
                 item.startsWith("EB.1.3") || item.startsWith("EB.1.4") ||
                 item.startsWith("EB.2.1") || 
-                item.startsWith("EB.2.2") || // 🔥 YENİ EKLENEN
+                item.startsWith("EB.2.2") || 
+                item.startsWith("EB.2.3") || // 🔥 YENİ EKLENEN
                 item.startsWith("EB.2.5") ||
                 item.startsWith("EB.3.1") || item.startsWith("EB.3.2") ||
                 item.startsWith("EB.3.3") || item.startsWith("EB.3.4") ||
