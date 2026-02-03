@@ -17,6 +17,8 @@ import NesneEslemeGame10 from '@/aba/esle/NesneEslemeGame10'; // EB.3.1 (Şekil)
 import NesneEslemeGame11 from '@/aba/esle/NesneEslemeGame11'; // EB.3.2 (Rakam)
 import NesneEslemeGame12 from '@/aba/esle/NesneEslemeGame12'; // EB.3.3 (Harf)
 import NesneEslemeGame13 from '@/aba/esle/NesneEslemeGame13'; // EB.3.4 (Gölge)
+// 🔥 YENİ EKLENEN: SES EŞLEME
+import NesneEslemeGame14 from '@/aba/esle/NesneEslemeGame14'; // EB.3.5 (Ses)
 import NesneEslemeGame15 from '@/aba/esle/NesneEslemeGame15'; // EB.4.1 (Kelime-Kelime)
 import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16'; // EB.4.2 (Klavye/Harf)
 
@@ -113,6 +115,11 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             {activeGameItem.startsWith("EB.3.3") && <NesneEslemeGame12 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.3.4") && <NesneEslemeGame13 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             
+            {/* 🔥 YENİ EKLENEN: EB.3.5 (Ses Eşleme) */}
+            {activeGameItem.startsWith("EB.3.5") && (
+                <NesneEslemeGame14 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
+            )}
+
             {/* EB.4.1. Kelime-Kelime */}
             {activeGameItem.startsWith("EB.4.1.") && (
                 <NesneEslemeGame15 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
@@ -123,7 +130,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                 <NesneEslemeGame16 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
 
-            {/* 🔥 DÜZELTİLDİ: EB.4.9 - Öykü Eşleme 🔥 */}
+            {/* EB.4.9 - Öykü Eşleme */}
             {activeGameItem.startsWith("EB.4.9") && (
                <div className="fixed inset-0 z-[100] bg-white">
                  <NesneEslemeGame23 onClose={() => setActiveGameMode(null)} />
@@ -162,9 +169,10 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                 item.startsWith("EB.2.1") || item.startsWith("EB.2.5") ||
                 item.startsWith("EB.3.1") || item.startsWith("EB.3.2") ||
                 item.startsWith("EB.3.3") || item.startsWith("EB.3.4") ||
+                item.startsWith("EB.3.5") || // 🔥 YENİ EKLENEN
                 item.startsWith("EB.4.1.") || 
                 item.startsWith("EB.4.2") ||
-                item.startsWith("EB.4.9"); // 🔥 Düzeltildi: EB.4.9
+                item.startsWith("EB.4.9");
             
             const firstSpaceIndex = item.indexOf(' ');
             const code = item.substring(0, firstSpaceIndex);
@@ -200,4 +208,4 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       </div>
     </div>
   );
-}
+    }
