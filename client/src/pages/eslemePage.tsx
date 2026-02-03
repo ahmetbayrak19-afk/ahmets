@@ -12,12 +12,15 @@ import NesneEslemeGame1 from '@/aba/esle/NesneEslemeGame1';   // EB.1.1
 import NesneEslemeGame2 from '@/aba/esle/NesneEslemeGame2';   // EB.1.2
 import NesneEslemeGame3 from '@/aba/esle/NesneEslemeGame3';   // EB.1.3
 import NesneEslemeGame4 from '@/aba/esle/NesneEslemeGame4';   // EB.1.4
+
+// 🔥 YENİ EKLENEN: EB.2.2 (Farklı Nesne Resimleri)
+import NesneEslemeGame6 from '@/aba/esle/NesneEslemeGame6'; 
+
 import NesneEslemeGame9 from '@/aba/esle/NesneEslemeGame9';   // EB.2.5 (Renk)
 import NesneEslemeGame10 from '@/aba/esle/NesneEslemeGame10'; // EB.3.1 (Şekil)
 import NesneEslemeGame11 from '@/aba/esle/NesneEslemeGame11'; // EB.3.2 (Rakam)
 import NesneEslemeGame12 from '@/aba/esle/NesneEslemeGame12'; // EB.3.3 (Harf)
 import NesneEslemeGame13 from '@/aba/esle/NesneEslemeGame13'; // EB.3.4 (Gölge)
-// 🔥 YENİ EKLENEN: SES EŞLEME
 import NesneEslemeGame14 from '@/aba/esle/NesneEslemeGame14'; // EB.3.5 (Ses)
 import NesneEslemeGame15 from '@/aba/esle/NesneEslemeGame15'; // EB.4.1 (Kelime-Kelime)
 import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16'; // EB.4.2 (Klavye/Harf)
@@ -108,14 +111,20 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             {activeGameItem.startsWith("EB.1.2") && <NesneEslemeGame2 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.1.3") && <NesneEslemeGame3 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.1.4") && <NesneEslemeGame4 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
+            
+            {/* EB.2.1 (Geçici) */}
             {activeGameItem.startsWith("EB.2.1") && <div className="fixed inset-0 z-[100] bg-white"><EslemeGame onClose={() => setActiveGameMode(null)} /></div>}
+
+            {/* 🔥 YENİ EKLENEN: EB.2.2 (Farklı Nesne) */}
+            {activeGameItem.startsWith("EB.2.2") && <NesneEslemeGame6 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
+
             {activeGameItem.startsWith("EB.2.5") && <NesneEslemeGame9 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.3.1") && <NesneEslemeGame10 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.3.2") && <NesneEslemeGame11 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.3.3") && <NesneEslemeGame12 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.3.4") && <NesneEslemeGame13 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             
-            {/* 🔥 YENİ EKLENEN: EB.3.5 (Ses Eşleme) */}
+            {/* EB.3.5 (Ses Eşleme) */}
             {activeGameItem.startsWith("EB.3.5") && (
                 <NesneEslemeGame14 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
@@ -166,10 +175,12 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             const hasGame = 
                 item.startsWith("EB.1.1") || item.startsWith("EB.1.2") || 
                 item.startsWith("EB.1.3") || item.startsWith("EB.1.4") ||
-                item.startsWith("EB.2.1") || item.startsWith("EB.2.5") ||
+                item.startsWith("EB.2.1") || 
+                item.startsWith("EB.2.2") || // 🔥 YENİ EKLENEN
+                item.startsWith("EB.2.5") ||
                 item.startsWith("EB.3.1") || item.startsWith("EB.3.2") ||
                 item.startsWith("EB.3.3") || item.startsWith("EB.3.4") ||
-                item.startsWith("EB.3.5") || // 🔥 YENİ EKLENEN
+                item.startsWith("EB.3.5") || 
                 item.startsWith("EB.4.1.") || 
                 item.startsWith("EB.4.2") ||
                 item.startsWith("EB.4.9");
@@ -208,4 +219,5 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       </div>
     </div>
   );
-    }
+  }
+        
