@@ -18,12 +18,12 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 20
-          cache: 'npm' # ✅ npm paketlerini otomatik hafızaya alır
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm install
 
-      # ✅ Gradle Cache: Gradle dosyalarını ve bağımlılıkları saklar
+      # Gradle önbellekleme (Hız için)
       - name: Cache Gradle Wrapper
         uses: actions/cache@v3
         with:
@@ -38,14 +38,39 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-caches-
 
+      # React projesini derle
       - name: Build Web Assets
         run: npm run build
 
-      - name: Copy Web Assets to Android
+      # 🔥 KRİTİK ADIM: human.glb'yi koruyarak kopyalama 🔥
+      - name: Smart Copy Web Assets to Android
         run: |
+          echo "Dosya transferi başlıyor..."
+          
+          # 1. human.glb dosyasını yedekle (Eğer varsa)
+          if [ -f android/app/src/main/assets/human.glb ]; then
+            cp android/app/src/main/assets/human.glb human_backup.glb
+            echo "✅ human.glb bulundu ve güvene alındı."
+          else
+            echo "⚠️ UYARI: human.glb repo içinde bulunamadı! (Push etmeyi unuttun mu?)"
+          fi
+
+          # 2. Assets klasörünü temizle (Eski kod kalmasın)
           rm -rf android/app/src/main/assets/*
           mkdir -p android/app/src/main/assets
+
+          # 3. Yeni React Build'i (dist) kopyala
+          # Not: Vite kullanıyorsan klasör 'dist', CreateReactApp ise 'build' olur.
+          # Senin projende 'dist' olduğunu varsayıyoruz.
           cp -r dist/. android/app/src/main/assets/
+
+          # 4. human.glb dosyasını yedeğinden geri yükle
+          if [ -f human_backup.glb ]; then
+            mv human_backup.glb android/app/src/main/assets/human.glb
+            echo "✅ human.glb başarıyla geri yüklendi."
+          fi
+          
+          # 5. Son kontrol (Listeleme)
           ls -R android/app/src/main/assets/
 
       - name: Setup Java 17
@@ -53,13 +78,13 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle' # ✅ Java kurulumu üzerinden de gradle cache'ini destekler
+          cache: 'gradle'
 
       - name: Build Android
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew clean assembleDebug --stacktrace
+          ./gradlew clean assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
