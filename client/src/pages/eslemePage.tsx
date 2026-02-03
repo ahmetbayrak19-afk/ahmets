@@ -15,7 +15,8 @@ import NesneEslemeGame4 from '@/aba/esle/NesneEslemeGame4';   // EB.1.4
 
 // --- YENİ EKLENEN OYUNLAR ---
 import NesneEslemeGame6 from '@/aba/esle/NesneEslemeGame6';   // EB.2.2 (Farklı Nesne)
-import NesneEslemeGame7 from '@/aba/esle/NesneEslemeGame7';   // 🔥 YENİ: EB.2.3 (Farklı Eylem)
+import NesneEslemeGame7 from '@/aba/esle/NesneEslemeGame7';   // EB.2.3 (Farklı Eylem)
+import NesneEslemeGame8 from '@/aba/esle/NesneEslemeGame8';   // 🔥 YENİ: EB.2.4 (Resim-Nesne)
 
 import NesneEslemeGame9 from '@/aba/esle/NesneEslemeGame9';   // EB.2.5 (Renk)
 import NesneEslemeGame10 from '@/aba/esle/NesneEslemeGame10'; // EB.3.1 (Şekil)
@@ -119,8 +120,11 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             {/* EB.2.2 (Farklı Nesne) */}
             {activeGameItem.startsWith("EB.2.2") && <NesneEslemeGame6 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
 
-            {/* 🔥 YENİ: EB.2.3 (Farklı Eylem) */}
+            {/* EB.2.3 (Farklı Eylem) */}
             {activeGameItem.startsWith("EB.2.3") && <NesneEslemeGame7 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
+
+            {/* 🔥 YENİ: EB.2.4 (Resim-Nesne) */}
+            {activeGameItem.startsWith("EB.2.4") && <NesneEslemeGame8 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
 
             {activeGameItem.startsWith("EB.2.5") && <NesneEslemeGame9 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.3.1") && <NesneEslemeGame10 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
@@ -181,7 +185,8 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                 item.startsWith("EB.1.3") || item.startsWith("EB.1.4") ||
                 item.startsWith("EB.2.1") || 
                 item.startsWith("EB.2.2") || 
-                item.startsWith("EB.2.3") || // 🔥 YENİ EKLENEN
+                item.startsWith("EB.2.3") || 
+                item.startsWith("EB.2.4") || // 🔥 YENİ EKLENEN
                 item.startsWith("EB.2.5") ||
                 item.startsWith("EB.3.1") || item.startsWith("EB.3.2") ||
                 item.startsWith("EB.3.3") || item.startsWith("EB.3.4") ||
@@ -224,5 +229,5 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       </div>
     </div>
   );
-  }
-        
+    }
+            
