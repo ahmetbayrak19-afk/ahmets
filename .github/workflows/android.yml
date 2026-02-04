@@ -20,10 +20,12 @@ jobs:
           node-version: 20
           cache: 'npm'
 
+      # 🔥 DÜZELTİLEN KISIM BURASI 🔥
+      # --legacy-peer-deps komutu, sürüm kavgalarını (React 19 vs 18) susturur.
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
-      # Gradle Cache (Hız için - Aynen kalıyor)
+      # Gradle Cache
       - name: Cache Gradle Wrapper
         uses: actions/cache@v3
         with:
@@ -36,14 +38,13 @@ jobs:
           path: ~/.gradle/caches
           key: ${{ runner.os }}-gradle-caches-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
-            { runner.os }}-gradle-caches-
+            ${{ runner.os }}-gradle-caches-
 
-      # React Build (Burada public içindeki human.glb otomatik dist'e giriyor)
+      # React Build
       - name: Build Web Assets
         run: npm run build
 
-      # 🔥 YENİ SADELEŞTİRİLMİŞ KOPYALAMA ADIMI 🔥
-      # Yedekleme yok, geri yükleme yok. Direkt dist'i basıyoruz.
+      # Kopyalama Adımı (Sadeleştirilmiş hali)
       - name: Sync React Build to Android
         run: |
           echo "Eski assets klasörü temizleniyor..."
