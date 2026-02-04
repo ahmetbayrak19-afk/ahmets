@@ -1,18 +1,13 @@
 import React, { useState, Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { useGLTF, OrbitControls, Environment, ContactShadows, Html } from '@react-three/drei'
-import * as THREE from 'three'
 import { ArrowLeft, MousePointer2, AlertCircle } from "lucide-react"
 
-// 🔥 HAREKET 1: Dosyayı kodun içine 'import' ediyoruz.
-// (Dosya bu kod dosyasıyla AYNI KLASÖRDE olmalı)
-import humanModelPath from './human.glb'
-
-// 🔥 HAREKET 2: Aşağıdaki değişkene import ettiğimiz şeyi veriyoruz.
-const MODEL_PATH = humanModelPath
+// 🔥 SADECE DOSYA ADI 🔥
+// Çünkü YML dosyası bunu Android'in ana klasörüne koydu.
+const MODEL_PATH = 'human.glb'
 
 function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
-  // Model yolu artık dinamik olarak geliyor
   const { nodes } = useGLTF(MODEL_PATH) as any
   
   const [hovered, setHovered] = useState<string | null>(null)
@@ -63,28 +58,50 @@ function Loader() {
   )
 }
 
+// Hata Yakalayıcı
+class ErrorBoundary extends React.Component<any, { hasError: boolean }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true };
+  }
+  componentDidCatch(error: any) {
+    console.error("Model Hatası:", error);
+    this.props.setHasError(true);
+  }
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
+
 export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const [clickedName, setClickedName] = useState("Bir yere dokun...")
   const [hasError, setHasError] = useState(false)
 
   return (
     <div className="fixed inset-0 z-[500] bg-slate-900 flex flex-col">
+      {/* Geri Butonu */}
       <div className="absolute top-4 left-4 z-10">
         <button onClick={onClose} className="p-3 bg-slate-800/80 rounded-full text-white hover:bg-slate-700 transition">
           <ArrowLeft size={24} />
         </button>
       </div>
 
+      {/* Hata Mesajı */}
       {hasError && (
         <div className="absolute top-20 left-4 right-4 z-50 bg-red-500/90 text-white p-4 rounded-xl flex items-center gap-3 shadow-lg backdrop-blur-md animate-bounce">
           <AlertCircle size={24} />
           <div>
             <p className="font-bold">Model Yüklenemedi!</p>
-            <p className="text-xs opacity-90">Dosya yolu veya import hatası.</p>
+            <p className="text-xs opacity-90">Dosya bulunamadı.</p>
           </div>
         </div>
       )}
 
+      {/* 3D Sahne */}
       <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400 relative">
         <Canvas 
             camera={{ position: [0, 1.5, 3.5], fov: 50 }} 
@@ -105,6 +122,7 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         </Canvas>
       </div>
 
+      {/* Alt Bilgi */}
       <div className="absolute bottom-8 w-full flex justify-center pointer-events-none px-4">
         <div className="bg-blue-600/90 text-white w-full max-w-md py-4 rounded-2xl text-center shadow-lg backdrop-blur-md border border-blue-400/30">
           <div className="flex items-center justify-center gap-2 mb-1 opacity-80">
@@ -116,23 +134,4 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   )
-}
-
-// Hata Yakalayıcı
-class ErrorBoundary extends React.Component<any, { hasError: boolean }> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false };
-  }
-  static getDerivedStateFromError(error: any) {
-    return { hasError: true };
-  }
-  componentDidCatch(error: any) {
-    console.error("Model Yükleme Hatası:", error);
-    this.props.setHasError(true);
-  }
-  render() {
-    if (this.state.hasError) return null;
-    return this.props.children;
-  }
 }
