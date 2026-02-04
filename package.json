@@ -1,14 +1,4 @@
-{
-  "name": "rest-express",
-  "version": "1.0.0",
-  "type": "module",
-  "license": "MIT",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
+"dependencies": {
     "@capacitor/cli": "^6.0.0",
     "@capacitor/core": "^6.0.0",
     "@capacitor/ios": "^6.0.0",
@@ -66,27 +56,8 @@
     "tailwindcss-animate": "^1.0.7",
     "wouter": "^3.3.5",
     "zod": "^3.24.0",
-    "three": "^0.160.0",
-    "@react-three/fiber": "^8.16.0",
-    "@react-three/drei": "^9.100.0"
+    
+    "three": "^0.166.0",
+    "@react-three/fiber": "^8.16.8",
+    "@react-three/drei": "^9.108.0"
   },
-  "devDependencies": {
-    "@types/canvas-confetti": "^1.6.4",
-    "@tailwindcss/vite": "^4.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^4.3.4",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^4.0.0",
-    "typescript": "^5.7.0",
-    "vite": "^6.0.0",
-    "@types/three": "^0.160.0"
-  },
-  "overrides": {
-    "@hello-pangea/dnd": {
-      "react": "$react",
-      "react-dom": "$react-dom"
-    }
-  }
-}
