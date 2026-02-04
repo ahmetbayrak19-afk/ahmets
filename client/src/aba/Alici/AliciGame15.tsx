@@ -6,8 +6,8 @@ import { ArrowLeft, MousePointer2, AlertCircle } from "lucide-react"
 
 // --- 1. MODEL PARÇASI ---
 function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
-  // DİKKAT: ', true' kısmını sildim. Standart yükleme yapıyoruz.
-  const { nodes } = useGLTF('/human.glb') as any
+  // ✅ DÜZELTİLDİ: Başındaki '/' kalktı. Artık Android dosyayı bulur.
+  const { nodes } = useGLTF('human.glb') as any
   
   const [hovered, setHovered] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
@@ -87,7 +87,7 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
       <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400">
         <Canvas 
             camera={{ position: [0, 1.5, 3.5], fov: 50 }}
-            onCreated={() => console.log("Canvas Yüklendi")} // Konsola bilgi basar
+            onCreated={() => console.log("Canvas Yüklendi")}
         >
           {/* Işıklar */}
           <ambientLight intensity={0.7} />
