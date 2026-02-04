@@ -23,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # Gradle Cache (Hız için)
+      # Gradle Cache (Hız için - Aynen kalıyor)
       - name: Cache Gradle Wrapper
         uses: actions/cache@v3
         with:
@@ -36,48 +36,25 @@ jobs:
           path: ~/.gradle/caches
           key: ${{ runner.os }}-gradle-caches-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
-            ${{ runner.os }}-gradle-caches-
+            { runner.os }}-gradle-caches-
 
-      # React Build
+      # React Build (Burada public içindeki human.glb otomatik dist'e giriyor)
       - name: Build Web Assets
         run: npm run build
 
-      # 🔥 DÜZELTİLEN KISIM: DOSYAYI KORUYARAK KOPYALAMA 🔥
-      - name: Safe Copy Assets
+      # 🔥 YENİ SADELEŞTİRİLMİŞ KOPYALAMA ADIMI 🔥
+      # Yedekleme yok, geri yükleme yok. Direkt dist'i basıyoruz.
+      - name: Sync React Build to Android
         run: |
-          echo "Dosya transferi başlıyor..."
-
-          # 1. human.glb dosyasını repo'dan geldiği yerde bul ve geçici olarak /tmp'ye yedekle
-          if [ -f android/app/src/main/assets/human.glb ]; then
-            cp android/app/src/main/assets/human.glb /tmp/human_safe.glb
-            echo "✅ human.glb repo içinde bulundu ve korumaya alındı."
-          else
-            echo "⚠️ UYARI: human.glb repo içinde bulunamadı!"
-          fi
-
-          # 2. Assets klasörünü temizle (Eski React dosyaları çöp olmasın diye)
+          echo "Eski assets klasörü temizleniyor..."
           rm -rf android/app/src/main/assets/*
           mkdir -p android/app/src/main/assets
 
-          # 3. Yeni React Build'i (dist) kopyala
-          if [ -d "dist" ]; then
-             cp -r dist/* android/app/src/main/assets/
-             echo "✅ React build dosyaları kopyalandı."
-          else
-             echo "❌ HATA: dist klasörü bulunamadı. Build başarısız olmuş olabilir."
-             exit 1
-          fi
+          echo "Yeni build (human.glb dahil) kopyalanıyor..."
+          # dist klasöründeki her şeyi Android assets'e at
+          cp -r dist/* android/app/src/main/assets/
 
-          # 4. human.glb dosyasını yedeğinden geri yükle
-          if [ -f /tmp/human_safe.glb ]; then
-            cp /tmp/human_safe.glb android/app/src/main/assets/human.glb
-            echo "✅ human.glb başarıyla assets klasörüne geri kondu."
-          else
-             echo "⚠️ human.glb yedeği yok, dosya eklenmedi."
-          fi
-          
-          # 5. Son durum kontrolü (Loglarda human.glb görmelisin)
-          echo "📂 Final Assets Klasörü İçeriği:"
+          echo "📂 Kontrol edelim, human.glb orada mı?"
           ls -la android/app/src/main/assets/
 
       - name: Setup Java 17
@@ -98,4 +75,3 @@ jobs:
         with:
           name: app-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
-          
