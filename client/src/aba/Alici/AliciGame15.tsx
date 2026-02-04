@@ -9,23 +9,52 @@ import {
 } from "@react-three/drei";
 import { ArrowLeft, MousePointer2, AlertCircle } from "lucide-react";
 
-// ✅ EN GARANTİLİ: GLB'yi build'e zorla dahil eder (dist/assets içine girer)
-import humanUrl from "@/assets/human.glb?url";
+// ✅ Firebase Storage Download URL (HTTPS olmalı)
+const MODEL_PATH =
+  "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/human.glb?alt=media&token=7b979206-e91e-4e34-95ce-370e4c537998";
 
-// Not: Vite base: "./" olsa bile bu URL doğru şekilde çözümlenir.
-const MODEL_PATH = humanUrl;
+function Loader() {
+  return (
+    <Html center>
+      <div className="flex flex-col items-center bg-white/90 p-4 rounded-xl shadow-xl backdrop-blur-sm">
+        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-gray-800 font-bold text-sm">Model Yükleniyor...</p>
+        <p className="text-[10px] text-gray-500 mt-2 max-w-[260px] break-words text-center">
+          {MODEL_PATH}
+        </p>
+      </div>
+    </Html>
+  );
+}
 
-type ModelProps = {
-  onPartClick: (name: string) => void;
-};
+// Hata yakalayıcı
+class ErrorBoundary extends React.Component<
+  { setHasError: (v: boolean) => void },
+  { hasError: boolean }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: any) {
+    console.error("Model Hatası:", error);
+    this.props.setHasError(true);
+  }
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children as any;
+  }
+}
 
-function Model({ onPartClick }: ModelProps) {
+function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
   const gltf = useGLTF(MODEL_PATH) as any;
-
   const [hovered, setHovered] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
-  // nodes içinden Mesh olanları filtreleyelim (daha temiz)
+  // nodes içinden Mesh olanları al
   const meshes = useMemo(() => {
     const nodes = gltf?.nodes || {};
     return Object.entries(nodes)
@@ -45,14 +74,13 @@ function Model({ onPartClick }: ModelProps) {
           key={key}
           geometry={node.geometry}
           material={node.material}
-          // highlight (sadece renk override)
           material-color={
             selected === key ? "#22c55e" : hovered === key ? "#fcd34d" : undefined
           }
           onClick={(e) => {
             e.stopPropagation();
             setSelected(key);
-            onPartClick(key);
+            onPartClick(key); // burada key yerine istersen node.name de yollayabiliriz
           }}
           onPointerOver={(e) => {
             e.stopPropagation();
@@ -67,45 +95,6 @@ function Model({ onPartClick }: ModelProps) {
       ))}
     </group>
   );
-}
-
-function Loader() {
-  return (
-    <Html center>
-      <div className="flex flex-col items-center bg-white/90 p-4 rounded-xl shadow-xl backdrop-blur-sm">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3"></div>
-        <p className="text-gray-800 font-bold text-sm">Model Yükleniyor...</p>
-        <p className="text-[10px] text-gray-500 mt-2 max-w-[240px] break-words text-center">
-          {MODEL_PATH}
-        </p>
-      </div>
-    </Html>
-  );
-}
-
-// Hata yakalayıcı (React componenti olmalı)
-class ErrorBoundary extends React.Component<
-  { setHasError: (v: boolean) => void },
-  { hasError: boolean }
-> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: any) {
-    console.error("GLTF/Scene Error:", error);
-    this.props.setHasError(true);
-  }
-
-  render() {
-    if (this.state.hasError) return null;
-    return this.props.children as any;
-  }
 }
 
 export default function AliciGame15({ onClose }: { onClose: () => void }) {
@@ -131,13 +120,10 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
           <div className="min-w-0">
             <p className="font-bold">Model Yüklenemedi!</p>
             <p className="text-xs opacity-90">
-              GLB dosyası build’e dahil olmuyor olabilir.
+              Firebase URL / internet / erişim izni kontrol et.
             </p>
             <p className="text-[10px] mt-2 opacity-80 break-words">
               Path: {MODEL_PATH}
-            </p>
-            <p className="text-[10px] mt-1 opacity-80">
-              Dosya şu konumda olmalı: <b>client/src/assets/human.glb</b>
             </p>
           </div>
         </div>
@@ -147,13 +133,7 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
       <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400 relative">
         <Canvas camera={{ position: [0, 1.5, 3.5], fov: 50 }}>
           <ambientLight intensity={0.7} />
-          <spotLight
-            position={[10, 10, 10]}
-            angle={0.15}
-            penumbra={1}
-            intensity={1}
-          />
-
+          <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} />
           <Environment preset="city" />
 
           <Suspense fallback={<Loader />}>
@@ -168,13 +148,7 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
             maxPolarAngle={Math.PI / 1.8}
             enablePan={false}
           />
-
-          <ContactShadows
-            position={[0, -0.01, 0]}
-            opacity={0.4}
-            scale={10}
-            blur={2.5}
-          />
+          <ContactShadows position={[0, -0.01, 0]} opacity={0.4} scale={10} blur={2.5} />
         </Canvas>
       </div>
 
@@ -187,14 +161,12 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
               Tespit Edilen Bölge
             </span>
           </div>
-          <p className="font-mono text-xl font-bold truncate px-4">
-            {clickedName}
-          </p>
+          <p className="font-mono text-xl font-bold truncate px-4">{clickedName}</p>
         </div>
       </div>
     </div>
   );
 }
 
-// ✅ optional: preload (ilk açılış hızlanır)
+// ✅ preload (ilk açılış hızlanır)
 useGLTF.preload(MODEL_PATH);
