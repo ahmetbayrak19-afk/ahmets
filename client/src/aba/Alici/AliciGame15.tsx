@@ -3,19 +3,23 @@ import { Canvas } from '@react-three/fiber'
 import { useGLTF, OrbitControls, Environment, ContactShadows, Html } from '@react-three/drei'
 import { ArrowLeft, MousePointer2, AlertCircle } from "lucide-react"
 
-// 🔥 KESİN ÇÖZÜM: Android'in "yerel dosya yasağını" internetten çekerek deliyoruz.
-// Bu link senin GitHub'ındaki dosyanın direkt adresidir.
-const MODEL_PATH = 'https://raw.githubusercontent.com/ahmetbayrak19-afk/ahmets/main/client/public/human.glb'
+// NOT: Eğer internet linki (URL) ile çalıştırdıysan buraya o linki yapıştır.
+// Eğer YML yöntemiyle dosya attıysan 'human.glb' kalsın.
+const MODEL_PATH = 'human.glb' 
+// Veya URL örneği: 'https://raw.githubusercontent.com/..../human.glb'
 
 function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
-  // İnternet adresi olduğu için Android sorun çıkarmaz, şak diye yükler.
   const { nodes } = useGLTF(MODEL_PATH) as any
   
   const [hovered, setHovered] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
 
   return (
-    <group dispose={null}>
+    // 🔥 DÜZELTME BURADA YAPILDI 🔥
+    // rotation={[-Math.PI / 2, 0, 0]} -> Adamı yerden kaldırır (Dik konuma getirir)
+    // position={[0, -1, 0]} -> Ayaklarını merkeze (aşağı) çeker
+    // scale={2.5} -> Adamı biraz büyütür
+    <group dispose={null} rotation={[-Math.PI / 2, 0, 0]} position={[0, -1, 0]} scale={2.5}>
       {Object.keys(nodes).map((key) => {
         const node = nodes[key]
         if (node.type === 'Mesh') {
@@ -53,10 +57,29 @@ function Loader() {
     <Html center>
       <div className="flex flex-col items-center bg-white/90 p-4 rounded-xl shadow-xl backdrop-blur-sm">
         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3"></div>
-        <p className="text-gray-800 font-bold text-sm">Model İndiriliyor...</p>
+        <p className="text-gray-800 font-bold text-sm">Model Yükleniyor...</p>
       </div>
     </Html>
   )
+}
+
+// Hata Yakalayıcı
+class ErrorBoundary extends React.Component<any, { hasError: boolean }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true };
+  }
+  componentDidCatch(error: any) {
+    console.error("Model Hatası:", error);
+    this.props.setHasError(true);
+  }
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
 }
 
 export default function AliciGame15({ onClose }: { onClose: () => void }) {
@@ -65,22 +88,25 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-[500] bg-slate-900 flex flex-col">
+      {/* Geri Butonu */}
       <div className="absolute top-4 left-4 z-10">
         <button onClick={onClose} className="p-3 bg-slate-800/80 rounded-full text-white hover:bg-slate-700 transition">
           <ArrowLeft size={24} />
         </button>
       </div>
 
+      {/* Hata Mesajı */}
       {hasError && (
         <div className="absolute top-20 left-4 right-4 z-50 bg-red-500/90 text-white p-4 rounded-xl flex items-center gap-3 shadow-lg backdrop-blur-md animate-bounce">
           <AlertCircle size={24} />
           <div>
             <p className="font-bold">Model Yüklenemedi!</p>
-            <p className="text-xs opacity-90">İnternet bağlantını kontrol et.</p>
+            <p className="text-xs opacity-90">Dosya yolu hatalı olabilir.</p>
           </div>
         </div>
       )}
 
+      {/* 3D Sahne */}
       <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400 relative">
         <Canvas 
             camera={{ position: [0, 1.5, 3.5], fov: 50 }} 
@@ -101,6 +127,7 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         </Canvas>
       </div>
 
+      {/* Alt Bilgi */}
       <div className="absolute bottom-8 w-full flex justify-center pointer-events-none px-4">
         <div className="bg-blue-600/90 text-white w-full max-w-md py-4 rounded-2xl text-center shadow-lg backdrop-blur-md border border-blue-400/30">
           <div className="flex items-center justify-center gap-2 mb-1 opacity-80">
@@ -112,23 +139,4 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   )
-}
-
-// Hata Yakalayıcı
-class ErrorBoundary extends React.Component<any, { hasError: boolean }> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false };
-  }
-  static getDerivedStateFromError(error: any) {
-    return { hasError: true };
-  }
-  componentDidCatch(error: any) {
-    console.error("Model Yükleme Hatası:", error);
-    this.props.setHasError(true);
-  }
-  render() {
-    if (this.state.hasError) return null;
-    return this.props.children;
-  }
 }
