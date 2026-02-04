@@ -20,12 +20,10 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      # 🔥 DÜZELTİLEN KISIM BURASI 🔥
-      # --legacy-peer-deps komutu, sürüm kavgalarını (React 19 vs 18) susturur.
       - name: Install dependencies
+        # Sürüm çakışmalarını önlemek için legacy-peer-deps
         run: npm install --legacy-peer-deps
 
-      # Gradle Cache
       - name: Cache Gradle Wrapper
         uses: actions/cache@v3
         with:
@@ -40,20 +38,23 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-caches-
 
-      # React Build
       - name: Build Web Assets
         run: npm run build
 
-      # Kopyalama Adımı (Sadeleştirilmiş hali)
+      # 🔥 KRİTİK ADIM BURASI 🔥
       - name: Sync React Build to Android
         run: |
           echo "Eski assets klasörü temizleniyor..."
           rm -rf android/app/src/main/assets/*
           mkdir -p android/app/src/main/assets
 
-          echo "Yeni build (human.glb dahil) kopyalanıyor..."
-          # dist klasöründeki her şeyi Android assets'e at
+          echo "Yeni build kopyalanıyor..."
           cp -r dist/* android/app/src/main/assets/
+
+          # 👇 İŞTE O SİHİRLİ SATIR 👇
+          # Dosyayı public klasöründen alıp Android'in içine ismini bozmadan koyuyoruz.
+          echo "Model dosyası manuel olarak kopyalanıyor..."
+          cp client/public/human.glb android/app/src/main/assets/human.glb
 
           echo "📂 Kontrol edelim, human.glb orada mı?"
           ls -la android/app/src/main/assets/
