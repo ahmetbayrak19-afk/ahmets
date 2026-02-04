@@ -3,22 +3,20 @@ import { Canvas } from '@react-three/fiber'
 import { useGLTF, OrbitControls, Environment, ContactShadows, Html } from '@react-three/drei'
 import { ArrowLeft, MousePointer2, AlertCircle } from "lucide-react"
 
-// NOT: Eğer internet linki (URL) ile çalıştırdıysan buraya o linki yapıştır.
-// Eğer YML yöntemiyle dosya attıysan 'human.glb' kalsın.
-const MODEL_PATH = 'human.glb' 
-// Veya URL örneği: 'https://raw.githubusercontent.com/..../human.glb'
+// 🔥 KESİN VE SADE ÇÖZÜM 🔥
+// Dosya 'client/public' içinde olduğu için ve vite.config'de base='./' olduğu için
+// SADECE İSMİNİ yazmamız yeterlidir.
+const MODEL_PATH = 'human.glb'
 
 function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
+  // useGLTF artık bunu hemen yanındaki dosya gibi şak diye bulacak.
   const { nodes } = useGLTF(MODEL_PATH) as any
   
   const [hovered, setHovered] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
 
   return (
-    // 🔥 DÜZELTME BURADA YAPILDI 🔥
-    // rotation={[-Math.PI / 2, 0, 0]} -> Adamı yerden kaldırır (Dik konuma getirir)
-    // position={[0, -1, 0]} -> Ayaklarını merkeze (aşağı) çeker
-    // scale={2.5} -> Adamı biraz büyütür
+    // 🔥 ADAM DÜZELTME AYARLARI (AYNEN KORUDUK) 🔥
     <group dispose={null} rotation={[-Math.PI / 2, 0, 0]} position={[0, -1, 0]} scale={2.5}>
       {Object.keys(nodes).map((key) => {
         const node = nodes[key]
@@ -63,7 +61,6 @@ function Loader() {
   )
 }
 
-// Hata Yakalayıcı
 class ErrorBoundary extends React.Component<any, { hasError: boolean }> {
   constructor(props: any) {
     super(props);
@@ -88,25 +85,22 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-[500] bg-slate-900 flex flex-col">
-      {/* Geri Butonu */}
       <div className="absolute top-4 left-4 z-10">
         <button onClick={onClose} className="p-3 bg-slate-800/80 rounded-full text-white hover:bg-slate-700 transition">
           <ArrowLeft size={24} />
         </button>
       </div>
 
-      {/* Hata Mesajı */}
       {hasError && (
         <div className="absolute top-20 left-4 right-4 z-50 bg-red-500/90 text-white p-4 rounded-xl flex items-center gap-3 shadow-lg backdrop-blur-md animate-bounce">
           <AlertCircle size={24} />
           <div>
             <p className="font-bold">Model Yüklenemedi!</p>
-            <p className="text-xs opacity-90">Dosya yolu hatalı olabilir.</p>
+            <p className="text-xs opacity-90">Dosya yolu bulunamadı.</p>
           </div>
         </div>
       )}
 
-      {/* 3D Sahne */}
       <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400 relative">
         <Canvas 
             camera={{ position: [0, 1.5, 3.5], fov: 50 }} 
@@ -127,7 +121,6 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         </Canvas>
       </div>
 
-      {/* Alt Bilgi */}
       <div className="absolute bottom-8 w-full flex justify-center pointer-events-none px-4">
         <div className="bg-blue-600/90 text-white w-full max-w-md py-4 rounded-2xl text-center shadow-lg backdrop-blur-md border border-blue-400/30">
           <div className="flex items-center justify-center gap-2 mb-1 opacity-80">
