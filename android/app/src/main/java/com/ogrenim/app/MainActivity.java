@@ -23,7 +23,7 @@ import android.webkit.WebResourceResponse;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.activity.OnBackPressedCallback; // ✅ YENİ IMPORT
+import androidx.activity.OnBackPressedCallback;
 
 import org.json.JSONObject;
 
@@ -52,7 +52,7 @@ public class MainActivity extends AppCompatActivity {
 
         checkAndRequestPermissions();
 
-        // 1. NFC
+        // 1. NFC Ayarları
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
         Intent intent = new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? PendingIntent.FLAG_MUTABLE : PendingIntent.FLAG_UPDATE_CURRENT;
@@ -63,7 +63,7 @@ public class MainActivity extends AppCompatActivity {
             new IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED)
         };
 
-        // 2. TTS
+        // 2. TTS (Sesli Okuma) Ayarları
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
                 tts.setLanguage(new Locale("tr", "TR"));
@@ -71,21 +71,17 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // 3. WEBVIEW KURULUMU
+        // 3. WebView Kurulumu
         webView = new WebView(this);
         setContentView(webView);
 
-        // 🔥 YENİ EKLENEN KISIM: GERİ TUŞU YÖNETİMİ 🔥
-        // Android'in geri tuşuna basıldığında ne olacağını belirliyoruz.
+        // Geri Tuşu Yönetimi
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                // Eğer WebView'da geriye gidilecek bir sayfa varsa (History varsa)
                 if (webView.canGoBack()) {
-                    webView.goBack(); // WebView içinde geri git
+                    webView.goBack();
                 } else {
-                    // Geri gidilecek sayfa yoksa (Ana sayfadaysak)
-                    // Bu callback'i devre dışı bırak ve sistemin normal geri işlevini (kapatma/alta alma) çalıştır
                     setEnabled(false);
                     getOnBackPressedDispatcher().onBackPressed();
                 }
@@ -101,7 +97,7 @@ public class MainActivity extends AppCompatActivity {
         settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
 
-        // JS Arayüzü
+        // JS Arayüzü (TTS için)
         webView.addJavascriptInterface(new Object() {
             @JavascriptInterface
             public void speak(String text) {
@@ -112,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }, "AndroidTTS");
 
-        // 4. CHROME CLIENT
+        // 4. WebChromeClient (Kamera/Mikrofon İzinleri ve Dosya Seçici)
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
@@ -143,33 +139,40 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // 5. WEBVIEW CLIENT (MODEL DOSYASI YAKALAYICI)
+        // 5. WebViewClient (3D Model Yakalayıcı - FIX EKLENDİ)
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
 
-                if (url.equals("https://appassets.android/human.glb")) {
+                // 🔥 GÜNCEL KOD: URL'nin başı ne olursa olsun, sonu /human.glb ise yakala 🔥
+                if (url.endsWith("/human.glb")) {
                     try {
+                        // Assets klasöründen dosyayı aç
                         InputStream is = getAssets().open("human.glb");
+
+                        // Güvenlik ve Tip Başlıkları
                         Map<String, String> headers = new HashMap<>();
                         headers.put("Access-Control-Allow-Origin", "*");
                         headers.put("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
                         headers.put("Access-Control-Allow-Headers", "*");
+                        headers.put("Content-Type", "model/gltf-binary"); // Tarayıcıya bunun 3D model olduğunu söyle
+
                         return new WebResourceResponse("model/gltf-binary", "UTF-8", 200, "OK", headers, is);
                     } catch (Exception e) {
                         e.printStackTrace();
-                        return null;
+                        return null; // Hata olursa null dön (Logcat'e bakılabilir)
                     }
                 }
                 return super.shouldInterceptRequest(view, request);
             }
         });
 
+        // Uygulamayı Başlat
         webView.loadUrl("file:///android_asset/index.html");
     }
 
-    // İzinler
+    // İzin İsteme Fonksiyonu
     private void checkAndRequestPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             String[] permissions = {Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO, Manifest.permission.NFC};
@@ -181,7 +184,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // Dosya seçici sonucu
+    // Dosya Seçici Sonucu
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == FILECHOOSER_RESULTCODE) {
@@ -194,7 +197,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // NFC ve Yaşam Döngüsü
+    // NFC Yaşam Döngüsü
     @Override
     protected void onResume() {
         super.onResume();
@@ -216,6 +219,7 @@ public class MainActivity extends AppCompatActivity {
             Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
             if (tag != null) {
                 String nfcId = bytesToHex(tag.getId());
+                // React tarafındaki global fonksiyona ID gönder
                 webView.evaluateJavascript("window.handleNfcScan(" + JSONObject.quote(nfcId) + ")", null);
             }
         }
@@ -232,4 +236,5 @@ public class MainActivity extends AppCompatActivity {
         if (tts != null) { tts.stop(); tts.shutdown(); }
         super.onDestroy();
     }
-    }
+                    }
+            
