@@ -1,4 +1,4 @@
-import React, { Suspense, useMemo, useState } from "react";
+import React, { Suspense, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import {
   ContactShadows,
@@ -6,9 +6,9 @@ import {
   Html,
   OrbitControls,
   useGLTF,
-  Bounds,
 } from "@react-three/drei";
 import { ArrowLeft, MousePointer2, AlertCircle } from "lucide-react";
+import * as THREE from "three";
 
 // ✅ Firebase Storage Download URL (HTTPS)
 const MODEL_PATH =
@@ -46,12 +46,9 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-// ✅ ÖNEMLİ: Rig/Transform bozulmasın diye meshleri tek tek çizmek yerine
-// GLTF'nin SAHNESİNİ olduğu gibi render ediyoruz.
 function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
   const gltf = useGLTF(MODEL_PATH) as any;
 
-  // Bazı exporter'lar name boş bırakabiliyor; en kötü material/uuid yedek
   const pickName = (obj: any) => {
     const n =
       obj?.name ||
@@ -62,14 +59,11 @@ function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
     return String(n || "unknown");
   };
 
-  // Pointer event'i scene üstünden alıp tıklanan objeyi yakalıyoruz
   const onPointerDown = (e: any) => {
     e.stopPropagation();
-    const obj = e.object; // Mesh / SkinnedMesh
-    onPartClick(pickName(obj));
+    onPartClick(pickName(e.object));
   };
 
-  // Modeli ortalamak için Bounds kullanacağız (aşağıda)
   return (
     <group onPointerDown={onPointerDown}>
       <primitive object={gltf.scene} />
@@ -77,11 +71,26 @@ function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
   );
 }
 
+function FitCameraOnce({
+  controlsRef,
+  setHasError,
+}: {
+  controlsRef: React.RefObject<any>;
+  setHasError: (v: boolean) => void;
+}) {
+  // Canvas'tan camera ve scene almak için useThree yerine prop ile de yapılabilir,
+  // ama burada en kısa/temiz yöntem: onCreated içinde halledeceğiz.
+  // Bu componenti boş bırakıyoruz, sadece tip için var.
+  return null;
+}
+
 export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const [clickedName, setClickedName] = useState("Bir yere dokun...");
   const [hasError, setHasError] = useState(false);
 
-  // UI'de çok uzun isim taşmasın
+  const controlsRef = useRef<any>(null);
+  const didFitRef = useRef(false);
+
   const pretty = useMemo(() => {
     if (!clickedName) return "—";
     return clickedName.length > 40 ? clickedName.slice(0, 40) + "…" : clickedName;
@@ -111,23 +120,83 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      {/* Sahne */}
       <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400 relative">
-        <Canvas camera={{ position: [0, 1.2, 3.2], fov: 45 }}>
-          <ambientLight intensity={0.8} />
+        <Canvas
+          camera={{ position: [0, 1.4, 3.2], fov: 45, near: 0.01, far: 200 }}
+          onCreated={({ camera, scene }) => {
+            // ✅ Başlangıç görünümünü kesin "karşıdan" yap
+            // Model yüklendikten sonra 1 kez fit + target ayarlıyoruz.
+            // Scene'de mesh oluşunca bbox hesaplayacağız.
+            if (didFitRef.current) return;
+
+            // Birkaç frame sonra scene dolacak; kısa gecikmeyle bbox al.
+            requestAnimationFrame(() => {
+              try {
+                const box = new THREE.Box3().setFromObject(scene);
+                if (box.isEmpty()) return;
+
+                const size = new THREE.Vector3();
+                const center = new THREE.Vector3();
+                box.getSize(size);
+                box.getCenter(center);
+
+                // Target'ı göğüs hizasına çek: center.y + (boyun/baş) yerine biraz yukarı
+                const target = new THREE.Vector3(center.x, center.y + size.y * 0.15, center.z);
+
+                // Kamerayı "front" tarafta konumlandır (Z ekseninde biraz dışarı)
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const dist = maxDim * 1.25;
+
+                camera.position.set(target.x, target.y + maxDim * 0.05, target.z + dist);
+                camera.lookAt(target);
+                camera.updateProjectionMatrix();
+
+                // OrbitControls varsa target'ı set et
+                const c = controlsRef.current;
+                if (c) {
+                  c.target.copy(target);
+                  c.update();
+                }
+
+                didFitRef.current = true;
+              } catch (e) {
+                console.error("FitCamera error:", e);
+                setHasError(true);
+              }
+            });
+          }}
+        >
+          <ambientLight intensity={0.85} />
           <directionalLight position={[5, 10, 5]} intensity={1.1} />
           <Environment preset="city" />
 
           <Suspense fallback={<Loader />}>
             <ErrorBoundary setHasError={setHasError}>
-              {/* ✅ Bounds: modeli otomatik ortalar ve kamerayı sığdırır */}
-              <Bounds fit clip observe margin={1.1}>
-                <Model onPartClick={setClickedName} />
-              </Bounds>
+              <Model onPartClick={setClickedName} />
             </ErrorBoundary>
           </Suspense>
 
-          <OrbitControls makeDefault enablePan={false} />
+          {/* ✅ 2 parmak hareketi: PAN + ZOOM açık */}
+          {/* - enablePan=true: iki parmakla sağa/sola/yukarı/aşağı taşıma */}
+          {/* - enableZoom=true: pinch zoom */}
+          {/* - min/maxPolarAngle: ayak altına geçmesin */}
+          <OrbitControls
+            ref={controlsRef}
+            makeDefault
+            enablePan={true}
+            enableZoom={true}
+            enableRotate={true}
+            panSpeed={0.9}
+            rotateSpeed={0.8}
+            zoomSpeed={0.9}
+            // Kamera "altından" dolaşmasın
+            minPolarAngle={0.15}
+            maxPolarAngle={Math.PI - 0.35}
+            // Çok uzak/çok yakın gitmesin
+            minDistance={1.4}
+            maxDistance={10}
+          />
+
           <ContactShadows position={[0, -1.05, 0]} opacity={0.35} scale={12} blur={2.5} />
         </Canvas>
       </div>
@@ -147,3 +216,4 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
 }
 
 useGLTF.preload(MODEL_PATH);
+```0
