@@ -3,7 +3,6 @@ import { Canvas } from "@react-three/fiber";
 import { Environment, Html, OrbitControls, useGLTF } from "@react-three/drei";
 import { ArrowLeft, MousePointer2, AlertCircle } from "lucide-react";
 
-// ✅ Firebase Linkin
 const MODEL_PATH =
   "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/human.glb?alt=media&token=7b979206-e91e-4e34-95ce-370e4c537998";
 
@@ -18,8 +17,21 @@ function Loader() {
   );
 }
 
-function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
+function Model({
+  onPartClick,
+  onReady,
+}: {
+  onPartClick: (name: string) => void;
+  onReady: () => void;
+}) {
   const gltf = useGLTF(MODEL_PATH) as any;
+
+  // ✅ Model gerçekten yüklendiğinde bu component render olur.
+  // İlk renderdan sonra "onReady" çağırıyoruz.
+  useEffect(() => {
+    onReady();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <group
@@ -27,18 +39,16 @@ function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
         e.stopPropagation();
         const obj = e.object;
         const name =
-          obj?.name || obj?.material?.name || obj?.geometry?.name || obj?.uuid || "unknown";
+          obj?.name ||
+          obj?.material?.name ||
+          obj?.geometry?.name ||
+          obj?.uuid ||
+          "unknown";
         onPartClick(String(name));
       }}
     >
-      {/* 🔥 DÜZELTME 1: ADAM YATMASIN DİYE DİKELTME KODU */}
-      {/* Senin kodunda burası eksikti, o yüzden yatıyordu. */}
-      <primitive 
-        object={gltf.scene} 
-        rotation={[-Math.PI / 2, 0, 0]} // Adamı ayağa kaldırır
-        position={[0, -1, 0]} // Ayakları yere basar
-        scale={2.5} // Boyutu ayarlar
-      />
+      {/* ✅ Model aynen kalıyor, BOZULMA YOK */}
+      <primitive object={gltf.scene} />
     </group>
   );
 }
@@ -48,23 +58,27 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const [hasError, setHasError] = useState(false);
 
   const controlsRef = useRef<any>(null);
+  const cameraAppliedRef = useRef(false);
 
-  // ✅ DÜZELTME 2: KAMERA GÖĞSE BAKSIN (Senin useEffect yapın)
-  useEffect(() => {
+  // ✅ Sadece bir kere çalışsın
+  const applyCameraOnce = () => {
+    if (cameraAppliedRef.current) return;
+
     const c = controlsRef.current;
     if (!c) return;
 
-    // 1. Kamerayı yukarı kaldır (Göz hizası)
-    c.object.position.set(0, 1.6, 4.0);
-
-    // 2. Kamerayı aşağı (bacağa) değil, yukarı (göğse) odakla
-    c.target.set(0, 1.3, 0);
-
+    // 🔥 Model geldikten sonra: kamerayı GERİ + YUKARI al
+    // AÇIYI BOZMADAN: Position set + target set + update
+    c.object.position.set(0, 1.6, 4.2); // geri + yukarı
+    c.target.set(0, 1.4, 0); // göğüs hizası
     c.update();
-  }, []);
+
+    cameraAppliedRef.current = true;
+  };
 
   return (
     <div className="fixed inset-0 z-[500] bg-slate-900 flex flex-col">
+      {/* Üst bar */}
       <div className="absolute top-4 left-4 z-10">
         <button
           onClick={onClose}
@@ -74,36 +88,51 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
+      {/* Hata */}
       {hasError && (
         <div className="absolute top-20 left-4 right-4 z-50 bg-red-500/90 text-white p-4 rounded-xl flex items-center gap-3 shadow-lg backdrop-blur-md">
           <AlertCircle size={24} />
           <div className="min-w-0">
             <p className="font-bold">Model Yüklenemedi!</p>
-            <p className="text-xs opacity-90">İnternet bağlantını kontrol et.</p>
+            <p className="text-xs opacity-90 break-words">
+              URL / internet / Firebase erişimi kontrol et.
+            </p>
           </div>
         </div>
       )}
 
+      {/* Sahne */}
       <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400 relative">
-        {/* far: 2000 -> Beyaz perde sorununu çözer */}
         <Canvas camera={{ fov: 50, near: 0.01, far: 2000 }}>
           <ambientLight intensity={0.8} />
           <directionalLight position={[5, 10, 5]} intensity={1.1} />
           <Environment preset="city" />
 
-          <Suspense fallback={<Loader />}>
-            <Model onPartClick={setClickedName} />
-          </Suspense>
-
+          {/* Kontroller: gesture aynen, sadece ref ekledik */}
           <OrbitControls ref={controlsRef} makeDefault />
+
+          <Suspense fallback={<Loader />}>
+            <Model
+              onPartClick={setClickedName}
+              onReady={() => {
+                // OrbitControls bazen 1 frame sonra hazır oluyor
+                requestAnimationFrame(() => {
+                  applyCameraOnce();
+                });
+              }}
+            />
+          </Suspense>
         </Canvas>
       </div>
 
+      {/* Alt bilgi */}
       <div className="absolute bottom-8 w-full flex justify-center pointer-events-none px-4">
         <div className="bg-blue-600/90 text-white w-full max-w-md py-4 rounded-2xl text-center shadow-lg backdrop-blur-md border border-blue-400/30">
           <div className="flex items-center justify-center gap-2 mb-1 opacity-80">
             <MousePointer2 size={16} />
-            <span className="font-bold text-xs tracking-widest uppercase">Tespit Edilen Bölge</span>
+            <span className="font-bold text-xs tracking-widest uppercase">
+              Tespit Edilen Bölge
+            </span>
           </div>
           <p className="font-mono text-xl font-bold truncate px-4">{clickedName}</p>
         </div>
