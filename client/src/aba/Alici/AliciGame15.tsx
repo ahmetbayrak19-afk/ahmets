@@ -30,7 +30,15 @@ function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
         onPartClick(String(name));
       }}
     >
-      <primitive object={gltf.scene} />
+      {/* 🔥 DEĞİŞİKLİK 1: MODELİ AŞAĞI ÇEKTİK */}
+      {/* position={[0, -2.5, 0]} -> Bu sayede adamın göğsü tam ekranın ortasına (0,0,0) gelir. */}
+      {/* Kamera nereye bakarsa baksın, adamın göğsü orada olur. */}
+      <primitive 
+        object={gltf.scene} 
+        rotation={[-Math.PI / 2, 0, 0]} 
+        position={[0, -2.5, 0]} 
+        scale={2.5} 
+      />
     </group>
   );
 }
@@ -61,9 +69,9 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
       )}
 
       <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400 relative">
-        {/* ✅ AYAR 1: KAMERA BAŞLANGIÇ POZİSYONU BURAYA YAZILDI */}
-        {/* position: [0, 1.6, 4.2] -> Tam karşıdan, göz hizası */}
-        <Canvas camera={{ position: [0, 1.6, 4.2], fov: 50, near: 0.01, far: 2000 }}>
+        {/* 🔥 DEĞİŞİKLİK 2: KAMERA DÜZ BAKIYOR */}
+        {/* y=0 diyerek tam ortaya bakmasını sağlıyoruz. */}
+        <Canvas camera={{ position: [0, 0, 4.5], fov: 50, near: 0.01, far: 2000 }}>
           <ambientLight intensity={0.8} />
           <directionalLight position={[5, 10, 5]} intensity={1.1} />
           <Environment preset="city" />
@@ -72,13 +80,10 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
             <Model onPartClick={setClickedName} />
           </Suspense>
 
-          {/* ✅ AYAR 2: HEDEF NOKTASI DİREKT BURAYA YAZILDI */}
-          {/* target: [0, 1.4, 0] -> Kameranın baktığı merkez nokta (Göğüs) */}
-          {/* useEffect ile uğraşmıyoruz, direkt emrediyoruz. */}
-          <OrbitControls 
-            makeDefault 
-            target={[0, 1.4, 0]} 
-          />
+          {/* 🔥 DEĞİŞİKLİK 3: TARGET SIFIRLANDI */}
+          {/* target={[0,0,0]} -> Kamera merkeze kilitli. */}
+          {/* Adamı da merkeze indirdiğimiz için sorun çözüldü. */}
+          <OrbitControls makeDefault target={[0, 0, 0]} />
         </Canvas>
       </div>
 
@@ -96,3 +101,4 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
 }
 
 useGLTF.preload(MODEL_PATH);
+        
