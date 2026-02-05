@@ -1,7 +1,7 @@
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { Environment, Html, OrbitControls, useGLTF } from "@react-three/drei";
-import { ArrowLeft, MousePointer2 } from "lucide-react";
+import { ArrowLeft, MousePointer2, AlertCircle } from "lucide-react";
 import * as THREE from "three";
 
 const MODEL_PATH =
@@ -18,63 +18,64 @@ function Loader() {
   );
 }
 
-/**
- * ✅ Ağız intro: İSİMLE UĞRAŞMADAN çalışır.
- * - Scene içindeki morphTargetInfluences olan meshleri bulur
- * - İlk morph index'ini 3sn dalgalandırır, sonra 0'a sabitler
- *
- * Not: Modelde mouth shape key varsa (senin yaptığın gibi) bu çalışır.
- */
-function MouthIntroPlay({ scene }: { scene: any }) {
-  useEffect(() => {
-    if (!scene) return;
-
-    const targets: { mesh: any; index: number }[] = [];
-
-    scene.traverse((o: any) => {
-      if (
-        o?.isMesh &&
-        Array.isArray(o.morphTargetInfluences) &&
-        o.morphTargetInfluences.length > 0
-      ) {
-        // Morph target varsa, ilkini oynatıyoruz (isim şart değil)
-        targets.push({ mesh: o, index: 0 });
-      }
-    });
-
-    if (targets.length === 0) return;
-
-    let start = performance.now();
-    let raf = 0;
-
-    const tick = () => {
-      const t = (performance.now() - start) / 1000; // saniye
-
-      if (t <= 3) {
-        const v = (Math.sin(t * 8) + 1) / 2; // 0-1
-        targets.forEach(({ mesh, index }) => {
-          mesh.morphTargetInfluences[index] = v * 0.4;
-        });
-        raf = requestAnimationFrame(tick);
-      } else {
-        targets.forEach(({ mesh, index }) => {
-          mesh.morphTargetInfluences[index] = 0;
-        });
-      }
-    };
-
-    tick();
-    return () => cancelAnimationFrame(raf);
-  }, [scene]);
-
-  return null;
-}
-
 type FitInfo = {
   center: [number, number, number];
   radius: number;
   meshes: number;
 };
+
+/**
+ * ✅ AĞIZ KONUŞSUN (SÜREKLİ)
+ * - Mesh adı: "agiz"
+ * - Shape key adı: "Mouth_Open"
+ */
+function MouthTalk({ scene }: { scene: any }) {
+  useEffect(() => {
+    if (!scene) return;
+
+    let mouthMesh: any = null;
+    let mouthIndex = -1;
+
+    scene.traverse((o: any) => {
+      if (
+        o?.isMesh &&
+        o?.name === "agiz" &&
+        o?.morphTargetDictionary &&
+        o.morphTargetDictionary["Mouth_Open"] !== undefined
+      ) {
+        mouthMesh = o;
+        mouthIndex = o.morphTargetDictionary["Mouth_Open"];
+      }
+    });
+
+    if (!mouthMesh || mouthIndex === -1) return;
+
+    // güvenlik: influences dizisi yoksa oluşturulmamış olabilir
+    if (!mouthMesh.morphTargetInfluences) return;
+
+    let raf = 0;
+    let t = 0;
+
+    const tick = () => {
+      t += 0.055; // hız
+      // 0..0.55 arası: net görünsün diye biraz güçlü yaptım
+      const v = (Math.sin(t * 6) + 1) * 0.275;
+      mouthMesh.morphTargetInfluences[mouthIndex] = v;
+
+      raf = requestAnimationFrame(tick);
+    };
+
+    tick();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      // çıkarken ağzı kapat
+      mouthMesh.morphTargetInfluences[mouthIndex] = 0;
+    };
+  }, [scene]);
+
+  return null;
+}
 
 function Model({
   onPartClick,
@@ -128,8 +129,9 @@ function Model({
       }}
     >
       <primitive object={gltf.scene} />
-      {/* ✅ Ağız intro burada */}
-      <MouthIntroPlay scene={gltf.scene} />
+
+      {/* ✅ SADECE EK: AĞIZ KONUŞSUN */}
+      <MouthTalk scene={gltf.scene} />
     </group>
   );
 }
@@ -164,8 +166,12 @@ function CameraFit({ ready, fit }: { ready: boolean; fit: FitInfo | null }) {
       camera.far = Math.max(5000, dist * 50);
       camera.updateProjectionMatrix();
 
-      // ✅ Sınır: çok küçülmesin
+      // ✅ SADECE EK: fazla uzaklaşma (çok küçülme) sınırı
+      // Son attığın gibi "nokta" olmasın diye maxDistance sınırlıyoruz.
       c.maxDistance = dist * 1.25; // daha sıkı istersen 1.15 yap
+      // (İsteğe bağlı) aşırı yakınlaşmayı da engellemek istersen:
+      // c.minDistance = dist * 0.65;
+
       c.update();
     };
 
@@ -218,8 +224,11 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
       </div>
 
       {fatalError && (
-        <div className="absolute top-20 left-4 right-4 z-30 bg-red-500/90 text-white p-4 rounded-xl shadow-lg backdrop-blur-md">
-          <p className="font-bold">Model Yüklenemedi!</p>
+        <div className="absolute top-20 left-4 right-4 z-30 bg-red-500/90 text-white p-4 rounded-xl flex items-center gap-3 shadow-lg backdrop-blur-md">
+          <AlertCircle size={24} />
+          <div className="min-w-0">
+            <p className="font-bold">Model Yüklenemedi!</p>
+          </div>
         </div>
       )}
 
