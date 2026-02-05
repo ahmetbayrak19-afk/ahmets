@@ -18,7 +18,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 20
-          cache: 'npm'
+          cache: "npm"
 
       - name: Install dependencies
         # Sürüm çakışmalarını önlemek için legacy-peer-deps
@@ -41,7 +41,8 @@ jobs:
       - name: Build Web Assets
         run: npm run build
 
-      # 🔥 KRİTİK ADIM BURASI 🔥
+      # ✅ React build çıktısını Android assets'e kopyala
+      # Not: Model artık Firebase URL'den çekiliyor, bu yüzden human.glb kopyalama yok.
       - name: Sync React Build to Android
         run: |
           echo "Eski assets klasörü temizleniyor..."
@@ -51,20 +52,15 @@ jobs:
           echo "Yeni build kopyalanıyor..."
           cp -r dist/* android/app/src/main/assets/
 
-          # 👇 İŞTE O SİHİRLİ SATIR 👇
-          # Dosyayı public klasöründen alıp Android'in içine ismini bozmadan koyuyoruz.
-          echo "Model dosyası manuel olarak kopyalanıyor..."
-          cp client/public/human.glb android/app/src/main/assets/human.glb
-
-          echo "📂 Kontrol edelim, human.glb orada mı?"
+          echo "📂 Kontrol: assets içeriği"
           ls -la android/app/src/main/assets/
 
       - name: Setup Java 17
         uses: actions/setup-java@v3
         with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'gradle'
+          distribution: "temurin"
+          java-version: "17"
+          cache: "gradle"
 
       - name: Build Android
         run: |
