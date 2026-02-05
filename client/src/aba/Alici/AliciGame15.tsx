@@ -8,8 +8,8 @@ import {
   Html,
 } from "@react-three/drei";
 import { ArrowLeft, MousePointer2, AlertCircle } from "lucide-react";
+import * as THREE from "three";
 
-// Firebase Storage URL
 const MODEL_PATH =
   "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/human.glb?alt=media&token=7b979206-e91e-4e34-95ce-370e4c537998";
 
@@ -36,8 +36,9 @@ function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
       .map(([key, node]: any) => ({ key, node }));
   }, [gltf]);
 
+  // ❗ MODEL TRANSFORM YOK: rotation/position/scale yok. Dokunma!
   return (
-    <group dispose={null} scale={2.5}>
+    <group dispose={null}>
       {meshes.map(({ key, node }) => (
         <mesh
           key={key}
@@ -72,19 +73,22 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
 
   const controlsRef = useRef<any>(null);
 
-  // ✅ SADECE BAŞLANGIÇ KAMERA AYARI (geri + yukarı + göğse bak)
+  // ✅ SADECE KAMERA / TARGET
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
 
-    controls.object.position.set(0, 1.3, 3.8); // geri + yukarı
-    controls.target.set(0, 0.9, 0); // göğüs hizası
+    // Kamerayı geri + yukarı al
+    controls.object.position.set(0, 1.35, 3.9);
+
+    // Göğüs hizasına bak (merkez)
+    controls.target.set(0, 1.0, 0);
+
     controls.update();
   }, []);
 
   return (
     <div className="fixed inset-0 z-[500] bg-slate-900 flex flex-col">
-      {/* Geri Butonu */}
       <div className="absolute top-4 left-4 z-10">
         <button
           onClick={onClose}
@@ -94,7 +98,6 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
-      {/* Hata Mesajı */}
       {hasError && (
         <div className="absolute top-20 left-4 right-4 z-50 bg-red-500/90 text-white p-4 rounded-xl flex items-center gap-3 shadow-lg backdrop-blur-md">
           <AlertCircle size={24} />
@@ -107,18 +110,16 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      {/* 3D Sahne */}
       <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400 relative">
         <Canvas camera={{ fov: 50 }}>
           <ambientLight intensity={0.7} />
-          <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} />
+          <spotLight position={[10, 10, 10]} intensity={1} />
           <Environment preset="city" />
 
           <Suspense fallback={<Loader />}>
             <Model onPartClick={setClickedName} />
           </Suspense>
 
-          {/* 2 parmak aynen çalışır (dokunmuyoruz) */}
           <OrbitControls
             ref={controlsRef}
             makeDefault
@@ -127,11 +128,15 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
             maxPolarAngle={Math.PI}
           />
 
-          <ContactShadows position={[0, -0.01, 0]} opacity={0.4} scale={10} blur={2.5} />
+          <ContactShadows
+            position={[0, -0.01, 0]}
+            opacity={0.4}
+            scale={10}
+            blur={2.5}
+          />
         </Canvas>
       </div>
 
-      {/* Alt Bilgi */}
       <div className="absolute bottom-8 w-full flex justify-center pointer-events-none px-4">
         <div className="bg-blue-600/90 text-white w-full max-w-md py-4 rounded-2xl text-center shadow-lg backdrop-blur-md border border-blue-400/30">
           <div className="flex items-center justify-center gap-2 mb-1 opacity-80">
