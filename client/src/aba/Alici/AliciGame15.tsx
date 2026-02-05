@@ -167,4 +167,3 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
 }
 
 useGLTF.preload(MODEL_PATH);
-```0
