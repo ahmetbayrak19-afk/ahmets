@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useRef, useState } from "react";
+import React, { Suspense, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Environment, Html, OrbitControls, useGLTF } from "@react-three/drei";
 import { ArrowLeft, MousePointer2, AlertCircle } from "lucide-react";
@@ -17,19 +17,8 @@ function Loader() {
   );
 }
 
-function Model({
-  onPartClick,
-  onReady,
-}: {
-  onPartClick: (name: string) => void;
-  onReady: () => void;
-}) {
+function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
   const gltf = useGLTF(MODEL_PATH) as any;
-
-  useEffect(() => {
-    onReady();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return (
     <group
@@ -45,6 +34,7 @@ function Model({
         onPartClick(String(name));
       }}
     >
+      {/* ❗ MODELE HİÇ DOKUNMUYORUZ */}
       <primitive object={gltf.scene} />
     </group>
   );
@@ -54,36 +44,9 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const [clickedName, setClickedName] = useState("Bir yere dokun...");
   const [hasError, setHasError] = useState(false);
 
-  const controlsRef = useRef<any>(null);
-  const cameraAppliedRef = useRef(false);
-
-  const applyCameraOnce = () => {
-    if (cameraAppliedRef.current) return;
-
-    const c = controlsRef.current;
-    if (!c) return;
-
-    // ✅ istediğin: kamerayı geri + yukarı
-    c.object.position.set(0, 1.6, 4.2);
-    // ✅ göğüs hizası
-    c.target.set(0, 1.4, 0);
-
-    c.update();
-    cameraAppliedRef.current = true;
-  };
-
-  const applyAfter3Frames = () => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          applyCameraOnce();
-        });
-      });
-    });
-  };
-
   return (
     <div className="fixed inset-0 z-[500] bg-slate-900 flex flex-col">
+      {/* Üst bar */}
       <div className="absolute top-4 left-4 z-10">
         <button
           onClick={onClose}
@@ -93,39 +56,45 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
+      {/* Hata */}
       {hasError && (
         <div className="absolute top-20 left-4 right-4 z-50 bg-red-500/90 text-white p-4 rounded-xl flex items-center gap-3 shadow-lg backdrop-blur-md">
           <AlertCircle size={24} />
-          <div className="min-w-0">
+          <div>
             <p className="font-bold">Model Yüklenemedi!</p>
-            <p className="text-xs opacity-90 break-words">
-              URL / internet / Firebase erişimi kontrol et.
-            </p>
+            <p className="text-xs opacity-90">Firebase / internet kontrol et.</p>
           </div>
         </div>
       )}
 
-      <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400 relative">
-        <Canvas camera={{ fov: 50, near: 0.01, far: 2000 }}>
+      {/* SAHNE */}
+      <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400">
+        <Canvas
+          camera={{
+            position: [0, 1.6, 4.2], // ✅ GERİ + YUKARI (GÖĞÜS HİZASI)
+            fov: 50,
+            near: 0.01,
+            far: 2000,
+          }}
+        >
           <ambientLight intensity={0.8} />
           <directionalLight position={[5, 10, 5]} intensity={1.1} />
           <Environment preset="city" />
 
-          {/* 👇 Kontroller aynı, sadece ref */}
-          <OrbitControls ref={controlsRef} makeDefault />
-
           <Suspense fallback={<Loader />}>
             <Model
-              onPartClick={setClickedName}
-              onReady={() => {
-                // ✅ Model geldi → 3 frame sonra uygula → OrbitControls hazır olur
-                applyAfter3Frames();
+              onPartClick={(n) => {
+                setClickedName(n);
               }}
             />
           </Suspense>
+
+          {/* ❗ KONTROLLER AYNEN, HİÇ ELLEMEDİK */}
+          <OrbitControls makeDefault />
         </Canvas>
       </div>
 
+      {/* Alt bilgi */}
       <div className="absolute bottom-8 w-full flex justify-center pointer-events-none px-4">
         <div className="bg-blue-600/90 text-white w-full max-w-md py-4 rounded-2xl text-center shadow-lg backdrop-blur-md border border-blue-400/30">
           <div className="flex items-center justify-center gap-2 mb-1 opacity-80">
@@ -134,7 +103,9 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
               Tespit Edilen Bölge
             </span>
           </div>
-          <p className="font-mono text-xl font-bold truncate px-4">{clickedName}</p>
+          <p className="font-mono text-xl font-bold truncate px-4">
+            {clickedName}
+          </p>
         </div>
       </div>
     </div>
