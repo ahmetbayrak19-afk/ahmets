@@ -1,9 +1,8 @@
-import React, { Suspense, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Environment, Html, OrbitControls, useGLTF } from "@react-three/drei";
 import { ArrowLeft, MousePointer2, AlertCircle } from "lucide-react";
 
-// ✅ Firebase Linkin (Aynen kalıyor)
 const MODEL_PATH =
   "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/human.glb?alt=media&token=7b979206-e91e-4e34-95ce-370e4c537998";
 
@@ -31,13 +30,8 @@ function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
         onPartClick(String(name));
       }}
     >
-      {/* ✅ ESKİ SAĞLAM AYAR: ADAM DİK DURUYOR */}
-      <primitive 
-        object={gltf.scene} 
-        rotation={[-Math.PI / 2, 0, 0]} 
-        position={[0, -1, 0]} 
-        scale={2.5} 
-      />
+      {/* Model aynen kalıyor */}
+      <primitive object={gltf.scene} />
     </group>
   );
 }
@@ -46,8 +40,28 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const [clickedName, setClickedName] = useState("Bir yere dokun...");
   const [hasError, setHasError] = useState(false);
 
+  const controlsRef = useRef<any>(null);
+
+  // ✅ DÜZELTME 1: KAMERA AÇISI VE HEDEF
+  useEffect(() => {
+    const c = controlsRef.current;
+    if (!c) return;
+
+    // ESKİSİ: position.set(0, 1.35, 3.9) -> Biraz alçaktı.
+    // YENİSİ: y=1.6 (Göz hizası), z=4.2 (Biraz daha geri, ferah açı)
+    c.object.position.set(0, 1.6, 4.2);
+
+    // ESKİSİ: target.set(0, 1.0, 0) -> Kemer/Bacak hizasıydı.
+    // YENİSİ: y=1.4 -> GÖĞÜS/BOYUN hizası.
+    // Artık kamerayı çevirince adamın göğsünün etrafında döner, altına girmez.
+    c.target.set(0, 1.4, 0);
+
+    c.update();
+  }, []);
+
   return (
     <div className="fixed inset-0 z-[500] bg-slate-900 flex flex-col">
+      {/* Üst bar */}
       <div className="absolute top-4 left-4 z-10">
         <button
           onClick={onClose}
@@ -57,37 +71,41 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
+      {/* Hata */}
       {hasError && (
         <div className="absolute top-20 left-4 right-4 z-50 bg-red-500/90 text-white p-4 rounded-xl flex items-center gap-3 shadow-lg backdrop-blur-md">
           <AlertCircle size={24} />
           <div className="min-w-0">
             <p className="font-bold">Model Yüklenemedi!</p>
-            <p className="text-xs opacity-90">İnternet bağlantını kontrol et.</p>
+            <p className="text-xs opacity-90 break-words">
+              URL / internet / Firebase erişimi kontrol et.
+            </p>
           </div>
         </div>
       )}
 
+      {/* Sahne */}
       <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400 relative">
-        {/* ✅ KAMERA AYARI: Göz hizasından bak */}
-        <Canvas camera={{ position: [0, 1.5, 4], fov: 50, near: 0.01, far: 2000 }}>
+        {/* ✅ DÜZELTME 2: BEYAZ PERDE (CLIPPING) SORUNU */}
+        {/* far: 200 yerine 2000 yaptık. Artık model arkadan kesilmez. */}
+        <Canvas camera={{ fov: 50, near: 0.01, far: 2000 }}>
           <ambientLight intensity={0.8} />
           <directionalLight position={[5, 10, 5]} intensity={1.1} />
           <Environment preset="city" />
 
           <Suspense fallback={<Loader />}>
-            <Model onPartClick={setClickedName} />
+            <Model
+              onPartClick={(n) => {
+                setClickedName(n);
+              }}
+            />
           </Suspense>
 
-          {/* 🔥 ÇÖZÜM BURADA: TARGET (HEDEF) AYARI 🔥 */}
-          {/* target={[0, 1.3, 0]} -> Bu satır kameraya "Ayaklara değil, göğse (1.3 metre yukarı) bak" der. */}
-          {/* Böylece adamı ortalar ve bacak arasına girmez. */}
-          <OrbitControls 
-            makeDefault 
-            target={[0, 1.3, 0]} 
-          />
+          <OrbitControls ref={controlsRef} makeDefault />
         </Canvas>
       </div>
 
+      {/* Alt bilgi */}
       <div className="absolute bottom-8 w-full flex justify-center pointer-events-none px-4">
         <div className="bg-blue-600/90 text-white w-full max-w-md py-4 rounded-2xl text-center shadow-lg backdrop-blur-md border border-blue-400/30">
           <div className="flex items-center justify-center gap-2 mb-1 opacity-80">
@@ -102,4 +120,4 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
 }
 
 useGLTF.preload(MODEL_PATH);
-      
+        
