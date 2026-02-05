@@ -30,7 +30,7 @@ function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
         onPartClick(String(name));
       }}
     >
-      {/* ✅ Modeli BOZMAYAN TEK YOL: SAHNEYİ AYNEN ÇİZ */}
+      {/* Model aynen kalıyor */}
       <primitive object={gltf.scene} />
     </group>
   );
@@ -42,16 +42,19 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
 
   const controlsRef = useRef<any>(null);
 
-  // ✅ SADECE BAŞLANGIÇ KAMERA: geri + yukarı
+  // ✅ DÜZELTME 1: KAMERA AÇISI VE HEDEF
   useEffect(() => {
     const c = controlsRef.current;
     if (!c) return;
 
-    // Kamerayı geri ve yukarı al
-    c.object.position.set(0, 1.35, 3.9);
+    // ESKİSİ: position.set(0, 1.35, 3.9) -> Biraz alçaktı.
+    // YENİSİ: y=1.6 (Göz hizası), z=4.2 (Biraz daha geri, ferah açı)
+    c.object.position.set(0, 1.6, 4.2);
 
-    // Göğüs hizasına bak
-    c.target.set(0, 1.0, 0);
+    // ESKİSİ: target.set(0, 1.0, 0) -> Kemer/Bacak hizasıydı.
+    // YENİSİ: y=1.4 -> GÖĞÜS/BOYUN hizası.
+    // Artık kamerayı çevirince adamın göğsünün etrafında döner, altına girmez.
+    c.target.set(0, 1.4, 0);
 
     c.update();
   }, []);
@@ -83,13 +86,14 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
 
       {/* Sahne */}
       <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400 relative">
-        <Canvas camera={{ fov: 50, near: 0.01, far: 200 }}>
+        {/* ✅ DÜZELTME 2: BEYAZ PERDE (CLIPPING) SORUNU */}
+        {/* far: 200 yerine 2000 yaptık. Artık model arkadan kesilmez. */}
+        <Canvas camera={{ fov: 50, near: 0.01, far: 2000 }}>
           <ambientLight intensity={0.8} />
           <directionalLight position={[5, 10, 5]} intensity={1.1} />
           <Environment preset="city" />
 
           <Suspense fallback={<Loader />}>
-            {/* Basit try/catch yerine: yükleme patlarsa hasError set edelim */}
             <Model
               onPartClick={(n) => {
                 setClickedName(n);
@@ -97,7 +101,6 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
             />
           </Suspense>
 
-          {/* ✅ 2 parmak vs. neyse aynen kalsın: sadece ref taktık */}
           <OrbitControls ref={controlsRef} makeDefault />
         </Canvas>
       </div>
