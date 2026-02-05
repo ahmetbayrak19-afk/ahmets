@@ -3,6 +3,7 @@ import { Canvas } from "@react-three/fiber";
 import { Environment, Html, OrbitControls, useGLTF } from "@react-three/drei";
 import { ArrowLeft, MousePointer2, AlertCircle } from "lucide-react";
 
+// ✅ Firebase Linkin (Aynen kalıyor)
 const MODEL_PATH =
   "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/human.glb?alt=media&token=7b979206-e91e-4e34-95ce-370e4c537998";
 
@@ -30,13 +31,11 @@ function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
         onPartClick(String(name));
       }}
     >
-      {/* 🔥 DEĞİŞİKLİK 1: MODELİ AŞAĞI ÇEKTİK */}
-      {/* position={[0, -2.5, 0]} -> Bu sayede adamın göğsü tam ekranın ortasına (0,0,0) gelir. */}
-      {/* Kamera nereye bakarsa baksın, adamın göğsü orada olur. */}
+      {/* ✅ ESKİ SAĞLAM AYAR: ADAM DİK DURUYOR */}
       <primitive 
         object={gltf.scene} 
         rotation={[-Math.PI / 2, 0, 0]} 
-        position={[0, -2.5, 0]} 
+        position={[0, -1, 0]} 
         scale={2.5} 
       />
     </group>
@@ -63,15 +62,14 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
           <AlertCircle size={24} />
           <div className="min-w-0">
             <p className="font-bold">Model Yüklenemedi!</p>
-            <p className="text-xs opacity-90">Bağlantıyı kontrol et.</p>
+            <p className="text-xs opacity-90">İnternet bağlantını kontrol et.</p>
           </div>
         </div>
       )}
 
       <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400 relative">
-        {/* 🔥 DEĞİŞİKLİK 2: KAMERA DÜZ BAKIYOR */}
-        {/* y=0 diyerek tam ortaya bakmasını sağlıyoruz. */}
-        <Canvas camera={{ position: [0, 0, 4.5], fov: 50, near: 0.01, far: 2000 }}>
+        {/* ✅ KAMERA AYARI: Göz hizasından bak */}
+        <Canvas camera={{ position: [0, 1.5, 4], fov: 50, near: 0.01, far: 2000 }}>
           <ambientLight intensity={0.8} />
           <directionalLight position={[5, 10, 5]} intensity={1.1} />
           <Environment preset="city" />
@@ -80,10 +78,13 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
             <Model onPartClick={setClickedName} />
           </Suspense>
 
-          {/* 🔥 DEĞİŞİKLİK 3: TARGET SIFIRLANDI */}
-          {/* target={[0,0,0]} -> Kamera merkeze kilitli. */}
-          {/* Adamı da merkeze indirdiğimiz için sorun çözüldü. */}
-          <OrbitControls makeDefault target={[0, 0, 0]} />
+          {/* 🔥 ÇÖZÜM BURADA: TARGET (HEDEF) AYARI 🔥 */}
+          {/* target={[0, 1.3, 0]} -> Bu satır kameraya "Ayaklara değil, göğse (1.3 metre yukarı) bak" der. */}
+          {/* Böylece adamı ortalar ve bacak arasına girmez. */}
+          <OrbitControls 
+            makeDefault 
+            target={[0, 1.3, 0]} 
+          />
         </Canvas>
       </div>
 
@@ -101,4 +102,4 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
 }
 
 useGLTF.preload(MODEL_PATH);
-        
+      
