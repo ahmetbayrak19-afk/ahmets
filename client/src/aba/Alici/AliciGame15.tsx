@@ -34,7 +34,6 @@ function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
         onPartClick(String(name));
       }}
     >
-      {/* MODELE DOKUNMUYORUZ */}
       <primitive object={gltf.scene} />
     </group>
   );
@@ -42,36 +41,51 @@ function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
 
 export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const [clickedName, setClickedName] = useState("Bir yere dokun...");
-  const [hasError, setHasError] = useState(false);
+  const [hasError] = useState(false);
+
+  // 🔎 KANIT PANELİ
+  const [dbg, setDbg] = useState<string>("Başlıyor…");
 
   const controlsRef = useRef<any>(null);
   const appliedRef = useRef(false);
 
-  // 🔥 TEK HAMLE: OrbitControls AÇILARI
   useEffect(() => {
-    const controls = controlsRef.current;
-    if (!controls || appliedRef.current) return;
+    // 3 frame sonra dene (kontrolün dolması için)
+    const step = () => {
+      const c = controlsRef.current;
 
-    // Azimuthal: sağ-sol dönüş (0 = tam karşı)
-    controls.setAzimuthalAngle(0);
+      if (!c) {
+        setDbg("OrbitControls REF = null (ref dolmadı) ❌");
+        return;
+      }
 
-    // Polar: yukarı-aşağı (Math.PI/2 = düz karşı)
-    // Daha yukarıdan bakması için biraz küçültüyoruz
-    controls.setPolarAngle(Math.PI / 2.4);
+      // Çok bariz bir değişiklik yapalım ki gözle görünür olsun:
+      // Kamerayı aşırı yukarı + geri alıyoruz.
+      // Eğer hala değişmiyorsa, gerçekten override ediliyor demektir.
+      c.target.set(0, 1.4, 0);
+      c.object.position.set(0, 6, 12); // 🔥 bariz, kaçırılmaz
+      c.update();
 
-    // Uzaklık (zoom geri)
-    controls.object.position.setLength(4.2);
+      appliedRef.current = true;
 
-    // Bakış noktası (göğüs hizası)
-    controls.target.set(0, 1.4, 0);
+      setDbg(
+        `APPLY ✅\n` +
+          `cam = [${c.object.position.x.toFixed(2)}, ${c.object.position.y.toFixed(
+            2
+          )}, ${c.object.position.z.toFixed(2)}]\n` +
+          `tgt = [${c.target.x.toFixed(2)}, ${c.target.y.toFixed(2)}, ${c.target.z.toFixed(2)}]`
+      );
+    };
 
-    controls.update();
-    appliedRef.current = true;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(step);
+      });
+    });
   }, []);
 
   return (
     <div className="fixed inset-0 z-[500] bg-slate-900 flex flex-col">
-      {/* Üst bar */}
       <div className="absolute top-4 left-4 z-10">
         <button
           onClick={onClose}
@@ -81,7 +95,6 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
-      {/* Hata */}
       {hasError && (
         <div className="absolute top-20 left-4 right-4 z-50 bg-red-500/90 text-white p-4 rounded-xl flex items-center gap-3 shadow-lg backdrop-blur-md">
           <AlertCircle size={24} />
@@ -92,9 +105,8 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      {/* SAHNE */}
-      <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400">
-        <Canvas camera={{ fov: 50, near: 0.01, far: 2000 }}>
+      <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400 relative">
+        <Canvas camera={{ fov: 50, near: 0.01, far: 5000 }}>
           <ambientLight intensity={0.8} />
           <directionalLight position={[5, 10, 5]} intensity={1.1} />
           <Environment preset="city" />
@@ -103,12 +115,18 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
             <Model onPartClick={setClickedName} />
           </Suspense>
 
-          {/* ❗ İŞİN KALBİ BURASI */}
           <OrbitControls ref={controlsRef} makeDefault />
         </Canvas>
+
+        {/* 🔎 Debug overlay */}
+        <div className="absolute top-4 right-4 bg-black/70 text-white text-[11px] p-3 rounded-lg max-w-[70%] whitespace-pre-wrap">
+          {dbg}
+          <div className="opacity-70 mt-2">
+            applied: {appliedRef.current ? "true" : "false"}
+          </div>
+        </div>
       </div>
 
-      {/* Alt bilgi */}
       <div className="absolute bottom-8 w-full flex justify-center pointer-events-none px-4">
         <div className="bg-blue-600/90 text-white w-full max-w-md py-4 rounded-2xl text-center shadow-lg backdrop-blur-md border border-blue-400/30">
           <div className="flex items-center justify-center gap-2 mb-1 opacity-80">
