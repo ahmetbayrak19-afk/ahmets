@@ -1,4 +1,4 @@
-import React, { useState, Suspense, useMemo, useRef, useEffect } from "react";
+import React, { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import {
   useGLTF,
@@ -9,11 +9,10 @@ import {
 } from "@react-three/drei";
 import { ArrowLeft, MousePointer2, AlertCircle } from "lucide-react";
 
-// 🔗 Firebase / internetten yüklenen model
+// Firebase Storage URL
 const MODEL_PATH =
   "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/human.glb?alt=media&token=7b979206-e91e-4e34-95ce-370e4c537998";
 
-/* ---------------- LOADER ---------------- */
 function Loader() {
   return (
     <Html center>
@@ -25,7 +24,6 @@ function Loader() {
   );
 }
 
-/* ---------------- MODEL ---------------- */
 function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
   const gltf = useGLTF(MODEL_PATH) as any;
   const [hovered, setHovered] = useState<string | null>(null);
@@ -34,7 +32,7 @@ function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
   const meshes = useMemo(() => {
     const nodes = gltf?.nodes || {};
     return Object.entries(nodes)
-      .filter(([, n]: any) => n?.type === "Mesh")
+      .filter(([, n]: any) => n?.type === "Mesh" && n?.geometry && n?.material)
       .map(([key, node]: any) => ({ key, node }));
   }, [gltf]);
 
@@ -68,24 +66,19 @@ function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
   );
 }
 
-/* ---------------- MAIN ---------------- */
 export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const [clickedName, setClickedName] = useState("Bir yere dokun...");
   const [hasError, setHasError] = useState(false);
 
   const controlsRef = useRef<any>(null);
 
-  // 🔥 SADECE BAŞLANGIÇ KAMERASI
+  // ✅ SADECE BAŞLANGIÇ KAMERA AYARI (geri + yukarı + göğse bak)
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
 
-    // Kamera: geri + yukarı
-    controls.object.position.set(0, 1.3, 3.8);
-
-    // Adamın göğsüne bak
-    controls.target.set(0, 0.9, 0);
-
+    controls.object.position.set(0, 1.3, 3.8); // geri + yukarı
+    controls.target.set(0, 0.9, 0); // göğüs hizası
     controls.update();
   }, []);
 
@@ -101,6 +94,57 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
-      {/* Hata */}
+      {/* Hata Mesajı */}
       {hasError && (
-        <div className="absolute top-20 left-4 right-4 z-50
+        <div className="absolute top-20 left-4 right-4 z-50 bg-red-500/90 text-white p-4 rounded-xl flex items-center gap-3 shadow-lg backdrop-blur-md">
+          <AlertCircle size={24} />
+          <div className="min-w-0">
+            <p className="font-bold">Model Yüklenemedi!</p>
+            <p className="text-xs opacity-90 break-words">
+              URL / internet / erişim izni kontrol et.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 3D Sahne */}
+      <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400 relative">
+        <Canvas camera={{ fov: 50 }}>
+          <ambientLight intensity={0.7} />
+          <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} />
+          <Environment preset="city" />
+
+          <Suspense fallback={<Loader />}>
+            <Model onPartClick={setClickedName} />
+          </Suspense>
+
+          {/* 2 parmak aynen çalışır (dokunmuyoruz) */}
+          <OrbitControls
+            ref={controlsRef}
+            makeDefault
+            enablePan={false}
+            minPolarAngle={0}
+            maxPolarAngle={Math.PI}
+          />
+
+          <ContactShadows position={[0, -0.01, 0]} opacity={0.4} scale={10} blur={2.5} />
+        </Canvas>
+      </div>
+
+      {/* Alt Bilgi */}
+      <div className="absolute bottom-8 w-full flex justify-center pointer-events-none px-4">
+        <div className="bg-blue-600/90 text-white w-full max-w-md py-4 rounded-2xl text-center shadow-lg backdrop-blur-md border border-blue-400/30">
+          <div className="flex items-center justify-center gap-2 mb-1 opacity-80">
+            <MousePointer2 size={16} />
+            <span className="font-bold text-xs tracking-widest uppercase">
+              Tespit Edilen Bölge
+            </span>
+          </div>
+          <p className="font-mono text-xl font-bold truncate px-4">{clickedName}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+useGLTF.preload(MODEL_PATH);
