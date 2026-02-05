@@ -18,6 +18,49 @@ function Loader() {
   );
 }
 
+/* 🔥 SADECE EKLENEN BÖLÜM: AĞIZ 3 SN OYNASIN 🔥 */
+function MouthIntroPlay({ scene }: { scene: any }) {
+  useEffect(() => {
+    if (!scene) return;
+
+    const mouths: { mesh: any; index: number }[] = [];
+
+    scene.traverse((o: any) => {
+      if (o.isMesh && o.morphTargetDictionary?.Mouth_Open !== undefined) {
+        mouths.push({
+          mesh: o,
+          index: o.morphTargetDictionary.Mouth_Open,
+        });
+      }
+    });
+
+    if (mouths.length === 0) return;
+
+    let start = performance.now();
+    let raf = 0;
+
+    const tick = () => {
+      const t = (performance.now() - start) / 1000;
+      if (t <= 3) {
+        const v = (Math.sin(t * 8) + 1) / 2;
+        mouths.forEach(({ mesh, index }) => {
+          mesh.morphTargetInfluences[index] = v * 0.4;
+        });
+        raf = requestAnimationFrame(tick);
+      } else {
+        mouths.forEach(({ mesh, index }) => {
+          mesh.morphTargetInfluences[index] = 0;
+        });
+      }
+    };
+
+    tick();
+    return () => cancelAnimationFrame(raf);
+  }, [scene]);
+
+  return null;
+}
+
 type FitInfo = {
   center: [number, number, number];
   radius: number;
@@ -38,9 +81,7 @@ function Model({
     if (!scene) return { center: [0, 0, 0], radius: 1, meshes: 0 };
 
     let meshes = 0;
-    scene.traverse?.((o: any) => {
-      if (o?.isMesh) meshes++;
-    });
+    scene.traverse?.((o: any) => o.isMesh && meshes++);
 
     const box = new THREE.Box3().setFromObject(scene);
     const sphere = new THREE.Sphere();
@@ -58,167 +99,90 @@ function Model({
 
   useEffect(() => {
     onLoaded(fit);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fit.center[0], fit.center[1], fit.center[2], fit.radius, fit.meshes]);
+  }, [fit]);
 
   return (
     <group
       onPointerDown={(e: any) => {
         e.stopPropagation();
-        const obj = e.object;
-        const name =
-          obj?.name ||
-          obj?.material?.name ||
-          obj?.geometry?.name ||
-          obj?.uuid ||
-          "unknown";
-        onPartClick(String(name));
+        const o = e.object;
+        onPartClick(
+          o?.name || o?.material?.name || o?.geometry?.name || "unknown"
+        );
       }}
     >
       <primitive object={gltf.scene} />
+      {/* 👇 AĞIZ INTRO BURADA */}
+      <MouthIntroPlay scene={gltf.scene} />
     </group>
   );
 }
 
-function CameraFit({
-  ready,
-  fit,
-}: {
-  ready: boolean;
-  fit: FitInfo | null;
-}) {
+function CameraFit({ ready, fit }: { ready: boolean; fit: FitInfo | null }) {
   const { camera, controls } = useThree();
 
   useEffect(() => {
-    if (!ready || !fit) return;
+    if (!ready || !fit || !controls) return;
 
-    let cancelled = false;
+    const c: any = controls;
+    const [cx, cy, cz] = fit.center;
+    const r = fit.radius;
 
-    const apply = (tries: number) => {
-      if (cancelled) return;
+    c.target.set(cx, cy + r * 0.15, cz);
+    const dist = r * 2.6;
+    camera.position.set(cx, cy + r * 0.35, cz + dist);
 
-      const c: any = controls;
-      if (!c) {
-        if (tries < 120) requestAnimationFrame(() => apply(tries + 1));
-        return;
-      }
-
-      const [cx, cy, cz] = fit.center;
-      const r = fit.radius;
-
-      // ✅ SENİN KODUN: başlangıç kamera/target hesabına dokunmadım
-      c.target.set(cx, cy + r * 0.15, cz);
-
-      const dist = r * 2.6;
-      camera.position.set(cx, cy + r * 0.35, cz + dist);
-
-      camera.near = Math.max(0.01, dist / 200);
-      camera.far = Math.max(5000, dist * 50);
-      camera.updateProjectionMatrix();
-
-      // ✅ SADECE EKLENEN: fazla uzaklaşma (çok küçülme) sınırı
-      // Son attığın gibi "nokta" olmasın diye maxDistance sınırlıyoruz.
-      c.maxDistance = dist * 1.25; // daha sıkı istersen 1.15 yap
-      // (İsteğe bağlı) aşırı yakınlaşmayı da engellemek istersen:
-      // c.minDistance = dist * 0.65;
-
-      c.update();
-    };
-
-    requestAnimationFrame(() => apply(0));
-
-    return () => {
-      cancelled = true;
-    };
+    c.maxDistance = dist * 1.25;
+    camera.updateProjectionMatrix();
+    c.update();
   }, [ready, fit, camera, controls]);
 
   return null;
 }
 
-class ErrorBoundary extends React.Component<
-  { onError: () => void; children: any },
-  { hasError: boolean }
-> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false };
-  }
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  componentDidCatch() {
-    this.props.onError();
-  }
-  render() {
-    if (this.state.hasError) return null;
-    return this.props.children;
-  }
-}
-
 export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const [clickedName, setClickedName] = useState("Bir yere dokun...");
-  const [fatalError, setFatalError] = useState(false);
-
   const [fit, setFit] = useState<FitInfo | null>(null);
-  const [modelReady, setModelReady] = useState(false);
+  const [ready, setReady] = useState(false);
 
   return (
     <div className="fixed inset-0 z-[500] bg-slate-900 flex flex-col">
       <div className="absolute top-4 left-4 z-20">
         <button
           onClick={onClose}
-          className="p-3 bg-slate-800/80 rounded-full text-white hover:bg-slate-700 transition"
+          className="p-3 bg-slate-800/80 rounded-full text-white"
         >
           <ArrowLeft size={24} />
         </button>
       </div>
 
-      {fatalError && (
-        <div className="absolute top-20 left-4 right-4 z-30 bg-red-500/90 text-white p-4 rounded-xl flex items-center gap-3 shadow-lg backdrop-blur-md">
-          <AlertCircle size={24} />
-          <div className="min-w-0">
-            <p className="font-bold">Model Yüklenemedi!</p>
-          </div>
-        </div>
-      )}
-
-      <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400 relative">
+      <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400">
         <Canvas camera={{ fov: 50, near: 0.01, far: 5000 }}>
           <ambientLight intensity={0.8} />
           <directionalLight position={[5, 10, 5]} intensity={1.1} />
           <Environment preset="city" />
-
-          {/* Dokunma hareketleri aynen kalsın */}
           <OrbitControls makeDefault />
-
-          {/* Model yüklenince gerçek merkeze göre kamerayı oturt + maxDistance sınırı */}
-          <CameraFit ready={modelReady} fit={fit} />
+          <CameraFit ready={ready} fit={fit} />
 
           <Suspense fallback={<Loader />}>
-            <ErrorBoundary onError={() => setFatalError(true)}>
-              <Model
-                onPartClick={setClickedName}
-                onLoaded={(f) => {
-                  setFit(f);
-                  setModelReady(true);
-                }}
-              />
-            </ErrorBoundary>
+            <Model
+              onPartClick={setClickedName}
+              onLoaded={(f) => {
+                setFit(f);
+                setReady(true);
+              }}
+            />
           </Suspense>
         </Canvas>
       </div>
 
       <div className="absolute bottom-8 w-full flex justify-center pointer-events-none px-4">
-        <div className="bg-blue-600/90 text-white w-full max-w-md py-4 rounded-2xl text-center shadow-lg backdrop-blur-md border border-blue-400/30">
+        <div className="bg-blue-600/90 text-white w-full max-w-md py-4 rounded-2xl text-center">
           <div className="flex items-center justify-center gap-2 mb-1 opacity-80">
             <MousePointer2 size={16} />
-            <span className="font-bold text-xs tracking-widest uppercase">
-              Tespit Edilen Bölge
-            </span>
+            <span className="font-bold text-xs uppercase">Tespit Edilen Bölge</span>
           </div>
-          <p className="font-mono text-xl font-bold truncate px-4">
-            {clickedName}
-          </p>
+          <p className="font-mono text-xl font-bold truncate">{clickedName}</p>
         </div>
       </div>
     </div>
