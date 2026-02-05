@@ -24,54 +24,39 @@ type FitInfo = {
   meshes: number;
 };
 
-/**
- * ✅ AĞIZ KONUŞSUN (SÜREKLİ)
- * - Mesh adı: "agiz"
- * - Shape key adı: "Mouth_Open"
- */
-function MouthTalk({ scene }: { scene: any }) {
+/** ✅ Ağız Mesh'lerini (agiz_1/agiz_2) pozisyonla konuşturur */
+function MouthTalkByPosition({ scene }: { scene: any }) {
   useEffect(() => {
     if (!scene) return;
 
-    let mouthMesh: any = null;
-    let mouthIndex = -1;
+    const mouths: { mesh: any; baseY: number }[] = [];
 
     scene.traverse((o: any) => {
-      if (
-        o?.isMesh &&
-        o?.name === "agiz" &&
-        o?.morphTargetDictionary &&
-        o.morphTargetDictionary["Mouth_Open"] !== undefined
-      ) {
-        mouthMesh = o;
-        mouthIndex = o.morphTargetDictionary["Mouth_Open"];
+      if (!o?.isMesh) return;
+      const n = String(o.name || "").toLowerCase();
+      if (n.includes("agiz") || n.includes("mouth")) {
+        mouths.push({ mesh: o, baseY: o.position.y });
       }
     });
 
-    if (!mouthMesh || mouthIndex === -1) return;
-
-    // güvenlik: influences dizisi yoksa oluşturulmamış olabilir
-    if (!mouthMesh.morphTargetInfluences) return;
+    if (mouths.length === 0) return;
 
     let raf = 0;
-    let t = 0;
+    const start = performance.now();
 
     const tick = () => {
-      t += 0.055; // hız
-      // 0..0.55 arası: net görünsün diye biraz güçlü yaptım
-      const v = (Math.sin(t * 6) + 1) * 0.275;
-      mouthMesh.morphTargetInfluences[mouthIndex] = v;
+      const t = (performance.now() - start) / 1000;
+      const v = Math.sin(t * 10) * 0.015; // konuşma miktarı (istersen 0.01 / 0.02 yap)
+
+      for (const m of mouths) {
+        m.mesh.position.y = m.baseY + v;
+      }
 
       raf = requestAnimationFrame(tick);
     };
 
     tick();
-
-    return () => {
-      cancelAnimationFrame(raf);
-      // çıkarken ağzı kapat
-      mouthMesh.morphTargetInfluences[mouthIndex] = 0;
-    };
+    return () => cancelAnimationFrame(raf);
   }, [scene]);
 
   return null;
@@ -129,9 +114,8 @@ function Model({
       }}
     >
       <primitive object={gltf.scene} />
-
-      {/* ✅ SADECE EK: AĞIZ KONUŞSUN */}
-      <MouthTalk scene={gltf.scene} />
+      {/* ✅ AĞIZ KONUŞSUN */}
+      <MouthTalkByPosition scene={gltf.scene} />
     </group>
   );
 }
@@ -156,7 +140,7 @@ function CameraFit({ ready, fit }: { ready: boolean; fit: FitInfo | null }) {
       const [cx, cy, cz] = fit.center;
       const r = fit.radius;
 
-      // ✅ SENİN KODUN: başlangıç kamera/target hesabına dokunmadım
+      // ✅ başlangıç kamera/target hesabına DOKUNMUYORUM
       c.target.set(cx, cy + r * 0.15, cz);
 
       const dist = r * 2.6;
@@ -166,11 +150,8 @@ function CameraFit({ ready, fit }: { ready: boolean; fit: FitInfo | null }) {
       camera.far = Math.max(5000, dist * 50);
       camera.updateProjectionMatrix();
 
-      // ✅ SADECE EK: fazla uzaklaşma (çok küçülme) sınırı
-      // Son attığın gibi "nokta" olmasın diye maxDistance sınırlıyoruz.
+      // ✅ sadece: fazla uzaklaşma sınırı (çok küçülmesin)
       c.maxDistance = dist * 1.25; // daha sıkı istersen 1.15 yap
-      // (İsteğe bağlı) aşırı yakınlaşmayı da engellemek istersen:
-      // c.minDistance = dist * 0.65;
 
       c.update();
     };
