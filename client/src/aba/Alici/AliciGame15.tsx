@@ -1,4 +1,4 @@
-import React, { Suspense, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Environment, Html, OrbitControls, useGLTF } from "@react-three/drei";
 import { ArrowLeft, MousePointer2, AlertCircle } from "lucide-react";
@@ -34,7 +34,7 @@ function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
         onPartClick(String(name));
       }}
     >
-      {/* ❗ MODELE HİÇ DOKUNMUYORUZ */}
+      {/* MODELE DOKUNMUYORUZ */}
       <primitive object={gltf.scene} />
     </group>
   );
@@ -43,6 +43,31 @@ function Model({ onPartClick }: { onPartClick: (name: string) => void }) {
 export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const [clickedName, setClickedName] = useState("Bir yere dokun...");
   const [hasError, setHasError] = useState(false);
+
+  const controlsRef = useRef<any>(null);
+  const appliedRef = useRef(false);
+
+  // 🔥 TEK HAMLE: OrbitControls AÇILARI
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls || appliedRef.current) return;
+
+    // Azimuthal: sağ-sol dönüş (0 = tam karşı)
+    controls.setAzimuthalAngle(0);
+
+    // Polar: yukarı-aşağı (Math.PI/2 = düz karşı)
+    // Daha yukarıdan bakması için biraz küçültüyoruz
+    controls.setPolarAngle(Math.PI / 2.4);
+
+    // Uzaklık (zoom geri)
+    controls.object.position.setLength(4.2);
+
+    // Bakış noktası (göğüs hizası)
+    controls.target.set(0, 1.4, 0);
+
+    controls.update();
+    appliedRef.current = true;
+  }, []);
 
   return (
     <div className="fixed inset-0 z-[500] bg-slate-900 flex flex-col">
@@ -69,28 +94,17 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
 
       {/* SAHNE */}
       <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400">
-        <Canvas
-          camera={{
-            position: [0, 1.6, 4.2], // ✅ GERİ + YUKARI (GÖĞÜS HİZASI)
-            fov: 50,
-            near: 0.01,
-            far: 2000,
-          }}
-        >
+        <Canvas camera={{ fov: 50, near: 0.01, far: 2000 }}>
           <ambientLight intensity={0.8} />
           <directionalLight position={[5, 10, 5]} intensity={1.1} />
           <Environment preset="city" />
 
           <Suspense fallback={<Loader />}>
-            <Model
-              onPartClick={(n) => {
-                setClickedName(n);
-              }}
-            />
+            <Model onPartClick={setClickedName} />
           </Suspense>
 
-          {/* ❗ KONTROLLER AYNEN, HİÇ ELLEMEDİK */}
-          <OrbitControls makeDefault />
+          {/* ❗ İŞİN KALBİ BURASI */}
+          <OrbitControls ref={controlsRef} makeDefault />
         </Canvas>
       </div>
 
