@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Check, XCircle, Trophy, Mic, MicOff, Play, Volume2, ArrowRight } from 'lucide-react';
+import { Check, XCircle, Trophy, Mic, MicOff, ArrowRight } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
@@ -26,20 +26,22 @@ const STANDARD_YES = ['evet', 'eved', 'he', 'hıhı', 'doğru', 'tamam', 'evetev
 const STANDARD_NO = ['hayır', 'yok', 'cık', 'değil', 'olmaz', 'hayı', 'yanlış', 'no'];
 
 export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
+  // --- STATES ---
   const [phase, setPhase] = useState<'init' | 'setup' | 'playing' | 'success'>('init');
   
-  // State'ler (Setup Ekranı İçin)
+  // Setup Kelimeleri
   const [customYesWords, setCustomYesWords] = useState<string[]>([]);
   const [customNoWords, setCustomNoWords] = useState<string[]>([]);
   
-  // 🔥 REF'LER (OYUN EKRANI İÇİN - DONMAYI ÖNLER) 🔥
-  // Ses motoru state'i anlık okuyamaz, bu yüzden Ref kullanıyoruz.
+  // 🔥 REF'LER: Oyun ekranına geçince kelimeler kaybolmasın diye şart
   const yesWordsRef = useRef<string[]>([]);
   const noWordsRef = useRef<string[]>([]);
 
+  // Setup Değişkenleri
   const [lastHeard, setLastHeard] = useState<string>("");
   const [isRecordingSetup, setIsRecordingSetup] = useState<'yes' | 'no' | null>(null);
 
+  // Oyun Değişkenleri
   const [targetItem, setTargetItem] = useState(ITEMS[0]);
   const [compareItem, setCompareItem] = useState(ITEMS[0]);
   const [isMatch, setIsMatch] = useState(true);
@@ -50,15 +52,15 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   const [questionCount, setQuestionCount] = useState(0);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
 
-  // REFERANSLAR
+  // Teknik Referanslar
   const recognitionRef = useRef<any>(null);
   const isMountedRef = useRef(true);
 
-  // --- STATE GÜNCELLEYİNCE REF'İ DE GÜNCELLE ---
+  // --- KELİMELERİ SÜREKLİ GÜNCEL TUT ---
   useEffect(() => { yesWordsRef.current = customYesWords; }, [customYesWords]);
   useEffect(() => { noWordsRef.current = customNoWords; }, [customNoWords]);
 
-  // --- 1. GÜVENLİ BAŞLATMA VE KAPATMA ---
+  // --- GÜVENLİK ---
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -67,25 +69,27 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     };
   }, []);
 
+  // Tüm ses olaylarını temizleyen sigorta
   const killEverything = () => {
       window.speechSynthesis.cancel();
       if (recognitionRef.current) {
           try {
             recognitionRef.current.onend = null;
-            recognitionRef.current.onresult = null;
+            recognitionRef.current.onerror = null;
             recognitionRef.current.stop(); 
           } catch(e) {}
           recognitionRef.current = null;
       }
       setIsListening(false);
+      setIsRecordingSetup(null);
   };
 
   const handleSafeClose = () => {
       killEverything();
-      onClose(); 
+      onClose();
   };
 
-  // --- SES MOTORU BAŞLATICI ---
+  // --- SES MOTORU ---
   const initSpeechEngine = (continuousMode: boolean) => {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (!SpeechRecognition) return null;
@@ -94,7 +98,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       recognition.lang = 'tr-TR';
       recognition.interimResults = true; 
       recognition.maxAlternatives = 1;
-      recognition.continuous = continuousMode; // Setup'ta false olabilir ama oyunda true olmalı
+      recognition.continuous = continuousMode; 
 
       recognition.onstart = () => {
           if (isMountedRef.current) setIsListening(true);
@@ -104,10 +108,9 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
           if (!isMountedRef.current) return;
           setIsListening(false);
           
-          // OYUN MODUNDA OTOMATİK TEKRAR BAŞLATMA
-          // Sürekli dinlemesi için burası kritik
+          // OYUNDAYSAK ve CEVAP VERİLMEDİYSE -> HEMEN TEKRAR DİNLE
+          // Bu sayede "Google hemen kapatmasın" isteğini yerine getiriyoruz.
           if (phase === 'playing' && !feedback) {
-              // Motor kapandıysa hemen geri aç
               setTimeout(() => {
                   if (isMountedRef.current && phase === 'playing' && !feedback) {
                        startListening(); 
@@ -128,9 +131,9 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
               transcript += event.results[i][0].transcript;
           }
           const lower = transcript.trim().toLowerCase();
-          setLastHeard(lower);
+          setLastHeard(lower); // Ekrana ne duyduğunu yaz
 
-          // OYUN MODU KONTROLÜ
+          // EĞER OYUNDAYSAK -> CEVABI KONTROL ET
           if (phase === 'playing') {
               checkTranscriptForGame(lower, recognition);
           }
@@ -139,11 +142,9 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       return recognition;
   };
 
-  // --- OYUN KELİME KONTROLÜ (REF KULLANARAK) ---
+  // --- OYUN KELİME KONTROLÜ (Ref'ten Okur) ---
   const checkTranscriptForGame = (transcript: string, recognitionInstance: any) => {
       const words = transcript.split(" ");
-      
-      // 🔥 BURASI DEĞİŞTİ: State yerine Ref kullandık ki güncel listeyi görsün
       const YES_POOL = [...STANDARD_YES, ...yesWordsRef.current];
       const NO_POOL = [...STANDARD_NO, ...noWordsRef.current];
 
@@ -154,8 +155,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       }
 
       if (detected) {
-          // Cevabı bulduk, motoru hemen durdur
-          recognitionInstance.abort();
+          recognitionInstance.abort(); // Cevabı bulduk, motoru durdur
           checkAnswer(detected);
       }
   };
@@ -168,17 +168,12 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       else handleFail();
   };
 
-  // Oyun modu için dinlemeyi başlat (Continuous: true yaptık)
   const startListening = () => {
       if (!isMountedRef.current) return;
-      
-      if (recognitionRef.current) {
-         try { recognitionRef.current.abort(); } catch(e){}
-      }
+      if (recognitionRef.current) return; // Zaten açıksa elleme
 
-      // Oyunda sürekli dinlesin ki kapanmasın
-      recognitionRef.current = initSpeechEngine(true); 
-      
+      // Continuous: false yapıyoruz çünkü onend döngüsüyle biz tekrar başlatıyoruz (daha stabil)
+      recognitionRef.current = initSpeechEngine(false); 
       try {
           recognitionRef.current.start();
       } catch (e) {}
@@ -187,22 +182,34 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   // --- AKIŞ KONTROLLERİ ---
   const initGame = () => setPhase('setup');
   
-  const startGame = () => {
-      // 1. Önce her şeyi temizle (Setup mikrofonunu kapat)
+  // 🔥 DONMAYI ÖNLEYEN GEÇİŞ FONKSİYONU 🔥
+  const handleStartGameClick = () => {
+      // 1. Önce temizlik
       killEverything();
-      setPhase('playing');
       
-      // 2. DONMAYI ÖNLEMEK İÇİN GECİKME
-      // React ekranı çizmeden ağır işleme girmesin
-      setTimeout(() => {
-          generateQuestion();
-      }, 100);
+      // 2. Sadece ekranı değiştir (Henüz oyun mantığını başlatma!)
+      setPhase('playing');
   };
 
+  // 🔥 OYUN BAŞLADIĞINDA OTOMATİK ÇALIŞAN KOD 🔥
+  // Bu useEffect sadece 'playing' aşamasına geçildiğinde bir kez çalışır.
+  // Ekran çizildikten sonra çalıştığı için donma yapmaz.
+  useEffect(() => {
+      if (phase === 'playing') {
+          // Biraz bekleyip soruyu soralım, sistem kendine gelsin
+          const timer = setTimeout(() => {
+              generateQuestion();
+          }, 500);
+          return () => clearTimeout(timer);
+      }
+  }, [phase]);
+
   const generateQuestion = () => {
+      if (!isMountedRef.current) return;
+
       setFeedback(null);
       setAnimState('hidden');
-      setLastHeard(""); // Ekranı temizle
+      setLastHeard("");
       killEverything(); 
       
       const target = ITEMS[Math.floor(Math.random() * ITEMS.length)];
@@ -230,25 +237,23 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       const utterance = new SpeechSynthesisUtterance("Doğru eşledim mi?");
       utterance.lang = 'tr-TR';
       utterance.rate = 1.0;
-      window.speechSynthesis.speak(utterance);
-
+      
       utterance.onend = () => {
           if (isMountedRef.current && phase === 'playing') {
-              startListening(); // Soru bitince dinlemeye başla
+              startListening();
           }
       };
       
-      // Hata olursa yine de dinlemeyi başlat (Bazı telefonlar konuşmaz)
       utterance.onerror = () => {
-          if (isMountedRef.current && phase === 'playing') startListening();
+         if (isMountedRef.current && phase === 'playing') startListening();
       }
+
+      window.speechSynthesis.speak(utterance);
   };
 
   const handleSuccess = () => {
-      try {
-          const audio = new Audio(Math.random() > 0.5 ? aferin1 : bravo);
-          audio.play().catch(()=>{});
-      } catch (e) {}
+      killEverything();
+      try { new Audio(Math.random() > 0.5 ? aferin1 : bravo).play().catch(()=>{}); } catch (e) {}
 
       setFeedback('correct');
       setTimeout(() => {
@@ -261,20 +266,18 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   };
 
   const handleFail = () => {
-      try {
-          const audio = new Audio(tekrardene1);
-          audio.play().catch(()=>{});
-      } catch (e) {}
+      killEverything();
+      try { new Audio(tekrardene1).play().catch(()=>{}); } catch (e) {}
 
       setFeedback('wrong');
       setTimeout(() => {
           if (!isMountedRef.current) return;
           setFeedback(null);
-          startListening(); // Yanlışta tekrar dinle
+          startListening(); 
       }, 2000);
   };
 
-  // --- SETUP EKRANI KAYIT (SENİN KODUN AYNI KALDI) ---
+  // --- SETUP KAYIT (Senin kodun, çalışıyor) ---
   const toggleSetupRecord = (type: 'yes' | 'no') => {
       if (isRecordingSetup === type) {
           setIsRecordingSetup(null);
@@ -283,7 +286,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
           setIsRecordingSetup(type);
           if (recognitionRef.current) recognitionRef.current.abort();
           
-          recognitionRef.current = initSpeechEngine(true); // Setup için sürekli dinle
+          recognitionRef.current = initSpeechEngine(true); // Setup için sürekli
           setTimeout(() => {
               try { recognitionRef.current?.start(); } catch(e) {}
           }, 200);
@@ -314,8 +317,8 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
               <button onClick={handleSafeClose} className="absolute top-4 right-4 p-2 bg-white rounded-full shadow-sm"><XCircle className="text-slate-400"/></button>
               
               <div className="text-center">
-                 <h1 className="text-2xl font-black text-slate-800">Ses Kalibrasyonu</h1>
-                 <p className="text-xs text-slate-500">Çocuğun söylediği kelimeyi ekle.</p>
+                <h1 className="text-2xl font-black text-slate-800">Ses Kalibrasyonu</h1>
+                <p className="text-xs text-slate-500">Çocuğun söylediği kelimeyi ekle.</p>
               </div>
 
               {/* EVET */}
@@ -356,18 +359,20 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
                   </div>
               </div>
 
-              <button onClick={startGame} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-lg mt-4 flex items-center justify-center gap-2 active:scale-95 transition-transform">
+              <button onClick={handleStartGameClick} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-lg mt-4 flex items-center justify-center gap-2 active:scale-95 transition-transform">
                   OYUNA GEÇ <ArrowRight/>
               </button>
           </div>
       )}
 
-      {/* 2. OYUN */}
+      {/* 2. OYUN EKRANI */}
       {phase === 'playing' && (
           <div className="flex-1 flex flex-col relative bg-slate-50">
               <div className="p-4 flex justify-between items-center z-20">
-                  <button onClick={handleSafeClose} className="p-2 bg-white border rounded-full shadow-sm"><XCircle className="text-slate-300"/></button>
-                  <div className="px-4 py-1 bg-white shadow-sm rounded-full font-bold text-xs border">SORU: {questionCount + 1} / 10</div>
+                  <button onClick={handleSafeClose} className="p-2 bg-white border rounded-full shadow-sm active:scale-95"><XCircle className="text-slate-400"/></button>
+                  <div className="px-4 py-1 bg-white shadow-sm rounded-full font-bold text-xs border border-slate-200 text-slate-500">
+                    SORU: <span className="text-blue-600 text-sm">{questionCount + 1}</span> / 10
+                  </div>
               </div>
 
               <div className="flex-1 flex flex-col items-center justify-center gap-8 p-4">
