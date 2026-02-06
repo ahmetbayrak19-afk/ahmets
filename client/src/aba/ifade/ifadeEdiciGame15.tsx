@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Check, XCircle, Trophy, Mic, MicOff, Play, Volume2, ArrowRight } from 'lucide-react';
+import { Check, XCircle, Trophy, Mic, MicOff, Volume2, ArrowRight } from 'lucide-react'; // Play silindi, kullanılmıyordu
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
@@ -26,10 +26,16 @@ const STANDARD_YES = ['evet', 'eved', 'he', 'hıhı', 'doğru', 'tamam', 'evetev
 const STANDARD_NO = ['hayır', 'yok', 'cık', 'değil', 'olmaz', 'hayı', 'yanlış'];
 
 export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
+  // --- STATES ---
   const [phase, setPhase] = useState<'init' | 'setup' | 'playing' | 'success'>('init');
   
   const [customYesWords, setCustomYesWords] = useState<string[]>([]);
   const [customNoWords, setCustomNoWords] = useState<string[]>([]);
+  
+  // 🔥 KRİTİK DÜZELTME 1: Referanslar (Ses motorunun güncel veriyi okuması için)
+  const yesWordsRef = useRef<string[]>([]);
+  const noWordsRef = useRef<string[]>([]);
+
   const [lastHeard, setLastHeard] = useState<string>("");
   const [isRecordingSetup, setIsRecordingSetup] = useState<'yes' | 'no' | null>(null);
 
@@ -45,13 +51,15 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
   // REFERANSLAR
   const recognitionRef = useRef<any>(null);
-  const isMountedRef = useRef(true); // Çökme önleyici sigorta
+  const isMountedRef = useRef(true);
+
+  // --- STATE GÜNCELLEMELERİNİ REF'E AKTAR ---
+  useEffect(() => { yesWordsRef.current = customYesWords; }, [customYesWords]);
+  useEffect(() => { noWordsRef.current = customNoWords; }, [customNoWords]);
 
   // --- 1. GÜVENLİ BAŞLATMA VE KAPATMA ---
   useEffect(() => {
     isMountedRef.current = true;
-    
-    // Cleanup: Sayfa kapanırken her şeyi öldür
     return () => {
         isMountedRef.current = false;
         killEverything();
@@ -61,22 +69,29 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   const killEverything = () => {
       window.speechSynthesis.cancel();
       if (recognitionRef.current) {
-          recognitionRef.current.onend = null; // Döngüyü kır
-          recognitionRef.current.onresult = null;
-          recognitionRef.current.abort();
+          try {
+            recognitionRef.current.onend = null;
+            recognitionRef.current.onresult = null;
+            recognitionRef.current.onerror = null;
+            recognitionRef.current.abort();
+          } catch(e) {}
           recognitionRef.current = null;
       }
+      setIsListening(false);
   };
 
   const handleSafeClose = () => {
       killEverything();
-      onClose(); // Parent'a haber ver
+      onClose();
   };
 
-  // --- SES MOTORU BAŞLATICI ---
+  // --- SES MOTORU ---
   const initSpeechEngine = (continuousMode: boolean) => {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (!SpeechRecognition) return null;
+      if (!SpeechRecognition) {
+          alert("Tarayıcınız ses tanımayı desteklemiyor.");
+          return null;
+      }
 
       const recognition = new SpeechRecognition();
       recognition.lang = 'tr-TR';
@@ -89,21 +104,18 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       };
 
       recognition.onend = () => {
-          if (isMountedRef.current) setIsListening(false);
-          
-          // OYUN MODUNDA OTOMATİK TEKRAR BAŞLATMA
-          // Eğer oyun devam ediyorsa ve cevap verilmediyse
-          if (phase === 'playing' && !feedback && isMountedRef.current) {
-              setTimeout(() => {
-                  if (isMountedRef.current && phase === 'playing' && !feedback) {
-                       startListening(); // Tekrar dene
-                  }
-              }, 500);
+          if (isMountedRef.current) {
+              setIsListening(false);
+              // Setup modundaysa kaydı durdur
+              if (phase === 'setup') setIsRecordingSetup(null);
           }
       };
 
       recognition.onerror = (event: any) => {
+          console.log("Ses Hatası:", event.error);
           if (isMountedRef.current) setIsListening(false);
+          // Setup modunda hata verirse butonu resetle
+          if (phase === 'setup') setIsRecordingSetup(null);
       };
 
       recognition.onresult = (event: any) => {
@@ -114,9 +126,11 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
               transcript += event.results[i][0].transcript;
           }
           const lower = transcript.trim().toLowerCase();
+          
+          // State'i güncelle (Ekranda görünsün diye)
           setLastHeard(lower);
 
-          // OYUN MODU KONTROLÜ (Agresif Yakalama)
+          // OYUN MODU KONTROLÜ
           if (phase === 'playing') {
               checkTranscriptForGame(lower, recognition);
           }
@@ -125,20 +139,23 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       return recognition;
   };
 
-  // --- OYUN KELİME KONTROLÜ ---
+  // --- OYUN KELİME KONTROLÜ (DÜZELTİLDİ) ---
   const checkTranscriptForGame = (transcript: string, recognitionInstance: any) => {
-      const words = transcript.split(" ");
-      const YES_POOL = [...STANDARD_YES, ...customYesWords];
-      const NO_POOL = [...STANDARD_NO, ...customNoWords];
+      // 🔥 State yerine REF kullanıyoruz (En güncel listeyi okumak için)
+      const YES_POOL = [...STANDARD_YES, ...yesWordsRef.current];
+      const NO_POOL = [...STANDARD_NO, ...noWordsRef.current];
 
+      const words = transcript.split(" ");
       let detected: 'yes' | 'no' | null = null;
+
       for (const word of words) {
+          // Tam eşleşme veya içerme kontrolü
           if (YES_POOL.some(w => word === w || word.includes(w))) detected = 'yes';
           else if (NO_POOL.some(w => word === w || word.includes(w))) detected = 'no';
       }
 
       if (detected) {
-          // Cevabı bulduk, motoru hemen durdur
+          console.log("Algılandı:", detected); // Debug için
           recognitionInstance.abort();
           checkAnswer(detected);
       }
@@ -155,33 +172,34 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   const startListening = () => {
       if (!isMountedRef.current) return;
       
-      // Eğer motor yoksa oluştur
-      if (!recognitionRef.current) {
-          recognitionRef.current = initSpeechEngine(false); // Oyun için continuous: false
+      // Eski motoru temizle ki çakışma olmasın
+      if (recognitionRef.current) {
+          try { recognitionRef.current.abort(); } catch(e){}
       }
 
-      try {
-          // Zaten çalışıyorsa hata verir, yakalayalım
-          recognitionRef.current.start();
-      } catch (e) {
-          // Hata verirse (zaten açık vs.) yoksay, sorun değil
+      const recognition = initSpeechEngine(false); // Oyun için continuous: false
+      if (recognition) {
+          recognitionRef.current = recognition;
+          try {
+              recognition.start();
+          } catch (e) {
+              console.error("Başlatma hatası:", e);
+          }
       }
   };
 
-  // --- AKIŞ KONTROLLERİ ---
-  const initGame = () => setPhase('setup');
-  
+  // --- OYUN AKIŞI ---
   const startGame = () => {
-      // Setup motorunu temizle
       killEverything();
       setPhase('playing');
-      generateQuestion();
+      // Biraz bekle ki render olsun
+      setTimeout(() => generateQuestion(), 100);
   };
 
   const generateQuestion = () => {
       setFeedback(null);
       setAnimState('hidden');
-      killEverything(); // Önceki sesleri temizle
+      killEverything(); 
       
       const target = ITEMS[Math.floor(Math.random() * ITEMS.length)];
       setTargetItem(target);
@@ -199,8 +217,8 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
               if(!isMountedRef.current) return;
               setAnimState('visible');
               askQuestion();
-          }, 1000);
-      }, 500);
+          }, 600);
+      }, 300);
   };
 
   const askQuestion = () => {
@@ -208,16 +226,23 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       const utterance = new SpeechSynthesisUtterance("Doğru eşledim mi?");
       utterance.lang = 'tr-TR';
       utterance.rate = 1.0;
-      window.speechSynthesis.speak(utterance);
-
+      
       utterance.onend = () => {
-          if (isMountedRef.current) {
-              setTimeout(startListening, 500);
+          if (isMountedRef.current && phase === 'playing') {
+              startListening();
           }
       };
+
+      // Eğer TTS hata verirse veya çalışmazsa yine de dinlemeyi başlat
+      utterance.onerror = () => {
+        if (isMountedRef.current && phase === 'playing') startListening();
+      };
+
+      window.speechSynthesis.speak(utterance);
   };
 
   const handleSuccess = () => {
+      killEverything(); // Dinlemeyi durdur
       try {
           const audio = new Audio(Math.random() > 0.5 ? aferin1 : bravo);
           audio.play().catch(()=>{});
@@ -230,10 +255,11 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
           setQuestionCount(nextQ);
           if (nextQ < 10) generateQuestion();
           else { setPhase('success'); confetti(); }
-      }, 2500);
+      }, 2000);
   };
 
   const handleFail = () => {
+      killEverything();
       try {
           const audio = new Audio(tekrardene1);
           audio.play().catch(()=>{});
@@ -243,169 +269,229 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       setTimeout(() => {
           if (!isMountedRef.current) return;
           setFeedback(null);
+          // Yanlışta tekrar sormuyoruz, dinlemeye geri dönüyoruz
           startListening(); 
       }, 2000);
   };
 
-  // Setup için kayıt (Continuous: True olabilir burada)
+  // Setup için kayıt (Continuous: True)
   const toggleSetupRecord = (type: 'yes' | 'no') => {
       if (isRecordingSetup === type) {
           setIsRecordingSetup(null);
           if (recognitionRef.current) recognitionRef.current.abort();
       } else {
+          killEverything(); // Öncekini temizle
           setIsRecordingSetup(type);
-          if (recognitionRef.current) recognitionRef.current.abort();
           
-          recognitionRef.current = initSpeechEngine(true); // Setup için sürekli dinle
           setTimeout(() => {
-              try { recognitionRef.current?.start(); } catch(e) {}
-          }, 200);
+              const recognition = initSpeechEngine(true);
+              if (recognition) {
+                  recognitionRef.current = recognition;
+                  try { recognition.start(); } catch(e) {}
+              }
+          }, 100);
       }
   };
 
+  // --- RENDER ---
   return (
     <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 min-h-screen">
       
       {/* 0. GİRİŞ */}
       {phase === 'init' && (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
-               {/* Güvenli Kapatma Butonu */}
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white animate-in zoom-in">
               <button onClick={handleSafeClose} className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full"><XCircle className="text-slate-400"/></button>
               
               <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-6 animate-bounce">
                   <Mic size={48} className="text-blue-600" />
               </div>
               <h1 className="text-2xl font-black mb-4">Hazır mısın?</h1>
-              <button onClick={initGame} className="px-10 py-4 bg-blue-600 text-white rounded-2xl font-bold text-xl shadow-xl active:scale-95 transition-all">
+              <p className="text-slate-500 mb-8 max-w-xs">Önce sesini tanıyalım, sonra oyuna başlayalım.</p>
+              <button onClick={() => setPhase('setup')} className="px-10 py-4 bg-blue-600 text-white rounded-2xl font-bold text-xl shadow-xl active:scale-95 transition-all">
                   BAŞLA
               </button>
           </div>
       )}
 
-      {/* 1. SETUP */}
+      {/* 1. SETUP (KALİBRASYON) */}
       {phase === 'setup' && (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6 max-w-2xl mx-auto w-full overflow-y-auto relative">
-              <button onClick={handleSafeClose} className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full"><XCircle className="text-slate-400"/></button>
+          <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6 max-w-2xl mx-auto w-full overflow-y-auto relative bg-slate-50">
+              <button onClick={handleSafeClose} className="absolute top-4 right-4 p-2 bg-white rounded-full shadow-sm"><XCircle className="text-slate-400"/></button>
               
-              <h1 className="text-2xl font-black">Ses Kalibrasyonu</h1>
+              <div className="text-center">
+                <h1 className="text-2xl font-black text-slate-800">Ses Kalibrasyonu</h1>
+                <p className="text-xs text-slate-500">Çocuğun söylediği kelimeyi ekle.</p>
+              </div>
 
-              {/* EVET */}
-              <div className="w-full bg-white p-4 rounded-2xl border-2 border-green-100">
-                  <h3 className="font-bold text-green-600 mb-2 flex items-center gap-2"><Check size={18}/> EVET</h3>
+              {/* EVET KUTUSU */}
+              <div className="w-full bg-white p-4 rounded-2xl border-2 border-green-100 shadow-sm">
+                  <h3 className="font-bold text-green-600 mb-2 flex items-center gap-2"><Check size={18}/> EVET (Onay)</h3>
                   <div className="flex gap-2">
                       <button 
                         onClick={() => toggleSetupRecord('yes')}
-                        className={twMerge("flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2", isRecordingSetup === 'yes' ? "bg-red-500 text-white animate-pulse" : "bg-slate-100 border")}
+                        className={twMerge("flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors", isRecordingSetup === 'yes' ? "bg-red-500 text-white animate-pulse" : "bg-slate-100 border text-slate-600")}
                       >
                           {isRecordingSetup === 'yes' ? <MicOff size={18}/> : <Mic size={18}/>}
-                          {isRecordingSetup === 'yes' ? "Dur" : "Söylet"}
+                          {isRecordingSetup === 'yes' ? "Durdur" : "Söyle"}
                       </button>
-                      <button onClick={() => { setCustomYesWords([...customYesWords, lastHeard]); setLastHeard(""); }} disabled={!lastHeard} className="px-4 bg-green-500 text-white rounded-xl font-bold disabled:opacity-30">Ekle</button>
+                      
+                      <button 
+                        onClick={() => { 
+                            if(lastHeard && !customYesWords.includes(lastHeard)) {
+                                setCustomYesWords([...customYesWords, lastHeard]); 
+                                setLastHeard("");
+                            }
+                        }} 
+                        disabled={!lastHeard || isRecordingSetup !== 'yes'} 
+                        className="px-6 bg-green-500 text-white rounded-xl font-bold disabled:opacity-30 disabled:bg-slate-300"
+                      >
+                        Ekle
+                      </button>
                   </div>
-                  <p className="text-[10px] mt-2 text-slate-400 h-4">Algılanan: <span className="text-blue-600 font-bold text-sm">{lastHeard}</span></p>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                      {customYesWords.map((w, i) => <span key={i} className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] rounded-full">{w}</span>)}
+                  
+                  {isRecordingSetup === 'yes' && (
+                      <p className="text-center mt-2 text-xs font-bold text-blue-600 h-5">{lastHeard || "Dinliyor..."}</p>
+                  )}
+
+                  <div className="flex flex-wrap gap-1 mt-3 min-h-[20px]">
+                      {customYesWords.map((w, i) => (
+                          <span key={i} className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold rounded-md border border-green-200 flex items-center gap-1">
+                              {w} <button onClick={() => setCustomYesWords(prev => prev.filter(x => x !== w))}><XCircle size={10}/></button>
+                          </span>
+                      ))}
+                      {customYesWords.length === 0 && <span className="text-[10px] text-slate-300 italic">Örn: "he", "hıhı" ekleyin...</span>}
                   </div>
               </div>
 
-              {/* HAYIR */}
-              <div className="w-full bg-white p-4 rounded-2xl border-2 border-red-100">
-                  <h3 className="font-bold text-red-600 mb-2 flex items-center gap-2"><XCircle size={18}/> HAYIR</h3>
+              {/* HAYIR KUTUSU */}
+              <div className="w-full bg-white p-4 rounded-2xl border-2 border-red-100 shadow-sm">
+                  <h3 className="font-bold text-red-600 mb-2 flex items-center gap-2"><XCircle size={18}/> HAYIR (Red)</h3>
                   <div className="flex gap-2">
                       <button 
                         onClick={() => toggleSetupRecord('no')}
-                        className={twMerge("flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2", isRecordingSetup === 'no' ? "bg-red-500 text-white animate-pulse" : "bg-slate-100 border")}
+                        className={twMerge("flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors", isRecordingSetup === 'no' ? "bg-red-500 text-white animate-pulse" : "bg-slate-100 border text-slate-600")}
                       >
                           {isRecordingSetup === 'no' ? <MicOff size={18}/> : <Mic size={18}/>}
-                          {isRecordingSetup === 'no' ? "Dur" : "Söylet"}
+                          {isRecordingSetup === 'no' ? "Durdur" : "Söyle"}
                       </button>
-                      <button onClick={() => { setCustomNoWords([...customNoWords, lastHeard]); setLastHeard(""); }} disabled={!lastHeard} className="px-4 bg-red-500 text-white rounded-xl font-bold disabled:opacity-30">Ekle</button>
+                      
+                      <button 
+                         onClick={() => { 
+                            if(lastHeard && !customNoWords.includes(lastHeard)) {
+                                setCustomNoWords([...customNoWords, lastHeard]); 
+                                setLastHeard("");
+                            }
+                        }} 
+                        disabled={!lastHeard || isRecordingSetup !== 'no'} 
+                        className="px-6 bg-red-500 text-white rounded-xl font-bold disabled:opacity-30 disabled:bg-slate-300"
+                      >
+                        Ekle
+                      </button>
                   </div>
-                  <p className="text-[10px] mt-2 text-slate-400 h-4">Algılanan: <span className="text-blue-600 font-bold text-sm">{lastHeard}</span></p>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                      {customNoWords.map((w, i) => <span key={i} className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] rounded-full">{w}</span>)}
+
+                  {isRecordingSetup === 'no' && (
+                      <p className="text-center mt-2 text-xs font-bold text-blue-600 h-5">{lastHeard || "Dinliyor..."}</p>
+                  )}
+
+                  <div className="flex flex-wrap gap-1 mt-3 min-h-[20px]">
+                      {customNoWords.map((w, i) => (
+                          <span key={i} className="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded-md border border-red-200 flex items-center gap-1">
+                              {w} <button onClick={() => setCustomNoWords(prev => prev.filter(x => x !== w))}><XCircle size={10}/></button>
+                          </span>
+                      ))}
+                      {customNoWords.length === 0 && <span className="text-[10px] text-slate-300 italic">Örn: "yok", "cık" ekleyin...</span>}
                   </div>
               </div>
 
-              <button onClick={startGame} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-lg mt-4 flex items-center justify-center gap-2">
+              <button onClick={startGame} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-lg mt-2 flex items-center justify-center gap-2 active:scale-95 transition-transform">
                   OYUNA GEÇ <ArrowRight/>
               </button>
           </div>
       )}
 
-      {/* 2. OYUN */}
+      {/* 2. OYUN EKRANI */}
       {phase === 'playing' && (
           <div className="flex-1 flex flex-col relative bg-slate-50">
               <div className="p-4 flex justify-between items-center z-20">
-                  <button onClick={handleSafeClose} className="p-2 bg-white border rounded-full shadow-sm"><XCircle className="text-slate-300"/></button>
-                  <div className="px-4 py-1 bg-white shadow-sm rounded-full font-bold text-xs border">SORU: {questionCount + 1} / 10</div>
+                  <button onClick={handleSafeClose} className="p-2 bg-white border rounded-full shadow-sm active:scale-95"><XCircle className="text-slate-400"/></button>
+                  <div className="px-4 py-1 bg-white shadow-sm rounded-full font-bold text-xs border border-slate-200 text-slate-500">
+                    SORU: <span className="text-blue-600 text-sm">{questionCount + 1}</span> / 10
+                  </div>
               </div>
 
-              <div className="flex-1 flex flex-col items-center justify-center gap-8 p-4">
-                  <div className="flex items-center gap-4 sm:gap-12 w-full justify-center h-56">
-                      <div className="w-32 h-32 bg-white border-4 border-slate-200 rounded-[2rem] p-4 flex items-center justify-center relative">
-                          <img src={targetItem.src} className="w-full h-full object-contain" />
+              <div className="flex-1 flex flex-col items-center justify-start pt-10 gap-8 p-4">
+                  {/* RESİM ALANI */}
+                  <div className="flex items-center gap-4 sm:gap-8 w-full justify-center h-48">
+                      <div className="w-36 h-36 bg-white border-4 border-slate-200 rounded-[2rem] p-6 flex items-center justify-center shadow-md relative">
+                          <img src={targetItem.src} className="w-full h-full object-contain" alt="Hedef" />
+                          <div className="absolute -top-3 bg-blue-100 text-blue-600 text-[10px] font-bold px-3 py-1 rounded-full border border-blue-200">HEDEF</div>
                       </div>
                       
                       <motion.div 
-                        initial={{ x: 200, opacity: 0 }}
-                        animate={animState !== 'hidden' ? { x: 0, opacity: 1 } : { x: 200, opacity: 0 }}
+                        initial={{ x: 100, opacity: 0 }}
+                        animate={animState !== 'hidden' ? { x: 0, opacity: 1 } : { x: 100, opacity: 0 }}
                         className={twMerge(
-                            "w-32 h-32 bg-white border-4 rounded-[2rem] p-4 flex items-center justify-center transition-colors duration-500",
-                            feedback === 'correct' ? "border-green-500 bg-green-50" : 
-                            feedback === 'wrong' ? "border-red-500 bg-red-50" : "border-slate-200"
+                            "w-36 h-36 bg-white border-4 rounded-[2rem] p-6 flex items-center justify-center transition-all duration-300 shadow-md",
+                            feedback === 'correct' ? "border-green-500 bg-green-50 scale-110 shadow-green-200" : 
+                            feedback === 'wrong' ? "border-red-500 bg-red-50 shake" : "border-slate-200"
                         )}
                       >
-                          <img src={compareItem.src} className="w-full h-full object-contain" />
+                          <img src={compareItem.src} className="w-full h-full object-contain" alt="Karşılaştırma" />
                       </motion.div>
                   </div>
 
-                  {/* MİKROFON BUTONU (Dönen top yerine) */}
-                  <div className="flex flex-col items-center gap-3 h-32 justify-center w-full">
+                  {/* SORU METNİ */}
+                  <div className="bg-white px-6 py-2 rounded-full shadow-sm border border-slate-200">
+                      <p className="font-bold text-lg text-slate-700">Bu ikisi aynı mı?</p>
+                  </div>
+
+                  {/* MİKROFON DURUMU */}
+                  <div className="flex flex-col items-center gap-3 h-32 justify-center w-full mt-4">
                       {isListening ? (
-                          <div className="flex flex-col items-center gap-2">
-                              <div className="w-20 h-20 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-blue-200 animate-pulse">
-                                  <Mic size={40} />
+                          <div className="flex flex-col items-center gap-3 animate-in zoom-in duration-300">
+                              <div className="w-24 h-24 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-xl shadow-blue-200 animate-pulse relative">
+                                  <Mic size={48} />
+                                  <span className="absolute -bottom-2 bg-blue-700 text-white text-[9px] px-2 rounded-full">DİNLİYOR</span>
                               </div>
-                              <span className="text-blue-600 font-black text-xs">DİNLİYORUM...</span>
-                              <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-bold h-6 min-w-[50px] text-center">{lastHeard}</span>
+                              <p className="text-slate-400 text-xs font-medium h-4">{lastHeard ? `"${lastHeard}"` : "Cevap bekleniyor..."}</p>
                           </div>
                       ) : feedback ? (
-                          <div className={twMerge("text-4xl font-black animate-in zoom-in", feedback === 'correct' ? "text-green-500" : "text-red-500")}>
-                              {feedback === 'correct' ? "DOĞRU!" : "YANLIŞ"}
+                          <div className={twMerge("text-5xl font-black animate-in zoom-in drop-shadow-sm", feedback === 'correct' ? "text-green-500" : "text-red-500")}>
+                              {feedback === 'correct' ? "HARİKA!" : "OLMADI"}
                           </div>
                       ) : (
-                          // TIKANMAYI ÖNLEYEN BUTON: Otomatik başlamazsa buna basar
+                          // TIKANMAYI ÖNLEYEN BUTON (Hata durumunda çıkar)
                           <button 
                             onClick={startListening}
-                            className="flex flex-col items-center gap-2 group"
+                            className="flex flex-col items-center gap-2 group animate-in fade-in"
                           >
                              <div className="w-20 h-20 bg-white border-4 border-slate-200 text-slate-400 rounded-full flex items-center justify-center group-hover:border-blue-400 group-hover:text-blue-500 transition-all shadow-sm">
                                   <MicOff size={32} />
                              </div>
-                             <span className="text-slate-400 text-xs font-bold group-hover:text-blue-500">TEKRAR DİNLE</span>
+                             <span className="text-slate-400 text-xs font-bold group-hover:text-blue-500">DOKUN VE KONUŞ</span>
                           </button>
                       )}
                   </div>
               </div>
 
-              {/* GİZLİ BUTONLAR */}
-              <div className="absolute bottom-6 left-6 opacity-20 hover:opacity-100 z-30">
-                  <button onClick={() => checkAnswer('no')} className="w-16 h-16 bg-red-100 text-red-600 border-2 border-red-200 rounded-2xl flex items-center justify-center font-bold text-xs">HAYIR</button>
+              {/* GİZLİ MANUEL BUTONLAR (Ses çalışmazsa diye) */}
+              <div className="absolute bottom-6 left-6 opacity-30 hover:opacity-100 z-30 transition-opacity">
+                  <button onClick={() => checkAnswer('no')} className="w-16 h-16 bg-red-50 text-red-400 border-2 border-red-200 rounded-2xl flex items-center justify-center font-bold text-xs active:scale-95">HAYIR</button>
               </div>
-              <div className="absolute bottom-6 right-6 opacity-20 hover:opacity-100 z-30">
-                  <button onClick={() => checkAnswer('yes')} className="w-16 h-16 bg-green-100 text-green-600 border-2 border-green-200 rounded-2xl flex items-center justify-center font-bold text-xs">EVET</button>
+              <div className="absolute bottom-6 right-6 opacity-30 hover:opacity-100 z-30 transition-opacity">
+                  <button onClick={() => checkAnswer('yes')} className="w-16 h-16 bg-green-50 text-green-400 border-2 border-green-200 rounded-2xl flex items-center justify-center font-bold text-xs active:scale-95">EVET</button>
               </div>
           </div>
       )}
 
-      {/* 3. SONUÇ */}
+      {/* 3. SONUÇ EKRANI */}
       {phase === 'success' && (
-        <div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center p-8">
-           <Trophy size={100} className="text-yellow-500 mb-6 animate-bounce" />
-           <h1 className="text-3xl font-black mb-2 uppercase text-slate-800">Tebrikler!</h1>
-           <button onClick={() => onComplete(true)} className="bg-green-600 text-white px-12 py-5 rounded-2xl font-bold text-xl shadow-xl">
-             KAYDET VE ÇIK
+        <div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center p-8 animate-in zoom-in">
+           <Trophy size={120} className="text-yellow-500 mb-8 animate-bounce drop-shadow-xl" />
+           <h1 className="text-4xl font-black mb-4 uppercase text-slate-800">Tebrikler!</h1>
+           <p className="text-slate-500 mb-8 font-medium">Bütün soruları cevapladın.</p>
+           <button onClick={() => onComplete(true)} className="bg-green-600 text-white px-12 py-5 rounded-2xl font-bold text-xl shadow-xl active:scale-95 transition-transform">
+             KAYDET VE BİTİR
            </button>
         </div>
       )}
