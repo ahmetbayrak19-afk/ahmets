@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas } from "@react-three/fiber";
 import { Environment, Html, OrbitControls, useGLTF } from "@react-three/drei";
 import { ArrowLeft, MousePointer2, AlertCircle } from "lucide-react";
 import * as THREE from "three";
@@ -8,7 +8,7 @@ import * as THREE from "three";
 const MODEL_PATH =
   "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/human.glb?alt=media&token=7b979206-e91e-4e34-95ce-370e4c537998";
 
-/* ================= MP3 ================= */
+/* ================= MP3 (aynı klasör) ================= */
 import calismaGiris from "./calismagiris.mp3";
 import degerlendirmeGiris from "./degerlendirmegiris.mp3";
 
@@ -63,18 +63,19 @@ type Question = {
   key: string;
   label: string;
   audioUrl: string;
-  acceptNames: string[];
+  acceptNames: string[]; // ✅ BOYAMA hedefi
 };
 
 /* ================= ACCEPT MAP ================= */
+/** Not: bacak = Object_6 ve diz */
 const ACCEPT = {
   kol: ["Object_0001_1", "Object_0001"],
   el: ["Object_0002", "Object_0002_1", "Object_0006", "Object_0006_1"],
   sac: ["sac"],
   alin: ["alin"],
   burun: ["burun"],
-  kas: ["kas"],
-  goz: ["Object_3_1", "mesh_20"], // 👈 göz zor seçiliyor demiştin, mesh_20 boşlukları da kabul
+  kas: ["kas"], // ✅ sadece kaşı boyayacağız
+  goz: ["Object_3_1"], // ✅ sadece gözü boyayacağız
   yanak: ["yanak"],
   kulak: ["Object_5001", "Object_5001_1"],
   boyun: ["Object_10008"],
@@ -100,7 +101,7 @@ const ACCEPT = {
   gogus: ["gogus"],
   karin: ["karin"],
   ozelbolge: ["ozelbolge"],
-  bacak: ["Object_6", "diz"], // ✅ senin son dediğin
+  bacak: ["Object_6", "diz"],
   diz: ["diz"],
   ayak: ["ayak", "Object_0006_2"],
   tirnak: ["tirnak"],
@@ -109,6 +110,17 @@ const ACCEPT = {
   omuz: ["Object_0005", "Object_0005_1"],
   parmak: ["Object_0006", "Object_0006_1", "Object_0006_2"],
 } as const;
+
+/* ================= SOFT ACCEPT (DOĞRU SAYMA) ================= */
+/**
+ * ✅ DOĞRU SAYMA listesi (boyama hedefi değil!)
+ * - Göz sorusu: mesh_20 + kas + goz(Object_3_1) doğru sayılacak, sadece göz boyanacak.
+ * - Kaş sorusu: kas + goz + alin doğru sayılacak, sadece kaş boyanacak.
+ */
+const SOFT_ACCEPT: Record<string, string[]> = {
+  goz: ["mesh_20", "kas", "Object_3_1"],
+  kas: ["kas", "Object_3_1", "alin"],
+};
 
 /* ================= QUESTIONS ================= */
 const QUESTIONS: Question[] = [
@@ -126,17 +138,19 @@ const QUESTIONS: Question[] = [
   { key: "cene", label: "Çene", audioUrl: ceneNerede, acceptNames: ACCEPT.cene },
   { key: "ense", label: "Ense", audioUrl: enseNerede, acceptNames: ACCEPT.ense },
   { key: "kafa", label: "Kafa", audioUrl: kafaNerede, acceptNames: ACCEPT.kafa },
+
   { key: "gogus", label: "Göğüs", audioUrl: gogusNerede, acceptNames: ACCEPT.gogus },
   { key: "karin", label: "Karın", audioUrl: karinNerede, acceptNames: ACCEPT.karin },
-  { key: "ozelbolge", label: "Özel Bölge", audioUrl: ozelBolgeNerede, acceptNames: ACCEPT.ozelbolge },
   { key: "bacak", label: "Bacak", audioUrl: bacakNerede, acceptNames: ACCEPT.bacak },
   { key: "diz", label: "Diz", audioUrl: dizNerede, acceptNames: ACCEPT.diz },
   { key: "ayak", label: "Ayak", audioUrl: ayakNerede, acceptNames: ACCEPT.ayak },
-  { key: "tirnak", label: "Tırnak", audioUrl: tirnakNerede, acceptNames: ACCEPT.tirnak },
+
   { key: "sirt", label: "Sırt", audioUrl: sirtNerede, acceptNames: ACCEPT.sirt },
   { key: "bel", label: "Bel", audioUrl: belNerede, acceptNames: ACCEPT.bel },
   { key: "omuz", label: "Omuz", audioUrl: omuzNerede, acceptNames: ACCEPT.omuz },
   { key: "parmak", label: "Parmak", audioUrl: parmakNerede, acceptNames: ACCEPT.parmak },
+  { key: "ozelbolge", label: "Özel Bölge", audioUrl: ozelBolgeNerede, acceptNames: ACCEPT.ozelbolge },
+  { key: "tirnak", label: "Tırnak", audioUrl: tirnakNerede, acceptNames: ACCEPT.tirnak },
 ];
 
 function pickRandomN<T>(arr: T[], n: number) {
@@ -162,30 +176,36 @@ function useSingleAudio() {
 
   const play = (url: string) =>
     new Promise<void>((resolve) => {
-      stop();
-      const a = new Audio(url);
-      a.preload = "auto";
-      audioRef.current = a;
-      a.onended = () => resolve();
-      a.play().catch(() => resolve());
+      try {
+        stop();
+        const a = new Audio(url);
+        a.preload = "auto";
+        audioRef.current = a;
+        a.onended = () => resolve();
+        a.onerror = () => resolve();
+        a.play().catch(() => resolve());
+      } catch {
+        resolve();
+      }
     });
 
   return { play, stop };
 }
 
 /* ================= MOUTH SHAPE KEY ================= */
-function useMouthTalk(scene: THREE.Object3D | null, enabled: boolean) {
+function useMouthTalk(scene: THREE.Object3D | null, enabled: boolean, strength = 0.9) {
   useEffect(() => {
     if (!scene || !enabled) return;
 
     const targets: { mesh: any; idx: number }[] = [];
     scene.traverse((o: any) => {
       if (o?.isMesh && o.morphTargetDictionary?.Mouth_Open !== undefined) {
-        targets.push({ mesh: o, idx: o.morphTargetDictionary.Mouth_Open });
+        const idx = o.morphTargetDictionary.Mouth_Open;
+        if (Array.isArray(o.morphTargetInfluences)) targets.push({ mesh: o, idx });
       }
     });
 
-    if (!targets.length) return;
+    if (targets.length === 0) return;
 
     let raf = 0;
     const start = performance.now();
@@ -193,16 +213,18 @@ function useMouthTalk(scene: THREE.Object3D | null, enabled: boolean) {
     const tick = () => {
       const t = (performance.now() - start) / 1000;
       const v = (Math.sin(t * 10) + 1) / 2;
+      const val = v * strength;
+
       targets.forEach(({ mesh, idx }) => {
         if (mesh?.morphTargetInfluences && mesh.morphTargetInfluences.length > idx) {
-          mesh.morphTargetInfluences[idx] = v * 0.9; // ✅ daha belirgin
+          mesh.morphTargetInfluences[idx] = val;
         }
       });
+
       raf = requestAnimationFrame(tick);
     };
 
     tick();
-
     return () => {
       cancelAnimationFrame(raf);
       targets.forEach(({ mesh, idx }) => {
@@ -211,118 +233,103 @@ function useMouthTalk(scene: THREE.Object3D | null, enabled: boolean) {
         }
       });
     };
-  }, [scene, enabled]);
+  }, [scene, enabled, strength]);
 }
 
-/* ================= HIGHLIGHT (KALICI BOYA BUG FIX) ================= */
-type MatBackup = {
-  material: THREE.Material | THREE.Material[];
-  emissive?: THREE.Color;
-  emissiveIntensity?: number;
-};
-function createHighlighter() {
-  // mesh uuid -> backup
-  const backup = new Map<string, MatBackup>();
+/* ================= HIGHLIGHT (kalıcı boyanma fixli) ================= */
+function ensureOriginalMaterial(mesh: THREE.Mesh) {
+  const ud: any = mesh.userData || (mesh.userData = {});
+  if (!ud.__origMat) ud.__origMat = mesh.material;
+}
 
-  const restoreAll = () => {
-    backup.forEach((b, uuid) => {
-      // restore in traverse (uuid bulup)
-      // bu restoreAll, dışarıdan scene verilince uygulanacak
-    });
+function restoreOriginalMaterial(mesh: THREE.Mesh) {
+  const ud: any = mesh.userData;
+  if (ud?.__origMat) mesh.material = ud.__origMat;
+}
+
+function highlightByNames(
+  scene: THREE.Object3D | null,
+  names: string[],
+  ms: number,
+  kind: "ok" | "bad"
+) {
+  if (!scene) return;
+
+  const meshes: THREE.Mesh[] = [];
+  scene.traverse((o: any) => {
+    if (o?.isMesh && names.includes(o.name)) meshes.push(o);
+  });
+  if (meshes.length === 0) return;
+
+  meshes.forEach((m) => ensureOriginalMaterial(m));
+
+  meshes.forEach((m) => {
+    restoreOriginalMaterial(m);
+    const matAny: any = m.material;
+    const cloned = matAny?.clone ? matAny.clone() : matAny;
+    m.material = cloned;
+
+    if (cloned?.emissive) {
+      cloned.emissive.set(kind === "ok" ? 0x22c55e : 0xef4444);
+      cloned.emissiveIntensity = 1.25;
+    }
+  });
+
+  window.setTimeout(() => {
+    meshes.forEach((m) => restoreOriginalMaterial(m));
+  }, ms);
+}
+
+/* ================= CLICK vs DRAG ================= */
+function useTapGuard() {
+  const isDraggingRef = useRef(false);
+  const downPosRef = useRef<{ x: number; y: number } | null>(null);
+  const movedRef = useRef(false);
+
+  const onControlStart = () => {
+    isDraggingRef.current = true;
   };
-
-  const highlight = (
-    scene: THREE.Object3D | null,
-    names: string[],
-    ms: number,
-    kind: "ok" | "bad"
-  ) => {
-    if (!scene) return;
-
-    const meshes: THREE.Mesh[] = [];
-    scene.traverse((o: any) => {
-      if (!o?.isMesh) return;
-      if (names.includes(o.name)) meshes.push(o);
-    });
-    if (!meshes.length) return;
-
-    // önce o meshlerin eski halini backup'a al
-    for (const m of meshes) {
-      if (!backup.has(m.uuid)) {
-        // materyal shared olabilir -> clone
-        const mat = m.material as any;
-        const cloned = mat?.clone ? mat.clone() : mat;
-        m.material = cloned;
-
-        const em = (cloned as any)?.emissive?.clone?.();
-        backup.set(m.uuid, {
-          material: cloned,
-          emissive: em ?? undefined,
-          emissiveIntensity: (cloned as any)?.emissiveIntensity,
-        });
-      }
-    }
-
-    // uygula
-    for (const m of meshes) {
-      const mat: any = m.material as any;
-      if (mat?.emissive) {
-        mat.emissive.set(kind === "ok" ? 0x22c55e : 0xef4444);
-        mat.emissiveIntensity = 1.35;
-      }
-    }
-
+  const onControlEnd = () => {
     window.setTimeout(() => {
-      // süre bitince geri koy
-      for (const m of meshes) {
-        const b = backup.get(m.uuid);
-        if (!b) continue;
-        const mat: any = m.material as any;
-        if (mat?.emissive && b.emissive) {
-          mat.emissive.copy(b.emissive);
-          mat.emissiveIntensity = b.emissiveIntensity ?? mat.emissiveIntensity;
-        }
-      }
-    }, ms);
+      isDraggingRef.current = false;
+    }, 60);
   };
 
-  const restoreScene = (scene: THREE.Object3D | null) => {
-    if (!scene) return;
-    scene.traverse((o: any) => {
-      if (!o?.isMesh) return;
-      const b = backup.get(o.uuid);
-      if (!b) return;
-      // material zaten clone’du; emissive’i geri koymak yeterli
-      const mat: any = o.material as any;
-      if (mat?.emissive && b.emissive) {
-        mat.emissive.copy(b.emissive);
-        mat.emissiveIntensity = b.emissiveIntensity ?? mat.emissiveIntensity;
-      }
-    });
+  const pointerDown = (e: any) => {
+    movedRef.current = false;
+    downPosRef.current = { x: e.clientX ?? 0, y: e.clientY ?? 0 };
   };
 
-  const clear = () => {
-    backup.clear();
+  const pointerMove = (e: any) => {
+    const d = downPosRef.current;
+    if (!d) return;
+    const x = e.clientX ?? 0;
+    const y = e.clientY ?? 0;
+    const dx = x - d.x;
+    const dy = y - d.y;
+    if (dx * dx + dy * dy > 10 * 10) movedRef.current = true;
   };
 
-  return { highlight, restoreScene, clear };
+  const isTapAllowed = () => {
+    if (isDraggingRef.current) return false;
+    if (movedRef.current) return false;
+    return true;
+  };
+
+  return { onControlStart, onControlEnd, pointerDown, pointerMove, isTapAllowed };
 }
 
-/* ================= MODEL (fit + scene ref + pick) ================= */
+/* ================= MODEL ================= */
 function Model({
   onMeshPick,
   onLoaded,
   setSceneRef,
-  setClickedName,
-  canPickRef,
-  dragRef,
+  tapGuard,
 }: {
   onMeshPick: (mesh: THREE.Object3D) => void;
   onLoaded: (fit: FitInfo) => void;
   setSceneRef: (scene: THREE.Object3D | null) => void;
-  setClickedName: (s: string) => void;
-  canPickRef: React.MutableRefObject<boolean>;
-  dragRef: React.MutableRefObject<{ down: boolean; moved: boolean; x: number; y: number }>;
+  tapGuard: ReturnType<typeof useTapGuard>;
 }) {
   const gltf = useGLTF(MODEL_PATH) as any;
 
@@ -331,12 +338,13 @@ function Model({
     if (!scene) return { center: [0, 0, 0], radius: 1, meshes: 0 };
 
     let meshes = 0;
-    scene.traverse?.((o: any) => o?.isMesh && meshes++);
+    scene.traverse?.((o: any) => {
+      if (o?.isMesh) meshes++;
+    });
 
     const box = new THREE.Box3().setFromObject(scene);
     const sphere = new THREE.Sphere();
     box.getBoundingSphere(sphere);
-
     const r = Number.isFinite(sphere.radius) && sphere.radius > 0 ? sphere.radius : 1;
 
     return {
@@ -352,198 +360,186 @@ function Model({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fit.center[0], fit.center[1], fit.center[2], fit.radius, fit.meshes, gltf?.scene]);
 
-  // ✅ drag tespiti: kaydırıyorsa seçim sayma
-  const onDown = (e: any) => {
-    e.stopPropagation();
-    dragRef.current.down = true;
-    dragRef.current.moved = false;
-    dragRef.current.x = e.clientX ?? 0;
-    dragRef.current.y = e.clientY ?? 0;
-  };
-  const onMove = (e: any) => {
-    if (!dragRef.current.down) return;
-    const dx = Math.abs((e.clientX ?? 0) - dragRef.current.x);
-    const dy = Math.abs((e.clientY ?? 0) - dragRef.current.y);
-    if (dx + dy > 8) dragRef.current.moved = true;
-  };
-  const onUp = (e: any) => {
-    e.stopPropagation();
-
-    const obj = e?.object;
-    const name =
-      obj?.name || obj?.material?.name || obj?.geometry?.name || obj?.uuid || "unknown";
-    setClickedName(String(name));
-
-    // drag ise seçim yok
-    if (dragRef.current.moved) {
-      dragRef.current.down = false;
-      return;
-    }
-
-    dragRef.current.down = false;
-
-    if (!canPickRef.current) return;
-    if (obj) onMeshPick(obj);
-  };
-
   return (
-    <group onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}>
+    <group
+      onPointerDown={(e: any) => {
+        e.stopPropagation();
+        tapGuard.pointerDown(e);
+      }}
+      onPointerMove={(e: any) => {
+        tapGuard.pointerMove(e);
+      }}
+      onPointerUp={(e: any) => {
+        e.stopPropagation();
+        if (!tapGuard.isTapAllowed()) return;
+        if (e?.object) onMeshPick(e.object);
+      }}
+    >
       <primitive object={gltf.scene} />
     </group>
   );
 }
 
-/* ================= CAMERA (SENİN HESAP + ZOOM LIMIT) ================= */
-function CameraFit({
-  ready,
-  fit,
-  controlsRef,
-}: {
-  ready: boolean;
-  fit: FitInfo | null;
-  controlsRef: React.MutableRefObject<any>;
-}) {
-  const { camera, controls } = useThree();
-
-  useEffect(() => {
-    if (!ready || !fit) return;
-
-    let cancelled = false;
-
-    const apply = (tries: number) => {
-      if (cancelled) return;
-
-      const c: any = controlsRef.current || controls;
-      if (!c) {
-        if (tries < 120) requestAnimationFrame(() => apply(tries + 1));
-        return;
-      }
-
-      const [cx, cy, cz] = fit.center;
-      const r = fit.radius;
-
-      // ✅ SENİN KODUN (DOKUNMADIM)
-      c.target.set(cx, cy + r * 0.15, cz);
-      const dist = r * 2.6;
-      camera.position.set(cx, cy + r * 0.35, cz + dist);
-
-      camera.near = Math.max(0.01, dist / 200);
-      camera.far = Math.max(5000, dist * 50);
-      camera.updateProjectionMatrix();
-
-      // ✅ SADECE: çok küçülmesin diye zoom-out sınırı
-      c.maxDistance = dist * 1.25;
-
-      c.update();
-    };
-
-    requestAnimationFrame(() => apply(0));
-    return () => {
-      cancelled = true;
-    };
-  }, [ready, fit, camera, controls, controlsRef]);
-
-  return null;
+/* ================= ERROR BOUNDARY ================= */
+class ErrorBoundary extends React.Component<
+  { onError: () => void; children: any },
+  { hasError: boolean }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch() {
+    this.props.onError();
+  }
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
 }
 
 /* ================= MAIN ================= */
 export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const { play, stop } = useSingleAudio();
+  const tapGuard = useTapGuard();
 
-  const controlsRef = useRef<any>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef = useRef<any>(null);
+
+  const [fatalError, setFatalError] = useState(false);
+  const [clickedName, setClickedName] = useState("Bir yere dokun...");
 
   const [scene, setScene] = useState<THREE.Object3D | null>(null);
   const [fit, setFit] = useState<FitInfo | null>(null);
   const [modelReady, setModelReady] = useState(false);
 
-  const [clickedName, setClickedName] = useState("Bir yere dokun...");
-  const [fatalError, setFatalError] = useState(false);
-
   const [mode, setMode] = useState<Mode>("menu");
   const [phase, setPhase] = useState<"idle" | "intro" | "asking" | "finished">("idle");
-
   const [score, setScore] = useState(0);
   const [qIndex, setQIndex] = useState(0);
   const [qList, setQList] = useState<Question[]>([]);
   const [currentQ, setCurrentQ] = useState<Question | null>(null);
 
-  const [mouthEnabled, setMouthEnabled] = useState(false);
-  useMouthTalk(scene, mouthEnabled);
-
-  // ✅ seçim açık/kapalı
   const canPickRef = useRef(false);
 
-  // ✅ drag tespiti
-  const dragRef = useRef({ down: false, moved: false, x: 0, y: 0 });
+  const [mouthEnabled, setMouthEnabled] = useState(false);
+  useMouthTalk(scene, mouthEnabled, 0.9);
 
-  // ✅ highlight cache (kalıcı boya bug fix)
-  const highlighterRef = useRef(createHighlighter());
+  const HEAD_KEYS = useMemo(
+    () =>
+      new Set([
+        "kafa",
+        "goz",
+        "kas",
+        "burun",
+        "agiz",
+        "cene",
+        "kulak",
+        "yanak",
+        "alin",
+        "sac",
+        "ense",
+        "boyun",
+      ]),
+    []
+  );
 
-  // component kapanınca her şeyi temizle
-  useEffect(() => {
-    return () => {
-      stop();
-      highlighterRef.current.clear();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const getOutPose = () => {
+    if (!fit) return null;
+    const [cx, cy, cz] = fit.center;
+    const r = fit.radius;
 
-  // ===== Kamera head zoom (intro) =====
-  const tweenCamera = (toTarget: THREE.Vector3, toPos: THREE.Vector3, ms = 650) => {
+    const target = new THREE.Vector3(cx, cy + r * 0.15, cz);
+    const pos = new THREE.Vector3(cx, cy + r * 0.35, cz + r * 2.6);
+    return { target, pos, dist: r * 2.6 };
+  };
+
+  const getHeadPose = () => {
+    if (!fit) return null;
+    const [cx, cy, cz] = fit.center;
+    const r = fit.radius;
+
+    const target = new THREE.Vector3(cx, cy + r * 0.55, cz);
+    const pos = new THREE.Vector3(cx, cy + r * 0.65, cz + r * 0.85);
+    return { target, pos };
+  };
+
+  const applyOutPoseOnce = () => {
     const cam = cameraRef.current;
     const c = controlsRef.current;
-    if (!cam || !c) return Promise.resolve();
+    const out = getOutPose();
+    if (!cam || !c || !out) return;
 
-    const fromTarget = c.target.clone();
-    const fromPos = cam.position.clone();
+    c.target.copy(out.target);
+    cam.position.copy(out.pos);
+    cam.near = Math.max(0.01, out.dist / 200);
+    cam.far = Math.max(5000, out.dist * 50);
+    cam.updateProjectionMatrix();
 
-    const start = performance.now();
+    c.maxDistance = out.dist * 1.25;
+    c.update();
+  };
 
-    return new Promise<void>((resolve) => {
-      const tick = () => {
-        const t = (performance.now() - start) / ms;
-        const k = t >= 1 ? 1 : t;
+  useEffect(() => {
+    if (!modelReady) return;
+    requestAnimationFrame(() => applyOutPoseOnce());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelReady]);
 
-        // smoothstep
-        const s = k * k * (3 - 2 * k);
+  const tweenCamera = (target: THREE.Vector3, pos: THREE.Vector3, ms: number) =>
+    new Promise<void>((resolve) => {
+      const cam = cameraRef.current;
+      const c = controlsRef.current;
+      if (!cam || !c) return resolve();
 
-        c.target.lerpVectors(fromTarget, toTarget, s);
-        cam.position.lerpVectors(fromPos, toPos, s);
+      const t0 = performance.now();
+      const startPos = cam.position.clone();
+      const startTgt = c.target.clone();
+
+      const step = () => {
+        const t = (performance.now() - t0) / ms;
+        const k = t >= 1 ? 1 : t * (2 - t);
+
+        cam.position.lerpVectors(startPos, pos, k);
+        c.target.lerpVectors(startTgt, target, k);
 
         cam.updateProjectionMatrix();
         c.update();
 
         if (k >= 1) resolve();
-        else requestAnimationFrame(tick);
+        else requestAnimationFrame(step);
       };
-      requestAnimationFrame(tick);
+
+      requestAnimationFrame(step);
     });
+
+  const autoFocusForQuestion = async (q: Question | null) => {
+    if (!q) return;
+    if (!fit || !controlsRef.current || !cameraRef.current) return;
+
+    if (HEAD_KEYS.has(q.key)) {
+      const head = getHeadPose();
+      if (head) await tweenCamera(head.target, head.pos, 450);
+    } else {
+      const out = getOutPose();
+      if (out) await tweenCamera(out.target, out.pos, 350);
+    }
   };
 
-  const getOutPose = () => {
-    const c = controlsRef.current;
-    if (!fit || !c) return null;
-    const [cx, cy, cz] = fit.center;
-    const r = fit.radius;
-    const target = new THREE.Vector3(cx, cy + r * 0.15, cz);
-    const pos = new THREE.Vector3(cx, cy + r * 0.35, cz + r * 2.6);
-    return { target, pos };
+  const isAccepted = (q: Question, pickedName: string) => {
+    // ✅ Boyama hedefi listesi
+    if (q.acceptNames.includes(pickedName)) return true;
+
+    // ✅ Soft doğru sayma listesi (boyamaz)
+    const soft = SOFT_ACCEPT[q.key];
+    if (soft && soft.includes(pickedName)) return true;
+
+    return false;
   };
 
-  const getHeadPose = () => {
-    const c = controlsRef.current;
-    if (!fit || !c) return null;
-    const [cx, cy, cz] = fit.center;
-    const r = fit.radius;
-
-    // ✅ “Kafaya daha çok yaklaşsın” dediğin için biraz daha yaklaştırdım
-    const target = new THREE.Vector3(cx, cy + r * 0.55, cz);
-    const pos = new THREE.Vector3(cx, cy + r * 0.68, cz + r * 0.75);
-    return { target, pos };
-  };
-
-  // ===== oyun akışı =====
   const nextQuestion = async (nextIdx: number, list: Question[]) => {
     if (nextIdx >= list.length) {
       setPhase("finished");
@@ -558,45 +554,44 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
     setCurrentQ(q);
 
     canPickRef.current = false;
-    try {
-      await play(q.audioUrl);
-    } finally {
-      canPickRef.current = true; // ✅ ses bitince çocuk seçsin
+
+    await autoFocusForQuestion(q);
+
+    await play(q.audioUrl);
+
+    if (HEAD_KEYS.has(q.key)) {
+      const out = getOutPose();
+      if (out) await tweenCamera(out.target, out.pos, 450);
     }
+
+    canPickRef.current = true;
   };
 
   const startAssessment = async () => {
-    if (!modelReady || !fit || !controlsRef.current || !cameraRef.current) return;
-
-    // önce eski highlight kalıntısı varsa temizle
-    highlighterRef.current.restoreScene(scene);
+    if (!modelReady) return;
 
     setMode("assessment");
     setPhase("intro");
     setScore(0);
-
-    const list = pickRandomN(QUESTIONS, 10);
-    setQList(list);
     setQIndex(0);
     setCurrentQ(null);
 
-    // intro boyunca seçimi kapat
+    const list = pickRandomN(QUESTIONS, 10);
+    setQList(list);
+
     canPickRef.current = false;
 
-    // yüze yaklaş
-    const headPose = getHeadPose();
-    if (headPose) await tweenCamera(headPose.target, headPose.pos, 700);
-
-    // intro konuşsun + ağız oynasın
     setMouthEnabled(true);
+    const head = getHeadPose();
+    if (head) await tweenCamera(head.target, head.pos, 550);
+
     await play(degerlendirmeGiris);
+
+    const out = getOutPose();
+    if (out) await tweenCamera(out.target, out.pos, 500);
+
     setMouthEnabled(false);
 
-    // geri dön
-    const outPose = getOutPose();
-    if (outPose) await tweenCamera(outPose.target, outPose.pos, 650);
-
-    // sorular
     setPhase("asking");
     await nextQuestion(0, list);
   };
@@ -604,49 +599,73 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const startTeaching = async () => {
     if (!modelReady) return;
 
-    // temizle
-    highlighterRef.current.restoreScene(scene);
-
     setMode("teaching");
     setPhase("intro");
     setScore(0);
-    setQList([]);
     setQIndex(0);
+    setQList([]);
     setCurrentQ(null);
 
     canPickRef.current = false;
-    setMouthEnabled(true);
-    await play(calismaGiris);
-    setMouthEnabled(false);
 
+    setMouthEnabled(true);
+    const head = getHeadPose();
+    if (head) await tweenCamera(head.target, head.pos, 550);
+
+    await play(calismaGiris);
+
+    const out = getOutPose();
+    if (out) await tweenCamera(out.target, out.pos, 500);
+
+    setMouthEnabled(false);
     setPhase("idle");
-    canPickRef.current = false; // öğretimde şimdilik değerlendirme yok
   };
 
   const onMeshPick = async (obj: THREE.Object3D) => {
-    if (mode !== "assessment") return;
-    if (phase !== "asking" || !currentQ) return;
-    if (!canPickRef.current) return;
-
     const name = String(obj?.name || "unknown");
+    setClickedName(name);
 
-    const ok = currentQ.acceptNames.includes(name);
+    if (mode === "menu") return;
+    if (mode === "teaching") return;
 
-    if (ok) {
+    if (mode === "assessment") {
+      if (phase !== "asking" || !currentQ) return;
+      if (!canPickRef.current) return;
+
+      if (!tapGuard.isTapAllowed()) return;
+
       canPickRef.current = false;
 
-      setScore((s) => s + 1);
-      highlighterRef.current.highlight(scene, currentQ.acceptNames, 450, "ok");
+      const ok = isAccepted(currentQ, name);
 
-      await new Promise((r) => setTimeout(r, 220));
-      await nextQuestion(qIndex + 1, qList);
-    } else {
-      // yanlış: sadece tıklananı yak
-      highlighterRef.current.highlight(scene, [name], 250, "bad");
-      // aynı soruda kal, tekrar seçebilir
-      canPickRef.current = true;
+      if (ok) {
+        setScore((s) => s + 1);
+
+        // ✅ HER ZAMAN sadece hedefi boya:
+        // göz sorusunda sadece Object_3_1 boyanır
+        // kaş sorusunda sadece kas boyanır
+        highlightByNames(scene, currentQ.acceptNames, 450, "ok");
+
+        await new Promise((r) => setTimeout(r, 220));
+        await nextQuestion(qIndex + 1, qList);
+      } else {
+        highlightByNames(scene, [name], 250, "bad");
+        canPickRef.current = true;
+      }
     }
   };
+
+  useEffect(() => {
+    return () => {
+      stop();
+      if (scene) {
+        scene.traverse((o: any) => {
+          if (o?.isMesh) restoreOriginalMaterial(o);
+        });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene]);
 
   return (
     <div className="fixed inset-0 z-[500] bg-slate-900 flex flex-col">
@@ -654,8 +673,6 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         <button
           onClick={() => {
             stop();
-            // highlight reset (boyalı kalma fix)
-            highlighterRef.current.restoreScene(scene);
             onClose();
           }}
           className="p-3 bg-slate-800/80 rounded-full text-white hover:bg-slate-700 transition"
@@ -673,7 +690,6 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      {/* Mod seçimi */}
       {mode === "menu" && (
         <div className="absolute top-4 right-4 z-20 bg-black/60 text-white p-3 rounded-xl w-[260px]">
           <div className="text-sm font-bold">Mod Seç</div>
@@ -701,7 +717,6 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      {/* Üst bilgi */}
       {mode !== "menu" && (
         <div className="absolute top-4 right-4 z-20 bg-black/55 text-white px-3 py-2 rounded-xl text-[12px]">
           <div className="font-bold">{mode === "assessment" ? "Değerlendirme" : "Öğretim"}</div>
@@ -732,23 +747,25 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
           <directionalLight position={[5, 10, 5]} intensity={1.1} />
           <Environment preset="city" />
 
-          <OrbitControls makeDefault ref={controlsRef} />
-
-          {/* SENİN başlangıç kamera/target + zoom-out sınırı */}
-          <CameraFit ready={modelReady} fit={fit} controlsRef={controlsRef} />
+          <OrbitControls
+            makeDefault
+            ref={controlsRef}
+            onStart={tapGuard.onControlStart}
+            onEnd={tapGuard.onControlEnd}
+          />
 
           <Suspense fallback={<Loader />}>
-            <Model
-              onMeshPick={onMeshPick}
-              setSceneRef={(s) => setScene(s)}
-              setClickedName={setClickedName}
-              canPickRef={canPickRef}
-              dragRef={dragRef}
-              onLoaded={(f) => {
-                setFit(f);
-                setModelReady(true);
-              }}
-            />
+            <ErrorBoundary onError={() => setFatalError(true)}>
+              <Model
+                tapGuard={tapGuard}
+                onMeshPick={onMeshPick}
+                setSceneRef={(s) => setScene(s)}
+                onLoaded={(f) => {
+                  setFit(f);
+                  setModelReady(true);
+                }}
+              />
+            </ErrorBoundary>
           </Suspense>
         </Canvas>
       </div>
@@ -766,4 +783,4 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
   );
 }
 
-useGLTF.preload(MODEL_PATH); 
+useGLTF.preload(MODEL_PATH);
