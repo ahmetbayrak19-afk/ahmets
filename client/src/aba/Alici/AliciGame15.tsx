@@ -63,7 +63,7 @@ type Question = {
   key: string;
   label: string;
   audioUrl: string;
-  acceptNames: string[]; // ✅ BOYAMA hedefi
+  acceptNames: string[]; // ✅ boyanacak hedef
 };
 
 /* ================= ACCEPT MAP ================= */
@@ -74,8 +74,8 @@ const ACCEPT = {
   sac: ["sac"],
   alin: ["alin"],
   burun: ["burun"],
-  kas: ["kas"], // ✅ sadece kaşı boyayacağız
-  goz: ["Object_3_1"], // ✅ sadece gözü boyayacağız
+  kas: ["kas"], // sadece kaş boyansın
+  goz: ["Object_3_1"], // sadece göz boyansın
   yanak: ["yanak"],
   kulak: ["Object_5001", "Object_5001_1"],
   boyun: ["Object_10008"],
@@ -113,9 +113,8 @@ const ACCEPT = {
 
 /* ================= SOFT ACCEPT (DOĞRU SAYMA) ================= */
 /**
- * ✅ DOĞRU SAYMA listesi (boyama hedefi değil!)
- * - Göz sorusu: mesh_20 + kas + goz(Object_3_1) doğru sayılacak, sadece göz boyanacak.
- * - Kaş sorusu: kas + goz + alin doğru sayılacak, sadece kaş boyanacak.
+ * Göz: mesh_20 + kas + Object_3_1 doğru sayılır ama sadece Object_3_1 boyanır.
+ * Kaş: kas + Object_3_1 + alin doğru sayılır ama sadece kas boyanır.
  */
 const SOFT_ACCEPT: Record<string, string[]> = {
   goz: ["mesh_20", "kas", "Object_3_1"],
@@ -280,56 +279,15 @@ function highlightByNames(
   }, ms);
 }
 
-/* ================= CLICK vs DRAG ================= */
-function useTapGuard() {
-  const isDraggingRef = useRef(false);
-  const downPosRef = useRef<{ x: number; y: number } | null>(null);
-  const movedRef = useRef(false);
-
-  const onControlStart = () => {
-    isDraggingRef.current = true;
-  };
-  const onControlEnd = () => {
-    window.setTimeout(() => {
-      isDraggingRef.current = false;
-    }, 60);
-  };
-
-  const pointerDown = (e: any) => {
-    movedRef.current = false;
-    downPosRef.current = { x: e.clientX ?? 0, y: e.clientY ?? 0 };
-  };
-
-  const pointerMove = (e: any) => {
-    const d = downPosRef.current;
-    if (!d) return;
-    const x = e.clientX ?? 0;
-    const y = e.clientY ?? 0;
-    const dx = x - d.x;
-    const dy = y - d.y;
-    if (dx * dx + dy * dy > 10 * 10) movedRef.current = true;
-  };
-
-  const isTapAllowed = () => {
-    if (isDraggingRef.current) return false;
-    if (movedRef.current) return false;
-    return true;
-  };
-
-  return { onControlStart, onControlEnd, pointerDown, pointerMove, isTapAllowed };
-}
-
 /* ================= MODEL ================= */
 function Model({
   onMeshPick,
   onLoaded,
   setSceneRef,
-  tapGuard,
 }: {
   onMeshPick: (mesh: THREE.Object3D) => void;
   onLoaded: (fit: FitInfo) => void;
   setSceneRef: (scene: THREE.Object3D | null) => void;
-  tapGuard: ReturnType<typeof useTapGuard>;
 }) {
   const gltf = useGLTF(MODEL_PATH) as any;
 
@@ -364,14 +322,6 @@ function Model({
     <group
       onPointerDown={(e: any) => {
         e.stopPropagation();
-        tapGuard.pointerDown(e);
-      }}
-      onPointerMove={(e: any) => {
-        tapGuard.pointerMove(e);
-      }}
-      onPointerUp={(e: any) => {
-        e.stopPropagation();
-        if (!tapGuard.isTapAllowed()) return;
         if (e?.object) onMeshPick(e.object);
       }}
     >
@@ -404,7 +354,6 @@ class ErrorBoundary extends React.Component<
 /* ================= MAIN ================= */
 export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const { play, stop } = useSingleAudio();
-  const tapGuard = useTapGuard();
 
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<any>(null);
@@ -422,6 +371,9 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
   const [qIndex, setQIndex] = useState(0);
   const [qList, setQList] = useState<Question[]>([]);
   const [currentQ, setCurrentQ] = useState<Question | null>(null);
+
+  // ✅ cevap beklerken kontrollere dokunma: OrbitControls disabled
+  const [controlsEnabled, setControlsEnabled] = useState(true);
 
   const canPickRef = useRef(false);
 
@@ -452,6 +404,7 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
     const [cx, cy, cz] = fit.center;
     const r = fit.radius;
 
+    // ✅ senin eski “tam karşı” mantığı: target ve pos aynı sistem
     const target = new THREE.Vector3(cx, cy + r * 0.15, cz);
     const pos = new THREE.Vector3(cx, cy + r * 0.35, cz + r * 2.6);
     return { target, pos, dist: r * 2.6 };
@@ -462,8 +415,9 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
     const [cx, cy, cz] = fit.center;
     const r = fit.radius;
 
-    const target = new THREE.Vector3(cx, cy + r * 0.55, cz);
-    const pos = new THREE.Vector3(cx, cy + r * 0.65, cz + r * 0.85);
+    // ✅ yüze daha çok yaklaşsın (sen istedin)
+    const target = new THREE.Vector3(cx, cy + r * 0.62, cz);
+    const pos = new THREE.Vector3(cx, cy + r * 0.70, cz + r * 0.72);
     return { target, pos };
   };
 
@@ -475,6 +429,7 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
 
     c.target.copy(out.target);
     cam.position.copy(out.pos);
+
     cam.near = Math.max(0.01, out.dist / 200);
     cam.far = Math.max(5000, out.dist * 50);
     cam.updateProjectionMatrix();
@@ -530,13 +485,9 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
   };
 
   const isAccepted = (q: Question, pickedName: string) => {
-    // ✅ Boyama hedefi listesi
     if (q.acceptNames.includes(pickedName)) return true;
-
-    // ✅ Soft doğru sayma listesi (boyamaz)
     const soft = SOFT_ACCEPT[q.key];
     if (soft && soft.includes(pickedName)) return true;
-
     return false;
   };
 
@@ -545,6 +496,7 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
       setPhase("finished");
       setCurrentQ(null);
       canPickRef.current = false;
+      setControlsEnabled(true);
       stop();
       return;
     }
@@ -553,18 +505,20 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
     setQIndex(nextIdx);
     setCurrentQ(q);
 
+    // ✅ soru hazırlanırken pick kapalı + controls açık (isterse döndürsün)
     canPickRef.current = false;
+    setControlsEnabled(true);
 
     await autoFocusForQuestion(q);
 
+    // ✅ soruyu çal
     await play(q.audioUrl);
 
-    if (HEAD_KEYS.has(q.key)) {
-      const out = getOutPose();
-      if (out) await tweenCamera(out.target, out.pos, 450);
-    }
-
+    // ✅ SORU BİTTİKTEN SONRA GERİ UZAKLAŞMA YOK!
+    // çocuk kolay işaretlesin diye yakın konumda kalıyoruz (özellikle yüz)
+    // sadece cevap beklerken controls kapatıyoruz ki tek parmak tap %100 çalışsın
     canPickRef.current = true;
+    setControlsEnabled(false);
   };
 
   const startAssessment = async () => {
@@ -580,6 +534,7 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
     setQList(list);
 
     canPickRef.current = false;
+    setControlsEnabled(true);
 
     setMouthEnabled(true);
     const head = getHeadPose();
@@ -587,12 +542,13 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
 
     await play(degerlendirmeGiris);
 
+    // intro bitince eski pozisyona dön (burası doğru)
     const out = getOutPose();
     if (out) await tweenCamera(out.target, out.pos, 500);
 
     setMouthEnabled(false);
-
     setPhase("asking");
+
     await nextQuestion(0, list);
   };
 
@@ -607,6 +563,7 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
     setCurrentQ(null);
 
     canPickRef.current = false;
+    setControlsEnabled(true);
 
     setMouthEnabled(true);
     const head = getHeadPose();
@@ -632,8 +589,6 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
       if (phase !== "asking" || !currentQ) return;
       if (!canPickRef.current) return;
 
-      if (!tapGuard.isTapAllowed()) return;
-
       canPickRef.current = false;
 
       const ok = isAccepted(currentQ, name);
@@ -641,16 +596,19 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
       if (ok) {
         setScore((s) => s + 1);
 
-        // ✅ HER ZAMAN sadece hedefi boya:
-        // göz sorusunda sadece Object_3_1 boyanır
-        // kaş sorusunda sadece kas boyanır
+        // ✅ her zaman sadece hedefi boya
         highlightByNames(scene, currentQ.acceptNames, 450, "ok");
+
+        // ✅ doğru tıklayınca controls tekrar açılır (çocuk yeniden çevirebilir)
+        setControlsEnabled(true);
 
         await new Promise((r) => setTimeout(r, 220));
         await nextQuestion(qIndex + 1, qList);
       } else {
         highlightByNames(scene, [name], 250, "bad");
         canPickRef.current = true;
+        // yanlışta da controls kapalı kalsın ki tekrar tek parmakla rahat denesin
+        setControlsEnabled(false);
       }
     }
   };
@@ -690,33 +648,6 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      {mode === "menu" && (
-        <div className="absolute top-4 right-4 z-20 bg-black/60 text-white p-3 rounded-xl w-[260px]">
-          <div className="text-sm font-bold">Mod Seç</div>
-          <div className="text-[11px] opacity-80 mt-1">(Model yüklendikten sonra başlat)</div>
-          <div className="mt-3 flex flex-col gap-2">
-            <button
-              disabled={!modelReady}
-              onClick={startTeaching}
-              className={`px-3 py-2 rounded-lg text-sm font-semibold ${
-                modelReady ? "bg-slate-200 text-slate-900" : "bg-slate-600 text-slate-300"
-              }`}
-            >
-              Öğretim
-            </button>
-            <button
-              disabled={!modelReady}
-              onClick={startAssessment}
-              className={`px-3 py-2 rounded-lg text-sm font-semibold ${
-                modelReady ? "bg-blue-500 text-white" : "bg-slate-600 text-slate-300"
-              }`}
-            >
-              Değerlendirme (10 soru)
-            </button>
-          </div>
-        </div>
-      )}
-
       {mode !== "menu" && (
         <div className="absolute top-4 right-4 z-20 bg-black/55 text-white px-3 py-2 rounded-xl text-[12px]">
           <div className="font-bold">{mode === "assessment" ? "Değerlendirme" : "Öğretim"}</div>
@@ -747,17 +678,11 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
           <directionalLight position={[5, 10, 5]} intensity={1.1} />
           <Environment preset="city" />
 
-          <OrbitControls
-            makeDefault
-            ref={controlsRef}
-            onStart={tapGuard.onControlStart}
-            onEnd={tapGuard.onControlEnd}
-          />
+          <OrbitControls makeDefault ref={controlsRef} enabled={controlsEnabled} />
 
           <Suspense fallback={<Loader />}>
             <ErrorBoundary onError={() => setFatalError(true)}>
               <Model
-                tapGuard={tapGuard}
                 onMeshPick={onMeshPick}
                 setSceneRef={(s) => setScene(s)}
                 onLoaded={(f) => {
