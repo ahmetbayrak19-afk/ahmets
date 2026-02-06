@@ -444,7 +444,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
                       <p className="font-bold text-lg text-slate-700">Bu ikisi aynı mı?</p>
                   </div>
 
-                   {/* MİKROFON DURUMU */}
+                  {/* MİKROFON DURUMU */}
                   <div className="flex flex-col items-center gap-3 h-32 justify-center w-full mt-4">
                       {isListening ? (
                           <div className="flex flex-col items-center gap-3 animate-in zoom-in duration-300">
