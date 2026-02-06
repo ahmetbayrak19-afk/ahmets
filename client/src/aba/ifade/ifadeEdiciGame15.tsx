@@ -43,7 +43,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   const [questionCount, setQuestionCount] = useState(0);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
 
-  // --- REFS (stale-state + spam + "cevap penceresi") ---
+  // --- REFS ---
   const recognitionRef = useRef<any>(null);
   const isMountedRef = useRef(true);
 
@@ -52,16 +52,23 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   const customYesRef = useRef<string[]>(customYesWords);
   const customNoRef = useRef<string[]>(customNoWords);
 
-  const answerWindowOpenRef = useRef(false); // sadece bu true iken evet/hayır yakala
-  const lastTriggerAtRef = useRef(0); // spam önleme
-  const lastDetectedRef = useRef<'yes' | 'no' | null>(null); // aynı kelimeyi üst üste yakalama kontrolü
+  // Cevap kabul penceresi (true iken evet/hayır yakala)
+  const answerWindowOpenRef = useRef(false);
+
+  // Bu soruda cevap verildi mi? (yakalanır yakalanmaz true olur)
+  const answeredRef = useRef(false);
+
+  // spam/çift tetikleme önleme
+  const lastTriggerAtRef = useRef(0);
+  const lastDetectedRef = useRef<'yes' | 'no' | null>(null);
+
+  const startedPlayingOnceRef = useRef(false);
 
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { feedbackRef.current = feedback; }, [feedback]);
   useEffect(() => { customYesRef.current = customYesWords; }, [customYesWords]);
   useEffect(() => { customNoRef.current = customNoWords; }, [customNoWords]);
 
-  // --- 1) Güvenli başlatma/kapatma ---
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -73,7 +80,9 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
   const killEverything = () => {
     window.speechSynthesis.cancel();
+
     answerWindowOpenRef.current = false;
+    answeredRef.current = false;
     lastDetectedRef.current = null;
 
     if (recognitionRef.current) {
@@ -95,7 +104,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     onClose();
   };
 
-  // --- 2) SpeechRecognition engine (SÜREKLİ) ---
+  // --- SpeechRecognition (continuous: true) ---
   const initSpeechEngine = () => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -105,8 +114,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     recognition.lang = 'tr-TR';
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
-
-    // KRİTİK: Çocuk konuşsa da kesme
     recognition.continuous = true;
 
     recognition.onstart = () => {
@@ -116,17 +123,12 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     recognition.onend = () => {
       if (isMountedRef.current) setIsListening(false);
 
-      // Bazı cihazlarda kendiliğinden kapanır -> setup/playing'de geri aç
+      // Setup/Playing modunda kapanırsa geri aç
       const p = phaseRef.current;
       if (!isMountedRef.current) return;
-
       if ((p === 'setup' || p === 'playing') && recognitionRef.current) {
         setTimeout(() => {
-          try {
-            recognitionRef.current?.start();
-          } catch {
-            // zaten açıksa sorun değil
-          }
+          try { recognitionRef.current?.start(); } catch {}
         }, 250);
       }
     };
@@ -142,16 +144,12 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         transcript += event.results[i][0].transcript;
       }
-
       const lower = transcript.trim().toLowerCase();
       setLastHeard(lower);
 
       const p = phaseRef.current;
-
-      // Setup: sadece göster, kelime ekleme kullanıcı butonuyla
       if (p === 'setup') return;
 
-      // Oyun: sadece cevap penceresi açıkken ve feedback yokken yakala
       if (p === 'playing') {
         checkTranscriptForGame(lower);
       }
@@ -161,53 +159,53 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   };
 
   const ensureEngine = () => {
-    if (!recognitionRef.current) {
-      recognitionRef.current = initSpeechEngine();
-    }
+    if (!recognitionRef.current) recognitionRef.current = initSpeechEngine();
     return recognitionRef.current;
   };
 
-  // Kullanıcı jesti ile başlat (buton click içinde çağır)
   const startEngineUserGesture = () => {
     if (!isMountedRef.current) return;
     const rec = ensureEngine();
     if (!rec) return;
-
     try { rec.start(); } catch {}
   };
 
-  // --- 3) Yakalama / filtreleme ---
+  // --- Detect ---
   const detectYesNo = (transcript: string): 'yes' | 'no' | null => {
     const words = transcript.split(/\s+/).filter(Boolean);
     const YES_POOL = [...STANDARD_YES, ...customYesRef.current];
     const NO_POOL = [...STANDARD_NO, ...customNoRef.current];
 
     let detected: 'yes' | 'no' | null = null;
-
     for (const word of words) {
       if (YES_POOL.some(w => word === w || word.includes(w))) detected = 'yes';
       else if (NO_POOL.some(w => word === w || word.includes(w))) detected = 'no';
     }
-
     return detected;
   };
 
   const checkTranscriptForGame = (transcript: string) => {
-    // Cevap beklemiyorsak, gereksiz konuşmayı görmezden gel
+    // cevap beklemiyorsak gereksiz konuşmayı yok say
     if (!answerWindowOpenRef.current) return;
 
-    // Feedback varken de yok say (animasyon/ses çalarken tetikleme yapmasın)
+    // bu soruda zaten cevap yakalandıysa tekrar tetikleme yapma
+    if (answeredRef.current) return;
+
+    // feedback varken tetikleme yapma
     if (feedbackRef.current) return;
 
-    // Spam önleme
+    // spam
     const now = Date.now();
-    if (now - lastTriggerAtRef.current < 900) return;
+    if (now - lastTriggerAtRef.current < 700) return;
 
     const detected = detectYesNo(transcript);
     if (!detected) return;
 
-    // Aynı kelimeyi interim-results yüzünden üst üste yakalama (ek bir sigorta)
-    if (lastDetectedRef.current === detected && now - lastTriggerAtRef.current < 1400) return;
+    if (lastDetectedRef.current === detected && now - lastTriggerAtRef.current < 1200) return;
+
+    // >>> KRİTİK: kelime yakalandı => bu soru cevaplandı (tek sefer)
+    answeredRef.current = true;
+    answerWindowOpenRef.current = false;
 
     lastTriggerAtRef.current = now;
     lastDetectedRef.current = detected;
@@ -223,42 +221,53 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     else handleFail();
   };
 
-  // --- 4) Akış ---
+  // --- Akış ---
   const initGame = () => setPhase('setup');
 
   const startGame = () => {
-    // KRİTİK: oyuna geçerken (kullanıcı tıklaması) engine'i başlat
+    // kullanıcı jestiyle engine başlat
     startEngineUserGesture();
 
+    startedPlayingOnceRef.current = false;
     setFeedback(null);
     setQuestionCount(0);
     setPhase('playing');
-
-    generateQuestion();
   };
+
+  // Playing'e girince ilk soruyu üret
+  useEffect(() => {
+    if (phase === 'playing' && !startedPlayingOnceRef.current) {
+      startedPlayingOnceRef.current = true;
+      generateQuestion();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   const generateQuestion = () => {
     setFeedback(null);
     setAnimState('hidden');
 
-    // yeni soruda cevap penceresi kapalı; TTS bitince açılacak
+    // yeni soru resetleri
+    answeredRef.current = false;
     answerWindowOpenRef.current = false;
     lastDetectedRef.current = null;
 
     window.speechSynthesis.cancel();
 
     const target = ITEMS[Math.floor(Math.random() * ITEMS.length)];
-    setTargetItem(target);
-
     const shouldMatch = Math.random() > 0.5;
+
+    let compare = target;
+    if (!shouldMatch) {
+      const others = ITEMS.filter(i => i.id !== target.id);
+      compare = others[Math.floor(Math.random() * others.length)] || target;
+    }
+
+    setTargetItem(target);
     setIsMatch(shouldMatch);
-
-    const compare = shouldMatch
-      ? target
-      : (ITEMS.filter(i => i.id !== target.id)[Math.floor(Math.random() * (ITEMS.length - 1))] || target);
-
     setCompareItem(compare);
 
+    // sağdan kayma animasyonu
     setTimeout(() => {
       if (!isMountedRef.current) return;
       setAnimState('sliding');
@@ -267,15 +276,16 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
         if (!isMountedRef.current) return;
         setAnimState('visible');
         askQuestion();
-      }, 1000);
-    }, 500);
+      }, 900);
+    }, 250);
   };
 
   const askQuestion = () => {
     window.speechSynthesis.cancel();
 
-    // TTS konuşurken cevap yakalama kapalı
+    // soru sorulurken cevap penceresi kapalı
     answerWindowOpenRef.current = false;
+    answeredRef.current = false;
     lastDetectedRef.current = null;
 
     const utterance = new SpeechSynthesisUtterance('Doğru eşledim mi?');
@@ -284,8 +294,8 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
     utterance.onend = () => {
       if (!isMountedRef.current) return;
-      // TTS bitti -> artık evet/hayır yakalayabiliriz
       setTimeout(() => {
+        // artık cevap bekle
         answerWindowOpenRef.current = true;
       }, 250);
     };
@@ -294,8 +304,9 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   };
 
   const handleSuccess = () => {
-    // cevap geldi -> pencereyi kapat (sıradaki soruya kadar)
+    // doğruysa: aferin -> sonra yeni soruya geç
     answerWindowOpenRef.current = false;
+    answeredRef.current = true;
 
     try {
       const audio = new Audio(Math.random() > 0.5 ? aferin1 : bravo);
@@ -315,12 +326,13 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
         setPhase('success');
         confetti();
       }
-    }, 2500);
+    }, 2200);
   };
 
   const handleFail = () => {
-    // yanlış geldi -> kısa süre kilitle, sonra tekrar cevap penceresini aç
+    // yanlışsa: tekrar dene -> sonra aynı soruda dinlemeyi tekrar aç
     answerWindowOpenRef.current = false;
+    answeredRef.current = true;
 
     try {
       const audio = new Audio(tekrardene1);
@@ -331,22 +343,22 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
     setTimeout(() => {
       if (!isMountedRef.current) return;
+
+      // geri bildirimi kaldır, aynı eşleme kalsın, yeniden cevap al
       setFeedback(null);
+
       lastDetectedRef.current = null;
-      answerWindowOpenRef.current = true; // tekrar evet/hayır bekle
-    }, 2000);
+      lastTriggerAtRef.current = Date.now();
+
+      answeredRef.current = false;        // çocuk tekrar cevap verebilsin
+      answerWindowOpenRef.current = true; // dinleme penceresini yeniden aç
+    }, 1800);
   };
 
-  // Setup için kayıt (engine sürekli; burada sadece UI amaçlı)
+  // Setup UI
   const toggleSetupRecord = (type: 'yes' | 'no') => {
-    // Setup’ta da motoru kullanıcı jestiyle aç
     startEngineUserGesture();
-
-    if (isRecordingSetup === type) {
-      setIsRecordingSetup(null);
-    } else {
-      setIsRecordingSetup(type);
-    }
+    setIsRecordingSetup(prev => (prev === type ? null : type));
   };
 
   return (
@@ -415,9 +427,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
             <div className="flex flex-wrap gap-1 mt-2">
               {customYesWords.map((w, i) => (
-                <span key={i} className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] rounded-full">
-                  {w}
-                </span>
+                <span key={i} className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] rounded-full">{w}</span>
               ))}
             </div>
           </div>
@@ -455,9 +465,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
             <div className="flex flex-wrap gap-1 mt-2">
               {customNoWords.map((w, i) => (
-                <span key={i} className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] rounded-full">
-                  {w}
-                </span>
+                <span key={i} className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] rounded-full">{w}</span>
               ))}
             </div>
           </div>
@@ -478,6 +486,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
             <button onClick={handleSafeClose} className="p-2 bg-white border rounded-full shadow-sm">
               <XCircle className="text-slate-300" />
             </button>
+
             <div className="px-4 py-1 bg-white shadow-sm rounded-full font-bold text-xs border">
               SORU: {questionCount + 1} / 10
             </div>
@@ -485,17 +494,25 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
           <div className="flex-1 flex flex-col items-center justify-center gap-8 p-4">
             <div className="flex items-center gap-4 sm:gap-12 w-full justify-center h-56">
+              {/* SOL: HEDEF */}
               <div className="w-32 h-32 bg-white border-4 border-slate-200 rounded-[2rem] p-4 flex items-center justify-center relative">
                 <img src={targetItem.src} className="w-full h-full object-contain" />
               </div>
 
+              {/* SAĞ: EŞLEME (SAĞDAN KAYAR) */}
               <motion.div
-                initial={{ x: 200, opacity: 0 }}
-                animate={animState !== 'hidden' ? { x: 0, opacity: 1 } : { x: 200, opacity: 0 }}
+                initial={{ x: 260, opacity: 0 }}
+                animate={
+                  animState === 'hidden'
+                    ? { x: 260, opacity: 0 }
+                    : { x: 0, opacity: 1 }
+                }
+                transition={{ duration: 0.6, ease: 'easeOut' }}
                 className={twMerge(
-                  "w-32 h-32 bg-white border-4 rounded-[2rem] p-4 flex items-center justify-center transition-colors duration-500",
+                  "w-32 h-32 bg-white border-4 rounded-[2rem] p-4 flex items-center justify-center transition-colors duration-300",
                   feedback === 'correct' ? "border-green-500 bg-green-50" :
-                  feedback === 'wrong' ? "border-red-500 bg-red-50" : "border-slate-200"
+                  feedback === 'wrong' ? "border-red-500 bg-red-50" :
+                  "border-slate-200"
                 )}
               >
                 <img src={compareItem.src} className="w-full h-full object-contain" />
@@ -519,7 +536,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
                   {feedback === 'correct' ? "DOĞRU!" : "YANLIŞ"}
                 </div>
               ) : (
-                // Bazı cihazlarda motor kapalı kalırsa kullanıcı yeniden açabilsin
                 <button onClick={startEngineUserGesture} className="flex flex-col items-center gap-2 group">
                   <div className="w-20 h-20 bg-white border-4 border-slate-200 text-slate-400 rounded-full flex items-center justify-center group-hover:border-blue-400 group-hover:text-blue-500 transition-all shadow-sm">
                     <MicOff size={32} />
@@ -528,24 +544,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
                 </button>
               )}
             </div>
-          </div>
-
-          {/* GİZLİ TEST BUTONLARI */}
-          <div className="absolute bottom-6 left-6 opacity-20 hover:opacity-100 z-30">
-            <button
-              onClick={() => checkAnswer('no')}
-              className="w-16 h-16 bg-red-100 text-red-600 border-2 border-red-200 rounded-2xl flex items-center justify-center font-bold text-xs"
-            >
-              HAYIR
-            </button>
-          </div>
-          <div className="absolute bottom-6 right-6 opacity-20 hover:opacity-100 z-30">
-            <button
-              onClick={() => checkAnswer('yes')}
-              className="w-16 h-16 bg-green-100 text-green-600 border-2 border-green-200 rounded-2xl flex items-center justify-center font-bold text-xs"
-            >
-              EVET
-            </button>
           </div>
         </div>
       )}
