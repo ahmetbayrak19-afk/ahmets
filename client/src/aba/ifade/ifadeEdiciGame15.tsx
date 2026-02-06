@@ -10,10 +10,11 @@ import arabaImg from '../esle/araba.png';
 import kalemImg from '../esle/kalem.png';
 import topImg from '../esle/top.png';
 
-// --- SES EFEKTLERİ ---
+// --- SESLER ---
 import aferin1 from '../esle/ses/aferin1.mp3';
 import bravo from '../esle/ses/bravo.mp3';
 import tekrardene1 from '../esle/ses/tekrardene1.mp3';
+import aynimi from '../esle/ses/aynimi.mp3'; // <-- dosyanın path'ini gerekirse düzelt
 
 const ITEMS = [
   { id: 'anahtar', src: anahtarImg, label: 'Anahtar' },
@@ -23,7 +24,7 @@ const ITEMS = [
 ];
 
 const STANDARD_YES = ['evet', 'eved', 'he', 'hıhı', 'doğru', 'tamam', 'evetevet', 'olur', 'aynen'];
-const STANDARD_NO  = ['hayır', 'yok', 'cık', 'değil', 'olmaz', 'hayı', 'yanlış'];
+const STANDARD_NO = ['hayır', 'yok', 'cık', 'değil', 'olmaz', 'hayı', 'yanlış'];
 
 type Phase = 'init' | 'setup' | 'playing' | 'success';
 type RecMode = 'off' | 'setup_yes' | 'setup_no' | 'game';
@@ -46,12 +47,11 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   const [questionCount, setQuestionCount] = useState(0);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
 
-  // --- refs ---
+  // --- REFS ---
   const isMountedRef = useRef(true);
 
   const recognitionRef = useRef<any>(null);
   const recModeRef = useRef<RecMode>('off');
-  const engineWantedRef = useRef(false); // playing boyunca true -> mic kapanırsa yeniden aç
 
   const phaseRef = useRef<Phase>(phase);
   const feedbackRef = useRef<typeof feedback>(feedback);
@@ -59,16 +59,17 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   const customYesRef = useRef<string[]>(customYesWords);
   const customNoRef = useRef<string[]>(customNoWords);
 
-  // >>> KRİTİK: isMatch’i ref’ten okuyacağız (stale fix)
+  // stale fix: isMatch ref
   const isMatchRef = useRef<boolean>(true);
 
-  // Oyun: sadece bu true iken evet/hayır kabul et
-  const answerWindowOpenRef = useRef(false);
+  // oyunda kontrol
+  const answerWindowOpenRef = useRef(false); // true iken evet/hayır kabul
+  const answeredRef = useRef(false);         // bu soruda cevap alındı mı?
 
-  // Oyun: bu soruda cevap yakalandı mı?
-  const answeredRef = useRef(false);
+  // mic gerçekten açık mı olmalı? (soru mp3 bitince true, cevap alınca false)
+  const shouldListenRef = useRef(false);
 
-  // spam/çift tetikleme önleme
+  // spam/çift tetikleme
   const lastTriggerAtRef = useRef(0);
   const lastDetectedRef = useRef<'yes' | 'no' | null>(null);
 
@@ -88,29 +89,30 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- güvenli TTS ---
-  const safeCancelTTS = () => {
+  // --- Audio helper: mp3 bitince callback ---
+  const playFx = (src: string, onDone?: () => void) => {
     try {
-      const synth = (window as any)?.speechSynthesis;
-      synth?.cancel?.();
-    } catch {}
-  };
+      const a = new Audio(src);
 
-  const safeSpeak = (text: string, onEnd?: () => void) => {
-    try {
-      const synth = (window as any)?.speechSynthesis;
-      const Utter = (window as any)?.SpeechSynthesisUtterance;
-      if (!synth || !Utter) { onEnd?.(); return; }
+      const finish = () => {
+        try { a.onended = null; } catch {}
+        onDone?.();
+      };
 
-      const u = new Utter(text);
-      u.lang = 'tr-TR';
-      u.rate = 1.0;
-      u.onend = () => onEnd?.();
+      // emniyet: bazı cihazlarda onended kaçarsa
+      const safety = window.setTimeout(finish, 6000);
 
-      synth.cancel?.();
-      synth.speak?.(u);
+      a.onended = () => {
+        clearTimeout(safety);
+        finish();
+      };
+
+      a.play().catch(() => {
+        clearTimeout(safety);
+        finish();
+      });
     } catch {
-      onEnd?.();
+      onDone?.();
     }
   };
 
@@ -122,8 +124,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     const rec = new SR();
     rec.lang = 'tr-TR';
     rec.maxAlternatives = 1;
-
-    // Setup daha stabil olsun
     rec.interimResults = false;
     rec.continuous = true;
 
@@ -133,25 +133,24 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
     rec.onerror = () => {
       if (isMountedRef.current) setIsListening(false);
-      // restart yok (no-speech döngüsünü tetiklemesin)
     };
 
     rec.onend = () => {
       if (isMountedRef.current) setIsListening(false);
 
-      // Setup’ta asla kendini aç/kapa yapma
+      // setup'ta restart yok
       const mode = recModeRef.current;
       if (mode === 'setup_yes' || mode === 'setup_no' || mode === 'off') return;
 
-      // >>> KRİTİK FIX: Game modunda playing boyunca mic kapanırsa DAİMA geri aç
-      if (mode === 'game' && engineWantedRef.current && phaseRef.current === 'playing' && isMountedRef.current) {
+      // oyun: "dinlemeli miyiz?" true ise yeniden başlat
+      if (mode === 'game' && phaseRef.current === 'playing' && shouldListenRef.current && isMountedRef.current) {
         setTimeout(() => {
           if (!isMountedRef.current) return;
           if (recModeRef.current !== 'game') return;
-          if (!engineWantedRef.current) return;
           if (phaseRef.current !== 'playing') return;
+          if (!shouldListenRef.current) return;
           try { recognitionRef.current?.start(); } catch {}
-        }, 350);
+        }, 300);
       }
     };
 
@@ -167,9 +166,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
       const mode = recModeRef.current;
 
-      if (mode === 'setup_yes' || mode === 'setup_no') {
-        return; // setup’ta sadece gösteriyoruz
-      }
+      if (mode === 'setup_yes' || mode === 'setup_no') return;
 
       if (mode === 'game' && phaseRef.current === 'playing') {
         checkTranscriptForGame(lower);
@@ -184,19 +181,22 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     return recognitionRef.current;
   };
 
+  const startRecognition = () => {
+    const rec = ensureRecognition();
+    if (!rec) return;
+    try { rec.start(); } catch {}
+  };
+
   const stopRecognition = () => {
     try { recognitionRef.current?.abort?.(); } catch {}
-    recModeRef.current = 'off';
     if (isMountedRef.current) setIsListening(false);
   };
 
   const killEverything = () => {
-    safeCancelTTS();
-
     answerWindowOpenRef.current = false;
     answeredRef.current = false;
+    shouldListenRef.current = false;
     lastDetectedRef.current = null;
-    engineWantedRef.current = false;
 
     try { recognitionRef.current?.abort?.(); } catch {}
     recognitionRef.current = null;
@@ -210,7 +210,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     onClose();
   };
 
-  // --- detect ---
+  // --- detect yes/no ---
   const detectYesNo = (transcript: string): 'yes' | 'no' | null => {
     const words = transcript.split(/\s+/).filter(Boolean);
     const YES_POOL = [...STANDARD_YES, ...customYesRef.current];
@@ -237,9 +237,11 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
     if (lastDetectedRef.current === detected && now - lastTriggerAtRef.current < 1000) return;
 
-    // >>> kelime yakalandı => bu soru cevaplandı (kilit)
+    // cevap alındı -> mikrofonu kapat
     answeredRef.current = true;
     answerWindowOpenRef.current = false;
+    shouldListenRef.current = false;
+    stopRecognition();
 
     lastTriggerAtRef.current = now;
     lastDetectedRef.current = detected;
@@ -247,23 +249,13 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     checkAnswer(detected);
   };
 
-  const playFx = (src: string) => {
-    try { new Audio(src).play().catch(() => {}); } catch {}
-  };
-
-  // >>> KRİTİK FIX: expected artık isMatchRef’ten okunur (stale yok)
   const checkAnswer = (userSays: 'yes' | 'no') => {
-    if (feedbackRef.current) return;
-
     const expected: 'yes' | 'no' = isMatchRef.current ? 'yes' : 'no';
     if (userSays === expected) handleSuccess();
     else handleFail();
   };
 
-  // --- akış ---
-  const initGame = () => setPhase('setup');
-
-  // Setup: eski mantık Söylet/Dur
+  // --- Setup (eski gibi: Söylet/Dur) ---
   const toggleSetupRecord = (type: 'yes' | 'no') => {
     const rec = ensureRecognition();
     if (!rec) return;
@@ -271,25 +263,24 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     if (isRecordingSetup === type) {
       setIsRecordingSetup(null);
       recModeRef.current = 'off';
+      shouldListenRef.current = false;
       stopRecognition();
       return;
     }
 
     setIsRecordingSetup(type);
     recModeRef.current = type === 'yes' ? 'setup_yes' : 'setup_no';
-    try { rec.start(); } catch {}
+    shouldListenRef.current = true;
+    startRecognition();
   };
+
+  // --- Game flow ---
+  const initGame = () => setPhase('setup');
 
   const startGame = () => {
     setIsRecordingSetup(null);
 
-    const rec = ensureRecognition();
-    if (rec) {
-      recModeRef.current = 'game';
-      engineWantedRef.current = true; // playing boyunca mic’i ayakta tut
-      try { rec.start(); } catch {}
-    }
-
+    recModeRef.current = 'game';
     startedPlayingOnceRef.current = false;
     setFeedback(null);
     setQuestionCount(0);
@@ -301,10 +292,8 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       startedPlayingOnceRef.current = true;
       generateQuestion();
     }
-
-    // playing dışına çıkınca mic’i zorlamayı kapat
     if (phase !== 'playing') {
-      engineWantedRef.current = false;
+      shouldListenRef.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
@@ -313,11 +302,14 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     setFeedback(null);
     setAnimState('hidden');
 
+    // yeni soru reset
     answeredRef.current = false;
     answerWindowOpenRef.current = false;
+    shouldListenRef.current = false;
     lastDetectedRef.current = null;
 
-    safeCancelTTS();
+    // yeni soruda mic kapalı; zaten kapatalım
+    stopRecognition();
 
     const target = ITEMS[Math.floor(Math.random() * ITEMS.length)];
     const shouldMatch = Math.random() > 0.5;
@@ -331,7 +323,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     setTargetItem(target);
     setCompareItem(compare);
 
-    // >>> KRİTİK: hem state hem ref güncelle
     setIsMatch(shouldMatch);
     isMatchRef.current = shouldMatch;
 
@@ -342,66 +333,64 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       setTimeout(() => {
         if (!isMountedRef.current) return;
         setAnimState('visible');
-        askQuestion();
+
+        // resimler göründü -> "aynı mı?" mp3 -> bitince dinleme aç
+        askAyniMiThenListen();
       }, 900);
     }, 250);
   };
 
-  const askQuestion = () => {
-    safeCancelTTS();
-
+  const askAyniMiThenListen = () => {
+    // MP3 çalarken mic kapalı kalsın
     answeredRef.current = false;
     answerWindowOpenRef.current = false;
-    lastDetectedRef.current = null;
+    shouldListenRef.current = false;
+    stopRecognition();
 
-    safeSpeak('Doğru eşledim mi?', () => {
+    playFx(aynimi, () => {
       if (!isMountedRef.current) return;
-      setTimeout(() => {
-        answerWindowOpenRef.current = true; // şimdi evet/hayır bekle
-      }, 250);
+
+      // MP3 bitti -> şimdi cevap bekle ve mic aç
+      answeredRef.current = false;
+      answerWindowOpenRef.current = true;
+      shouldListenRef.current = true;
+      startRecognition();
     });
   };
 
   const handleSuccess = () => {
-    answerWindowOpenRef.current = false;
-    answeredRef.current = true;
-
-    playFx(Math.random() > 0.5 ? aferin1 : bravo);
     setFeedback('correct');
 
-    setTimeout(() => {
+    const fx = Math.random() > 0.5 ? aferin1 : bravo;
+
+    playFx(fx, () => {
       if (!isMountedRef.current) return;
 
       const nextQ = questionCount + 1;
       setQuestionCount(nextQ);
 
-      if (nextQ < 10) generateQuestion();
-      else {
+      if (nextQ < 10) {
+        generateQuestion();
+      } else {
         setPhase('success');
         try { confetti(); } catch {}
       }
-    }, 2200);
+    });
   };
 
   const handleFail = () => {
-    answerWindowOpenRef.current = false;
-    answeredRef.current = true;
-
-    playFx(tekrardene1);
     setFeedback('wrong');
 
-    // yanlışta: aynı soruda cevap penceresini tekrar aç
-    setTimeout(() => {
+    playFx(tekrardene1, () => {
       if (!isMountedRef.current) return;
 
+      // Yanlışta: aynı soruyu tekrar sor (aynimi.mp3) ve sonra mic aç
       setFeedback(null);
-
       lastDetectedRef.current = null;
       lastTriggerAtRef.current = Date.now();
 
-      answeredRef.current = false;
-      answerWindowOpenRef.current = true;
-    }, 1800);
+      askAyniMiThenListen();
+    });
   };
 
   return (
@@ -572,7 +561,9 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
                   {feedback === 'correct' ? "DOĞRU!" : "YANLIŞ"}
                 </div>
               ) : (
-                <div className="text-slate-400 text-xs font-bold">Mikrofon kapalı (izin/destek)</div>
+                <div className="text-slate-400 text-xs font-bold">
+                  {answerWindowOpenRef.current ? "Cevap bekliyorum..." : "Soru soruluyor / bekle..."}
+                </div>
               )}
             </div>
           </div>
