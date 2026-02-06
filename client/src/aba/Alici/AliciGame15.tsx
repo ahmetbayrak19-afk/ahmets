@@ -126,6 +126,17 @@ const QUESTIONS: Question[] = [
   { key: "cene", label: "Çene", audioUrl: ceneNerede, acceptNames: ACCEPT.cene },
   { key: "ense", label: "Ense", audioUrl: enseNerede, acceptNames: ACCEPT.ense },
   { key: "kafa", label: "Kafa", audioUrl: kafaNerede, acceptNames: ACCEPT.kafa },
+  { key: "gogus", label: "Göğüs", audioUrl: gogusNerede, acceptNames: ACCEPT.gogus },
+  { key: "karin", label: "Karın", audioUrl: karinNerede, acceptNames: ACCEPT.karin },
+  { key: "ozelbolge", label: "Özel Bölge", audioUrl: ozelBolgeNerede, acceptNames: ACCEPT.ozelbolge },
+  { key: "bacak", label: "Bacak", audioUrl: bacakNerede, acceptNames: ACCEPT.bacak },
+  { key: "diz", label: "Diz", audioUrl: dizNerede, acceptNames: ACCEPT.diz },
+  { key: "ayak", label: "Ayak", audioUrl: ayakNerede, acceptNames: ACCEPT.ayak },
+  { key: "tirnak", label: "Tırnak", audioUrl: tirnakNerede, acceptNames: ACCEPT.tirnak },
+  { key: "sirt", label: "Sırt", audioUrl: sirtNerede, acceptNames: ACCEPT.sirt },
+  { key: "bel", label: "Bel", audioUrl: belNerede, acceptNames: ACCEPT.bel },
+  { key: "omuz", label: "Omuz", audioUrl: omuzNerede, acceptNames: ACCEPT.omuz },
+  { key: "parmak", label: "Parmak", audioUrl: parmakNerede, acceptNames: ACCEPT.parmak },
 ];
 
 /* ================= HELPERS ================= */
@@ -138,9 +149,10 @@ function pickRandomN<T>(arr: T[], n: number) {
   return copy.slice(0, Math.min(n, copy.length));
 }
 
-/* ================= AUDIO ================= */
+/* ================= AUDIO (unlock + single channel) ================= */
 function useSingleAudio() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const unlockedRef = useRef(false);
 
   const stop = () => {
     if (audioRef.current) {
@@ -150,18 +162,210 @@ function useSingleAudio() {
     }
   };
 
-  const play = (url: string) =>
+  // Android/WebView için: ilk gesture’da WebAudio unlock
+  const unlockOnce = async () => {
+    if (unlockedRef.current) return;
+    unlockedRef.current = true;
+
+    try {
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) return;
+
+      const ctx = new Ctx();
+      await ctx.resume();
+
+      // minik sessiz buffer (unlock için)
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+      source.stop(0.01);
+    } catch {
+      // unlock başarısız olsa bile devam
+    }
+  };
+
+  const play = async (url: string) =>
     new Promise<void>((resolve) => {
       stop();
       const a = new Audio(url);
       a.preload = "auto";
       audioRef.current = a;
+
       a.onended = () => resolve();
       a.onerror = () => resolve();
-      a.play().catch(() => resolve());
+
+      // Not: unlockOnce çağrısı start butonunda yapılacak
+      a.play().catch(() => {
+        // bloklanırsa: kullanıcı bir kez daha dokunmak zorunda kalmasın diye
+        // hemen resolve etmiyoruz; 1 kere retry yapıyoruz (microtask + küçük timeout)
+        setTimeout(() => {
+          a.play().then(() => {}).catch(() => resolve());
+        }, 0);
+      });
     });
 
-  return { play, stop };
+  return { play, stop, unlockOnce };
+}
+
+/* ================= HIGHLIGHT (stuck fix) ================= */
+function createHighlighter() {
+  const originalByMesh = new WeakMap<THREE.Mesh, any>();
+  const timeoutByMesh = new WeakMap<THREE.Mesh, number>();
+
+  const highlight = (
+    scene: THREE.Object3D | null,
+    names: string[],
+    ms: number,
+    kind: "ok" | "bad"
+  ) => {
+    if (!scene) return;
+
+    const meshes: THREE.Mesh[] = [];
+    scene.traverse((o: any) => {
+      if (o?.isMesh && names.includes(o.name)) meshes.push(o);
+    });
+    if (meshes.length === 0) return;
+
+    meshes.forEach((m) => {
+      // önceki timeout varsa iptal
+      const prev = timeoutByMesh.get(m);
+      if (prev) window.clearTimeout(prev);
+
+      // original material yakala (1 kere)
+      if (!originalByMesh.has(m)) originalByMesh.set(m, m.material);
+
+      // mesh’e özel clone ver (shared materyali bozmayalım)
+      const base = originalByMesh.get(m);
+      const cloned = base?.clone ? base.clone() : base;
+      m.material = cloned;
+
+      if (cloned?.emissive) {
+        cloned.emissive.set(kind === "ok" ? 0x22c55e : 0xef4444);
+        cloned.emissiveIntensity = 1.25;
+      }
+
+      const tid = window.setTimeout(() => {
+        const orig = originalByMesh.get(m);
+        if (orig) m.material = orig;
+        timeoutByMesh.delete(m);
+      }, ms);
+
+      timeoutByMesh.set(m, tid);
+    });
+  };
+
+  return { highlight };
+}
+
+/* ================= MODEL (fit + click) ================= */
+function Model({
+  onLoaded,
+  setSceneRef,
+  onMeshPick,
+}: {
+  onLoaded: (fit: FitInfo) => void;
+  setSceneRef: (scene: THREE.Object3D | null) => void;
+  onMeshPick: (obj: THREE.Object3D) => void;
+}) {
+  const gltf = useGLTF(MODEL_PATH) as any;
+
+  const fit = useMemo<FitInfo>(() => {
+    const scene = gltf?.scene;
+    if (!scene) return { center: [0, 0, 0], radius: 1, meshes: 0 };
+
+    let meshes = 0;
+    scene.traverse?.((o: any) => {
+      if (o?.isMesh) meshes++;
+    });
+
+    const box = new THREE.Box3().setFromObject(scene);
+    const sphere = new THREE.Sphere();
+    box.getBoundingSphere(sphere);
+
+    const r = Number.isFinite(sphere.radius) && sphere.radius > 0 ? sphere.radius : 1;
+
+    return {
+      center: [sphere.center.x, sphere.center.y, sphere.center.z],
+      radius: r,
+      meshes,
+    };
+  }, [gltf]);
+
+  useEffect(() => {
+    onLoaded(fit);
+    setSceneRef(gltf?.scene ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fit.center[0], fit.center[1], fit.center[2], fit.radius, fit.meshes, gltf?.scene]);
+
+  return (
+    <group
+      onPointerDown={(e: any) => {
+        e.stopPropagation();
+        if (e?.object) onMeshPick(e.object);
+      }}
+    >
+      <primitive object={gltf.scene} />
+    </group>
+  );
+}
+
+/* ================= CAMERA FIT (SENİN BAZ + base capture) ================= */
+function CameraFit({
+  ready,
+  fit,
+  controlsRef,
+  onBaseCaptured,
+}: {
+  ready: boolean;
+  fit: FitInfo | null;
+  controlsRef: React.MutableRefObject<any>;
+  onBaseCaptured: (camPos: THREE.Vector3, target: THREE.Vector3, dist: number) => void;
+}) {
+  const { camera } = useThree();
+
+  useEffect(() => {
+    if (!ready || !fit) return;
+
+    let cancelled = false;
+
+    const apply = (tries: number) => {
+      if (cancelled) return;
+
+      const c = controlsRef.current;
+      if (!c) {
+        if (tries < 120) requestAnimationFrame(() => apply(tries + 1));
+        return;
+      }
+
+      const [cx, cy, cz] = fit.center;
+      const r = fit.radius;
+
+      // ✅ SENİN BAZ HESABIN (DOKUNMADIM)
+      c.target.set(cx, cy + r * 0.15, cz);
+      const dist = r * 2.6;
+      camera.position.set(cx, cy + r * 0.35, cz + dist);
+
+      camera.near = Math.max(0.01, dist / 200);
+      camera.far = Math.max(5000, dist * 50);
+      camera.updateProjectionMatrix();
+
+      // ✅ zoom-out sınırı
+      c.maxDistance = dist * 1.25;
+
+      c.update();
+
+      onBaseCaptured(camera.position.clone(), c.target.clone(), dist);
+    };
+
+    requestAnimationFrame(() => apply(0));
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, fit, camera, controlsRef, onBaseCaptured]);
+
+  return null;
 }
 
 /* ================= MOUTH SHAPE KEY ================= */
@@ -206,173 +410,180 @@ function useMouthTalk(scene: THREE.Object3D | null, enabled: boolean) {
   }, [scene, enabled]);
 }
 
-/* ================= MODEL (fit + scene ref) ================= */
-function Model({
-  onLoaded,
-  setSceneRef,
-}: {
-  onLoaded: (fit: FitInfo) => void;
-  setSceneRef: (scene: THREE.Object3D | null) => void;
-}) {
-  const gltf = useGLTF(MODEL_PATH) as any;
-
-  const fit = useMemo<FitInfo>(() => {
-    const scene = gltf?.scene;
-    if (!scene) return { center: [0, 0, 0], radius: 1, meshes: 0 };
-
-    let meshes = 0;
-    scene.traverse?.((o: any) => {
-      if (o?.isMesh) meshes++;
-    });
-
-    const box = new THREE.Box3().setFromObject(scene);
-    const sphere = new THREE.Sphere();
-    box.getBoundingSphere(sphere);
-
-    const r = Number.isFinite(sphere.radius) && sphere.radius > 0 ? sphere.radius : 1;
-
-    return {
-      center: [sphere.center.x, sphere.center.y, sphere.center.z],
-      radius: r,
-      meshes,
-    };
-  }, [gltf]);
-
-  useEffect(() => {
-    onLoaded(fit);
-    setSceneRef(gltf?.scene ?? null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fit.center[0], fit.center[1], fit.center[2], fit.radius, fit.meshes, gltf?.scene]);
-
-  return <primitive object={gltf.scene} />;
-}
-
-/* ================= CAMERA FIT (SENİN BAZ) ================= */
-function CameraFit({
-  ready,
-  fit,
-  controlsRef,
-  onBaseCaptured,
-}: {
-  ready: boolean;
-  fit: FitInfo | null;
-  controlsRef: React.MutableRefObject<any>;
-  onBaseCaptured: (camPos: THREE.Vector3, target: THREE.Vector3, dist: number) => void;
-}) {
-  const { camera } = useThree();
-
-  useEffect(() => {
-    if (!ready || !fit) return;
-
-    let cancelled = false;
-
-    const apply = (tries: number) => {
-      if (cancelled) return;
-
-      const c = controlsRef.current;
-      if (!c) {
-        if (tries < 120) requestAnimationFrame(() => apply(tries + 1));
-        return;
-      }
-
-      const [cx, cy, cz] = fit.center;
-      const r = fit.radius;
-
-      // ✅ SENİN BAZ HESABIN (DOKUNMADIM)
-      c.target.set(cx, cy + r * 0.15, cz);
-      const dist = r * 2.6;
-      camera.position.set(cx, cy + r * 0.35, cz + dist);
-
-      camera.near = Math.max(0.01, dist / 200);
-      camera.far = Math.max(5000, dist * 50);
-      camera.updateProjectionMatrix();
-
-      // ✅ çok küçülmesin
-      c.maxDistance = dist * 1.25;
-
-      c.update();
-
-      // ✅ bazı ref'e kilitle (sonra buraya BİREBİR geri döneceğiz)
-      onBaseCaptured(camera.position.clone(), c.target.clone(), dist);
-    };
-
-    requestAnimationFrame(() => apply(0));
-
-    return () => {
-      cancelled = true;
-    };
-  }, [ready, fit, camera, controlsRef, onBaseCaptured]);
-
-  return null;
+/* ================= ERROR BOUNDARY ================= */
+class ErrorBoundary extends React.Component<
+  { onError: () => void; children: any },
+  { hasError: boolean }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch() {
+    this.props.onError();
+  }
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
 }
 
 /* ================= MAIN ================= */
 export default function AliciGame15({ onClose }: { onClose: () => void }) {
-  const { play, stop } = useSingleAudio();
+  const { play, stop, unlockOnce } = useSingleAudio();
+  const { highlight } = useMemo(() => createHighlighter(), []);
 
   const controlsRef = useRef<any>(null);
+  const draggingRef = useRef(false);
+
+  const [clickedName, setClickedName] = useState("Bir yere dokun...");
+  const [fatalError, setFatalError] = useState(false);
 
   const [scene, setScene] = useState<THREE.Object3D | null>(null);
   const [fit, setFit] = useState<FitInfo | null>(null);
   const [modelReady, setModelReady] = useState(false);
 
   const [mode, setMode] = useState<Mode>("menu");
-  const [fatalError, setFatalError] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "intro" | "asking" | "finished">("idle");
+  const [score, setScore] = useState(0);
 
+  const [qList, setQList] = useState<Question[]>([]);
+  const [qIndex, setQIndex] = useState(0);
+  const [currentQ, setCurrentQ] = useState<Question | null>(null);
+
+  const awaitingRef = useRef(false);
+
+  // mouth only intro
   const [mouthEnabled, setMouthEnabled] = useState(false);
   useMouthTalk(scene, mouthEnabled);
 
-  // ✅ baz kamera/target saklanacak
+  // base camera snapshot
   const baseCamPosRef = useRef<THREE.Vector3 | null>(null);
   const baseTargetRef = useRef<THREE.Vector3 | null>(null);
   const baseDistRef = useRef<number>(0);
+  const [baseReady, setBaseReady] = useState(false);
 
   const focusHead = (zoomIn: boolean) => {
     const c = controlsRef.current;
     if (!c || !fit) return;
-
-    // baz kayıt yoksa hiç zorlamayalım
     if (!baseCamPosRef.current || !baseTargetRef.current) return;
 
     const [cx, cy, cz] = fit.center;
     const r = fit.radius;
 
     if (zoomIn) {
-      // ✅ Dev modele göre: hedefi kafaya yaklaştır, kamera daha öne gelsin
-      // (bacak altı yapmaz; çünkü target yukarı taşınıyor)
-      const headTarget = new THREE.Vector3(cx, cy + r * 0.65, cz);
-      const headCam = new THREE.Vector3(cx, cy + r * 0.75, cz + r * 1.15); // daha yakın
-
+      // daha çok yaklaş (dev model)
+      const headTarget = new THREE.Vector3(cx, cy + r * 0.68, cz);
+      const headCam = new THREE.Vector3(cx, cy + r * 0.78, cz + r * 0.95);
       c.target.copy(headTarget);
       c.object.position.copy(headCam);
-
-      // zoom-out sınırı aynı kalsın
       c.update();
       c.object.updateProjectionMatrix?.();
       return;
     }
 
-    // ✅ konuşma bitince baz'a BİREBİR geri dön (hesap yok!)
+    // baz'a BİREBİR geri dön
     c.target.copy(baseTargetRef.current);
     c.object.position.copy(baseCamPosRef.current);
     c.update();
     c.object.updateProjectionMatrix?.();
   };
 
+  const startTeaching = async () => {
+    if (!modelReady || !baseReady) return;
+
+    setMode("teaching");
+    setPhase("intro");
+    setScore(0);
+    setQList([]);
+    setQIndex(0);
+    setCurrentQ(null);
+
+    await unlockOnce();
+
+    setMouthEnabled(true);
+    focusHead(true);
+    await play(calismaGiris);
+    focusHead(false);
+    setMouthEnabled(false);
+
+    setPhase("idle");
+  };
+
   const startAssessment = async () => {
-    if (!modelReady) return;
+    if (!modelReady || !baseReady) return;
 
     setMode("assessment");
+    setPhase("intro");
+    setScore(0);
 
-    // intro: yaklaş + ağız oyna + mp3
+    const list = pickRandomN(QUESTIONS, 10);
+    setQList(list);
+    setQIndex(0);
+    setCurrentQ(null);
+
+    await unlockOnce();
+
+    // intro (yaklaş + ağız + mp3)
     setMouthEnabled(true);
     focusHead(true);
     await play(degerlendirmeGiris);
     focusHead(false);
     setMouthEnabled(false);
 
-    // NOT: Soruları sonra bağlayacağız; şimdilik intro düzgün çalışsın diye burada bitiriyorum.
-    // (İstersen hemen 10 soruluk akışı da bu dosyaya eklerim; ama önce kamera "tam" otursun.)
+    // sorular
+    setPhase("asking");
+    const first = list[0] ?? null;
+    setCurrentQ(first);
+    if (first) {
+      await play(first.audioUrl);
+      awaitingRef.current = true;
+    }
+  };
+
+  const nextQuestion = async (idx: number) => {
+    if (idx >= qList.length) {
+      setPhase("finished");
+      setCurrentQ(null);
+      awaitingRef.current = false;
+      stop();
+      return;
+    }
+    const q = qList[idx];
+    setQIndex(idx);
+    setCurrentQ(q);
+    await play(q.audioUrl);
+    awaitingRef.current = true;
+  };
+
+  const onMeshPick = async (obj: THREE.Object3D) => {
+    const name = String(obj?.name || "unknown");
+    setClickedName(name);
+
+    // model döndürürken seçim sayma
+    if (draggingRef.current) return;
+
+    if (mode !== "assessment") return;
+    if (phase !== "asking") return;
+    if (!currentQ) return;
+    if (!awaitingRef.current) return;
+
+    const ok = currentQ.acceptNames.includes(name);
+
+    if (ok) {
+      awaitingRef.current = false;
+      setScore((s) => s + 1);
+      highlight(scene, currentQ.acceptNames, 450, "ok");
+      await new Promise((r) => setTimeout(r, 200));
+      await nextQuestion(qIndex + 1);
+    } else {
+      // yanlış: kırmızı yanıp sönsün, soru devam
+      highlight(scene, [name], 250, "bad");
+      awaitingRef.current = true;
+    }
   };
 
   return (
@@ -398,26 +609,88 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
+      {/* Mod seçimi */}
+      {mode === "menu" && (
+        <div className="absolute top-4 right-4 z-20 bg-black/60 text-white p-3 rounded-xl w-[260px]">
+          <div className="text-sm font-bold">Mod Seç</div>
+          <div className="text-[11px] opacity-80 mt-1">
+            (Model ve kamera hazır olunca aktif)
+          </div>
+          <div className="mt-3 flex flex-col gap-2">
+            <button
+              disabled={!modelReady || !baseReady}
+              onClick={startTeaching}
+              className={`px-3 py-2 rounded-lg text-sm font-semibold ${
+                modelReady && baseReady
+                  ? "bg-slate-200 text-slate-900"
+                  : "bg-slate-600 text-slate-300"
+              }`}
+            >
+              Öğretim
+            </button>
+            <button
+              disabled={!modelReady || !baseReady}
+              onClick={startAssessment}
+              className={`px-3 py-2 rounded-lg text-sm font-semibold ${
+                modelReady && baseReady
+                  ? "bg-blue-500 text-white"
+                  : "bg-slate-600 text-slate-300"
+              }`}
+            >
+              Değerlendirme (10 soru)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Üst bilgi */}
+      {mode !== "menu" && (
+        <div className="absolute top-4 right-4 z-20 bg-black/55 text-white px-3 py-2 rounded-xl text-[12px]">
+          <div className="font-bold">
+            {mode === "assessment" ? "Değerlendirme" : "Öğretim"}
+          </div>
+          {mode === "assessment" && (
+            <div className="opacity-85">
+              Soru: {Math.min(qIndex + 1, 10)}/10 · Puan: {score}
+            </div>
+          )}
+          {mode === "assessment" && currentQ && phase === "asking" && (
+            <div className="mt-1 text-[11px] opacity-85">
+              Şimdi: <b>{currentQ.label}</b>
+            </div>
+          )}
+          {phase === "finished" && mode === "assessment" && (
+            <div className="mt-1 text-[11px] opacity-90">Bravo! Bitti ✅</div>
+          )}
+        </div>
+      )}
+
       <div className="w-full h-full bg-gradient-to-b from-gray-200 to-gray-400 relative">
         <Canvas camera={{ fov: 50, near: 0.01, far: 5000 }}>
           <ambientLight intensity={0.8} />
           <directionalLight position={[5, 10, 5]} intensity={1.1} />
           <Environment preset="city" />
 
-          {/* ✅ Controls ref ile yönetiyoruz */}
-          <OrbitControls makeDefault ref={controlsRef} />
+          <OrbitControls
+            makeDefault
+            ref={controlsRef}
+            onStart={() => (draggingRef.current = true)}
+            onEnd={() => {
+              // küçük gecikme: parmak kalkarken tık saymasın
+              setTimeout(() => (draggingRef.current = false), 80);
+            }}
+          />
 
-          {/* ✅ Model yüklenince senin baz kamera oturtma + baz'ı kaydet */}
           <CameraFit
             ready={modelReady}
             fit={fit}
             controlsRef={controlsRef}
             onBaseCaptured={(camPos, target, dist) => {
-              // sadece ilk kez yaz (sonraki re-render’da baz kaymasın)
               if (!baseCamPosRef.current || !baseTargetRef.current) {
                 baseCamPosRef.current = camPos;
                 baseTargetRef.current = target;
                 baseDistRef.current = dist;
+                setBaseReady(true);
               }
             }}
           />
@@ -425,6 +698,7 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
           <Suspense fallback={<Loader />}>
             <ErrorBoundary onError={() => setFatalError(true)}>
               <Model
+                onMeshPick={onMeshPick}
                 onLoaded={(f) => {
                   setFit(f);
                   setModelReady(true);
@@ -434,42 +708,19 @@ export default function AliciGame15({ onClose }: { onClose: () => void }) {
             </ErrorBoundary>
           </Suspense>
         </Canvas>
+      </div>
 
-        {/* ✅ test butonu */}
-        <div className="absolute top-4 right-4 z-20">
-          <button
-            disabled={!modelReady}
-            onClick={startAssessment}
-            className={`px-4 py-2 rounded-xl font-semibold ${
-              modelReady ? "bg-blue-600 text-white" : "bg-slate-500 text-slate-200"
-            }`}
-          >
-            Değerlendirme Başla (Intro)
-          </button>
+      <div className="absolute bottom-8 w-full flex justify-center pointer-events-none px-4">
+        <div className="bg-blue-600/90 text-white w-full max-w-md py-4 rounded-2xl text-center shadow-lg backdrop-blur-md border border-blue-400/30">
+          <div className="flex items-center justify-center gap-2 mb-1 opacity-80">
+            <MousePointer2 size={16} />
+            <span className="font-bold text-xs tracking-widest uppercase">Tespit Edilen Bölge</span>
+          </div>
+          <p className="font-mono text-xl font-bold truncate px-4">{clickedName}</p>
         </div>
       </div>
     </div>
   );
-}
-
-class ErrorBoundary extends React.Component<
-  { onError: () => void; children: any },
-  { hasError: boolean }
-> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false };
-  }
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  componentDidCatch() {
-    this.props.onError();
-  }
-  render() {
-    if (this.state.hasError) return null;
-    return this.props.children;
-  }
 }
 
 useGLTF.preload(MODEL_PATH);
