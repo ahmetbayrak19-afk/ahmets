@@ -10,13 +10,12 @@ import arabaImg from "../esle/araba.png";
 import kalemImg from "../esle/kalem.png";
 import topImg from "../esle/top.png";
 
-// --- GERİBİLDİRİM SESLERİ (projedeki mevcut) ---
+// --- GERİBİLDİRİM SESLERİ ---
 import aferin1 from "../esle/ses/aferin1.mp3";
 import bravo from "../esle/ses/bravo.mp3";
 import tekrardene1 from "../esle/ses/tekrardene1.mp3";
 
-// --- “Aynı mı?” soru sesi (PATH GEREKİR) ---
-// Eğer aynimi.mp3 başka yerdeyse bu satırı düzelt.
+// --- “Aynı mı?” soru sesi ---
 import aynimi from "../esle/ses/aynimi.mp3";
 
 // --- Nesne tanıma soru sesleri (client/src/aba/ifade) ---
@@ -96,12 +95,12 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   // --- Menü seçimi (2x2)
   const [selectedModes, setSelectedModes] = useState<Record<ModeKey, boolean>>({
     object: true,
-    compare: true,   // <<< Karşılaştırma geri geldi (varsayılan açık)
+    compare: true,
     feature: false,
     category: false,
   });
 
-  // --- Oyun ortak
+  // --- Oyun
   const [questionCount, setQuestionCount] = useState(0);
   const [feedback, setFeedback] = useState<"correct" | "wrong" | null>(null);
   const feedbackRef = useRef<typeof feedback>(null);
@@ -109,9 +108,14 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
   const [isListening, setIsListening] = useState(false);
 
+  // --- Hangi modun sorusu?
+  const [currentMode, setCurrentMode] = useState<ModeKey>("object");
+  const currentModeRef = useRef<ModeKey>("object");
+  useEffect(() => { currentModeRef.current = currentMode; }, [currentMode]);
+
   // --- Object mode state
   const [visualItem, setVisualItem] = useState(VISUAL_ITEMS[0]);
-  const [askedKey, setAskedKey] = useState<string>("kalem"); // hangi “...mi” çalacak
+  const [askedKey, setAskedKey] = useState<string>("kalem");
   const askedKeyRef = useRef("kalem");
   useEffect(() => { askedKeyRef.current = askedKey; }, [askedKey]);
 
@@ -128,27 +132,21 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
   const [animState, setAnimState] = useState<"hidden" | "sliding" | "visible">("hidden");
 
-  // --- Current question mode
-  const [currentMode, setCurrentMode] = useState<ModeKey>("object");
-  const currentModeRef = useRef<ModeKey>("object");
-  useEffect(() => { currentModeRef.current = currentMode; }, [currentMode]);
-
   // --- Recognition control refs
   const isMountedRef = useRef(true);
   const recognitionRef = useRef<any>(null);
 
-  // Sadece true iken evet/hayır kabul (aksi halde çocuk konuşsa da tetiklemesin)
   const answerWindowOpenRef = useRef(false);
-  // Mikrofon gerçekten açık olmalı mı? (soru mp3 bitti => true; cevap alınca => false)
   const shouldListenRef = useRef(false);
-  // Bu soruda cevap yakalandı mı?
   const answeredRef = useRef(false);
 
-  // spam/çift tetikleme
   const lastTriggerAtRef = useRef(0);
   const lastDetectedRef = useRef<"yes" | "no" | null>(null);
 
-  // --- AUDIO helper (mp3 bitince callback)
+  // --- prompt keys
+  const promptKeys = useMemo(() => Object.keys(PROMPT_AUDIO), []);
+
+  // --- Audio helper (mp3 bitince cb)
   const playAudio = (src: string, onDone?: () => void) => {
     try {
       const a = new Audio(src);
@@ -158,7 +156,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
         onDone?.();
       };
 
-      // sigorta
       const safety = window.setTimeout(finish, 8000);
 
       a.onended = () => {
@@ -175,7 +172,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     }
   };
 
-  // --- SpeechRecognition create (STABLE: phaseRef kullanır)
+  // --- SpeechRecognition
   const createRecognition = () => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) return null;
@@ -197,7 +194,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     rec.onend = () => {
       if (isMountedRef.current) setIsListening(false);
 
-      // setup'ta döngü yapma
+      // setup'ta restart yok
       if (!isMountedRef.current) return;
       if (phaseRef.current !== "playing") return;
       if (!shouldListenRef.current) return;
@@ -217,6 +214,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         transcript += event.results[i][0].transcript;
       }
+
       const lower = transcript.trim().toLowerCase();
       setLastHeard(lower);
 
@@ -252,6 +250,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     shouldListenRef.current = false;
     answeredRef.current = false;
     lastDetectedRef.current = null;
+
     stopRecognition();
     recognitionRef.current = null;
   };
@@ -320,7 +319,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     else handleFail();
   };
 
-  // --- Feedback flow: mp3 bitene kadar dinleme açma yok
   const playCorrectFxThen = (cb: () => void) => {
     const src = Math.random() > 0.5 ? aferin1 : bravo;
     playAudio(src, () => {
@@ -334,99 +332,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       if (!isMountedRef.current) return;
       cb();
     });
-  };
-
-  const handleSuccess = () => {
-    setFeedback("correct");
-
-    playCorrectFxThen(() => {
-      const next = questionCount + 1;
-      setQuestionCount(next);
-
-      if (next < 10) {
-        nextQuestion();
-      } else {
-        setPhase("success");
-        try { confetti(); } catch {}
-      }
-    });
-  };
-
-  const handleFail = () => {
-    setFeedback("wrong");
-
-    playWrongFxThen(() => {
-      setFeedback(null);
-      lastDetectedRef.current = null;
-      lastTriggerAtRef.current = Date.now();
-
-      // yanlışta: aynı soruyu tekrar sor
-      askCurrentQuestionThenListen();
-    });
-  };
-
-  // --- Setup (Söylet/Dur) sadece algı gösterir
-  const toggleSetupRecord = (type: "yes" | "no") => {
-    ensureRecognition();
-
-    if (isRecordingSetup === type) {
-      setIsRecordingSetup(null);
-      shouldListenRef.current = false;
-      stopRecognition();
-      return;
-    }
-
-    setIsRecordingSetup(type);
-    shouldListenRef.current = true;
-    startRecognition();
-  };
-
-  // --- MENU (2x2 dark cards)
-  const toggleMode = (key: ModeKey) => {
-    // feature/category şimdilik pasif, seçtirmiyoruz
-    if (key === "feature" || key === "category") return;
-    setSelectedModes(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const canStart = selectedModes.object || selectedModes.compare;
-
-  // --- QUESTION ENGINE
-  const promptKeys = useMemo(() => Object.keys(PROMPT_AUDIO), []);
-
-  const startFromMenu = () => {
-    if (!canStart) return;
-
-    setFeedback(null);
-    setQuestionCount(0);
-    setPhase("playing");
-    setTimeout(() => nextQuestion(), 50);
-  };
-
-  const nextQuestion = () => {
-    // seçili modlardan biri
-    const active: ModeKey[] = [];
-    if (selectedModes.object) active.push("object");
-    if (selectedModes.compare) active.push("compare");
-
-    const mode = pickRandom(active);
-    setCurrentMode(mode);
-    currentModeRef.current = mode;
-
-    // soru resetleri
-    answeredRef.current = false;
-    answerWindowOpenRef.current = false;
-    shouldListenRef.current = false;
-    lastDetectedRef.current = null;
-    stopRecognition();
-
-    setAnimState("hidden");
-    setFeedback(null);
-
-    if (mode === "object") {
-      generateObjectQuestion();
-    } else if (mode === "compare") {
-      generateCompareQuestion();
-    }
   };
 
   const askCurrentQuestionThenListen = () => {
@@ -461,18 +366,14 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     }
   };
 
-  // --- OBJECT QUESTION (bu kalem mi?)
   const generateObjectQuestion = () => {
-    // görsel seç
     const v = pickRandom(VISUAL_ITEMS);
     setVisualItem(v);
 
-    // doğru mu yanlış mı sorulacak?
     const shouldMatch = Math.random() > 0.5;
     setIsMatch(shouldMatch);
     isMatchRef.current = shouldMatch;
 
-    // sorulan key
     let key = v.id;
     if (!shouldMatch) {
       const others = promptKeys.filter(k => k !== v.id);
@@ -481,7 +382,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     setAskedKey(key);
     askedKeyRef.current = key;
 
-    // küçük anim -> soru -> dinle
+    setAnimState("hidden");
     setTimeout(() => {
       if (!isMountedRef.current) return;
       setAnimState("sliding");
@@ -493,23 +394,23 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     }, 150);
   };
 
-  // --- COMPARE QUESTION (bu resimler aynı mı?)
   const generateCompareQuestion = () => {
     const target = pickRandom(VISUAL_ITEMS);
     const shouldMatch = Math.random() > 0.5;
 
-    let compare = target;
+    let comp = target;
     if (!shouldMatch) {
       const others = VISUAL_ITEMS.filter(i => i.id !== target.id);
-      compare = pickRandom(others);
+      comp = pickRandom(others);
     }
 
     setTargetItem(target);
-    setCompareItem(compare);
+    setCompareItem(comp);
 
     setCompareIsMatch(shouldMatch);
     compareIsMatchRef.current = shouldMatch;
 
+    setAnimState("hidden");
     setTimeout(() => {
       if (!isMountedRef.current) return;
       setAnimState("sliding");
@@ -521,7 +422,86 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     }, 150);
   };
 
-  // --- UI (Koyu tema)
+  const nextQuestion = () => {
+    const active: ModeKey[] = [];
+    if (selectedModes.object) active.push("object");
+    if (selectedModes.compare) active.push("compare");
+
+    const mode = pickRandom(active);
+    setCurrentMode(mode);
+    currentModeRef.current = mode;
+
+    // reset
+    setFeedback(null);
+    answeredRef.current = false;
+    answerWindowOpenRef.current = false;
+    shouldListenRef.current = false;
+    lastDetectedRef.current = null;
+    stopRecognition();
+
+    if (mode === "object") generateObjectQuestion();
+    else generateCompareQuestion();
+  };
+
+  const handleSuccess = () => {
+    setFeedback("correct");
+    playCorrectFxThen(() => {
+      const next = questionCount + 1;
+      setQuestionCount(next);
+
+      if (next < 10) {
+        nextQuestion();
+      } else {
+        setPhase("success");
+        try { confetti(); } catch {}
+      }
+    });
+  };
+
+  const handleFail = () => {
+    setFeedback("wrong");
+    playWrongFxThen(() => {
+      setFeedback(null);
+      lastDetectedRef.current = null;
+      lastTriggerAtRef.current = Date.now();
+      askCurrentQuestionThenListen(); // aynı soruyu tekrar sor
+    });
+  };
+
+  // --- Setup (Söylet/Dur)
+  const toggleSetupRecord = (type: "yes" | "no") => {
+    ensureRecognition();
+
+    if (isRecordingSetup === type) {
+      setIsRecordingSetup(null);
+      shouldListenRef.current = false;
+      stopRecognition();
+      return;
+    }
+
+    setIsRecordingSetup(type);
+    shouldListenRef.current = true;
+    startRecognition();
+  };
+
+  // --- Menü toggle
+  const toggleMode = (key: ModeKey) => {
+    if (key === "feature" || key === "category") return; // şimdilik pasif
+    setSelectedModes(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const canStart = selectedModes.object || selectedModes.compare;
+
+  const startFromMenu = () => {
+    if (!canStart) return;
+
+    setFeedback(null);
+    setQuestionCount(0);
+    setPhase("playing");
+    setTimeout(() => nextQuestion(), 50);
+  };
+
+  // --- UI wrappers
   const Screen = ({ children }: { children: any }) => (
     <div className="fixed inset-0 z-[100] bg-[#0b0f19] text-slate-100 flex flex-col font-sans select-none overflow-hidden touch-none overscroll-none min-h-screen">
       {children}
@@ -598,9 +578,11 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
                 Ekle
               </button>
             </div>
+
             <p className="text-[10px] mt-2 text-white/50 h-4">
               Algılanan: <span className="text-blue-300 font-black text-sm">{lastHeard}</span>
             </p>
+
             <div className="flex flex-wrap gap-1 mt-2">
               {customYesWords.map((w, i) => (
                 <span key={i} className="px-2 py-0.5 bg-green-500/15 text-green-200 text-[10px] rounded-full border border-green-400/20">
@@ -660,18 +642,17 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
         </div>
       )}
 
-      {/* MENU (2x2 dark) */}
+      {/* MENU 2x2 */}
       {phase === "menu" && (
         <div className="flex-1 flex flex-col p-6 gap-4 max-w-2xl mx-auto w-full relative">
           <TopBar title="Kazanım Seçimi" />
 
           <div>
             <div className="text-2xl font-black">Kazanım Seçimi</div>
-            <div className="text-sm text-white/60 mt-1">2x2 seçim ekranı (koyu tema)</div>
+            <div className="text-sm text-white/60 mt-1">2x2 seçim ekranı</div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 mt-2">
-            {/* Nesne Tanıma */}
             <button
               onClick={() => toggleMode("object")}
               className={twMerge(
@@ -690,7 +671,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
               </div>
             </button>
 
-            {/* Karşılaştırma */}
             <button
               onClick={() => toggleMode("compare")}
               className={twMerge(
@@ -709,7 +689,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
               </div>
             </button>
 
-            {/* Özellik & Fonksiyon (pasif) */}
             <div className="rounded-2xl border p-4 text-left min-h-[110px] flex flex-col justify-between bg-white/5 border-white/10 opacity-50">
               <div>
                 <div className="font-black text-lg">Özellik & Fonksiyon</div>
@@ -720,7 +699,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
               </div>
             </div>
 
-            {/* Kategorilendirme (pasif) */}
             <div className="rounded-2xl border p-4 text-left min-h-[110px] flex flex-col justify-between bg-white/5 border-white/10 opacity-50">
               <div>
                 <div className="font-black text-lg">Kategorilendirme</div>
@@ -749,7 +727,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
           <div className="flex-1 flex flex-col items-center justify-center gap-8 p-4">
             {currentMode === "object" ? (
-              // --- OBJECT UI ---
               <motion.div
                 initial={{ x: 260, opacity: 0 }}
                 animate={animState === "hidden" ? { x: 260, opacity: 0 } : { x: 0, opacity: 1 }}
@@ -764,7 +741,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
                 <img src={visualItem.img} className="w-full h-full object-contain" />
               </motion.div>
             ) : (
-              // --- COMPARE UI ---
               <div className="flex items-center gap-6">
                 <div className="w-36 h-36 bg-white/5 border-4 border-white/10 rounded-[2rem] p-4 flex items-center justify-center">
                   <img src={targetItem.img} className="w-full h-full object-contain" />
@@ -786,7 +762,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
               </div>
             )}
 
-            {/* Mic / Feedback */}
             <div className="flex flex-col items-center gap-2 h-32 justify-center w-full">
               {isListening ? (
                 <>
@@ -827,91 +802,4 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       )}
     </Screen>
   );
-
-  // ---------- Helpers that use current question state ----------
-  function askCurrentQuestionThenListen() {
-    // Soru çalarken mic kapalı
-    answeredRef.current = false;
-    answerWindowOpenRef.current = false;
-    shouldListenRef.current = false;
-    stopRecognition();
-
-    const mode = currentModeRef.current;
-
-    if (mode === "object") {
-      const key = askedKeyRef.current;
-      const prompt = PROMPT_AUDIO[key];
-      playAudio(prompt.src, () => {
-        if (!isMountedRef.current) return;
-        answerWindowOpenRef.current = true;
-        shouldListenRef.current = true;
-        startRecognition();
-      });
-      return;
-    }
-
-    if (mode === "compare") {
-      playAudio(aynimi, () => {
-        if (!isMountedRef.current) return;
-        answerWindowOpenRef.current = true;
-        shouldListenRef.current = true;
-        startRecognition();
-      });
-      return;
-    }
-  }
-
-  function generateObjectQuestion() {
-    const v = pickRandom(VISUAL_ITEMS);
-    setVisualItem(v);
-
-    const shouldMatch = Math.random() > 0.5;
-    setIsMatch(shouldMatch);
-    isMatchRef.current = shouldMatch;
-
-    let key = v.id;
-    if (!shouldMatch) {
-      const others = promptKeys.filter(k => k !== v.id);
-      key = pickRandom(others);
-    }
-    setAskedKey(key);
-    askedKeyRef.current = key;
-
-    setTimeout(() => {
-      if (!isMountedRef.current) return;
-      setAnimState("sliding");
-      setTimeout(() => {
-        if (!isMountedRef.current) return;
-        setAnimState("visible");
-        askCurrentQuestionThenListen();
-      }, 450);
-    }, 150);
-  }
-
-  function generateCompareQuestion() {
-    const target = pickRandom(VISUAL_ITEMS);
-    const shouldMatch = Math.random() > 0.5;
-
-    let comp = target;
-    if (!shouldMatch) {
-      const others = VISUAL_ITEMS.filter(i => i.id !== target.id);
-      comp = pickRandom(others);
-    }
-
-    setTargetItem(target);
-    setCompareItem(comp);
-
-    setCompareIsMatch(shouldMatch);
-    compareIsMatchRef.current = shouldMatch;
-
-    setTimeout(() => {
-      if (!isMountedRef.current) return;
-      setAnimState("sliding");
-      setTimeout(() => {
-        if (!isMountedRef.current) return;
-        setAnimState("visible");
-        askCurrentQuestionThenListen();
-      }, 450);
-    }, 150);
-  }
-}
+                }
