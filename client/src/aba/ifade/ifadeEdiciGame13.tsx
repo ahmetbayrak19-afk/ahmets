@@ -1,817 +1,456 @@
-// client/src/aba/ifade/ifadeEdiciGame13.tsx
+// client/src/aba/NesneEslemeGame13.tsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  collection,
+  addDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  serverTimestamp,
+  DocumentData,
+} from "firebase/firestore";
+import { db } from "../firebase"; // yolunu projene göre düzelt
+import { ArrowLeft, Mic, Square, Save, Loader2, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Trophy, Mic, MicOff, Save, Trash2, X as XIcon, XCircle } from "lucide-react";
-import confetti from "canvas-confetti";
-import { twMerge } from "tailwind-merge";
-
-// ✅ Firebase (client/src/firebase.ts)
-import { db } from "../../firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-
-// ✅ Öğrenci hook'u (varsa)
-import { useStudentData } from "@/hooks/useStudentData";
-
-// --- GERİBİLDİRİM SESLERİ ---
-import aferin1 from "../esle/ses/aferin1.mp3";
-import bravo from "../esle/ses/bravo.mp3";
-import tekrardene1 from "../esle/ses/tekrardene1.mp3";
-
-// --- SORU SESLERİ (client/src/aba/ifade) ---
-import kisineyapiyor from "./kisineyapiyor.mp3";
-import hayvanneyapiyor from "./hayvanneyapiyor.mp3";
-
-// --- VİDEOLAR (client/src/aba/esle/eylemesle) ---
-import disfircala from "../esle/eylemesle/disfircala.mp4";
-import disfircala1 from "../esle/eylemesle/disfircala1.mp4";
-import elmaye from "../esle/eylemesle/elmaye.mp4";
-import elmaye1 from "../esle/eylemesle/elmaye1.mp4";
-import elyika from "../esle/eylemesle/elyika.mp4";
-import elyika1 from "../esle/eylemesle/elyika1.mp4";
-import gitarcal from "../esle/eylemesle/gitarcal.mp4";
-import gitarcal1 from "../esle/eylemesle/gitarcal1.mp4";
-import kitapoku from "../esle/eylemesle/kitapoku.mp4";
-import kitapoku1 from "../esle/eylemesle/kitapoku1.mp4";
-import kos from "../esle/eylemesle/kos.mp4";
-import kos1 from "../esle/eylemesle/kos1.mp4";
-import resimyap from "../esle/eylemesle/resimyap.mp4";
-import resimyap1 from "../esle/eylemesle/resimyap1.mp4";
-import salincaksallan from "../esle/eylemesle/salincaksallan.mp4";
-import salincaksallan1 from "../esle/eylemesle/salincaksallan1.mp4";
-import suic from "../esle/eylemesle/suic.mp4";
-import suic1 from "../esle/eylemesle/suic1.mp4";
-import topoyna from "../esle/eylemesle/topoyna.mp4";
-import topoyna1 from "../esle/eylemesle/topoyna1.mp4";
-
-type Phase = "init" | "setup" | "playing" | "success";
-
-type Q = {
-  id: string;
-  label: string;
-  variants: { src: string; isAnimal: boolean }[];
-  keywords: string[];
+type CalibrationItem = {
+  id?: string;
+  promptKey: string; // örn "elma_yiyor"
+  promptText: string; // örn "elma yiyor"
+  recognizedText: string; // motor ne duyduysa
+  source: "final" | "interim" | "none" | "error";
+  createdAt?: any;
 };
 
-const QUESTIONS: Q[] = [
-  {
-    id: "disfircala",
-    label: "Diş fırçala",
-    variants: [
-      { src: disfircala, isAnimal: false },
-      { src: disfircala1, isAnimal: false },
-    ],
-    keywords: ["diş fırçala", "diş fırçalıyor", "dişini fırçalıyor", "disfircala", "dişfırçala"],
-  },
-  {
-    id: "elmaye",
-    label: "Elma ye",
-    variants: [
-      { src: elmaye, isAnimal: false },
-      { src: elmaye1, isAnimal: true },
-    ],
-    keywords: ["elma ye", "elma yiyor", "yiyor", "elmaye", "elma"],
-  },
-  {
-    id: "elyika",
-    label: "El yıka",
-    variants: [
-      { src: elyika, isAnimal: false },
-      { src: elyika1, isAnimal: false },
-    ],
-    keywords: ["el yıka", "el yıkıyor", "ellerini yıkıyor", "elyika"],
-  },
-  {
-    id: "gitarcal",
-    label: "Gitar çal",
-    variants: [
-      { src: gitarcal, isAnimal: false },
-      { src: gitarcal1, isAnimal: false },
-    ],
-    keywords: ["gitar çal", "gitar çalıyor", "çalıyor", "gitarcal"],
-  },
-  {
-    id: "kitapoku",
-    label: "Kitap oku",
-    variants: [
-      { src: kitapoku, isAnimal: false },
-      { src: kitapoku1, isAnimal: false },
-    ],
-    keywords: ["kitap oku", "kitap okuyor", "okuyor", "kitapoku"],
-  },
-  {
-    id: "kos",
-    label: "Koş",
-    variants: [
-      { src: kos, isAnimal: false },
-      { src: kos1, isAnimal: false },
-    ],
-    keywords: ["koş", "koşuyor", "kos"],
-  },
-  {
-    id: "resimyap",
-    label: "Resim yap",
-    variants: [
-      { src: resimyap, isAnimal: false },
-      { src: resimyap1, isAnimal: false },
-    ],
-    keywords: ["resim yap", "resim yapıyor", "çiziyor", "resimyap"],
-  },
-  {
-    id: "salincaksallan",
-    label: "Salıncakta sallan",
-    variants: [
-      { src: salincaksallan, isAnimal: false },
-      { src: salincaksallan1, isAnimal: true },
-    ],
-    keywords: ["sallan", "sallanıyor", "salıncakta sallanıyor", "salincaksallan"],
-  },
-  {
-    id: "suic",
-    label: "Su iç",
-    variants: [
-      { src: suic, isAnimal: false },
-      { src: suic1, isAnimal: true },
-    ],
-    keywords: ["su iç", "su içiyor", "içiyor", "suic"],
-  },
-  {
-    id: "topoyna",
-    label: "Top oyna",
-    variants: [
-      { src: topoyna, isAnimal: false },
-      { src: topoyna1, isAnimal: false },
-    ],
-    keywords: ["top oyna", "top oynuyor", "oynuyor", "topoyna"],
-  },
-];
+type Props = {
+  onBack: () => void;
+  studentId: string;
+};
 
-function pickRandom<T>(arr: readonly T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
+/** ===============================
+ *  WEB SPEECH (interim fallback)
+ *  =============================== */
+function createLooseRecognizer(lang = "tr-TR") {
+  const SR: any =
+    (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+
+  if (!SR) return null;
+
+  const rec = new SR();
+  rec.lang = lang;
+  rec.continuous = false;
+  rec.interimResults = true;
+  rec.maxAlternatives = 5;
+
+  return rec as any;
 }
 
-function normalizeTR(s: string) {
-  return (s || "")
-    .toLowerCase()
-    .trim()
-    .replaceAll("ı", "i")
-    .replaceAll("İ", "i")
-    .replaceAll("ğ", "g")
-    .replaceAll("ş", "s")
-    .replaceAll("ü", "u")
-    .replaceAll("ö", "o")
-    .replaceAll("ç", "c");
+function normalizeLooseText(s: string) {
+  // Burada "anlamlı kelime" filtresi YOK.
+  // Sadece trim + çoklu boşluk düzeltmesi.
+  return (s || "").replace(/\s+/g, " ").trim();
 }
 
-export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId: studentIdProp }: any) {
-  void mode;
-
-  const { selectedStudent } = useStudentData();
-  const studentId = studentIdProp || selectedStudent?.id || selectedStudent?.uid || null;
-
-  const [phase, setPhase] = useState<Phase>("init");
-  const phaseRef = useRef<Phase>("init");
-  useEffect(() => {
-    phaseRef.current = phase;
-  }, [phase]);
-
-  // --- Kalibrasyon map: { actionId: string[] }
-  const [savedMap, setSavedMap] = useState<Record<string, string[]>>({});
-  const savedMapRef = useRef<Record<string, string[]>>({});
-  useEffect(() => {
-    savedMapRef.current = savedMap;
-  }, [savedMap]);
-
-  const [setupActionId, setSetupActionId] = useState<string>(QUESTIONS[0].id);
-  const setupAction = useMemo(
-    () => QUESTIONS.find((q) => q.id === setupActionId) || QUESTIONS[0],
-    [setupActionId]
+/** ===============================
+ *  SAYFA
+ *  =============================== */
+export default function NesneEslemeGame13({ onBack, studentId }: Props) {
+  const instId = useMemo(
+    () => localStorage.getItem("kazanim-takip-institution-id") || "",
+    []
   );
 
-  const [lastHeard, setLastHeard] = useState("");
-  const [isRecordingSetup, setIsRecordingSetup] = useState(false);
+  const [items] = useState<{ key: string; text: string }[]>([
+    { key: "elma_yiyor", text: "elma yiyor" },
+    { key: "su_iciyor", text: "su içiyor" },
+    { key: "top_atiyor", text: "top atıyor" },
+    { key: "kapi_ac", text: "kapı aç" },
+    // burayı kendi kalibrasyon cümlelerinle çoğalt
+  ]);
 
-  // --- Oyun
-  const [questionCount, setQuestionCount] = useState(0);
-  const [feedback, setFeedback] = useState<"correct" | "wrong" | null>(null);
-  const feedbackRef = useRef<typeof feedback>(null);
-  useEffect(() => {
-    feedbackRef.current = feedback;
-  }, [feedback]);
+  const [selectedKey, setSelectedKey] = useState(items[0]?.key || "");
+  const selected = useMemo(
+    () => items.find((x) => x.key === selectedKey) || items[0],
+    [items, selectedKey]
+  );
 
+  // realtime kayıtlar
+  const [records, setRecords] = useState<CalibrationItem[]>([]);
+  const [isLoadingRecords, setIsLoadingRecords] = useState(true);
+
+  // recording state
   const [isListening, setIsListening] = useState(false);
+  const [liveText, setLiveText] = useState(""); // ekranda canlı göster
+  const [bestCandidate, setBestCandidate] = useState(""); // interim/final “ne geldiyse”
+  const [finalText, setFinalText] = useState(""); // final transcript
+  const [lastSource, setLastSource] = useState<
+    "final" | "interim" | "none" | "error"
+  >("none");
 
-  const [qAction, setQAction] = useState<Q>(QUESTIONS[0]);
-  const qActionRef = useRef<Q>(QUESTIONS[0]);
+  const recognizerRef = useRef<any>(null);
+  const stopTimerRef = useRef<number | null>(null);
+  const endedRef = useRef(false);
+
+  /** Realtime kayıtları çek */
   useEffect(() => {
-    qActionRef.current = qAction;
-  }, [qAction]);
+    if (!studentId || !instId) return;
 
-  const [qVariant, setQVariant] = useState<{ src: string; isAnimal: boolean }>(QUESTIONS[0].variants[0]);
-  const qVariantRef = useRef(qVariant);
-  useEffect(() => {
-    qVariantRef.current = qVariant;
-  }, [qVariant]);
+    const colRef = collection(
+      db,
+      "institutions",
+      instId,
+      "students",
+      studentId,
+      "calibration_nesne_esleme"
+    );
+    const qRef = query(colRef, orderBy("createdAt", "desc"));
 
-  // --- refs
-  const isMountedRef = useRef(true);
-  const recognitionRef = useRef<any>(null);
-
-  const answerWindowOpenRef = useRef(false);
-  const shouldListenRef = useRef(false);
-  const answeredRef = useRef(false);
-  const lastTriggerAtRef = useRef(0);
-
-  // video
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  // ---- Audio helper (mp3 bitmeden devam ETME)
-  const playAudio = (src: string, onDone?: () => void) => {
-    try {
-      const a = new Audio(src);
-
-      const finish = () => {
-        try {
-          a.onended = null;
-        } catch {}
-        onDone?.();
-      };
-
-      // güvenlik timeout
-      const safety = window.setTimeout(finish, 12000);
-
-      a.onended = () => {
-        clearTimeout(safety);
-        finish();
-      };
-
-      a.play().catch(() => {
-        clearTimeout(safety);
-        finish();
-      });
-    } catch {
-      onDone?.();
-    }
-  };
-
-  const playCorrectFxThen = (cb: () => void) => {
-    playAudio(Math.random() > 0.5 ? aferin1 : bravo, () => isMountedRef.current && cb());
-  };
-
-  const playWrongFxThen = (cb: () => void) => {
-    playAudio(tekrardene1, () => isMountedRef.current && cb());
-  };
-
-  const playQuestionPromptThenListen = () => {
-    // soru çalarken mic kapalı
-    answeredRef.current = false;
-    answerWindowOpenRef.current = false;
-    shouldListenRef.current = false;
-    stopRecognition();
-
-    const prompt = qVariantRef.current.isAnimal ? hayvanneyapiyor : kisineyapiyor;
-
-    playAudio(prompt, () => {
-      if (!isMountedRef.current) return;
-      // soru bitti -> dinle
-      answerWindowOpenRef.current = true;
-      shouldListenRef.current = true;
-      startRecognition();
-    });
-  };
-
-  // ---- SpeechRecognition
-  const createRecognition = () => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return null;
-
-    const rec = new SR();
-    rec.lang = "tr-TR";
-    rec.maxAlternatives = 1;
-    rec.interimResults = false;
-    rec.continuous = true; // çocuk gereksiz konuşsa da dinleme kesilmesin
-
-    rec.onstart = () => isMountedRef.current && setIsListening(true);
-    rec.onerror = () => isMountedRef.current && setIsListening(false);
-
-    rec.onend = () => {
-      if (isMountedRef.current) setIsListening(false);
-
-      if (!isMountedRef.current) return;
-      if (phaseRef.current !== "playing" && phaseRef.current !== "setup") return;
-      if (!shouldListenRef.current) return;
-
-      setTimeout(() => {
-        if (!isMountedRef.current) return;
-        if (!shouldListenRef.current) return;
-        try {
-          recognitionRef.current?.start();
-        } catch {}
-      }, 250);
-    };
-
-    rec.onresult = (event: any) => {
-      if (!isMountedRef.current) return;
-
-      let transcript = "";
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        transcript += event.results[i][0].transcript;
+    const unsub = onSnapshot(
+      qRef,
+      (snap) => {
+        const data = snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as DocumentData),
+        })) as CalibrationItem[];
+        setRecords(data);
+        setIsLoadingRecords(false);
+      },
+      (err) => {
+        console.error(err);
+        toast.error("Kayıtlar çekilemedi.");
+        setIsLoadingRecords(false);
       }
-      const lower = transcript.trim().toLowerCase();
-      setLastHeard(lower);
+    );
 
-      if (phaseRef.current === "setup") return;
-      if (phaseRef.current === "playing") checkTranscriptForGame(lower);
-    };
+    return () => unsub();
+  }, [studentId, instId]);
 
-    return rec;
-  };
-
-  const ensureRecognition = () => {
-    if (!recognitionRef.current) recognitionRef.current = createRecognition();
-    return recognitionRef.current;
-  };
-
-  const startRecognition = () => {
-    const rec = ensureRecognition();
-    if (!rec) return;
-    try {
-      rec.start();
-    } catch {}
-  };
-
-  const stopRecognition = () => {
-    try {
-      recognitionRef.current?.abort?.();
-    } catch {}
-    isMountedRef.current && setIsListening(false);
-  };
-
-  const killEverything = () => {
-    answerWindowOpenRef.current = false;
-    shouldListenRef.current = false;
-    answeredRef.current = false;
-
-    stopRecognition();
-    recognitionRef.current = null;
-  };
-
+  /** Recognizer kur */
   useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-      killEverything();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    recognizerRef.current = createLooseRecognizer("tr-TR");
   }, []);
 
-  const handleSafeClose = () => {
-    killEverything();
-    onClose?.();
-  };
-
-  // ---- Cevap kontrol (kalibrasyon + keywords)
-  const getAcceptPhrasesForAction = (actionId: string) => {
-    const base = QUESTIONS.find((q) => q.id === actionId)?.keywords || [];
-    const custom = savedMapRef.current[actionId] || [];
-    return [...base, ...custom].map((x) => normalizeTR(x)).filter(Boolean);
-  };
-
-  const matchesAction = (transcript: string, actionId: string) => {
-    const t = normalizeTR(transcript);
-    if (!t) return false;
-
-    const accept = getAcceptPhrasesForAction(actionId);
-
-    // agresif yakalama: eşit / içeriyor
-    return accept.some((a) => t === a || t.includes(a) || a.includes(t));
-  };
-
-  const checkTranscriptForGame = (transcript: string) => {
-    if (!answerWindowOpenRef.current) return;
-    if (answeredRef.current) return;
-    if (feedbackRef.current) return;
-
-    const now = Date.now();
-    if (now - lastTriggerAtRef.current < 450) return;
-
-    const ok = matchesAction(transcript, qActionRef.current.id);
-
-    // cevap yakalandı -> mic kapat
-    answeredRef.current = true;
-    answerWindowOpenRef.current = false;
-    shouldListenRef.current = false;
-    stopRecognition();
-
-    lastTriggerAtRef.current = now;
-
-    if (ok) handleSuccess();
-    else handleFail();
-  };
-
-  // ---- Soru üretimi (video 1 kere sabit, yeniden animasyon yok)
-  const nextQuestion = () => {
-    const action = pickRandom(QUESTIONS);
-    const variant = pickRandom(action.variants);
-
-    setQAction(action);
-    qActionRef.current = action;
-
-    setQVariant(variant);
-    qVariantRef.current = variant;
-
-    setFeedback(null);
-    answeredRef.current = false;
-    answerWindowOpenRef.current = false;
-    shouldListenRef.current = false;
-    stopRecognition();
-
-    // video reset (boyut oynamaz, sadece içerik değişir)
-    setTimeout(() => {
-      const v = videoRef.current;
-      if (!v) return;
-      try {
-        v.pause();
-        v.currentTime = 0;
-        v.muted = true;
-        v.volume = 0;
-        v.play().catch(() => {});
-      } catch {}
-    }, 60);
-
-    setTimeout(() => playQuestionPromptThenListen(), 200);
-  };
-
-  const handleSuccess = () => {
-    setFeedback("correct");
-    playCorrectFxThen(() => {
-      const next = questionCount + 1;
-      setQuestionCount(next);
-
-      if (next < 10) nextQuestion();
-      else {
-        setPhase("success");
-        try {
-          confetti();
-        } catch {}
-      }
-    });
-  };
-
-  const handleFail = () => {
-    setFeedback("wrong");
-    playWrongFxThen(() => {
-      setFeedback(null);
-      // aynı video kalsın, soru + dinleme tekrar
-      playQuestionPromptThenListen();
-    });
-  };
-
-  // ✅ Firebase load/save — SENİN SİSTEM: institutions/{instId}/students/{studentId}/ifade/eylem_kalibrasyon
-  const calibDocPath = useMemo(() => {
-    const instId = localStorage.getItem("kazanim-takip-institution-id");
-    if (!instId || !studentId) return null;
-
-    return doc(db, "institutions", instId, "students", String(studentId), "ifade", "eylem_kalibrasyon");
-  }, [studentId]);
-
-  const loadCalibration = async () => {
-    if (!calibDocPath) {
-      setPhase("setup");
-      return;
+  const clearStopTimer = () => {
+    if (stopTimerRef.current) {
+      window.clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = null;
     }
+  };
+
+  const hardStop = () => {
     try {
-      const snap = await getDoc(calibDocPath);
-      if (snap.exists()) {
-        const data = snap.data() as any;
-        const map = (data?.map || {}) as Record<string, string[]>;
-        setSavedMap(map);
-        setPhase("init");
-      } else {
-        setPhase("setup");
-      }
-    } catch {
-      setPhase("setup");
-    }
-  };
-
-  useEffect(() => {
-    loadCalibration();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [studentId]);
-
-  const saveCalibration = async () => {
-    if (!calibDocPath) {
-      setPhase("init");
-      return;
-    }
-    try {
-      await setDoc(calibDocPath, { map: savedMapRef.current, updatedAt: Date.now() }, { merge: true });
+      recognizerRef.current?.stop?.();
     } catch {}
-    setPhase("init");
   };
 
-  // Setup dinleme
-  const toggleSetupRecord = () => {
-    ensureRecognition();
+  const resetSession = () => {
+    endedRef.current = false;
+    setIsListening(false);
+    setLiveText("");
+    setBestCandidate("");
+    setFinalText("");
+    setLastSource("none");
+    clearStopTimer();
+  };
 
-    if (isRecordingSetup) {
-      setIsRecordingSetup(false);
-      shouldListenRef.current = false;
-      stopRecognition();
+  const saveToFirebase = async (payload: CalibrationItem) => {
+    if (!studentId || !instId) {
+      toast.error("Kurum veya öğrenci oturumu yok.");
       return;
     }
-    setIsRecordingSetup(true);
-    shouldListenRef.current = true;
-    startRecognition();
-  };
 
-  const addSetupPhrase = () => {
-    const phrase = lastHeard.trim();
-    if (!phrase) return;
+    const colRef = collection(
+      db,
+      "institutions",
+      instId,
+      "students",
+      studentId,
+      "calibration_nesne_esleme"
+    );
 
-    setSavedMap((prev) => {
-      const next = { ...prev };
-      const arr = next[setupActionId] ? [...next[setupActionId]] : [];
-
-      // duplicate engeli
-      const norm = normalizeTR(phrase);
-      const already = arr.some((x) => normalizeTR(x) === norm);
-      if (!already) arr.push(phrase);
-
-      next[setupActionId] = arr;
-      return next;
-    });
-
-    setLastHeard("");
-  };
-
-  const removeSetupPhrase = (idx: number) => {
-    setSavedMap((prev) => {
-      const next = { ...prev };
-      const arr = next[setupActionId] ? [...next[setupActionId]] : [];
-      arr.splice(idx, 1);
-      next[setupActionId] = arr;
-      return next;
+    await addDoc(colRef, {
+      promptKey: payload.promptKey,
+      promptText: payload.promptText,
+      recognizedText: payload.recognizedText,
+      source: payload.source,
+      createdAt: serverTimestamp(),
     });
   };
 
-  const clearSetupPhrases = () => {
-    setSavedMap((prev) => ({ ...prev, [setupActionId]: [] }));
+  const finalizeAndSave = async () => {
+    if (endedRef.current) return;
+    endedRef.current = true;
+
+    const f = normalizeLooseText(finalText);
+    const b = normalizeLooseText(bestCandidate);
+
+    let recognized = "";
+    let source: CalibrationItem["source"] = "none";
+
+    if (f) {
+      recognized = f;
+      source = "final";
+    } else if (b) {
+      recognized = b;
+      source = "interim";
+    } else {
+      recognized = "NO_RESULT";
+      source = "none";
+    }
+
+    setLastSource(source);
+
+    try {
+      await saveToFirebase({
+        promptKey: selected.key,
+        promptText: selected.text,
+        recognizedText: recognized,
+        source,
+      });
+      toast.success("Kaydedildi.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Firebase kayıt hatası: " + (e?.message || "unknown"));
+    } finally {
+      setIsListening(false);
+      clearStopTimer();
+      // canlı metni ekranda kalsın diye sıfırlamıyorum
+    }
   };
 
-  // ---- UI Components
-  const Screen = ({ children }: { children: any }) => (
-    <div className="fixed inset-0 z-[100] bg-[#0b0f19] text-slate-100 flex flex-col font-sans select-none overflow-hidden touch-none overscroll-none min-h-screen">
-      {children}
-    </div>
-  );
+  const startListening = async () => {
+    if (!recognizerRef.current) {
+      toast.error("SpeechRecognition yok (WebView desteklemiyor olabilir).");
+      return;
+    }
+    if (!instId || !studentId) {
+      toast.error("Kurum/Öğrenci ID yok.");
+      return;
+    }
 
-  const TopBar = ({ title }: { title?: string }) => (
-    <div className="p-4 flex justify-between items-center z-20">
-      <button onClick={handleSafeClose} className="p-2 bg-white/5 border border-white/10 rounded-full">
-        <XCircle className="text-white/60" />
-      </button>
-      {title ? <div className="text-xs font-bold text-white/70">{title}</div> : <div />}
-    </div>
-  );
+    // Session reset
+    resetSession();
+    setIsListening(true);
+
+    const rec = recognizerRef.current;
+
+    // Eventleri her start’ta yeniden bağla (en stabil yöntem)
+    rec.onresult = (e: any) => {
+      // final + interim yakala
+      let gotAnything = false;
+
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        for (let a = 0; a < r.length; a++) {
+          const t = normalizeLooseText(r[a]?.transcript ?? "");
+          if (t) {
+            gotAnything = true;
+            // “en son gelen” en iyi aday olarak tutulur (filtre yok)
+            setBestCandidate(t);
+            setLiveText(t);
+          }
+        }
+
+        if (r.isFinal) {
+          const ft = normalizeLooseText(r[0]?.transcript ?? "");
+          if (ft) {
+            gotAnything = true;
+            setFinalText(ft);
+            setLiveText(ft);
+          }
+        }
+      }
+
+      // Bazı cihazlarda sessizlikte takılıyor → her sonuçta timeout’u tazele
+      if (gotAnything) {
+        clearStopTimer();
+        stopTimerRef.current = window.setTimeout(() => {
+          hardStop();
+        }, 1800); // 1.8sn sessizlik → stop
+      }
+    };
+
+    rec.onerror = (err: any) => {
+      console.warn("rec.onerror", err);
+      setLastSource("error");
+      // hata olsa bile elimizde ne varsa kaydet
+      hardStop();
+    };
+
+    rec.onspeechend = () => {
+      // konuşma biter bitmez stop
+      hardStop();
+    };
+
+    rec.onend = () => {
+      // stop sonrası burada finalize
+      finalizeAndSave();
+    };
+
+    try {
+      // Bazı Android WebView’da start iki kere çağrılırsa bozulur → try/catch
+      rec.start();
+
+      // Global güvenlik: 6sn sonra stop (takılma olmasın)
+      stopTimerRef.current = window.setTimeout(() => {
+        hardStop();
+      }, 6000);
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Dinleme başlatılamadı: " + (e?.message || "unknown"));
+      setIsListening(false);
+    }
+  };
+
+  const stopListening = () => {
+    hardStop();
+  };
 
   return (
-    <Screen>
-      {/* INIT */}
-      {phase === "init" && (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-          <button onClick={handleSafeClose} className="absolute top-4 right-4 p-2 bg-white/5 rounded-full border border-white/10">
-            <XCircle className="text-white/50" />
-          </button>
+    <div className="min-h-screen bg-[#020617] text-white p-6 font-sans">
+      <header className="flex items-center justify-between mb-6">
+        <button
+          onClick={onBack}
+          className="p-2 rounded-xl bg-slate-900 border border-slate-800"
+        >
+          <ArrowLeft />
+        </button>
 
-          <div className="w-24 h-24 bg-blue-500/15 rounded-full flex items-center justify-center mb-6 animate-bounce border border-blue-500/25">
-            <Mic size={48} className="text-blue-300" />
+        <div className="text-right">
+          <div className="text-xs text-slate-500 font-black uppercase tracking-widest">
+            NesneEşlemeGame13
           </div>
-
-          <h1 className="text-2xl font-black mb-2">Eylem Adlandırma</h1>
-          <p className="text-xs text-white/60 mb-6">Video izletilir, “ne yapıyor?” sorusuna eylem söylenir.</p>
-
-          <div className="flex flex-col gap-3 w-full max-w-sm">
-            <button
-              onClick={() => {
-                setPhase("playing");
-                setQuestionCount(0);
-                setTimeout(() => nextQuestion(), 60);
-              }}
-              className="px-10 py-4 bg-green-500 text-black rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-all"
-            >
-              OYUNA BAŞLA
-            </button>
-
-            <button
-              onClick={() => setPhase("setup")}
-              className="px-10 py-4 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-all"
-            >
-              KALİBRASYON
-            </button>
+          <div className="text-[11px] text-slate-600 font-mono">
+            inst={instId || "?"} · student={studentId || "?"}
           </div>
         </div>
-      )}
+      </header>
 
-      {/* SETUP */}
-      {phase === "setup" && (
-        <div className="flex-1 flex flex-col p-6 gap-4 max-w-3xl mx-auto w-full overflow-y-auto relative">
-          <TopBar title="Kalibrasyon (Eylem Söyleyişleri)" />
+      {/* Üst panel */}
+      <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 shadow-2xl">
+        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">
+          Kalibrasyon Cümlesi Seç
+        </div>
 
-          <div className="text-center">
-            <div className="text-xl font-black">Kalibrasyon</div>
-            <div className="text-xs text-white/60 mt-1">Her eylem için söyleyiş ekle / sil. Sonra Kaydet.</div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-              <div className="font-black mb-2">Eylem Seç</div>
-              <select
-                value={setupActionId}
-                onChange={(e) => setSetupActionId(e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-xl p-3 font-bold"
-              >
-                {QUESTIONS.map((q) => (
-                  <option key={q.id} value={q.id}>
-                    {q.label}
-                  </option>
-                ))}
-              </select>
-
-              <div className="mt-3 text-xs text-white/60">
-                Kayıtlı varyasyon: <span className="font-black">{(savedMap[setupActionId] || []).length}</span>
-              </div>
-
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={toggleSetupRecord}
-                  className={twMerge(
-                    "flex-1 py-3 rounded-xl font-black flex items-center justify-center gap-2 border",
-                    isRecordingSetup
-                      ? "bg-red-600 text-white border-red-400/30 animate-pulse"
-                      : "bg-white/5 border-white/10 text-white/80"
-                  )}
-                >
-                  {isRecordingSetup ? <MicOff size={18} /> : <Mic size={18} />}
-                  {isRecordingSetup ? "Dur" : "Dinle"}
-                </button>
-
-                <button
-                  onClick={addSetupPhrase}
-                  disabled={!lastHeard}
-                  className="px-4 bg-green-500 text-black rounded-xl font-black disabled:opacity-30"
-                >
-                  Ekle
-                </button>
-              </div>
-
-              <div className="mt-2 text-[11px] text-white/60">
-                Algılanan: <span className="text-blue-300 font-black">{lastHeard}</span>
-              </div>
-
-              <button
-                onClick={clearSetupPhrases}
-                className="mt-4 w-full py-3 rounded-xl font-black flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white/80"
-              >
-                <Trash2 size={18} /> Seçileni Temizle
-              </button>
-            </div>
-
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-              <div className="font-black mb-2 flex items-center justify-between">
-                <span>Kayıtlı Söyleyişler</span>
-                <span className="text-[11px] text-white/50">({setupAction.label})</span>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {(savedMap[setupActionId] || []).map((w, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 text-[11px] font-black"
-                  >
-                    {w}
-                    <button
-                      onClick={() => removeSetupPhrase(i)}
-                      className="w-5 h-5 rounded-full bg-white/10 border border-white/10 flex items-center justify-center hover:bg-white/20"
-                      aria-label="Sil"
-                      title="Sil"
-                    >
-                      <XIcon size={12} className="text-white/70" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-
-              {(savedMap[setupActionId] || []).length === 0 && (
-                <div className="text-xs text-white/50">Henüz eklenmedi.</div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 mt-2">
+        <div className="grid grid-cols-2 gap-2">
+          {items.map((it) => (
             <button
-              onClick={saveCalibration}
-              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-lg flex items-center justify-center gap-2"
+              key={it.key}
+              onClick={() => setSelectedKey(it.key)}
+              className={`px-3 py-3 rounded-2xl border text-left transition ${
+                selectedKey === it.key
+                  ? "bg-blue-600 border-blue-500"
+                  : "bg-slate-950 border-slate-800"
+              }`}
             >
-              <Save /> KAYDET
+              <div className="text-xs font-black">{it.text}</div>
+              <div className="text-[10px] opacity-60 font-mono">{it.key}</div>
             </button>
+          ))}
+        </div>
 
+        <div className="mt-4 flex items-center gap-3">
+          {!isListening ? (
             <button
-              onClick={() => setPhase("init")}
-              className="w-full py-4 bg-white/5 text-white rounded-2xl font-black text-xl shadow-lg border border-white/10"
+              onClick={startListening}
+              className="flex-1 h-14 rounded-2xl bg-green-600 font-black flex items-center justify-center gap-2 active:scale-95 transition"
             >
-              GERİ DÖN
+              <Mic /> DİNLE
             </button>
+          ) : (
+            <button
+              onClick={stopListening}
+              className="flex-1 h-14 rounded-2xl bg-red-600 font-black flex items-center justify-center gap-2 active:scale-95 transition"
+            >
+              <Square /> DURDUR
+            </button>
+          )}
+
+          <div className="w-[140px] h-14 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col justify-center px-3">
+            <div className="text-[10px] text-slate-500 font-black uppercase">
+              kaynak
+            </div>
+            <div className="text-xs font-mono">
+              {isListening ? "listening…" : lastSource}
+            </div>
           </div>
         </div>
-      )}
 
-      {/* PLAYING */}
-      {phase === "playing" && (
-        <div className="flex-1 flex flex-col">
-          <TopBar title={`SORU: ${questionCount + 1} / 10`} />
-
-          {/* ✅ Video: 1 kere sabit, animasyon yok, en telefona sığar, oran bozulmaz */}
-          <div className="flex-1 flex items-start justify-center px-0 pb-2">
-            <div
-              style={{ width: "min(100vw, calc(100vh - 220px))" }}
-              className={twMerge(
-                "aspect-square bg-black overflow-hidden border-4 rounded-2xl",
-                feedback === "correct"
-                  ? "border-green-400/70"
-                  : feedback === "wrong"
-                    ? "border-red-400/70"
-                    : "border-white/10"
-              )}
-            >
-              <video
-                ref={videoRef}
-                src={qVariant.src}
-                className="w-full h-full object-contain"
-                muted
-                playsInline
-                preload="auto"
-                controls={false}
-                onLoadedMetadata={() => {
-                  const v = videoRef.current;
-                  if (!v) return;
-                  try {
-                    v.muted = true;
-                    v.volume = 0;
-                    v.currentTime = 0;
-                    v.play().catch(() => {});
-                  } catch {}
-                }}
-                onEnded={() => {
-                  const v = videoRef.current;
-                  if (!v) return;
-                  try {
-                    v.currentTime = 0;
-                    v.play().catch(() => {});
-                  } catch {}
-                }}
-              />
-            </div>
+        <div className="mt-4 bg-slate-950 border border-slate-800 rounded-2xl p-4">
+          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+            Canlı / Son Çıktı
           </div>
 
-          <div className="pb-6 flex flex-col items-center gap-2">
-            {isListening ? (
-              <>
-                <div className="w-20 h-20 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-blue-500/20 animate-pulse">
-                  <Mic size={40} />
-                </div>
-                <span className="text-blue-200 font-black text-xs">DİNLİYORUM...</span>
-                <span className="bg-white/10 text-white/80 px-3 py-1 rounded-full text-[10px] font-black h-6 min-w-[120px] text-center border border-white/10">
-                  {lastHeard}
-                </span>
-              </>
-            ) : feedback ? (
-              <div className={twMerge("text-4xl font-black animate-in zoom-in", feedback === "correct" ? "text-green-300" : "text-red-300")}>
-                {feedback === "correct" ? "DOĞRU!" : "YANLIŞ"}
-              </div>
-            ) : (
-              <div className="text-white/60 text-xs font-black">
-                {answerWindowOpenRef.current ? "Cevap bekliyorum..." : "Soru soruluyor / bekle..."}
-              </div>
+          <div className="text-lg font-black break-words">
+            {liveText || (
+              <span className="text-slate-700">
+                (Dinle’ye bas → konuş → ne duyarsa yazacak)
+              </span>
             )}
           </div>
-        </div>
-      )}
 
-      {/* SUCCESS */}
-      {phase === "success" && (
-        <div className="absolute inset-0 bg-[#0b0f19] z-50 flex flex-col items-center justify-center text-center p-8">
-          <Trophy size={100} className="text-yellow-400 mb-6 animate-bounce" />
-          <h1 className="text-3xl font-black mb-2 uppercase text-white">Tebrikler!</h1>
-          <p className="text-xs text-white/60 mb-6">10 soruyu tamamladı.</p>
-          <button
-            onClick={() => onComplete?.(true)}
-            className="bg-green-500 text-black px-12 py-5 rounded-2xl font-black text-xl shadow-xl"
-          >
-            KAYDET VE ÇIK
-          </button>
+          <div className="mt-2 text-[11px] text-slate-600 font-mono break-words">
+            bestCandidate: {bestCandidate || "-"} <br />
+            finalText: {finalText || "-"}
+          </div>
         </div>
-      )}
-    </Screen>
+      </div>
+
+      {/* Kayıt listesi */}
+      <div className="mt-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-xs font-black text-slate-500 uppercase tracking-widest">
+            Firebase Kayıtları
+          </div>
+          {isLoadingRecords && (
+            <div className="flex items-center gap-2 text-slate-500 text-xs">
+              <Loader2 className="animate-spin" size={16} /> yükleniyor
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          {records.map((r) => (
+            <div
+              key={r.id}
+              className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-black break-words">
+                    {r.promptText}
+                    <span className="ml-2 text-[11px] font-mono text-slate-500">
+                      ({r.promptKey})
+                    </span>
+                  </div>
+                  <div className="mt-2 text-lg font-black break-words">
+                    {r.recognizedText}
+                  </div>
+                  <div className="mt-2 text-[11px] text-slate-500 font-mono">
+                    source={r.source}
+                  </div>
+                </div>
+
+                <div className="shrink-0">
+                  <button
+                    className="p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 cursor-not-allowed"
+                    title="Silme istersen eklerim (şimdilik yok)"
+                    disabled
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {!isLoadingRecords && records.length === 0 && (
+            <div className="text-center text-slate-600 text-sm font-bold py-10">
+              Henüz kayıt yok.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
-                    }
+    }
