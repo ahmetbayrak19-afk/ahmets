@@ -66,7 +66,7 @@ const PROMPT_AUDIO: Record<string, { label: string; src: string }> = {
   masa: { label: "Masa", src: masami },
   seker: { label: "Şeker", src: sekermi },
   tavsan: { label: "Tavşan", src: tavsanmi },
-  tavuk: { label: "Tavuk", src: tavukmi },
+  tavuk: { label: "Tavuk", src: tavukmu },
   telefon: { label: "Telefon", src: telefonmu },
   top: { label: "Top", src: topmu },
   yumurta: { label: "Yumurta", src: yumurtami },
