@@ -1,14 +1,15 @@
+// client/src/aba/ifade/ifadeEdiciGame13.tsx
+
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, useAnimation } from "framer-motion";
 import { Trophy, Mic, MicOff, Save, Trash2, X as XIcon, XCircle } from "lucide-react";
 import confetti from "canvas-confetti";
 import { twMerge } from "tailwind-merge";
 
-// ✅ Firebase (DOĞRU PATH: client/src/firebase.ts)
+// ✅ Firebase (client/src/firebase.ts)
 import { db } from "../../firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
-// ✅ Öğrenci hook'u
+// ✅ Öğrenci hook'u (varsa)
 import { useStudentData } from "@/hooks/useStudentData";
 
 // --- GERİBİLDİRİM SESLERİ ---
@@ -66,7 +67,7 @@ const QUESTIONS: Q[] = [
     label: "Elma ye",
     variants: [
       { src: elmaye, isAnimal: false },
-      { src: elmaye1, isAnimal: true }, // ✅ hayvan
+      { src: elmaye1, isAnimal: true },
     ],
     keywords: ["elma ye", "elma yiyor", "yiyor", "elmaye", "elma"],
   },
@@ -120,7 +121,7 @@ const QUESTIONS: Q[] = [
     label: "Salıncakta sallan",
     variants: [
       { src: salincaksallan, isAnimal: false },
-      { src: salincaksallan1, isAnimal: true }, // ✅ hayvan
+      { src: salincaksallan1, isAnimal: true },
     ],
     keywords: ["sallan", "sallanıyor", "salıncakta sallanıyor", "salincaksallan"],
   },
@@ -129,7 +130,7 @@ const QUESTIONS: Q[] = [
     label: "Su iç",
     variants: [
       { src: suic, isAnimal: false },
-      { src: suic1, isAnimal: true }, // ✅ hayvan
+      { src: suic1, isAnimal: true },
     ],
     keywords: ["su iç", "su içiyor", "içiyor", "suic"],
   },
@@ -161,26 +162,17 @@ function normalizeTR(s: string) {
     .replaceAll("ç", "c");
 }
 
-export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
+export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId: studentIdProp }: any) {
   void mode;
 
   const { selectedStudent } = useStudentData();
-  const studentId = selectedStudent?.id || selectedStudent?.uid || null;
+  const studentId = studentIdProp || selectedStudent?.id || selectedStudent?.uid || null;
 
   const [phase, setPhase] = useState<Phase>("init");
   const phaseRef = useRef<Phase>("init");
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
-
-  // ✅ animasyon sadece yeni soruda bir kez
-  const [questionUid, setQuestionUid] = useState(0);
-  const videoAnim = useAnimation();
-  useEffect(() => {
-    videoAnim.set({ x: 260, opacity: 0 });
-    videoAnim.start({ x: 0, opacity: 1, transition: { duration: 0.55, ease: "easeOut" } });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [questionUid]);
 
   // --- Kalibrasyon map: { actionId: string[] }
   const [savedMap, setSavedMap] = useState<Record<string, string[]>>({});
@@ -229,9 +221,10 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
   const answeredRef = useRef(false);
   const lastTriggerAtRef = useRef(0);
 
+  // video
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  // ---- Audio helper
+  // ---- Audio helper (mp3 bitmeden devam ETME)
   const playAudio = (src: string, onDone?: () => void) => {
     try {
       const a = new Audio(src);
@@ -243,7 +236,9 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
         onDone?.();
       };
 
-      const safety = window.setTimeout(finish, 9000);
+      // güvenlik timeout
+      const safety = window.setTimeout(finish, 12000);
+
       a.onended = () => {
         clearTimeout(safety);
         finish();
@@ -267,6 +262,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
   };
 
   const playQuestionPromptThenListen = () => {
+    // soru çalarken mic kapalı
     answeredRef.current = false;
     answerWindowOpenRef.current = false;
     shouldListenRef.current = false;
@@ -276,6 +272,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
 
     playAudio(prompt, () => {
       if (!isMountedRef.current) return;
+      // soru bitti -> dinle
       answerWindowOpenRef.current = true;
       shouldListenRef.current = true;
       startRecognition();
@@ -291,7 +288,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
     rec.lang = "tr-TR";
     rec.maxAlternatives = 1;
     rec.interimResults = false;
-    rec.continuous = true;
+    rec.continuous = true; // çocuk gereksiz konuşsa da dinleme kesilmesin
 
     rec.onstart = () => isMountedRef.current && setIsListening(true);
     rec.onerror = () => isMountedRef.current && setIsListening(false);
@@ -309,7 +306,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
         try {
           recognitionRef.current?.start();
         } catch {}
-      }, 300);
+      }, 250);
     };
 
     rec.onresult = (event: any) => {
@@ -353,6 +350,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
     answerWindowOpenRef.current = false;
     shouldListenRef.current = false;
     answeredRef.current = false;
+
     stopRecognition();
     recognitionRef.current = null;
   };
@@ -371,7 +369,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
     onClose?.();
   };
 
-  // ---- Cevap kontrol
+  // ---- Cevap kontrol (kalibrasyon + keywords)
   const getAcceptPhrasesForAction = (actionId: string) => {
     const base = QUESTIONS.find((q) => q.id === actionId)?.keywords || [];
     const custom = savedMapRef.current[actionId] || [];
@@ -381,7 +379,10 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
   const matchesAction = (transcript: string, actionId: string) => {
     const t = normalizeTR(transcript);
     if (!t) return false;
+
     const accept = getAcceptPhrasesForAction(actionId);
+
+    // agresif yakalama: eşit / içeriyor
     return accept.some((a) => t === a || t.includes(a) || a.includes(t));
   };
 
@@ -395,6 +396,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
 
     const ok = matchesAction(transcript, qActionRef.current.id);
 
+    // cevap yakalandı -> mic kapat
     answeredRef.current = true;
     answerWindowOpenRef.current = false;
     shouldListenRef.current = false;
@@ -406,10 +408,8 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
     else handleFail();
   };
 
-  // ---- Soru üretimi
+  // ---- Soru üretimi (video 1 kere sabit, yeniden animasyon yok)
   const nextQuestion = () => {
-    setQuestionUid((v) => v + 1);
-
     const action = pickRandom(QUESTIONS);
     const variant = pickRandom(action.variants);
 
@@ -425,6 +425,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
     shouldListenRef.current = false;
     stopRecognition();
 
+    // video reset (boyut oynamaz, sadece içerik değişir)
     setTimeout(() => {
       const v = videoRef.current;
       if (!v) return;
@@ -435,9 +436,9 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
         v.volume = 0;
         v.play().catch(() => {});
       } catch {}
-    }, 80);
+    }, 60);
 
-    setTimeout(() => playQuestionPromptThenListen(), 250);
+    setTimeout(() => playQuestionPromptThenListen(), 200);
   };
 
   const handleSuccess = () => {
@@ -460,14 +461,17 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
     setFeedback("wrong");
     playWrongFxThen(() => {
       setFeedback(null);
+      // aynı video kalsın, soru + dinleme tekrar
       playQuestionPromptThenListen();
     });
   };
 
-  // ---- Firebase load/save
+  // ✅ Firebase load/save — SENİN SİSTEM: institutions/{instId}/students/{studentId}/ifade/eylem_kalibrasyon
   const calibDocPath = useMemo(() => {
-    if (!studentId) return null;
-    return doc(db, "students", String(studentId), "ifade", "eylem_kalibrasyon");
+    const instId = localStorage.getItem("kazanim-takip-institution-id");
+    if (!instId || !studentId) return null;
+
+    return doc(db, "institutions", instId, "students", String(studentId), "ifade", "eylem_kalibrasyon");
   }, [studentId]);
 
   const loadCalibration = async () => {
@@ -528,13 +532,16 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
     setSavedMap((prev) => {
       const next = { ...prev };
       const arr = next[setupActionId] ? [...next[setupActionId]] : [];
+
       // duplicate engeli
       const norm = normalizeTR(phrase);
       const already = arr.some((x) => normalizeTR(x) === norm);
       if (!already) arr.push(phrase);
+
       next[setupActionId] = arr;
       return next;
     });
+
     setLastHeard("");
   };
 
@@ -552,7 +559,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
     setSavedMap((prev) => ({ ...prev, [setupActionId]: [] }));
   };
 
-  // ---- UI
+  // ---- UI Components
   const Screen = ({ children }: { children: any }) => (
     <div className="fixed inset-0 z-[100] bg-[#0b0f19] text-slate-100 flex flex-col font-sans select-none overflow-hidden touch-none overscroll-none min-h-screen">
       {children}
@@ -589,7 +596,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
               onClick={() => {
                 setPhase("playing");
                 setQuestionCount(0);
-                setTimeout(() => nextQuestion(), 80);
+                setTimeout(() => nextQuestion(), 60);
               }}
               className="px-10 py-4 bg-green-500 text-black rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-all"
             >
@@ -724,20 +731,23 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
         <div className="flex-1 flex flex-col">
           <TopBar title={`SORU: ${questionCount + 1} / 10`} />
 
-          {/* ✅ Video: maksimum alan, kare, ses yok */}
-          <div className="flex-1 flex items-center justify-center px-2 pb-2">
-            <motion.div
-              initial={false}
-              animate={videoAnim}
+          {/* ✅ Video: 1 kere sabit, animasyon yok, en telefona sığar, oran bozulmaz */}
+          <div className="flex-1 flex items-start justify-center px-0 pb-2">
+            <div
+              style={{ width: "min(100vw, calc(100vh - 220px))" }}
               className={twMerge(
-                "w-full h-full max-w-[920px] max-h-[920px] aspect-square rounded-3xl overflow-hidden border-4 bg-black",
-                feedback === "correct" ? "border-green-400/70" : feedback === "wrong" ? "border-red-400/70" : "border-white/10"
+                "aspect-square bg-black overflow-hidden border-4 rounded-2xl",
+                feedback === "correct"
+                  ? "border-green-400/70"
+                  : feedback === "wrong"
+                    ? "border-red-400/70"
+                    : "border-white/10"
               )}
             >
               <video
                 ref={videoRef}
                 src={qVariant.src}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
                 muted
                 playsInline
                 preload="auto"
@@ -761,7 +771,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
                   } catch {}
                 }}
               />
-            </motion.div>
+            </div>
           </div>
 
           <div className="pb-6 flex flex-col items-center gap-2">
@@ -780,7 +790,9 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
                 {feedback === "correct" ? "DOĞRU!" : "YANLIŞ"}
               </div>
             ) : (
-              <div className="text-white/60 text-xs font-black">{answerWindowOpenRef.current ? "Cevap bekliyorum..." : "Soru soruluyor / bekle..."}</div>
+              <div className="text-white/60 text-xs font-black">
+                {answerWindowOpenRef.current ? "Cevap bekliyorum..." : "Soru soruluyor / bekle..."}
+              </div>
             )}
           </div>
         </div>
@@ -802,4 +814,4 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode }: any) {
       )}
     </Screen>
   );
-                }
+                    }
