@@ -4,7 +4,7 @@ import { Check, XCircle, Trophy, Mic, MicOff, ArrowRight } from "lucide-react";
 import confetti from "canvas-confetti";
 import { twMerge } from "tailwind-merge";
 
-// --- GÖRSELLER (şimdilik projede kesin olanlar) ---
+// --- GÖRSELLER ---
 import anahtarImg from "../esle/anahtar.png";
 import arabaImg from "../esle/araba.png";
 import kalemImg from "../esle/kalem.png";
@@ -66,7 +66,7 @@ const PROMPT_AUDIO: Record<string, { label: string; src: string }> = {
   masa: { label: "Masa", src: masami },
   seker: { label: "Şeker", src: sekermi },
   tavsan: { label: "Tavşan", src: tavsanmi },
-  tavuk: { label: "Tavuk", src: tavukmu },
+  tavuk: { label: "Tavuk", src: tavukmi },
   telefon: { label: "Telefon", src: telefonmu },
   top: { label: "Top", src: topmu },
   yumurta: { label: "Yumurta", src: yumurtami },
@@ -81,6 +81,9 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   const phaseRef = useRef<Phase>("init");
   useEffect(() => { phaseRef.current = phase; }, [phase]);
 
+  // --- NEW: sadece yeni soru gelince animasyon tetiklesin diye ---
+  const [questionUid, setQuestionUid] = useState(0);
+
   // --- Kalibrasyon
   const [customYesWords, setCustomYesWords] = useState<string[]>([]);
   const [customNoWords, setCustomNoWords] = useState<string[]>([]);
@@ -92,7 +95,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   const [lastHeard, setLastHeard] = useState("");
   const [isRecordingSetup, setIsRecordingSetup] = useState<"yes" | "no" | null>(null);
 
-  // --- Menü seçimi (2x2)
+  // --- Menü
   const [selectedModes, setSelectedModes] = useState<Record<ModeKey, boolean>>({
     object: true,
     compare: true,
@@ -108,12 +111,11 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
   const [isListening, setIsListening] = useState(false);
 
-  // --- Hangi modun sorusu?
   const [currentMode, setCurrentMode] = useState<ModeKey>("object");
   const currentModeRef = useRef<ModeKey>("object");
   useEffect(() => { currentModeRef.current = currentMode; }, [currentMode]);
 
-  // --- Object mode state
+  // --- Object
   const [visualItem, setVisualItem] = useState(VISUAL_ITEMS[0]);
   const [askedKey, setAskedKey] = useState<string>("kalem");
   const askedKeyRef = useRef("kalem");
@@ -123,16 +125,14 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   const isMatchRef = useRef(true);
   useEffect(() => { isMatchRef.current = isMatch; }, [isMatch]);
 
-  // --- Compare mode state
+  // --- Compare
   const [targetItem, setTargetItem] = useState(VISUAL_ITEMS[0]);
   const [compareItem, setCompareItem] = useState(VISUAL_ITEMS[0]);
   const [compareIsMatch, setCompareIsMatch] = useState(true);
   const compareIsMatchRef = useRef(true);
   useEffect(() => { compareIsMatchRef.current = compareIsMatch; }, [compareIsMatch]);
 
-  const [animState, setAnimState] = useState<"hidden" | "sliding" | "visible">("hidden");
-
-  // --- Recognition control refs
+  // --- Recognition refs
   const isMountedRef = useRef(true);
   const recognitionRef = useRef<any>(null);
 
@@ -143,10 +143,9 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   const lastTriggerAtRef = useRef(0);
   const lastDetectedRef = useRef<"yes" | "no" | null>(null);
 
-  // --- prompt keys
   const promptKeys = useMemo(() => Object.keys(PROMPT_AUDIO), []);
 
-  // --- Audio helper (mp3 bitince cb)
+  // --- Audio helper
   const playAudio = (src: string, onDone?: () => void) => {
     try {
       const a = new Audio(src);
@@ -183,18 +182,12 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     rec.interimResults = false;
     rec.continuous = true;
 
-    rec.onstart = () => {
-      if (isMountedRef.current) setIsListening(true);
-    };
-
-    rec.onerror = () => {
-      if (isMountedRef.current) setIsListening(false);
-    };
+    rec.onstart = () => { if (isMountedRef.current) setIsListening(true); };
+    rec.onerror = () => { if (isMountedRef.current) setIsListening(false); };
 
     rec.onend = () => {
       if (isMountedRef.current) setIsListening(false);
 
-      // setup'ta restart yok
       if (!isMountedRef.current) return;
       if (phaseRef.current !== "playing") return;
       if (!shouldListenRef.current) return;
@@ -218,12 +211,8 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       const lower = transcript.trim().toLowerCase();
       setLastHeard(lower);
 
-      // setup'ta sadece göster
       if (phaseRef.current === "setup") return;
-
-      if (phaseRef.current === "playing") {
-        checkTranscriptForGame(lower);
-      }
+      if (phaseRef.current === "playing") checkTranscriptForGame(lower);
     };
 
     return rec;
@@ -250,7 +239,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     shouldListenRef.current = false;
     answeredRef.current = false;
     lastDetectedRef.current = null;
-
     stopRecognition();
     recognitionRef.current = null;
   };
@@ -296,7 +284,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
     if (lastDetectedRef.current === detected && now - lastTriggerAtRef.current < 1000) return;
 
-    // cevap alındı => mic kapat
     answeredRef.current = true;
     answerWindowOpenRef.current = false;
     shouldListenRef.current = false;
@@ -321,21 +308,15 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
   const playCorrectFxThen = (cb: () => void) => {
     const src = Math.random() > 0.5 ? aferin1 : bravo;
-    playAudio(src, () => {
-      if (!isMountedRef.current) return;
-      cb();
-    });
+    playAudio(src, () => { if (isMountedRef.current) cb(); });
   };
 
   const playWrongFxThen = (cb: () => void) => {
-    playAudio(tekrardene1, () => {
-      if (!isMountedRef.current) return;
-      cb();
-    });
+    playAudio(tekrardene1, () => { if (isMountedRef.current) cb(); });
   };
 
+  // === KRİTİK: tekrar sorarken görsel animasyonu yeniden tetikleme yok
   const askCurrentQuestionThenListen = () => {
-    // soru çalarken mic kapalı
     answeredRef.current = false;
     answerWindowOpenRef.current = false;
     shouldListenRef.current = false;
@@ -345,8 +326,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
     if (mode === "object") {
       const key = askedKeyRef.current;
-      const prompt = PROMPT_AUDIO[key];
-      playAudio(prompt.src, () => {
+      playAudio(PROMPT_AUDIO[key].src, () => {
         if (!isMountedRef.current) return;
         answerWindowOpenRef.current = true;
         shouldListenRef.current = true;
@@ -355,18 +335,18 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       return;
     }
 
-    if (mode === "compare") {
-      playAudio(aynimi, () => {
-        if (!isMountedRef.current) return;
-        answerWindowOpenRef.current = true;
-        shouldListenRef.current = true;
-        startRecognition();
-      });
-      return;
-    }
+    playAudio(aynimi, () => {
+      if (!isMountedRef.current) return;
+      answerWindowOpenRef.current = true;
+      shouldListenRef.current = true;
+      startRecognition();
+    });
   };
 
+  // === YENİ SORU: sadece burada questionUid artar => animasyon 1 kere olur
   const generateObjectQuestion = () => {
+    setQuestionUid(v => v + 1);
+
     const v = pickRandom(VISUAL_ITEMS);
     setVisualItem(v);
 
@@ -382,19 +362,13 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     setAskedKey(key);
     askedKeyRef.current = key;
 
-    setAnimState("hidden");
-    setTimeout(() => {
-      if (!isMountedRef.current) return;
-      setAnimState("sliding");
-      setTimeout(() => {
-        if (!isMountedRef.current) return;
-        setAnimState("visible");
-        askCurrentQuestionThenListen();
-      }, 450);
-    }, 150);
+    // küçük gecikme sadece mount animasyonuna fırsat
+    setTimeout(() => askCurrentQuestionThenListen(), 120);
   };
 
   const generateCompareQuestion = () => {
+    setQuestionUid(v => v + 1);
+
     const target = pickRandom(VISUAL_ITEMS);
     const shouldMatch = Math.random() > 0.5;
 
@@ -410,16 +384,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     setCompareIsMatch(shouldMatch);
     compareIsMatchRef.current = shouldMatch;
 
-    setAnimState("hidden");
-    setTimeout(() => {
-      if (!isMountedRef.current) return;
-      setAnimState("sliding");
-      setTimeout(() => {
-        if (!isMountedRef.current) return;
-        setAnimState("visible");
-        askCurrentQuestionThenListen();
-      }, 450);
-    }, 150);
+    setTimeout(() => askCurrentQuestionThenListen(), 120);
   };
 
   const nextQuestion = () => {
@@ -431,7 +396,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     setCurrentMode(mode);
     currentModeRef.current = mode;
 
-    // reset
     setFeedback(null);
     answeredRef.current = false;
     answerWindowOpenRef.current = false;
@@ -449,9 +413,8 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       const next = questionCount + 1;
       setQuestionCount(next);
 
-      if (next < 10) {
-        nextQuestion();
-      } else {
+      if (next < 10) nextQuestion();
+      else {
         setPhase("success");
         try { confetti(); } catch {}
       }
@@ -464,11 +427,13 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       setFeedback(null);
       lastDetectedRef.current = null;
       lastTriggerAtRef.current = Date.now();
-      askCurrentQuestionThenListen(); // aynı soruyu tekrar sor
+
+      // aynı soru tekrar sorulur, ama questionUid artmaz => görsel sabit kalır
+      askCurrentQuestionThenListen();
     });
   };
 
-  // --- Setup (Söylet/Dur)
+  // --- Setup
   const toggleSetupRecord = (type: "yes" | "no") => {
     ensureRecognition();
 
@@ -486,7 +451,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
   // --- Menü toggle
   const toggleMode = (key: ModeKey) => {
-    if (key === "feature" || key === "category") return; // şimdilik pasif
+    if (key === "feature" || key === "category") return;
     setSelectedModes(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -494,14 +459,12 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
   const startFromMenu = () => {
     if (!canStart) return;
-
     setFeedback(null);
     setQuestionCount(0);
     setPhase("playing");
     setTimeout(() => nextQuestion(), 50);
   };
 
-  // --- UI wrappers
   const Screen = ({ children }: { children: any }) => (
     <div className="fixed inset-0 z-[100] bg-[#0b0f19] text-slate-100 flex flex-col font-sans select-none overflow-hidden touch-none overscroll-none min-h-screen">
       {children}
@@ -582,14 +545,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
             <p className="text-[10px] mt-2 text-white/50 h-4">
               Algılanan: <span className="text-blue-300 font-black text-sm">{lastHeard}</span>
             </p>
-
-            <div className="flex flex-wrap gap-1 mt-2">
-              {customYesWords.map((w, i) => (
-                <span key={i} className="px-2 py-0.5 bg-green-500/15 text-green-200 text-[10px] rounded-full border border-green-400/20">
-                  {w}
-                </span>
-              ))}
-            </div>
           </div>
 
           {/* HAYIR */}
@@ -623,14 +578,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
             <p className="text-[10px] mt-2 text-white/50 h-4">
               Algılanan: <span className="text-blue-300 font-black text-sm">{lastHeard}</span>
             </p>
-
-            <div className="flex flex-wrap gap-1 mt-2">
-              {customNoWords.map((w, i) => (
-                <span key={i} className="px-2 py-0.5 bg-red-500/15 text-red-200 text-[10px] rounded-full border border-red-400/20">
-                  {w}
-                </span>
-              ))}
-            </div>
           </div>
 
           <button
@@ -647,11 +594,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
         <div className="flex-1 flex flex-col p-6 gap-4 max-w-2xl mx-auto w-full relative">
           <TopBar title="Kazanım Seçimi" />
 
-          <div>
-            <div className="text-2xl font-black">Kazanım Seçimi</div>
-            <div className="text-sm text-white/60 mt-1">2x2 seçim ekranı</div>
-          </div>
-
           <div className="grid grid-cols-2 gap-3 mt-2">
             <button
               onClick={() => toggleMode("object")}
@@ -660,10 +602,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
                 selectedModes.object ? "bg-blue-600/20 border-blue-400/40" : "bg-white/5 border-white/10"
               )}
             >
-              <div>
-                <div className="font-black text-lg">Nesne Tanıma</div>
-                <div className="text-[11px] text-white/60">“Bu kalem mi?”</div>
-              </div>
+              <div className="font-black text-lg">Nesne Tanıma</div>
               <div className={twMerge("text-[11px] font-black px-3 py-1 rounded-full w-fit",
                 selectedModes.object ? "bg-blue-500 text-white" : "bg-white/10 text-white/70"
               )}>
@@ -678,10 +617,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
                 selectedModes.compare ? "bg-blue-600/20 border-blue-400/40" : "bg-white/5 border-white/10"
               )}
             >
-              <div>
-                <div className="font-black text-lg">Karşılaştırma</div>
-                <div className="text-[11px] text-white/60">“Bu resimler aynı mı?”</div>
-              </div>
+              <div className="font-black text-lg">Karşılaştırma</div>
               <div className={twMerge("text-[11px] font-black px-3 py-1 rounded-full w-fit",
                 selectedModes.compare ? "bg-blue-500 text-white" : "bg-white/10 text-white/70"
               )}>
@@ -689,31 +625,21 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
               </div>
             </button>
 
-            <div className="rounded-2xl border p-4 text-left min-h-[110px] flex flex-col justify-between bg-white/5 border-white/10 opacity-50">
-              <div>
-                <div className="font-black text-lg">Özellik & Fonksiyon</div>
-                <div className="text-[11px] text-white/60">yakında</div>
-              </div>
-              <div className="text-[11px] font-black px-3 py-1 rounded-full w-fit bg-white/10 text-white/60">
-                Kapalı
-              </div>
+            <div className="rounded-2xl border p-4 min-h-[110px] bg-white/5 border-white/10 opacity-50 flex flex-col justify-between">
+              <div className="font-black text-lg">Özellik & Fonksiyon</div>
+              <div className="text-[11px] font-black px-3 py-1 rounded-full w-fit bg-white/10 text-white/60">Kapalı</div>
             </div>
 
-            <div className="rounded-2xl border p-4 text-left min-h-[110px] flex flex-col justify-between bg-white/5 border-white/10 opacity-50">
-              <div>
-                <div className="font-black text-lg">Kategorilendirme</div>
-                <div className="text-[11px] text-white/60">yakında</div>
-              </div>
-              <div className="text-[11px] font-black px-3 py-1 rounded-full w-fit bg-white/10 text-white/60">
-                Kapalı
-              </div>
+            <div className="rounded-2xl border p-4 min-h-[110px] bg-white/5 border-white/10 opacity-50 flex flex-col justify-between">
+              <div className="font-black text-lg">Kategorilendirme</div>
+              <div className="text-[11px] font-black px-3 py-1 rounded-full w-fit bg-white/10 text-white/60">Kapalı</div>
             </div>
           </div>
 
           <button
             onClick={startFromMenu}
             disabled={!canStart}
-            className="w-full py-4 bg-green-500 text-black rounded-2xl font-black text-xl shadow-lg mt-2 disabled:opacity-30"
+            className="w-full py-4 bg-green-500 text-black rounded-2xl font-black text-xl shadow-lg mt-4 disabled:opacity-30"
           >
             BAŞLAT
           </button>
@@ -728,8 +654,9 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
           <div className="flex-1 flex flex-col items-center justify-center gap-8 p-4">
             {currentMode === "object" ? (
               <motion.div
+                key={`q-${questionUid}`} // <<< sadece yeni soruda değişir
                 initial={{ x: 260, opacity: 0 }}
-                animate={animState === "hidden" ? { x: 260, opacity: 0 } : { x: 0, opacity: 1 }}
+                animate={{ x: 0, opacity: 1 }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
                 className={twMerge(
                   "w-44 h-44 bg-white/5 border-4 rounded-[2rem] p-4 flex items-center justify-center",
@@ -747,8 +674,9 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
                 </div>
 
                 <motion.div
+                  key={`q-${questionUid}-right`} // <<< sadece yeni soruda değişir
                   initial={{ x: 260, opacity: 0 }}
-                  animate={animState === "hidden" ? { x: 260, opacity: 0 } : { x: 0, opacity: 1 }}
+                  animate={{ x: 0, opacity: 1 }}
                   transition={{ duration: 0.5, ease: "easeOut" }}
                   className={twMerge(
                     "w-36 h-36 bg-white/5 border-4 rounded-[2rem] p-4 flex items-center justify-center",
@@ -802,4 +730,4 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       )}
     </Screen>
   );
-                }
+                  }
