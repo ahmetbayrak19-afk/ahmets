@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useAnimation } from "framer-motion";
 import { Check, XCircle, Trophy, Mic, MicOff, ArrowRight } from "lucide-react";
 import confetti from "canvas-confetti";
 import { twMerge } from "tailwind-merge";
@@ -83,8 +83,24 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     phaseRef.current = phase;
   }, [phase]);
 
-  // ✅ Animasyon sadece yeni soruda 1 kere:
+  // ✅ sadece yeni soruda artar
   const [questionUid, setQuestionUid] = useState(0);
+
+  // ✅ Animasyon kontrolü (RE-RENDER’DA TEKRAR OYNAMAZ)
+  const objectAnim = useAnimation();
+  const compareRightAnim = useAnimation();
+
+  // Sadece questionUid değişince animasyonu bir kez oynat
+  useEffect(() => {
+    // object kutusu için
+    objectAnim.set({ x: 260, opacity: 0 });
+    objectAnim.start({ x: 0, opacity: 1, transition: { duration: 0.55, ease: "easeOut" } });
+
+    // compare sağ kutu için
+    compareRightAnim.set({ x: 260, opacity: 0 });
+    compareRightAnim.start({ x: 0, opacity: 1, transition: { duration: 0.55, ease: "easeOut" } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questionUid]);
 
   // --- Kalibrasyon
   const [customYesWords, setCustomYesWords] = useState<string[]>([]);
@@ -101,7 +117,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   const [lastHeard, setLastHeard] = useState("");
   const [isRecordingSetup, setIsRecordingSetup] = useState<"yes" | "no" | null>(null);
 
-  // --- Menü seçimi
+  // --- Menü
   const [selectedModes, setSelectedModes] = useState<Record<ModeKey, boolean>>({
     object: true,
     compare: true,
@@ -152,7 +168,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
   const isMountedRef = useRef(true);
   const recognitionRef = useRef<any>(null);
 
-  const answerWindowOpenRef = useRef(false); // sadece true iken evet/hayır kabul
+  const answerWindowOpenRef = useRef(false);
   const shouldListenRef = useRef(false);
   const answeredRef = useRef(false);
 
@@ -286,7 +302,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     onClose();
   };
 
-  // --- detect yes/no
   const detectYesNo = (transcript: string): "yes" | "no" | null => {
     const words = transcript.split(/\s+/).filter(Boolean);
     const YES_POOL = [...STANDARD_YES, ...customYesRef.current];
@@ -313,7 +328,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
 
     if (lastDetectedRef.current === detected && now - lastTriggerAtRef.current < 1000) return;
 
-    // cevap alındı => mic kapat
     answeredRef.current = true;
     answerWindowOpenRef.current = false;
     shouldListenRef.current = false;
@@ -349,7 +363,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     });
   };
 
-  // ✅ Aynı soruyu tekrar sorar: görsel/animasyon DEĞİŞMEZ
+  // ✅ aynı soruyu tekrar sor: görsel/animasyon TEKRARLAMAZ
   const askCurrentQuestionThenListen = () => {
     answeredRef.current = false;
     answerWindowOpenRef.current = false;
@@ -370,7 +384,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       return;
     }
 
-    // compare
     playAudio(aynimi, () => {
       if (!isMountedRef.current) return;
       answerWindowOpenRef.current = true;
@@ -379,7 +392,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     });
   };
 
-  // ✅ Yeni soru üret: sadece data değişir (animasyon key ile tetiklenir)
   const generateObjectQuestion = () => {
     const v = pickRandom(VISUAL_ITEMS);
     setVisualItem(v);
@@ -420,7 +432,7 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     setTimeout(() => askCurrentQuestionThenListen(), 120);
   };
 
-  // ✅ YENİ soruda UID artar => animasyon SADECE burada 1 kere çalışır
+  // ✅ YENİ soru: UID artar -> useEffect ile animasyon 1 kere oynar
   const nextQuestion = () => {
     setQuestionUid((v) => v + 1);
 
@@ -465,12 +477,10 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       setFeedback(null);
       lastDetectedRef.current = null;
       lastTriggerAtRef.current = Date.now();
-      // ✅ aynı soru tekrar sorulur (UID artmaz => animasyon yok)
       askCurrentQuestionThenListen();
     });
   };
 
-  // --- Setup record
   const toggleSetupRecord = (type: "yes" | "no") => {
     ensureRecognition();
 
@@ -486,9 +496,8 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     startRecognition();
   };
 
-  // --- Menü toggle
   const toggleMode = (key: ModeKey) => {
-    if (key === "feature" || key === "category") return; // şimdilik pasif
+    if (key === "feature" || key === "category") return;
     setSelectedModes((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -502,7 +511,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
     setTimeout(() => nextQuestion(), 80);
   };
 
-  // --- UI
   const Screen = ({ children }: { children: any }) => (
     <div className="fixed inset-0 z-[100] bg-[#0b0f19] text-slate-100 flex flex-col font-sans select-none overflow-hidden touch-none overscroll-none min-h-screen">
       {children}
@@ -648,7 +656,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
           </div>
 
           <div className="grid grid-cols-2 gap-4 mt-2">
-            {/* Nesne Tanıma */}
             <button
               onClick={() => toggleMode("object")}
               className={twMerge(
@@ -675,7 +682,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
               </div>
             </button>
 
-            {/* Karşılaştırma */}
             <button
               onClick={() => toggleMode("compare")}
               className={twMerge(
@@ -702,7 +708,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
               </div>
             </button>
 
-            {/* Özellik & Fonksiyon (pasif) */}
             <div className="rounded-3xl border p-5 text-left min-h-[150px] flex flex-col justify-between bg-white/5 border-white/10 opacity-50">
               <div>
                 <div className="font-black text-lg">Özellik & Fonksiyon</div>
@@ -711,7 +716,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
               <div className="text-[11px] font-black px-3 py-1 rounded-full w-fit bg-white/10 text-white/60">Kapalı</div>
             </div>
 
-            {/* Kategorilendirme (pasif) */}
             <div className="rounded-3xl border p-5 text-left min-h-[150px] flex flex-col justify-between bg-white/5 border-white/10 opacity-50">
               <div>
                 <div className="font-black text-lg">Kategorilendirme</div>
@@ -739,11 +743,9 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
           <div className="flex-1 flex flex-col items-center justify-center gap-8 p-4">
             {currentMode === "object" ? (
               <motion.div
-                // ✅ sadece yeni soruda key değişir => animasyon 1 kere
-                key={`q-${questionUid}-object`}
-                initial={{ x: 260, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ duration: 0.55, ease: "easeOut" }}
+                // ✅ initial kapalı: re-render’da asla tekrar kaymaz
+                initial={false}
+                animate={objectAnim}
                 className={twMerge(
                   "w-44 h-44 bg-white/5 border-4 rounded-[2rem] p-4 flex items-center justify-center",
                   feedback === "correct"
@@ -757,20 +759,13 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
               </motion.div>
             ) : (
               <div className="flex items-center gap-6">
-                <div
-                  className={twMerge(
-                    "w-36 h-36 bg-white/5 border-4 rounded-[2rem] p-4 flex items-center justify-center",
-                    "border-white/10"
-                  )}
-                >
+                <div className="w-36 h-36 bg-white/5 border-4 border-white/10 rounded-[2rem] p-4 flex items-center justify-center">
                   <img src={targetItem.img} className="w-full h-full object-contain" />
                 </div>
 
                 <motion.div
-                  key={`q-${questionUid}-compare-right`}
-                  initial={{ x: 260, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ duration: 0.55, ease: "easeOut" }}
+                  initial={false}
+                  animate={compareRightAnim}
                   className={twMerge(
                     "w-36 h-36 bg-white/5 border-4 rounded-[2rem] p-4 flex items-center justify-center",
                     feedback === "correct"
@@ -785,7 +780,6 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
               </div>
             )}
 
-            {/* Mic / Feedback */}
             <div className="flex flex-col items-center gap-2 h-32 justify-center w-full">
               {isListening ? (
                 <>
@@ -823,4 +817,4 @@ export default function IfadeEdiciGame15({ onClose, onComplete }: any) {
       )}
     </Screen>
   );
-}
+                }
