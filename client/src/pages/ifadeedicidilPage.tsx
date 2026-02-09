@@ -6,11 +6,11 @@ import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Gamepad2, Grad
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
-import Talk from './talk'; 
+import Talk from './talk';
 
 // --- OYUN IMPORT ---
-import IfadeEdiciGame15 from '@/aba/ifade/ifadeEdiciGame15'; // İEDB 3.7 - Evet/Hayır Oyunu
-import IfadeEdiciGame13 from '@/aba/ifade/ifadeEdiciGame13'; // ✅ İEDB 3.5 - Eylem Adlandırma
+import IfadeEdiciGame15 from '@/aba/ifade/ifadeEdiciGame15';
+import IfadeEdiciGame13 from '@/aba/ifade/ifadeEdiciGame13';
 
 interface IfadeEdiciDilPageProps {
   studentId: string;
@@ -20,7 +20,7 @@ interface IfadeEdiciDilPageProps {
 export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPageProps) {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
-  
+
   // Talk sayfasını kontrol eden state
   const [showTolkido, setShowTolkido] = useState(false);
 
@@ -61,7 +61,11 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
     try {
       const instId = localStorage.getItem("kazanim-takip-institution-id");
       const dataToSave = newData || formData;
-      await setDoc(doc(db, "institutions", instId!, "students", studentId, "assessments", "aba"), dataToSave, { merge: true });
+      await setDoc(
+        doc(db, "institutions", instId!, "students", studentId, "assessments", "aba"),
+        dataToSave,
+        { merge: true }
+      );
       if (!newData) toast.success("İfade Edici Dil becerileri kaydedildi!");
     } catch (error) {
       toast.error("Kaydetme hatası oluştu.");
@@ -112,6 +116,8 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
     if (activeGameItem.startsWith("İEDB 3.5")) {
       return (
         <IfadeEdiciGame13
+          // ✅ KRİTİK: studentId’yi mutlaka geçir!
+          studentId={studentId}
           mode={activeGameMode}
           onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }}
           onComplete={handleGameComplete}
@@ -122,6 +128,8 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
     if (activeGameItem.startsWith("İEDB 3.7")) {
       return (
         <IfadeEdiciGame15
+          // ✅ Aynı şekilde
+          studentId={studentId}
           mode={activeGameMode}
           onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }}
           onComplete={handleGameComplete}
@@ -164,8 +172,6 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
           const isCompleted = status === true;
 
           const isTolkidoItem = item.includes("TOLKİDO");
-
-          // ✅ OYUN VAR MI? (İEDB 3.5 ve 3.7)
           const hasGame = item.startsWith("İEDB 3.5") || item.startsWith("İEDB 3.7");
 
           return (
@@ -258,4 +264,4 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
       </div>
     </div>
   );
-      }
+        }
