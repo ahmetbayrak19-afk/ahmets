@@ -6,17 +6,14 @@ import { loadAssets, AssetLibrary } from "./Assets";
 import { PhysicsEngine, WORLD_WIDTH, WORLD_HEIGHT } from "./Physics";
 import { GameRenderer } from "./Renderer";
 
-// ✅ GLB’yi import et (Vite build’de hash sorunu yaşamamak için)
-import denizModelUrl from "./deniz.glb";
+// ✅ 3D Background component (aynı klasördeyse ./DenizBackground)
+import DenizBackground from "./DenizBackground";
 
 export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLandscape, setIsLandscape] = useState(true);
-
-  // model-viewer custom element’i hazır mı?
-  const [mvReady, setMvReady] = useState(false);
 
   // Motor
   const assets = useRef<AssetLibrary | null>(null);
@@ -37,35 +34,14 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     state: "SWIM" as any,
     lastDirection: 1 as any,
   });
-
   const camera = useRef({ x: 1500, y: 800 });
   const mousePos = useRef({ x: 1500, y: 800 });
   const targets = useRef<any[]>([]);
   const reqRef = useRef<number>();
 
-  // 0) model-viewer yükle (paket projede varsa)
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        // @ts-ignore
-        await import("@google/model-viewer");
-        if (!cancelled) setMvReady(true);
-      } catch {
-        // model-viewer yoksa sorun çıkarmasın
-        if (!cancelled) setMvReady(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   // 1. EKRAN YÖNÜ KONTROLÜ
   useEffect(() => {
-    const checkOrientation = () => {
-      setIsLandscape(window.innerWidth > window.innerHeight);
-    };
+    const checkOrientation = () => setIsLandscape(window.innerWidth > window.innerHeight);
     checkOrientation();
     window.addEventListener("resize", checkOrientation);
     return () => window.removeEventListener("resize", checkOrientation);
@@ -84,8 +60,8 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const handleInput = (e: any) => {
     if (!isPlaying || !canvasRef.current) return;
 
-    let clientX, clientY;
-    if (e.touches && e.touches.length > 0) {
+    let clientX: number, clientY: number;
+    if (e.touches?.length) {
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
     } else {
@@ -118,24 +94,21 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
       renderer.current?.resize(w, h);
 
-      // Fizik
       physics.current.updateFish(fish.current, mousePos.current.x, mousePos.current.y);
 
-      // Kamera Takibi
       const targetCamX = Math.max(w / 2, Math.min(WORLD_WIDTH - w / 2, fish.current.x));
       const targetCamY = Math.max(h / 2, Math.min(WORLD_HEIGHT - h / 2, fish.current.y));
 
       camera.current.x += (targetCamX - camera.current.x) * 0.1;
       camera.current.y += (targetCamY - camera.current.y) * 0.1;
 
-      // Çizim (şimdilik aynı)
       renderer.current?.draw(assets.current!, fish.current, camera.current, targets.current);
 
       reqRef.current = requestAnimationFrame(loop);
     };
 
     reqRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(reqRef.current!);
+    return () => reqRef.current && cancelAnimationFrame(reqRef.current);
   }, [isPlaying, isLoaded]);
 
   if (!isLandscape) {
@@ -147,78 +120,40 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 overflow-hidden">
-      {/* ✅ SKY (Gökyüzü kalsın) */}
-      <div
-        className="absolute inset-0"
-        style={{
-          // basit sky gradient — istersen renderer’daki sky ile aynı tona çekeriz
-          background: "linear-gradient(180deg, #5bb7ff 0%, #0b5aa6 55%, #021021 100%)",
-        }}
-      />
+    <div className="fixed inset-0 bg-black flex items-center justify-center overflow-hidden">
+      {isLoaded ? (
+        <>
+          {/* ✅ 3D arkaplan */}
+          <DenizBackground />
 
-      {/* ✅ 3D Deniz Arkaplan (GLB) */}
-      {mvReady && (
-        <model-viewer
-          src={denizModelUrl}
-          autoplay
-          ar={false as any}
-          camera-controls={false as any}
-          disable-zoom={true as any}
-          disable-pan={true as any}
-          interaction-prompt="none"
-          exposure="1"
-          shadow-intensity="0"
-          // Sky görünsün diye arkaplanı transparan bırakıyoruz
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            backgroundColor: "transparent",
-            pointerEvents: "none", // ✅ canvas input bozulmasın
-            zIndex: 1,
-          }}
-          // Görüntüyü “deniz” gibi aşağıya oturtmak için orbit/target ile oynayabilirsin
-          // Bunlar modeline göre değişebilir, şimdilik default bıraktım:
-          // camera-orbit="0deg 75deg 2.5m"
-          // camera-target="0m 0m 0m"
-        />
+          {/* ✅ Oyun canvas (2D) üstte */}
+          <canvas
+            ref={canvasRef}
+            className="w-full h-full block touch-none relative"
+            style={{ zIndex: 10 }}
+            onMouseMove={handleInput}
+            onTouchMove={handleInput}
+            onClick={handleInput}
+          />
+
+          <button onClick={onClose} className="fixed top-5 right-5 z-50 bg-white p-2 rounded-full">
+            <XCircle className="text-red-500" />
+          </button>
+
+          {!isPlaying && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+              <button
+                onClick={() => setIsPlaying(true)}
+                className="bg-orange-500 text-white px-8 py-4 rounded-xl text-2xl font-bold flex gap-2"
+              >
+                <Play /> BAŞLA
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="text-white text-xl animate-pulse">YÜKLENİYOR...</div>
       )}
-
-      {/* ✅ Oyun Canvas */}
-      <div className="absolute inset-0 z-10">
-        {isLoaded ? (
-          <>
-            <canvas
-              ref={canvasRef}
-              className="w-full h-full block touch-none"
-              onMouseMove={handleInput}
-              onTouchMove={handleInput}
-              onClick={handleInput}
-            />
-
-            <button onClick={onClose} className="fixed top-5 right-5 z-50 bg-white p-2 rounded-full">
-              <XCircle className="text-red-500" />
-            </button>
-
-            {!isPlaying && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-                <button
-                  onClick={() => setIsPlaying(true)}
-                  className="bg-orange-500 text-white px-8 py-4 rounded-xl text-2xl font-bold flex gap-2"
-                >
-                  <Play /> BAŞLA
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="absolute inset-0 z-20 bg-black flex items-center justify-center text-white text-xl animate-pulse">
-            YÜKLENİYOR...
-          </div>
-        )}
-      </div>
     </div>
   );
-      }
+    }
