@@ -1,96 +1,143 @@
 // DenizBackground.tsx
-import React, { Suspense, useEffect, useMemo } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Canvas } from "@react-three/fiber";
+import { Environment, useGLTF } from "@react-three/drei";
+import { getDownloadURL, ref as storageRef } from "firebase/storage";
+import { storage } from "../../firebase"; // ⚠️ Klasörün durumuna göre yolu düzelt (aşağıda not var)
+import * as THREE from "three";
 
-type Crash = {
-  where: string;
-  message: string;
-  stack?: string;
-  extra?: string;
+/**
+ * Not:
+ * - Bu dosya EslemeGame.tsx ile aynı klasördeyse ve EslemeGame "client/src/aba/esle/game/..." içindeyse
+ *   firebase import yolu genelde: import { storage } from "../../firebase";
+ * - Eğer build hata verirse, bu import yolunu senin klasör hiyerarşine göre ayarla.
+ */
+
+type Props = {
+  storagePath: string; // örn: "deniz.glb"
+  onReady?: () => void;
+  onCrash?: (e: any) => void;
 };
 
-function OnceRender({ onReady }: { onReady: () => void }) {
-  // GLB yüklendikten sonra sadece 1 frame çiz
-  const { invalidate } = useThree();
-  useEffect(() => {
-    onReady();
-    // tek frame render
-    invalidate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  return null;
-}
+function SceneModel({ url, onReady }: { url: string; onReady?: () => void }) {
+  // Drei GLTF loader
+  const gltf = useGLTF(url);
 
-function DenizModel({ url }: { url: string }) {
-  const gltf = useGLTF(url) as any;
+  useEffect(() => {
+    onReady?.();
+
+    // texture/anisotropy optimize (mobil)
+    gltf.scene.traverse((obj: any) => {
+      if (obj?.isMesh) {
+        obj.frustumCulled = true;
+        obj.castShadow = false;
+        obj.receiveShadow = false;
+        const mat = obj.material as THREE.Material | THREE.Material[];
+        const mats = Array.isArray(mat) ? mat : [mat];
+        mats.forEach((m: any) => {
+          if (m?.map) {
+            m.map.anisotropy = 1;
+            m.map.needsUpdate = false;
+          }
+        });
+      }
+    });
+  }, [gltf, onReady]);
+
+  // Sahneye ekle
   return <primitive object={gltf.scene} />;
 }
 
-export default function DenizBackground({
-  onReady,
-  onCrash,
-}: {
-  onReady: () => void;
-  onCrash: (c: Crash) => void;
-}) {
-  const url = useMemo(() => new URL("./deniz.glb", import.meta.url).href, []);
+export default function DenizBackground({ storagePath, onReady, onCrash }: Props) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
-  // preload (opsiyonel)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // 1) Storage -> downloadURL
   useEffect(() => {
-    try {
-      // @ts-ignore
-      useGLTF.preload(url);
-    } catch {}
-  }, [url]);
+    let alive = true;
+    setFailed(false);
+    setUrl(null);
+
+    (async () => {
+      try {
+        const r = storageRef(storage, storagePath); // "deniz.glb"
+        const u = await getDownloadURL(r);
+        if (!alive) return;
+        // cache bust (bazı webview’lerde iyi gelir)
+        setUrl(u + (u.includes("?") ? "&" : "?") + "v=" + Date.now());
+      } catch (e) {
+        if (!alive) return;
+        setFailed(true);
+        onCrash?.(e);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [storagePath, onCrash]);
+
+  // 2) WebGL context lost -> fallback
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+
+    const onLost = (ev: any) => {
+      try {
+        ev.preventDefault?.();
+      } catch {}
+      setFailed(true);
+      onCrash?.({ where: "webglcontextlost", message: "WebGL context lost" });
+    };
+
+    c.addEventListener("webglcontextlost", onLost as any);
+    return () => c.removeEventListener("webglcontextlost", onLost as any);
+  }, [onCrash]);
+
+  if (failed) return null;
+  if (!url) return null;
 
   return (
-    <div className="absolute inset-0 z-0" style={{ pointerEvents: "none" }}>
+    <div className="absolute inset-0 z-0 pointer-events-none">
       <Canvas
-        // ✅ sürekli render yok: sadece gerektiğinde
-        frameloop="never"
-        // ✅ mobilde dpr yükseltme yok
-        dpr={1}
-        camera={{ position: [0, 1, 6], fov: 45, near: 0.05, far: 500 }}
+        onCreated={({ gl }) => {
+          canvasRef.current = gl.domElement;
+
+          // mobil stabilite
+          gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+          gl.outputColorSpace = THREE.SRGBColorSpace;
+
+          // performans
+          gl.shadowMap.enabled = false;
+        }}
+        dpr={[1, 1.5]}
         gl={{
-          alpha: true,
           antialias: false,
+          alpha: true,
+          powerPreference: "high-performance",
+          preserveDrawingBuffer: false,
           depth: true,
           stencil: false,
-          preserveDrawingBuffer: false,
-          powerPreference: "low-power",
         }}
-        onCreated={({ gl }) => {
-          // Context lost yakala
-          const canvas = gl.domElement;
-
-          const lost = (e: any) => {
-            e.preventDefault?.();
-            onCrash({ where: "webglcontextlost", message: "WebGL context lost" });
-          };
-          const restored = () => {
-            // restore olursa tek frame tekrar çizdiririz
-            // ama çoğu cihazda restore olmaz, yine de loglayalım
-            onCrash({ where: "webglcontextrestored", message: "WebGL context restored" });
-          };
-
-          canvas.addEventListener("webglcontextlost", lost, false);
-          canvas.addEventListener("webglcontextrestored", restored, false);
-
-          // ekstra: pixel ratio tekrar 1
-          gl.setPixelRatio(1);
-        }}
+        camera={{ position: [0, 1.2, 4], fov: 50, near: 0.01, far: 200 }}
       >
-        {/* Işıkları da hafif tut */}
-        <ambientLight intensity={0.8} />
-        <directionalLight position={[6, 10, 6]} intensity={0.9} />
-        <directionalLight position={[-6, 6, -4]} intensity={0.4} />
+        {/* Işıklar */}
+        <ambientLight intensity={0.9} />
+        <directionalLight position={[3, 5, 2]} intensity={1.2} />
 
-        <Suspense fallback={null}>
-          <DenizModel url={url} />
-          <OnceRender onReady={onReady} />
-        </Suspense>
+        {/* Model */}
+        <group position={[0, -1.0, 0]} rotation={[0, 0, 0]} scale={[1, 1, 1]}>
+          <SceneModel url={url} onReady={onReady} />
+        </group>
+
+        {/* İsteğe bağlı environment */}
+        <Environment preset="sunset" />
       </Canvas>
     </div>
   );
-          }
+}
+
+// GLTF preload (url runtime geldiği için burada otomatik preload yok)
+// useGLTF.preload("...") ancak sabit url’de yapılır.
