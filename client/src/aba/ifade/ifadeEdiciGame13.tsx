@@ -1,13 +1,16 @@
 // client/src/aba/ifade/ifadeEdiciGame13.tsx
+
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Trophy, Mic, MicOff, Save, Trash2, X as XIcon, XCircle, Loader2 } from "lucide-react";
+import { Trophy, Mic, MicOff, Save, Trash2, X as XIcon, XCircle } from "lucide-react";
 import confetti from "canvas-confetti";
 import { twMerge } from "tailwind-merge";
-import { toast } from "sonner";
 
 // ✅ Firebase (client/src/firebase.ts)
 import { db } from "../../firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+
+// ✅ Öğrenci hook'u (varsa)
+import { useStudentData } from "@/hooks/useStudentData";
 
 // --- GERİBİLDİRİM SESLERİ ---
 import aferin1 from "../esle/ses/aferin1.mp3";
@@ -40,7 +43,7 @@ import suic1 from "../esle/eylemesle/suic1.mp4";
 import topoyna from "../esle/eylemesle/topoyna.mp4";
 import topoyna1 from "../esle/eylemesle/topoyna1.mp4";
 
-type Phase = "boot" | "init" | "setup" | "playing" | "success";
+type Phase = "init" | "setup" | "playing" | "success";
 
 type Q = {
   id: string;
@@ -159,20 +162,14 @@ function normalizeTR(s: string) {
     .replaceAll("ç", "c");
 }
 
-type Props = {
-  onClose?: () => void;
-  onComplete?: (success: boolean) => void;
-  mode?: "assessment" | "instruction";
-  studentId: string; // ✅ ZORUNLU
-};
-
-export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId }: Props) {
+export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId: studentIdProp }: any) {
   void mode;
 
-  const instId = useMemo(() => localStorage.getItem("kazanim-takip-institution-id") || "", []);
+  const { selectedStudent } = useStudentData();
+  const studentId = studentIdProp || selectedStudent?.id || selectedStudent?.uid || null;
 
-  const [phase, setPhase] = useState<Phase>("boot");
-  const phaseRef = useRef<Phase>("boot");
+  const [phase, setPhase] = useState<Phase>("init");
+  const phaseRef = useRef<Phase>("init");
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
@@ -192,7 +189,6 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
 
   const [lastHeard, setLastHeard] = useState("");
   const [isRecordingSetup, setIsRecordingSetup] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
 
   // --- Oyun
   const [questionCount, setQuestionCount] = useState(0);
@@ -225,24 +221,28 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
   const answeredRef = useRef(false);
   const lastTriggerAtRef = useRef(0);
 
+  // video
   const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  // --- guards (en kritik kısım)
-  const hasSession = !!instId && !!studentId;
 
   // ---- Audio helper (mp3 bitmeden devam ETME)
   const playAudio = (src: string, onDone?: () => void) => {
     try {
       const a = new Audio(src);
+
       const finish = () => {
-        try { a.onended = null; } catch {}
+        try {
+          a.onended = null;
+        } catch {}
         onDone?.();
       };
+
       const safety = window.setTimeout(finish, 12000);
+
       a.onended = () => {
         clearTimeout(safety);
         finish();
       };
+
       a.play().catch(() => {
         clearTimeout(safety);
         finish();
@@ -258,11 +258,6 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
 
   const playWrongFxThen = (cb: () => void) => {
     playAudio(tekrardene1, () => isMountedRef.current && cb());
-  };
-
-  const stopRecognition = () => {
-    try { recognitionRef.current?.abort?.(); } catch {}
-    isMountedRef.current && setIsListening(false);
   };
 
   const playQuestionPromptThenListen = () => {
@@ -305,7 +300,9 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
       setTimeout(() => {
         if (!isMountedRef.current) return;
         if (!shouldListenRef.current) return;
-        try { recognitionRef.current?.start(); } catch {}
+        try {
+          recognitionRef.current?.start();
+        } catch {}
       }, 250);
     };
 
@@ -316,7 +313,6 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         transcript += event.results[i][0].transcript;
       }
-
       const lower = transcript.trim().toLowerCase();
       setLastHeard(lower);
 
@@ -334,17 +330,24 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
 
   const startRecognition = () => {
     const rec = ensureRecognition();
-    if (!rec) {
-      toast.error("SpeechRecognition yok (WebView desteklemiyor olabilir).");
-      return;
-    }
-    try { rec.start(); } catch {}
+    if (!rec) return;
+    try {
+      rec.start();
+    } catch {}
+  };
+
+  const stopRecognition = () => {
+    try {
+      recognitionRef.current?.abort?.();
+    } catch {}
+    isMountedRef.current && setIsListening(false);
   };
 
   const killEverything = () => {
     answerWindowOpenRef.current = false;
     shouldListenRef.current = false;
     answeredRef.current = false;
+
     stopRecognition();
     recognitionRef.current = null;
   };
@@ -399,6 +402,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
     else handleFail();
   };
 
+  // ---- Soru üretimi
   const nextQuestion = () => {
     const action = pickRandom(QUESTIONS);
     const variant = pickRandom(action.variants);
@@ -439,7 +443,9 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
       if (next < 10) nextQuestion();
       else {
         setPhase("success");
-        try { confetti(); } catch {}
+        try {
+          confetti();
+        } catch {}
       }
     });
   };
@@ -452,21 +458,20 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
     });
   };
 
-  // ✅ Firebase doc path (Talk ile aynı mantık)
-  const calibDocRef = useMemo(() => {
+  // ✅ Firebase load/save
+  const calibDocPath = useMemo(() => {
+    const instId = localStorage.getItem("kazanim-takip-institution-id");
     if (!instId || !studentId) return null;
     return doc(db, "institutions", instId, "students", String(studentId), "ifade", "eylem_kalibrasyon");
-  }, [instId, studentId]);
+  }, [studentId]);
 
   const loadCalibration = async () => {
-    // BOOT -> karar ver
-    if (!hasSession) {
-      setPhase("init"); // yine açılabilsin ama kaydet disable olacak
+    if (!calibDocPath) {
+      setPhase("setup");
       return;
     }
-
     try {
-      const snap = await getDoc(calibDocRef!);
+      const snap = await getDoc(calibDocPath);
       if (snap.exists()) {
         const data = snap.data() as any;
         const map = (data?.map || {}) as Record<string, string[]>;
@@ -475,8 +480,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
       } else {
         setPhase("setup");
       }
-    } catch (e: any) {
-      toast.error("Kalibrasyon okunamadı: " + (e?.message || "unknown"));
+    } catch {
       setPhase("setup");
     }
   };
@@ -484,34 +488,17 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
   useEffect(() => {
     void loadCalibration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [studentId]);
 
   const saveCalibration = async () => {
-    if (!hasSession || !calibDocRef) {
-      toast.error("Kaydedemem: instId / studentId yok.");
+    if (!calibDocPath) {
+      setPhase("init");
       return;
     }
-
-    setIsSaving(true);
-    const tid = toast.loading("Kaydediliyor...");
     try {
-      await setDoc(
-        calibDocRef,
-        {
-          map: savedMapRef.current,
-          updatedAt: Date.now(),
-        },
-        { merge: true }
-      );
-      toast.dismiss(tid);
-      toast.success("Kaydedildi ✅");
-      setPhase("init");
-    } catch (e: any) {
-      toast.dismiss(tid);
-      toast.error("Kayıt hatası: " + (e?.message || "unknown"));
-    } finally {
-      setIsSaving(false);
-    }
+      await setDoc(calibDocPath, { map: savedMapRef.current, updatedAt: Date.now() }, { merge: true });
+    } catch {}
+    setPhase("init");
   };
 
   // Setup dinleme
@@ -524,7 +511,6 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
       stopRecognition();
       return;
     }
-
     setIsRecordingSetup(true);
     shouldListenRef.current = true;
     startRecognition();
@@ -578,16 +564,6 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
     </div>
   );
 
-  // ---- INIT/BOOT ekranlarında session debug
-  const DebugBar = () => (
-    <div className="mx-auto mt-2 w-full max-w-xl px-4">
-      <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-[11px] font-mono text-white/60 flex justify-between">
-        <span>instId: {instId ? instId.slice(0, 10) + "…" : "YOK"}</span>
-        <span>studentId: {studentId || "YOK"}</span>
-      </div>
-    </div>
-  );
-
   return (
     <Screen>
       {/* INIT */}
@@ -597,8 +573,6 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
             <XCircle className="text-white/50" />
           </button>
 
-          <DebugBar />
-
           <div className="w-24 h-24 bg-blue-500/15 rounded-full flex items-center justify-center mb-6 animate-bounce border border-blue-500/25">
             <Mic size={48} className="text-blue-300" />
           </div>
@@ -606,28 +580,14 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
           <h1 className="text-2xl font-black mb-2">Eylem Adlandırma</h1>
           <p className="text-xs text-white/60 mb-6">Video izletilir, “ne yapıyor?” sorusuna eylem söylenir.</p>
 
-          {!hasSession && (
-            <div className="mb-4 max-w-sm text-[12px] text-red-200 bg-red-500/10 border border-red-500/20 rounded-2xl p-3">
-              Bu sayfa <b>studentId</b> almıyor. Kalibrasyon kaydedilemez.  
-              Bu oyunu mutlaka <b>student sayfasından</b> aç ve <b>studentId prop’u gönder</b>.
-            </div>
-          )}
-
           <div className="flex flex-col gap-3 w-full max-w-sm">
             <button
               onClick={() => {
-                if (!hasSession) {
-                  toast.error("studentId yok. Oyun başlatılamaz.");
-                  return;
-                }
                 setPhase("playing");
                 setQuestionCount(0);
                 setTimeout(() => nextQuestion(), 60);
               }}
-              className={twMerge(
-                "px-10 py-4 rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-all",
-                hasSession ? "bg-green-500 text-black" : "bg-white/10 text-white/40 border border-white/10"
-              )}
+              className="px-10 py-4 bg-green-500 text-black rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-all"
             >
               OYUNA BAŞLA
             </button>
@@ -646,7 +606,6 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
       {phase === "setup" && (
         <div className="flex-1 flex flex-col p-6 gap-4 max-w-3xl mx-auto w-full overflow-y-auto relative">
           <TopBar title="Kalibrasyon (Eylem Söyleyişleri)" />
-          <DebugBar />
 
           <div className="text-center">
             <div className="text-xl font-black">Kalibrasyon</div>
@@ -696,7 +655,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
               </div>
 
               <div className="mt-2 text-[11px] text-white/60">
-                Algılanan: <span className="text-blue-300 font-black">{lastHeard || "-"}</span>
+                Algılanan: <span className="text-blue-300 font-black">{lastHeard}</span>
               </div>
 
               <button
@@ -741,17 +700,9 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
           <div className="flex flex-col gap-3 mt-2">
             <button
               onClick={saveCalibration}
-              disabled={!hasSession || isSaving}
-              className={twMerge(
-                "w-full py-4 rounded-2xl font-black text-xl shadow-lg flex items-center justify-center gap-2",
-                !hasSession
-                  ? "bg-white/10 text-white/40 border border-white/10"
-                  : "bg-blue-600 text-white",
-                isSaving ? "opacity-70" : ""
-              )}
+              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-lg flex items-center justify-center gap-2"
             >
-              {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
-              KAYDET
+              <Save /> KAYDET
             </button>
 
             <button
@@ -769,6 +720,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId 
         <div className="flex-1 flex flex-col">
           <TopBar title={`SORU: ${questionCount + 1} / 10`} />
 
+          {/* ✅ Video: 1 kere sabit, animasyon yok, en telefona sığar, oran bozulmaz */}
           <div className="flex-1 flex items-start justify-center px-0 pb-2">
             <div
               style={{ width: "min(100vw, calc(100vh - 220px))" }}
