@@ -1,73 +1,73 @@
-import React, { useEffect, useMemo } from "react";
-import * as THREE from "three";
-import { Canvas, useThree } from "@react-three/fiber";
+// DenizBackground.tsx
+import React, { Suspense, useMemo } from "react";
+import { Canvas } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
+import * as THREE from "three";
 
-// deniz.glb EslemeGame.tsx ile aynı klasörde
-const GLB_URL = new URL("./deniz.glb", import.meta.url).toString();
+function DenizModel({ url }: { url: string }) {
+  const gltf = useGLTF(url) as any;
 
-function FitAndLog({ object }: { object: THREE.Object3D }) {
-  const { camera } = useThree();
+  // Biraz optimize: gölge / materyal ayarları
+  useMemo(() => {
+    if (!gltf?.scene) return;
+    gltf.scene.traverse((obj: any) => {
+      if (obj?.isMesh) {
+        obj.frustumCulled = true;
+        obj.castShadow = false;
+        obj.receiveShadow = false;
 
-  useEffect(() => {
-    // SAHNEDE NE VAR -> konsola dök
-    const names: string[] = [];
-    object.traverse((o: any) => {
-      if (o?.isMesh) names.push(o.name || "(no-name)");
+        // Çok ağır PBR ise hafifletmek için (istersen kapat)
+        if (obj.material) {
+          obj.material.side = THREE.FrontSide;
+        }
+      }
     });
-    console.log("[deniz.glb] mesh names:", names);
+  }, [gltf]);
 
-    // KADRAJA SIĞDIR (tiyatro sahnesi gibi tek sefer fit)
-    const box = new THREE.Box3().setFromObject(object);
-    const size = new THREE.Vector3();
-    const center = new THREE.Vector3();
-    box.getSize(size);
-    box.getCenter(center);
-
-    const cam = camera as THREE.PerspectiveCamera;
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const fov = cam.fov || 50;
-    const dist = maxDim / (2 * Math.tan((fov * Math.PI) / 360));
-
-    cam.position.set(center.x, center.y, center.z + dist * 1.25);
-    cam.lookAt(center);
-    cam.updateProjectionMatrix();
-  }, [object, camera]);
-
-  return null;
-}
-
-function DenizModel() {
-  const gltf = useGLTF(GLB_URL);
-  const scene = useMemo(() => gltf.scene.clone(true), [gltf.scene]);
-
-  // 3D daha net görünsün diye (istersen)
-  // scene.scale.setScalar(1);
-
+  // Sahnenin “tiyatro sahnesi” gibi görünmesi senin GLB’de zaten var.
+  // Burada sadece konum/ölçek veriyoruz. Gerekirse değiştirirsin.
   return (
-    <>
-      <primitive object={scene} />
-      <FitAndLog object={scene} />
-    </>
+    <primitive
+      object={gltf.scene}
+      position={[0, 0, 0]}
+      rotation={[0, 0, 0]}
+      scale={1}
+    />
   );
 }
 
-export default function DenizBackground3D() {
+export default function DenizBackground() {
+  // ✅ deniz.glb aynı klasörde
+  const url = useMemo(() => new URL("./deniz.glb", import.meta.url).href, []);
+
+  // preload (opsiyonel ama iyi)
+  // @ts-ignore
+  useGLTF.preload(url);
+
   return (
     <div
-      className="absolute inset-0"
-      style={{ pointerEvents: "none", zIndex: 0 }}
+      className="absolute inset-0 z-0"
+      style={{
+        // ✅ 3D katman hiçbir tıklamayı/drag’i yemesin
+        pointerEvents: "none",
+      }}
     >
       <Canvas
+        // ✅ arka plan şeffaf, üstte 2D canvas var
         gl={{ alpha: true, antialias: true }}
-        camera={{ position: [0, 0, 5], fov: 50 }}
+        dpr={[1, 1.5]}
+        camera={{ position: [0, 1.6, 5.5], fov: 45, near: 0.01, far: 2000 }}
       >
-        <ambientLight intensity={1.0} />
-        <directionalLight position={[5, 8, 5]} intensity={1.2} />
-        <DenizModel />
+        <Suspense fallback={null}>
+          {/* Işıklar */}
+          <ambientLight intensity={0.9} />
+          <directionalLight position={[5, 10, 6]} intensity={1.2} />
+          <directionalLight position={[-6, 6, -4]} intensity={0.6} />
+
+          {/* Model */}
+          <DenizModel url={url} />
+        </Suspense>
       </Canvas>
     </div>
   );
 }
-
-useGLTF.preload(GLB_URL);
