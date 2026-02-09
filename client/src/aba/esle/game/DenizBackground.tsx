@@ -1,98 +1,90 @@
-import React, { Suspense, useEffect, useRef, useState } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import React, { Suspense, useMemo } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, useGLTF } from "@react-three/drei";
+import * as THREE from "three";
 
-import { storage } from "../../../firebase"; // ✅ doğru yol
-import { ref, getDownloadURL } from "firebase/storage";
+type Props = {
+  // EslemeGame içindeki camera ref’ini aynen gönderiyoruz: { current: {x,y} }
+  worldCameraRef: React.MutableRefObject<{ x: number; y: number }>;
+  // 2D dünya boyutları
+  worldWidth: number;
+  worldHeight: number;
+};
 
-const STORAGE_PATH = "deniz.glb";
+// ✅ Firebase Storage “alt=media&token=...”
+const DENIZ_URL =
+  "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/deniz.glb?alt=media&token=6ecb1237-70e1-43c8-b997-77b6e3943497";
 
-// ✅ Buradan ayar çek
-const MODEL_SCALE = 0.22;       // çok büyükse düşür (0.18 / 0.12 gibi)
-const MODEL_Y = -1.35;          // aşağı-yukarı
-const MODEL_Z = 0;              // ileri-geri
-const FLIP_Y = Math.PI;         // ters duvarı gösteriyorsa 180° çevirir
-
-function CameraRig() {
+function Scene({ worldCameraRef, worldWidth, worldHeight }: Props) {
+  const { scene } = useGLTF(DENIZ_URL) as any;
   const { camera } = useThree();
 
-  useEffect(() => {
-    // Kamera ayarı (sahne çok büyükse position'u büyüt)
-    camera.position.set(0, 0.9, 5.2);
-    camera.lookAt(0, 0.2, 0);
-    camera.near = 0.05;
-    camera.far = 300;
-    camera.updateProjectionMatrix();
-  }, [camera]);
+  // Model ayarları (90° sola + büyüt)
+  // Not: Eğer yön ters olursa rotationY işaretini değiştir (aşağıda belirttim)
+  const modelRotation = useMemo(() => new THREE.Euler(0, -Math.PI / 2, 0), []);
+  const modelScale = useMemo(() => new THREE.Vector3(2.2, 2.2, 2.2), []); // ✅ büyüttüm
 
-  return null;
-}
+  // 2D kamera -> 3D kamera map
+  // Range değerlerini modeline göre ayarlıyoruz (şimdilik güvenli aralık)
+  const RANGE_X = 18; // sağ-sol gezi alanı (arttırırsan daha çok gezinir)
+  const RANGE_Y = 8;  // yukarı-aşağı
+  const BASE_Z = 22;  // uzaklık (azaltırsan yakınlaşır, arttırırsan “daha çok alan” görür)
 
-function DenizModel({ url }: { url: string }) {
-  const gltf = useGLTF(url);
+  useFrame(() => {
+    const wc = worldCameraRef.current;
+
+    // 0..1 normalize
+    const nx = worldWidth > 0 ? wc.x / worldWidth : 0.5;
+    const ny = worldHeight > 0 ? wc.y / worldHeight : 0.5;
+
+    // -1..+1
+    const sx = (nx - 0.5) * 2;
+    const sy = (ny - 0.5) * 2;
+
+    // 3D kamera hedefi
+    const targetX = sx * RANGE_X;
+    const targetY = -sy * RANGE_Y; // ekran Y ters olduğu için -
+    const targetZ = BASE_Z;
+
+    // yumuşak takip
+    camera.position.x += (targetX - camera.position.x) * 0.08;
+    camera.position.y += (targetY - camera.position.y) * 0.08;
+    camera.position.z += (targetZ - camera.position.z) * 0.05;
+
+    camera.lookAt(0, 0, 0);
+  });
 
   return (
-    <primitive
-      object={gltf.scene}
-      position={[0, MODEL_Y, MODEL_Z]}
-      rotation={[0, FLIP_Y, 0]}
-      scale={[MODEL_SCALE, MODEL_SCALE, MODEL_SCALE]}
-    />
+    <>
+      {/* Işıklar (resim gibi durmasın diye) */}
+      <ambientLight intensity={0.7} />
+      <directionalLight position={[10, 10, 10]} intensity={1.1} />
+      <directionalLight position={[-12, 6, 8]} intensity={0.6} />
+
+      {/* Ortam yansıması */}
+      <Environment preset="sunset" />
+
+      {/* Model */}
+      <primitive object={scene} rotation={modelRotation} scale={modelScale} />
+    </>
   );
 }
 
-export default function DenizBackground() {
-  const [url, setUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const fileRef = ref(storage, STORAGE_PATH);
-        const downloadUrl = await getDownloadURL(fileRef);
-        if (!alive) return;
-        setUrl(downloadUrl);
-      } catch (e) {
-        console.error("DenizBackground getDownloadURL error:", e);
-        if (!alive) return;
-        setUrl(null);
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  // URL yoksa hiç render etme (oyun yine çalışsın)
-  if (!url) return null;
-
+export default function DenizBackground(props: Props) {
   return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        pointerEvents: "none",
-        zIndex: 0,
-      }}
-    >
+    <div className="w-full h-full">
       <Canvas
-        dpr={[1, 1.5]}
+        dpr={[1, 2]}
         gl={{ antialias: true, alpha: true }}
-        camera={{ position: [0, 0.9, 5.2], fov: 45, near: 0.05, far: 300 }}
-        onCreated={({ gl }) => {
-          gl.setClearColor(0x000000, 0); // transparan
-        }}
+        camera={{ fov: 45, position: [0, 0, 22], near: 0.1, far: 2000 }}
       >
-        <CameraRig />
-        <ambientLight intensity={0.9} />
-        <directionalLight position={[3, 5, 2]} intensity={1.2} />
-
         <Suspense fallback={null}>
-          <DenizModel url={url} />
-          <Environment preset="sunset" />
+          <Scene {...props} />
         </Suspense>
       </Canvas>
     </div>
   );
-    }
+}
+
+// preload
+useGLTF.preload(DENIZ_URL);
