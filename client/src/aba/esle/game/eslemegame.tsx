@@ -14,12 +14,10 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLandscape, setIsLandscape] = useState(true);
 
-  // Motor
   const assets = useRef<AssetLibrary | null>(null);
   const physics = useRef(new PhysicsEngine());
   const renderer = useRef<GameRenderer | null>(null);
 
-  // Oyun Durumu
   const fish = useRef({
     x: 1500,
     y: 800,
@@ -39,15 +37,15 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const targets = useRef<any[]>([]);
   const reqRef = useRef<number>();
 
-  // 1) EKRAN YÖNÜ KONTROLÜ
+  // orientation
   useEffect(() => {
-    const checkOrientation = () => setIsLandscape(window.innerWidth > window.innerHeight);
-    checkOrientation();
-    window.addEventListener("resize", checkOrientation);
-    return () => window.removeEventListener("resize", checkOrientation);
+    const check = () => setIsLandscape(window.innerWidth > window.innerHeight);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
   }, []);
 
-  // 2) YÜKLEME
+  // load assets
   useEffect(() => {
     const init = async () => {
       assets.current = await loadAssets();
@@ -56,12 +54,12 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     init();
   }, []);
 
-  // 3) INPUT
+  // input
   const handleInput = (e: any) => {
     if (!isPlaying || !canvasRef.current) return;
 
     let clientX: number, clientY: number;
-    if (e.touches && e.touches.length > 0) {
+    if (e.touches?.length) {
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
     } else {
@@ -80,7 +78,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     mousePos.current.y = camera.current.y + (screenY - h / 2);
   };
 
-  // 4) OYUN DÖNGÜSÜ
+  // loop
   useEffect(() => {
     if (!isPlaying || !isLoaded || !canvasRef.current || !assets.current) return;
 
@@ -91,20 +89,17 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
       const w = canvasRef.current.clientWidth;
       const h = canvasRef.current.clientHeight;
-
       renderer.current?.resize(w, h);
 
-      // Fizik
-      physics.current.updateFish(fish.current, mousePos.current.x, mousePos.current.y);
+      physics.current.updateFish(fish.current as any, mousePos.current.x, mousePos.current.y);
 
-      // Kamera Takibi
       const targetCamX = Math.max(w / 2, Math.min(WORLD_WIDTH - w / 2, fish.current.x));
       const targetCamY = Math.max(h / 2, Math.min(WORLD_HEIGHT - h / 2, fish.current.y));
 
       camera.current.x += (targetCamX - camera.current.x) * 0.1;
       camera.current.y += (targetCamY - camera.current.y) * 0.1;
 
-      // Çizim (Renderer.ts artık 3D arkayı kapatmayacak şekilde ayarlı olmalı)
+      // ✅ 3D arka plan var -> 2D renderer background boyamayacak (Renderer.ts fix ile)
       renderer.current?.draw(assets.current!, fish.current as any, camera.current, targets.current);
 
       reqRef.current = requestAnimationFrame(loop);
@@ -126,10 +121,10 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
-      {/* ✅ 3D BACKGROUND */}
+      {/* 3D BACKGROUND */}
       <DenizBackground />
 
-      {/* ✅ 2D OYUN CANVAS (ÜSTTE) */}
+      {/* 2D CANVAS ÜST KATMAN */}
       <div className="absolute inset-0 z-10">
         {isLoaded ? (
           <>
@@ -141,10 +136,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
               onClick={handleInput}
             />
 
-            <button
-              onClick={onClose}
-              className="fixed top-5 right-5 z-50 bg-white p-2 rounded-full"
-            >
+            <button onClick={onClose} className="fixed top-5 right-5 z-50 bg-white p-2 rounded-full">
               <XCircle className="text-red-500" />
             </button>
 
@@ -167,4 +159,4 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
-}
+                }
