@@ -4,13 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Trophy, Mic, MicOff, Save, Trash2, X as XIcon, XCircle } from "lucide-react";
 import confetti from "canvas-confetti";
 import { twMerge } from "tailwind-merge";
+import { toast } from "sonner";
 
-// ✅ Firebase (client/src/firebase.ts) — DOĞRU YOL
+// ✅ Firebase (client/src/firebase.ts)
 import { db } from "../../firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-
-// ✅ Öğrenci hook'u (varsa)
-import { useStudentData } from "@/hooks/useStudentData";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 
 // --- GERİBİLDİRİM SESLERİ ---
 import aferin1 from "../esle/ses/aferin1.mp3";
@@ -45,11 +43,13 @@ import topoyna1 from "../esle/eylemesle/topoyna1.mp4";
 
 type Phase = "init" | "setup" | "playing" | "success";
 
+type Variant = { src: string; isAnimal: boolean };
+
 type Q = {
   id: string;
   label: string;
-  variants: { src: string; isAnimal: boolean }[];
-  keywords: string[];
+  variants: Variant[];
+  keywords: string[]; // “doğru cevap” için kabul edilen temel kelimeler
 };
 
 const QUESTIONS: Q[] = [
@@ -60,14 +60,14 @@ const QUESTIONS: Q[] = [
       { src: disfircala, isAnimal: false },
       { src: disfircala1, isAnimal: false },
     ],
-    keywords: ["diş fırçala", "diş fırçalıyor", "dişini fırçalıyor", "disfircala", "dişfırçala"],
+    keywords: ["diş fırçala", "diş fırçalıyor", "dişini fırçalıyor", "disfircala", "dis fircala"],
   },
   {
     id: "elmaye",
     label: "Elma ye",
     variants: [
       { src: elmaye, isAnimal: false },
-      { src: elmaye1, isAnimal: true },
+      { src: elmaye1, isAnimal: true }, // hayvan
     ],
     keywords: ["elma ye", "elma yiyor", "yiyor", "elmaye", "elma"],
   },
@@ -78,7 +78,7 @@ const QUESTIONS: Q[] = [
       { src: elyika, isAnimal: false },
       { src: elyika1, isAnimal: false },
     ],
-    keywords: ["el yıka", "el yıkıyor", "ellerini yıkıyor", "elyika"],
+    keywords: ["el yıka", "el yıkıyor", "ellerini yıkıyor", "elyika", "el yikiyor"],
   },
   {
     id: "gitarcal",
@@ -87,7 +87,7 @@ const QUESTIONS: Q[] = [
       { src: gitarcal, isAnimal: false },
       { src: gitarcal1, isAnimal: false },
     ],
-    keywords: ["gitar çal", "gitar çalıyor", "çalıyor", "gitarcal"],
+    keywords: ["gitar çal", "gitar çalıyor", "çalıyor", "gitarcal", "gitar caliyor"],
   },
   {
     id: "kitapoku",
@@ -105,7 +105,7 @@ const QUESTIONS: Q[] = [
       { src: kos, isAnimal: false },
       { src: kos1, isAnimal: false },
     ],
-    keywords: ["koş", "koşuyor", "kos"],
+    keywords: ["koş", "koşuyor", "kos", "kosuyor"],
   },
   {
     id: "resimyap",
@@ -114,25 +114,25 @@ const QUESTIONS: Q[] = [
       { src: resimyap, isAnimal: false },
       { src: resimyap1, isAnimal: false },
     ],
-    keywords: ["resim yap", "resim yapıyor", "çiziyor", "resimyap"],
+    keywords: ["resim yap", "resim yapıyor", "çiziyor", "resimyap", "ciziyor"],
   },
   {
     id: "salincaksallan",
     label: "Salıncakta sallan",
     variants: [
       { src: salincaksallan, isAnimal: false },
-      { src: salincaksallan1, isAnimal: true },
+      { src: salincaksallan1, isAnimal: true }, // hayvan
     ],
-    keywords: ["sallan", "sallanıyor", "salıncakta sallanıyor", "salincaksallan"],
+    keywords: ["sallan", "sallanıyor", "salıncakta sallanıyor", "salincaksallan", "salincakta"],
   },
   {
     id: "suic",
     label: "Su iç",
     variants: [
       { src: suic, isAnimal: false },
-      { src: suic1, isAnimal: true },
+      { src: suic1, isAnimal: true }, // hayvan
     ],
-    keywords: ["su iç", "su içiyor", "içiyor", "suic"],
+    keywords: ["su iç", "su içiyor", "içiyor", "suic", "su iciyor"],
   },
   {
     id: "topoyna",
@@ -154,19 +154,26 @@ function normalizeTR(s: string) {
     .toLowerCase()
     .trim()
     .replaceAll("ı", "i")
-    .replaceAll("İ", "i")
     .replaceAll("ğ", "g")
     .replaceAll("ş", "s")
     .replaceAll("ü", "u")
     .replaceAll("ö", "o")
-    .replaceAll("ç", "c");
+    .replaceAll("ç", "c")
+    .replace(/\s+/g, " ");
 }
 
-export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId: studentIdProp }: any) {
+type Props = {
+  studentId: string; // ✅ zorunlu
+  onClose: () => void;
+  onComplete: (success: boolean) => void;
+  mode?: "assessment" | "instruction";
+};
+
+export default function IfadeEdiciGame13({ onClose, onComplete, studentId, mode }: Props) {
   void mode;
 
-  const { selectedStudent } = useStudentData();
-  const studentId = studentIdProp || selectedStudent?.id || selectedStudent?.uid || null;
+  const sid = String(studentId || "");
+  const instId = useMemo(() => localStorage.getItem("kazanim-takip-institution-id") || "", []);
 
   const [phase, setPhase] = useState<Phase>("init");
   const phaseRef = useRef<Phase>("init");
@@ -206,8 +213,8 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
     qActionRef.current = qAction;
   }, [qAction]);
 
-  const [qVariant, setQVariant] = useState<{ src: string; isAnimal: boolean }>(QUESTIONS[0].variants[0]);
-  const qVariantRef = useRef(qVariant);
+  const [qVariant, setQVariant] = useState<Variant>(QUESTIONS[0].variants[0]);
+  const qVariantRef = useRef<Variant>(QUESTIONS[0].variants[0]);
   useEffect(() => {
     qVariantRef.current = qVariant;
   }, [qVariant]);
@@ -236,16 +243,15 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
         onDone?.();
       };
 
-      // güvenlik timeout
       const safety = window.setTimeout(finish, 12000);
 
       a.onended = () => {
-        clearTimeout(safety);
+        window.clearTimeout(safety);
         finish();
       };
 
       a.play().catch(() => {
-        clearTimeout(safety);
+        window.clearTimeout(safety);
         finish();
       });
     } catch {
@@ -261,8 +267,14 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
     playAudio(tekrardene1, () => isMountedRef.current && cb());
   };
 
+  const stopRecognition = () => {
+    try {
+      recognitionRef.current?.abort?.();
+    } catch {}
+    if (isMountedRef.current) setIsListening(false);
+  };
+
   const playQuestionPromptThenListen = () => {
-    // soru çalarken mic kapalı
     answeredRef.current = false;
     answerWindowOpenRef.current = false;
     shouldListenRef.current = false;
@@ -272,14 +284,13 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
 
     playAudio(prompt, () => {
       if (!isMountedRef.current) return;
-      // soru bitti -> dinle
       answerWindowOpenRef.current = true;
       shouldListenRef.current = true;
       startRecognition();
     });
   };
 
-  // ---- SpeechRecognition
+  // ---- SpeechRecognition (continuous: true → çocuk gereksiz konuşsa da kesme)
   const createRecognition = () => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) return null;
@@ -287,11 +298,15 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
     const rec = new SR();
     rec.lang = "tr-TR";
     rec.maxAlternatives = 1;
-    rec.interimResults = false;
-    rec.continuous = true; // çocuk gereksiz konuşsa da dinleme kesilmesin
+    rec.interimResults = true;
+    rec.continuous = true;
 
     rec.onstart = () => isMountedRef.current && setIsListening(true);
-    rec.onerror = () => isMountedRef.current && setIsListening(false);
+
+    rec.onerror = (e: any) => {
+      console.warn("Speech error:", e);
+      isMountedRef.current && setIsListening(false);
+    };
 
     rec.onend = () => {
       if (isMountedRef.current) setIsListening(false);
@@ -316,6 +331,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         transcript += event.results[i][0].transcript;
       }
+
       const lower = transcript.trim().toLowerCase();
       setLastHeard(lower);
 
@@ -333,24 +349,19 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
 
   const startRecognition = () => {
     const rec = ensureRecognition();
-    if (!rec) return;
+    if (!rec) {
+      toast.error("SpeechRecognition yok (WebView desteklemiyor olabilir).");
+      return;
+    }
     try {
       rec.start();
     } catch {}
-  };
-
-  const stopRecognition = () => {
-    try {
-      recognitionRef.current?.abort?.();
-    } catch {}
-    isMountedRef.current && setIsListening(false);
   };
 
   const killEverything = () => {
     answerWindowOpenRef.current = false;
     shouldListenRef.current = false;
     answeredRef.current = false;
-
     stopRecognition();
     recognitionRef.current = null;
   };
@@ -379,8 +390,9 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
   const matchesAction = (transcript: string, actionId: string) => {
     const t = normalizeTR(transcript);
     if (!t) return false;
-
     const accept = getAcceptPhrasesForAction(actionId);
+
+    // “yaşasın” gibi boş konuşmalar gelirse t hiç birini kapsamaz → false
     return accept.some((a) => t === a || t.includes(a) || a.includes(t));
   };
 
@@ -394,7 +406,6 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
 
     const ok = matchesAction(transcript, qActionRef.current.id);
 
-    // cevap yakalandı -> mic kapat
     answeredRef.current = true;
     answerWindowOpenRef.current = false;
     shouldListenRef.current = false;
@@ -423,7 +434,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
     shouldListenRef.current = false;
     stopRecognition();
 
-    // video reset
+    // video reset + sessiz oynat
     setTimeout(() => {
       const v = videoRef.current;
       if (!v) return;
@@ -463,21 +474,23 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
     });
   };
 
-  // ✅ Firebase load/save
-  const calibDocPath = useMemo(() => {
-    const instId = localStorage.getItem("kazanim-takip-institution-id");
-    if (!instId || !studentId) return null;
-
-    return doc(db, "institutions", instId, "students", String(studentId), "ifade", "eylem_kalibrasyon");
-  }, [studentId]);
-
+  // ✅ FIREBASE LOAD/SAVE (Talk mantığı)
   const loadCalibration = async () => {
-    if (!calibDocPath) {
+    if (!instId) {
+      toast.error("Kurum oturumu yok (instId).");
       setPhase("setup");
       return;
     }
+    if (!sid) {
+      toast.error("Öğrenci ID yok (studentId).");
+      setPhase("setup");
+      return;
+    }
+
     try {
-      const snap = await getDoc(calibDocPath);
+      const ref = doc(db, "institutions", instId, "students", sid, "ifade", "eylem_kalibrasyon");
+      const snap = await getDoc(ref);
+
       if (snap.exists()) {
         const data = snap.data() as any;
         const map = (data?.map || {}) as Record<string, string[]>;
@@ -486,30 +499,46 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
       } else {
         setPhase("setup");
       }
-    } catch {
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Firebase okuma hatası: " + (e?.message || "unknown"));
       setPhase("setup");
+    }
+  };
+
+  const saveCalibration = async () => {
+    if (!instId) {
+      toast.error("Kurum oturumu yok (instId).");
+      return;
+    }
+    if (!sid) {
+      toast.error("Öğrenci ID yok (studentId).");
+      return;
+    }
+
+    try {
+      const ref = doc(db, "institutions", instId, "students", sid, "ifade", "eylem_kalibrasyon");
+      await setDoc(ref, { map: savedMapRef.current, updatedAt: serverTimestamp() }, { merge: true });
+      toast.success("Kalibrasyon kaydedildi.");
+      setPhase("init");
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Firebase kaydetme hatası: " + (e?.message || "unknown"));
     }
   };
 
   useEffect(() => {
     void loadCalibration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [studentId]);
-
-  const saveCalibration = async () => {
-    if (!calibDocPath) {
-      setPhase("init");
-      return;
-    }
-    try {
-      await setDoc(calibDocPath, { map: savedMapRef.current, updatedAt: Date.now() }, { merge: true });
-    } catch {}
-    setPhase("init");
-  };
+  }, [sid]);
 
   // Setup dinleme
   const toggleSetupRecord = () => {
-    ensureRecognition();
+    const rec = ensureRecognition();
+    if (!rec) {
+      toast.error("SpeechRecognition yok (WebView desteklemiyor olabilir).");
+      return;
+    }
 
     if (isRecordingSetup) {
       setIsRecordingSetup(false);
@@ -517,6 +546,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
       stopRecognition();
       return;
     }
+
     setIsRecordingSetup(true);
     shouldListenRef.current = true;
     startRecognition();
@@ -529,11 +559,9 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
     setSavedMap((prev) => {
       const next = { ...prev };
       const arr = next[setupActionId] ? [...next[setupActionId]] : [];
-
       const norm = normalizeTR(phrase);
       const already = arr.some((x) => normalizeTR(x) === norm);
       if (!already) arr.push(phrase);
-
       next[setupActionId] = arr;
       return next;
     });
@@ -575,7 +603,10 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
       {/* INIT */}
       {phase === "init" && (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-          <button onClick={handleSafeClose} className="absolute top-4 right-4 p-2 bg-white/5 rounded-full border border-white/10">
+          <button
+            onClick={handleSafeClose}
+            className="absolute top-4 right-4 p-2 bg-white/5 rounded-full border border-white/10"
+          >
             <XCircle className="text-white/50" />
           </button>
 
@@ -586,9 +617,21 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
           <h1 className="text-2xl font-black mb-2">Eylem Adlandırma</h1>
           <p className="text-xs text-white/60 mb-6">Video izletilir, “ne yapıyor?” sorusuna eylem söylenir.</p>
 
+          <div className="text-[10px] text-white/40 font-mono mb-6">
+            inst={instId || "?"} · student={sid || "?"}
+          </div>
+
           <div className="flex flex-col gap-3 w-full max-w-sm">
             <button
               onClick={() => {
+                if (!instId) {
+                  toast.error("Kurum oturumu yok (instId).");
+                  return;
+                }
+                if (!sid) {
+                  toast.error("Öğrenci ID yok (studentId).");
+                  return;
+                }
                 setPhase("playing");
                 setQuestionCount(0);
                 setTimeout(() => nextQuestion(), 60);
@@ -726,7 +769,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
         <div className="flex-1 flex flex-col">
           <TopBar title={`SORU: ${questionCount + 1} / 10`} />
 
-          {/* ✅ Video: 1 kere sabit, animasyon yok, en telefona sığar, oran bozulmaz */}
+          {/* ✅ Video: sabit kare, oran bozulmaz, ses çıkmaz */}
           <div className="flex-1 flex items-start justify-center px-0 pb-2">
             <div
               style={{ width: "min(100vw, calc(100vh - 220px))" }}
@@ -781,7 +824,12 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
                 </span>
               </>
             ) : feedback ? (
-              <div className={twMerge("text-4xl font-black animate-in zoom-in", feedback === "correct" ? "text-green-300" : "text-red-300")}>
+              <div
+                className={twMerge(
+                  "text-4xl font-black animate-in zoom-in",
+                  feedback === "correct" ? "text-green-300" : "text-red-300"
+                )}
+              >
                 {feedback === "correct" ? "DOĞRU!" : "YANLIŞ"}
               </div>
             ) : (
