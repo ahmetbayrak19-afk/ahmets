@@ -1,23 +1,19 @@
-// EslemeGame.tsx
+// eslemegame.tsx
 import { useState, useEffect, useRef } from "react";
 import { XCircle, Play } from "lucide-react";
-
-import DenizBackground from "./DenizBackground";
 
 import { loadAssets, AssetLibrary } from "./Assets";
 import { PhysicsEngine, WORLD_WIDTH, WORLD_HEIGHT } from "./Physics";
 import { GameRenderer } from "./Renderer";
 
+// ✅ 3D Arkaplan (Firebase’den deniz.glb çeker)
+import DenizBackground from "./DenizBackground";
+
 export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
   const [isLoaded, setIsLoaded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLandscape, setIsLandscape] = useState(true);
-
-  // 3D durum
-  const [bg3dOk, setBg3dOk] = useState(false);
-  const [bg3dFailed, setBg3dFailed] = useState(false);
 
   // Motor
   const assets = useRef<AssetLibrary | null>(null);
@@ -38,12 +34,13 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     state: "SWIM" as any,
     lastDirection: 1 as any,
   });
+
   const camera = useRef({ x: 1500, y: 800 });
   const mousePos = useRef({ x: 1500, y: 800 });
   const targets = useRef<any[]>([]);
   const reqRef = useRef<number>();
 
-  // 1) EKRAN YÖNÜ
+  // 1) EKRAN YÖNÜ KONTROLÜ
   useEffect(() => {
     const checkOrientation = () => setIsLandscape(window.innerWidth > window.innerHeight);
     checkOrientation();
@@ -53,18 +50,28 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
   // 2) YÜKLEME
   useEffect(() => {
+    let alive = true;
     const init = async () => {
-      assets.current = await loadAssets();
-      setIsLoaded(true);
+      try {
+        const a = await loadAssets();
+        if (!alive) return;
+        assets.current = a;
+        setIsLoaded(true);
+      } catch (e) {
+        console.error("loadAssets error:", e);
+      }
     };
     init();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // 3) INPUT
   const handleInput = (e: any) => {
     if (!isPlaying || !canvasRef.current) return;
 
-    let clientX: number, clientY: number;
+    let clientX, clientY;
     if (e.touches && e.touches.length > 0) {
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
@@ -84,7 +91,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     mousePos.current.y = camera.current.y + (screenY - h / 2);
   };
 
-  // 4) OYUN LOOP
+  // 4) OYUN DÖNGÜSÜ
   useEffect(() => {
     if (!isPlaying || !isLoaded || !canvasRef.current || !assets.current) return;
 
@@ -92,6 +99,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
     const loop = () => {
       if (!canvasRef.current) return;
+
       const w = canvasRef.current.clientWidth;
       const h = canvasRef.current.clientHeight;
 
@@ -100,31 +108,25 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
       // Fizik
       physics.current.updateFish(fish.current, mousePos.current.x, mousePos.current.y);
 
-      // Kamera
+      // Kamera Takibi
       const targetCamX = Math.max(w / 2, Math.min(WORLD_WIDTH - w / 2, fish.current.x));
       const targetCamY = Math.max(h / 2, Math.min(WORLD_HEIGHT - h / 2, fish.current.y));
 
       camera.current.x += (targetCamX - camera.current.x) * 0.1;
       camera.current.y += (targetCamY - camera.current.y) * 0.1;
 
-      // 2D çizim (üstte transparan)
-      renderer.current?.draw(assets.current!, fish.current, camera.current, targets.current);
+      // Çizim
+      renderer.current?.draw(assets.current!, fish.current as any, camera.current, targets.current);
 
       reqRef.current = requestAnimationFrame(loop);
     };
 
     reqRef.current = requestAnimationFrame(loop);
+
     return () => {
       if (reqRef.current) cancelAnimationFrame(reqRef.current);
     };
   }, [isPlaying, isLoaded]);
-
-  const safeClose = () => {
-    try {
-      if (reqRef.current) cancelAnimationFrame(reqRef.current);
-    } catch {}
-    onClose();
-  };
 
   if (!isLandscape) {
     return (
@@ -136,56 +138,44 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
-      {/* 3D arkaplan (Firebase Storage) */}
-      {!bg3dFailed && (
-        <DenizBackground
-          storagePath="deniz.glb" // ✅ root’a attığın dosya
-          onReady={() => setBg3dOk(true)}
-          onCrash={(e) => {
-            console.log("3D crash:", e);
-            setBg3dFailed(true); // ✅ 3D kapat, 2D devam et
-          }}
-        />
-      )}
+      {/* ✅ 3D BACKGROUND (arkada) */}
+      <DenizBackground />
 
-      {/* 2D canvas */}
-      <div className="absolute inset-0 z-10">
-        {isLoaded ? (
-          <>
-            <canvas
-              ref={canvasRef}
-              className="w-full h-full block touch-none"
-              onMouseMove={handleInput}
-              onTouchMove={handleInput}
-              onClick={handleInput}
-            />
+      {/* ✅ GAME CANVAS (üstte) */}
+      {isLoaded ? (
+        <>
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0 w-full h-full block touch-none"
+            style={{ zIndex: 10 }}
+            onMouseMove={handleInput}
+            onTouchMove={handleInput}
+            onClick={handleInput}
+          />
 
-            <button onClick={safeClose} className="fixed top-5 right-5 z-50 bg-white p-2 rounded-full">
-              <XCircle className="text-red-500" />
-            </button>
+          <button
+            onClick={onClose}
+            className="fixed top-5 right-5 z-50 bg-white p-2 rounded-full"
+          >
+            <XCircle className="text-red-500" />
+          </button>
 
-            {/* Debug küçük etiket */}
-            <div className="fixed bottom-3 left-3 z-50 text-[11px] font-mono bg-black/50 text-white px-2 py-1 rounded">
-              3D: {bg3dFailed ? "FAILED" : bg3dOk ? "READY" : "LOADING"} · 2D: READY
+          {!isPlaying && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70">
+              <button
+                onClick={() => setIsPlaying(true)}
+                className="bg-orange-500 text-white px-8 py-4 rounded-xl text-2xl font-bold flex gap-2 items-center active:scale-95 transition"
+              >
+                <Play /> BAŞLA
+              </button>
             </div>
-
-            {!isPlaying && (
-              <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-                <button
-                  onClick={() => setIsPlaying(true)}
-                  className="bg-orange-500 text-white px-8 py-4 rounded-xl text-2xl font-bold flex gap-2 items-center"
-                >
-                  <Play /> BAŞLA
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="absolute inset-0 z-20 flex items-center justify-center text-white text-xl animate-pulse">
-            YÜKLENİYOR...
-          </div>
-        )}
-      </div>
+          )}
+        </>
+      ) : (
+        <div className="absolute inset-0 z-20 flex items-center justify-center text-white text-xl animate-pulse">
+          YÜKLENİYOR...
+        </div>
+      )}
     </div>
   );
-      }
+    }
