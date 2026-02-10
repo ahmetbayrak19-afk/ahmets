@@ -1,6 +1,6 @@
 import React, { Suspense, useRef, useEffect, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useGLTF, useAnimations, Environment, useTexture } from "@react-three/drei";
+import { useGLTF, useAnimations, Environment, useTexture, MeshTransmissionMaterial } from "@react-three/drei";
 import * as THREE from "three";
 import gokResmi from "./gok.png";
 
@@ -17,23 +17,51 @@ function Gokyuzu() {
   );
 }
 
-// 🔥 YENİ SU MODELİ 🔥
+// 🔥 YENİ SU MODELİ (BÜYÜK DEĞİŞİM BURADA) 🔥
 function TestWaterModel() {
-  const { scene } = useGLTF(WATER_GLB_URL);
-  const clone = useMemo(() => scene.clone(), [scene]);
+  // Modeli yüklüyoruz
+  const { nodes } = useGLTF(WATER_GLB_URL) as any;
+  
+  // Modelin içindeki ilk "Mesh"i (şekli) buluyoruz.
+  // GLB'nin iç yapısını bilmediğimiz için 'nodes' içindeki ilk mesh'i kapıyoruz.
+  const waterMesh = useMemo(() => {
+    const found = Object.values(nodes).find((n: any) => n.isMesh) as THREE.Mesh;
+    return found;
+  }, [nodes]);
+
+  if (!waterMesh) return null;
 
   return (
-    <primitive 
-      object={clone} 
-      // AYAR 1: Boyutu 3'te 1'ine düşürdüm (15 -> 5)
-      scale={[5, 5, 5]} 
-      // AYAR 2: Yüksekliği 5 yaptım
-      position={[0, 5, 0]} 
-    />
+    <group position={[0, 2, 0]} scale={[5, 5, 5]}>
+      {/* Orijinal şekli (Geometry) kullanıyoruz ama materyali ÇÖPE atıp yenisini giydiriyoruz */}
+      <mesh geometry={waterMesh.geometry}>
+        {/* 🔥 İŞTE SİHİR BU: MeshTransmissionMaterial 🔥 */}
+        <MeshTransmissionMaterial
+          backside={true}       // Suyun altından bakınca da görünsün
+          samples={4}           // Kalite (Düşük tuttum kasmasın diye)
+          thickness={0.5}       // Suyun kalınlığı/derinlik hissi
+          chromaticAberration={0.02} // Hafif renk kayması (Gökkuşağı efekti)
+          anisotropy={0.1}
+          distortion={0.1}      // Işığı bükme oranı
+          distortionScale={0.1}
+          temporalDistortion={0.1}
+          iridescence={1}
+          iridescenceIOR={1}
+          iridescenceThicknessRange={[0, 1400]}
+          
+          // RENK AYARLARI
+          color={"#00aaff"}     // Okyanus Mavisi
+          background={new THREE.Color("#001e36")} // Arkadaki derinlik rengi
+          transmission={1}      // Tamamen cam gibi geçirgen
+          roughness={0.1}       // Pürüzsüz, parlak
+          metalness={0.1}
+        />
+      </mesh>
+    </group>
   );
 }
 
-// ESKİ DENİZ MODELİ
+// ESKİ DENİZ MODELİ (Olduğu gibi)
 function DenizModel() {
   const group = useRef<THREE.Group>(null);
   const { scene, animations } = useGLTF(DENIZ_GLB_URL);
@@ -59,7 +87,6 @@ function DenizModel() {
   );
 }
 
-// 🔥 HAREKETLİ GRUP (MovingScene) 🔥
 function MovingScene({ cameraRef }: { cameraRef: any }) {
   const group = useRef<THREE.Group>(null);
 
@@ -68,14 +95,12 @@ function MovingScene({ cameraRef }: { cameraRef: any }) {
     const camX = cameraRef.current.x;
     const camY = cameraRef.current.y;
     
-    // Dünyayı ters yöne kaydırarak hareket hissi veriyoruz
     group.current.position.x = -camX * 0.015;
     group.current.position.y = camY * 0.015;
   });
 
   return (
     <group ref={group}>
-      {/* İkisini de bu grubun içine koydum ki beraber hareket etsinler */}
       <DenizModel />
       <TestWaterModel />
     </group>
@@ -94,7 +119,7 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
         <Suspense fallback={null}>
            <Gokyuzu />
         </Suspense>
-
+        
         <ambientLight intensity={1.5} color="#ffffff" />
         <directionalLight position={[10, 20, 10]} intensity={2} color="#ffffff" />
 
@@ -104,4 +129,4 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-}
+          }
