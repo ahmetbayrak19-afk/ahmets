@@ -1,70 +1,84 @@
-import React, { Suspense, useRef, useLayoutEffect } from "react";
+import React, { Suspense, useRef, useEffect, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useGLTF, useAnimations } from "@react-three/drei";
 import * as THREE from "three";
 
-// NOT: Modelin adresi doğru olmalı. Hata verirse localdeki bir dosyayı kullan.
 const DENIZ_GLB_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/deniz.glb?alt=media&token=6ecb1237-70e1-43c8-b997-77b6e3943497";
 
-// DÜNYA ÖLÇEKLERİ (Physics ile uyumlu olmalı)
-// 3D dünyada 1 birim, 2D dünyada yaklaşık 100 piksel gibi düşünelim.
-const SCALE_FACTOR = 0.015; 
+// Bu çarpan ne kadar küçükse arka plan o kadar "uzakta" ve "dev" hissettirir.
+const PARALLAX_FACTOR = 0.05; 
 
 function DenizModel({ offset = 0 }) {
-  const { scene } = useGLTF(DENIZ_GLB_URL);
+  const group = useRef<THREE.Group>(null);
+  const { scene, animations } = useGLTF(DENIZ_GLB_URL);
   
-  // Modeli klonlayalım ki aynısından 3 tane koyabilelim
-  const clone = React.useMemo(() => scene.clone(), [scene]);
+  // 🔥 1. ÇÖZÜM: ANİMASYONLARI BAŞLAT 🔥
+  const { actions } = useAnimations(animations, group);
+
+  useEffect(() => {
+    // Modelin içindeki tüm animasyonları bul ve oynat (Dalgalanma vb.)
+    Object.keys(actions).forEach((key) => {
+      const action = actions[key];
+      if (action) {
+        action.reset().fadeIn(0.5).play(); // Yumuşak geçişle başlat
+      }
+    });
+  }, [actions]);
+
+  // Modeli her seferinde yeniden yüklememek için klonluyoruz
+  const clone = useMemo(() => scene.clone(), [scene]);
 
   return (
-    <primitive 
-      object={clone} 
-      position={[offset, -8, -10]} // Biraz aşağı ve geriye ittik
-      scale={[20, 20, 20]}         // Modeli kocaman yaptık
-      rotation={[0, -Math.PI / 2, 0]} 
-    />
+    <group ref={group}>
+      <primitive 
+        object={clone} 
+        position={[offset, -15, -10]} // Biraz daha aşağı aldım, balık ortada yüzsün
+        scale={[35, 35, 35]} // Modeli devasa yaptık
+        rotation={[0, -Math.PI / 2, 0]} 
+      />
+    </group>
   );
 }
 
 function InfiniteSea({ cameraRef }: { cameraRef: any }) {
   const group = useRef<THREE.Group>(null);
 
-  // Hungry Shark Hissiyatı: Kamera balığı takip ederken
-  // Arkaplan (Kayalıklar) daha yavaş hareket etmeli (Parallax)
   useFrame(() => {
     if (!group.current || !cameraRef.current) return;
-
-    // Kameranın 2D dünyadaki pozisyonunu 3D'ye çevir
-    const camX = cameraRef.current.x * SCALE_FACTOR;
     
-    // Kamerayı takip et
-    group.current.position.x = camX;
+    const camX = cameraRef.current.x;
+    
+    // 🔥 2. ÇÖZÜM: KAMERA YÖNÜNÜ TERSİNE ÇEVİR (- işareti) 🔥
+    // Balık sağa gidince (+X), Arka plan sola (-X) gitmeli ki ileri gidiyormuşuz gibi olsun.
+    group.current.position.x = -camX * PARALLAX_FACTOR;
   });
 
   return (
     <group ref={group}>
-      {/* 3 Tane Yan Yana Deniz Koyuyoruz (Sonsuzluk İçin) */}
-      <DenizModel offset={-60} />
+      {/* 3 Parça Deniz: Sonsuzluk hissi için yan yana dizdik */}
+      {/* Offset değerlerini modelin genişliğine göre ayarladım */}
+      <DenizModel offset={-100} />
       <DenizModel offset={0} />
-      <DenizModel offset={60} />
+      <DenizModel offset={100} />
     </group>
   );
 }
 
 export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
   return (
-    <div className="absolute inset-0 bg-[#06121c]">
+    <div className="absolute inset-0 bg-[#001e36]">
       <Canvas
-        gl={{ antialias: false, powerPreference: "high-performance" }}
-        camera={{ position: [0, 0, 20], fov: 50 }}
+        gl={{ antialias: true }} // Kenarlar pürüzsüz olsun
+        camera={{ position: [0, 0, 20], fov: 60 }} 
         style={{ pointerEvents: 'none' }}
       >
-        <color attach="background" args={["#06121c"]} />
-        
-        {/* Işıklandırma (Dramatik Su Altı) */}
-        <ambientLight intensity={0.5} color="#004080" />
-        <directionalLight position={[10, 20, 10]} intensity={1.5} color="#00aaff" />
-        <fog attach="fog" args={['#06121c', 10, 90]} /> {/* İlerisi sisli olsun */}
+        {/* Sis: Derinlik hissi verir ve sonu görünmez kılar */}
+        <fog attach="fog" args={['#001e36', 10, 90]} />
+
+        {/* Işıklandırma */}
+        <ambientLight intensity={0.6} color="#004488" />
+        <directionalLight position={[10, 50, 20]} intensity={1.5} color="#00aaff" />
+        <pointLight position={[0, -10, 5]} intensity={0.8} color="#00ffcc" />
 
         <Suspense fallback={null}>
             <InfiniteSea cameraRef={cameraRef} />
@@ -72,4 +86,5 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-}
+      }
+        
