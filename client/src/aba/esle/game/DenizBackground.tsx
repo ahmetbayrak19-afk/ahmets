@@ -4,10 +4,7 @@ import { useGLTF, useAnimations, Environment, useTexture } from "@react-three/dr
 import * as THREE from "three";
 import gokResmi from "./gok.png";
 
-// ESKİ MODEL
 const DENIZ_GLB_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/deniz.glb?alt=media&token=6ecb1237-70e1-43c8-b997-77b6e3943497";
-
-// 🔥 YENİ TEST MODELİ (Senin verdiğin water.glb) 🔥
 const WATER_GLB_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/water.glb?alt=media&token=8d3f648f-3952-4802-8008-20a8865b0426";
 
 function Gokyuzu() {
@@ -20,7 +17,7 @@ function Gokyuzu() {
   );
 }
 
-// 🔥 YENİ EKLENEN SU MODELİ 🔥
+// 🔥 YENİ SU MODELİ (Ayarlarıyla oynamadım) 🔥
 function TestWaterModel() {
   const { scene } = useGLTF(WATER_GLB_URL);
   const clone = useMemo(() => scene.clone(), [scene]);
@@ -28,21 +25,21 @@ function TestWaterModel() {
   return (
     <primitive 
       object={clone} 
-      scale={[15, 15, 15]} // BÜYÜKÇE EKLEDİM
-      position={[0, 10, 0]} // Yukarıda dursun, diğerine karışmasın
+      scale={[15, 15, 15]} 
+      // 🔥 KONUM GÜNCELLENDİ: 10'dan 0'a indirdim. 🔥
+      position={[0, 0, 0]} 
     />
   );
 }
 
-// ESKİ DENİZ MODELİ (Olduğu gibi duruyor)
+// ESKİ DENİZ MODELİ (Saf Hali)
 function DenizModel() {
   const group = useRef<THREE.Group>(null);
   const { scene, animations } = useGLTF(DENIZ_GLB_URL);
   const { actions } = useAnimations(animations, group);
 
   useEffect(() => {
-    // Burada eski modele yaptığımız materyal zorlamasını kaldırdım,
-    // belki yeni model gelince çakışıyordur. Saf haliyle bırakıyorum.
+    // Materyal zorlama KODU YOK. Sadece animasyon.
     Object.keys(actions).forEach((key) => {
       actions[key]?.reset().fadeIn(0.5).play();
     });
@@ -77,6 +74,7 @@ function MovingScene({ cameraRef }: { cameraRef: any }) {
   return (
     <group ref={group}>
       <DenizModel />
+      {/* Test suyunu hareketli gruba dahil etmedim, sabit dursun şimdilik */}
     </group>
   );
 }
@@ -94,7 +92,7 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
            <Gokyuzu />
         </Suspense>
         
-        {/* 🔥 YENİ SUYU BURAYA EKLEDİM (Hareket etmesin sabit dursun şimdilik) 🔥 */}
+        {/* YENİ SU MODELİ */}
         <Suspense fallback={null}>
             <TestWaterModel />
         </Suspense>
@@ -108,4 +106,4 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-        }
+      }
