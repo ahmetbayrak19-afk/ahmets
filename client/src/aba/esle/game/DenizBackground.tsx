@@ -10,7 +10,7 @@ function DenizModel() {
   const { scene, animations } = useGLTF(DENIZ_GLB_URL);
   const { actions } = useAnimations(animations, group);
 
-  // Animasyonlar çalışsın (Dalgalanma)
+  // Animasyonlar çalışsın
   useEffect(() => {
     Object.keys(actions).forEach((key) => {
       actions[key]?.reset().fadeIn(0.5).play();
@@ -23,12 +23,12 @@ function DenizModel() {
     <group ref={group}>
       <primitive 
         object={clone} 
-        // 🔥 BURAYI KÜÇÜLTTÜM 🔥
-        // 15 yerine 3 yaptık. Artık minicik bir maket gibi.
-        scale={[3, 3, 3]} 
+        // 🔥 İYİCE KÜÇÜLTTÜM 🔥
+        // 0.5 yaptık. Artık minicik bir obje.
+        scale={[0.5, 0.5, 0.5]} 
         
-        // Tam ortalasın diye pozisyonu sıfırladım
-        position={[0, -2, 0]} 
+        // Tam ortaya koydum
+        position={[0, 0, 0]} 
         
         rotation={[0, -Math.PI / 2, 0]} 
       />
@@ -36,7 +36,7 @@ function DenizModel() {
   );
 }
 
-// Hareket mantığı AYNI KALIYOR (Bozmadım)
+// Hareket mantığı AYNI KALIYOR
 function MovingScene({ cameraRef }: { cameraRef: any }) {
   const group = useRef<THREE.Group>(null);
 
@@ -46,7 +46,7 @@ function MovingScene({ cameraRef }: { cameraRef: any }) {
     const camX = cameraRef.current.x;
     const camY = cameraRef.current.y;
 
-    // Kamera hareketine göre ters yöne kaysın (Parallax)
+    // Kamera hareketine göre ters yöne kaysın
     group.current.position.x = -camX * 0.015;
     group.current.position.y = camY * 0.015;
   });
@@ -54,9 +54,6 @@ function MovingScene({ cameraRef }: { cameraRef: any }) {
   return (
     <group ref={group}>
       <DenizModel />
-      
-      {/* İstersen yanlara da koyabilirsin ama küçült dediğin için tek bıraktım */}
-      {/* <group position={[20, 0, 0]}><DenizModel /></group> */}
     </group>
   );
 }
