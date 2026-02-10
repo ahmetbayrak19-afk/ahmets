@@ -1,110 +1,77 @@
-// client/src/aba/esle/game/DenizBackground.tsx
-import React, { Suspense, useMemo, useState } from "react";
-import { Canvas } from "@react-three/fiber";
-import { Html, OrbitControls, useGLTF } from "@react-three/drei";
+// DenizBackground.tsx
+import React, { Suspense, useMemo, useRef } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { useGLTF } from "@react-three/drei";
+import * as THREE from "three";
 
-const GLB_URL =
-  "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/deniz.glb?alt=media&token=6ecb1237-70e1-43c8-b997-77b6e3943497";
+type Props = {
+  cameraRef: React.MutableRefObject<{ x: number; y: number }>;
+};
 
-function DenizModel({
-  onOk,
-  onErr,
-}: {
-  onOk: () => void;
-  onErr: (m: string) => void;
-}) {
-  try {
-    const gltf = useGLTF(GLB_URL);
-    // ✅ 90 derece sola çevir (Y ekseni -90deg)
-    const rotY = useMemo(() => -Math.PI / 2, []);
-    const scale = 1; // burayı sonra büyütür/küçültürüz
+// ✅ Buraya Firebase'den aldığın HTTPS download URL gelecek
+const DENIZ_GLB_URL =
+  "PASTE_FIREBASE_DOWNLOAD_URL_HERE";
 
-    // İlk başarılı load’da “OK” işaretle
-    React.useEffect(() => {
-      onOk();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+function Scene({ cameraRef }: { cameraRef: Props["cameraRef"] }) {
+  const group = useRef<THREE.Group>(null);
 
-    return (
+  // GLB
+  const gltf = useGLTF(DENIZ_GLB_URL);
+
+  // başlangıç transformları
+  const baseRotation = useMemo(() => {
+    // 90 derece sola (Y ekseni)
+    return new THREE.Euler(0, -Math.PI / 2, 0);
+  }, []);
+
+  useFrame(() => {
+    const g = group.current;
+    if (!g) return;
+
+    // Kamera world koordinatları (2D) -> 3D sahne kaydırma
+    // Bu oran en kritik nokta. Büyük world'de gezmek için X'i daha çok aç.
+    const camX = cameraRef.current.x;
+    const camY = cameraRef.current.y;
+
+    // 2D world px -> 3D unit dönüşüm (tune edeceğiz)
+    // Daha fazla "gezsin" istiyorsan PARALLAX_X'i büyüt
+    const PARALLAX_X = 0.012; // 0.008-0.02 arası dene
+    const PARALLAX_Y = 0.010;
+
+    // 3D sahne ters kayar (kamera sağa -> sahne sola)
+    g.position.x = -camX * PARALLAX_X;
+    g.position.y = (camY * PARALLAX_Y); // Y ekseninde ters/ düz ihtiyaca göre değişir
+  });
+
+  return (
+    <group ref={group}>
       <primitive
         object={gltf.scene}
-        rotation={[0, rotY, 0]}
-        scale={scale}
-        position={[0, 0, 0]}
+        rotation={baseRotation}
+        // büyüklük (çok küçük/büyük ise burayı ayarla)
+        scale={1.0}
+        // sahneyi ekrana oturtmak için başlangıç offset
+        position={[0, -2, 0]}
       />
-    );
-  } catch (e: any) {
-    onErr(e?.message || String(e));
-    return null;
-  }
-}
-
-function CenterMessage({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center p-6">
-      <div className="max-w-md w-full bg-black/70 border border-white/10 rounded-2xl p-4 text-white">
-        <div className="font-black text-lg">{title}</div>
-        <div className="mt-2 text-xs text-white/70 whitespace-pre-wrap break-words">
-          {text}
-        </div>
-      </div>
-    </div>
+    </group>
   );
 }
 
-export default function DenizBackground() {
-  const [status, setStatus] = useState<
-    | { kind: "loading" }
-    | { kind: "ok" }
-    | { kind: "error"; message: string }
-  >({ kind: "loading" });
-
+export default function DenizBackground({ cameraRef }: Props) {
   return (
-    <div className="absolute inset-0">
-      <Canvas
-        // ✅ 3D arkada kalacak
-        style={{ width: "100%", height: "100%", background: "black" }}
-        gl={{ antialias: true, alpha: false }}
-        camera={{ position: [0, 4, 9], fov: 55, near: 0.1, far: 2000 }}
-        onCreated={() => {
-          // Canvas created
-        }}
-      >
-        {/* ışıklar */}
-        <ambientLight intensity={0.8} />
-        <directionalLight position={[6, 10, 6]} intensity={1.2} />
-        <directionalLight position={[-6, 6, -6]} intensity={0.5} />
+    <Canvas
+      style={{ width: "100%", height: "100%", pointerEvents: "none" }}
+      gl={{ antialias: true, alpha: false }}
+      camera={{ position: [0, 0, 10], fov: 45 }} // perspektif
+    >
+      {/* ışıklar (resim gibi durmasın) */}
+      <ambientLight intensity={0.9} />
+      <directionalLight position={[6, 10, 8]} intensity={1.2} />
+      <directionalLight position={[-8, 4, -6]} intensity={0.6} />
 
-        <Suspense
-          fallback={
-            <Html center>
-              <div className="text-white text-sm font-black">3D yükleniyor…</div>
-            </Html>
-          }
-        >
-          <DenizModel
-            onOk={() => setStatus({ kind: "ok" })}
-            onErr={(m) => setStatus({ kind: "error", message: m })}
-          />
-        </Suspense>
-
-        {/* Debug kontrol (istersen kapatırsın) */}
-        <OrbitControls enableZoom={false} enablePan={false} enableRotate={false} />
-      </Canvas>
-
-      {status.kind === "loading" && (
-        <CenterMessage title="Deniz GLB yükleniyor…" text="Eğer burada takılı kalıyorsa URL/token veya GLB bozuk olabilir." />
-      )}
-
-      {status.kind === "error" && (
-        <CenterMessage
-          title="DenizBackground HATA"
-          text={status.message}
-        />
-      )}
-    </div>
+      <Suspense fallback={null}>
+        <Scene cameraRef={cameraRef} />
+      </Suspense>
+    </Canvas>
   );
 }
-
-// drei cache
-useGLTF.preload(GLB_URL);
