@@ -13,13 +13,12 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLandscape, setIsLandscape] = useState(true);
+  const [fatal, setFatal] = useState<string | null>(null);
 
-  // Motor
   const assets = useRef<AssetLibrary | null>(null);
   const physics = useRef(new PhysicsEngine());
   const renderer = useRef<GameRenderer | null>(null);
 
-  // Oyun durumu
   const fish = useRef({
     x: 1500,
     y: 800,
@@ -34,14 +33,11 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     lastDirection: 1 as any,
   });
 
-  // ✅ Kamera world koordinatı (bu ref 3D’ye de gidecek)
   const camera = useRef({ x: 1500, y: 800 });
-
   const mousePos = useRef({ x: 1500, y: 800 });
-  const targets = useRef<any[]>([]);
+
   const reqRef = useRef<number>();
 
-  // 1) Orientation kontrol
   useEffect(() => {
     const check = () => setIsLandscape(window.innerWidth > window.innerHeight);
     check();
@@ -49,16 +45,19 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // 2) Asset yükle
   useEffect(() => {
     const init = async () => {
-      assets.current = await loadAssets();
-      setIsLoaded(true);
+      try {
+        const a = await loadAssets();
+        assets.current = a;
+        setIsLoaded(true);
+      } catch (e: any) {
+        setFatal("loadAssets patladı: " + (e?.message || String(e)));
+      }
     };
     init();
   }, []);
 
-  // 3) Input → mousePos world koordinatı
   const handleInput = (e: any) => {
     if (!isPlaying || !canvasRef.current) return;
 
@@ -78,40 +77,39 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     const w = canvasRef.current.clientWidth;
     const h = canvasRef.current.clientHeight;
 
-    // Screen -> World
     mousePos.current.x = camera.current.x + (screenX - w / 2);
     mousePos.current.y = camera.current.y + (screenY - h / 2);
   };
 
-  // 4) Game loop
   useEffect(() => {
     if (!isPlaying || !isLoaded || !canvasRef.current || !assets.current) return;
 
     renderer.current = new GameRenderer(canvasRef.current);
 
     const loop = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
+      try {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
 
-      const w = canvas.clientWidth;
-      const h = canvas.clientHeight;
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
 
-      renderer.current?.resize(w, h);
+        renderer.current?.resize(w, h);
 
-      // Fizik: balığı hedefe sür
-      physics.current.updateFish(fish.current, mousePos.current.x, mousePos.current.y);
+        physics.current.updateFish(fish.current as any, mousePos.current.x, mousePos.current.y);
 
-      // Kamera: balığı takip et (world sınırlarına clamp)
-      const targetCamX = Math.max(w / 2, Math.min(WORLD_WIDTH - w / 2, fish.current.x));
-      const targetCamY = Math.max(h / 2, Math.min(WORLD_HEIGHT - h / 2, fish.current.y));
+        const targetCamX = Math.max(w / 2, Math.min(WORLD_WIDTH - w / 2, fish.current.x));
+        const targetCamY = Math.max(h / 2, Math.min(WORLD_HEIGHT - h / 2, fish.current.y));
 
-      camera.current.x += (targetCamX - camera.current.x) * 0.10;
-      camera.current.y += (targetCamY - camera.current.y) * 0.10;
+        camera.current.x += (targetCamX - camera.current.x) * 0.1;
+        camera.current.y += (targetCamY - camera.current.y) * 0.1;
 
-      // Çizim (artık transparan: sadece balık)
-      renderer.current?.draw(assets.current!, fish.current, camera.current, targets.current);
+        renderer.current?.draw(assets.current!, fish.current as any, camera.current);
 
-      reqRef.current = requestAnimationFrame(loop);
+        reqRef.current = requestAnimationFrame(loop);
+      } catch (e: any) {
+        setFatal("LOOP HATASI: " + (e?.message || String(e)));
+      }
     };
 
     reqRef.current = requestAnimationFrame(loop);
@@ -130,14 +128,26 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
-      {/* ✅ 3D ARKAPLAN */}
+      {/* 3D */}
       <div className="absolute inset-0 z-0">
-        {/* cameraRef ile bağlandı: artık 3D “dekor” değil, kamera ile akıyor */}
         <DenizBackground cameraRef={camera} />
       </div>
 
-      {/* ✅ 2D CANVAS (transparan) */}
+      {/* 2D */}
       <div className="absolute inset-0 z-10">
+        {fatal && (
+          <div className="absolute inset-0 z-[999] bg-black/80 text-white p-4 text-xs overflow-auto">
+            <div className="font-black mb-2 text-red-300">FATAL</div>
+            <pre className="whitespace-pre-wrap break-words">{fatal}</pre>
+            <button
+              onClick={onClose}
+              className="mt-4 bg-white text-black px-4 py-2 rounded font-black"
+            >
+              KAPAT
+            </button>
+          </div>
+        )}
+
         {isLoaded ? (
           <>
             <canvas
@@ -148,10 +158,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
               onClick={handleInput}
             />
 
-            <button
-              onClick={onClose}
-              className="fixed top-5 right-5 z-50 bg-white p-2 rounded-full"
-            >
+            <button onClick={onClose} className="fixed top-5 right-5 z-50 bg-white p-2 rounded-full">
               <XCircle className="text-red-500" />
             </button>
 
@@ -174,4 +181,4 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
-    }
+      }
