@@ -10,7 +10,7 @@ function DenizModel() {
   const { scene, animations } = useGLTF(DENIZ_GLB_URL);
   const { actions } = useAnimations(animations, group);
 
-  // Animasyonları başlat (Yosunlar sallansın)
+  // Animasyonlar çalışsın (Dalgalanma)
   useEffect(() => {
     Object.keys(actions).forEach((key) => {
       actions[key]?.reset().fadeIn(0.5).play();
@@ -23,40 +23,40 @@ function DenizModel() {
     <group ref={group}>
       <primitive 
         object={clone} 
-        // Modeli biraz büyüttük ki etraf dolsun (Hungry Shark hissi)
-        scale={[15, 15, 15]} 
-        // Başlangıç pozisyonu
-        position={[0, -5, -10]} 
+        // 🔥 BURAYI KÜÇÜLTTÜM 🔥
+        // 15 yerine 3 yaptık. Artık minicik bir maket gibi.
+        scale={[3, 3, 3]} 
+        
+        // Tam ortalasın diye pozisyonu sıfırladım
+        position={[0, -2, 0]} 
+        
         rotation={[0, -Math.PI / 2, 0]} 
       />
     </group>
   );
 }
 
-// 🔥 KAMERA HAREKET MANTIĞI BURADA 🔥
+// Hareket mantığı AYNI KALIYOR (Bozmadım)
 function MovingScene({ cameraRef }: { cameraRef: any }) {
   const group = useRef<THREE.Group>(null);
 
   useFrame(() => {
     if (!group.current || !cameraRef.current) return;
     
-    // 2D Dünyadaki kamera pozisyonunu al
     const camX = cameraRef.current.x;
     const camY = cameraRef.current.y;
 
-    // 3D dünyayı ters yöne kaydır (Parallax efekti)
-    // 0.015 çarpanı: Ne kadar hızlı akacağını belirler.
+    // Kamera hareketine göre ters yöne kaysın (Parallax)
     group.current.position.x = -camX * 0.015;
-    group.current.position.y = camY * 0.015; // Y ekseni ters çalışmasın diye + bıraktık
+    group.current.position.y = camY * 0.015;
   });
 
   return (
     <group ref={group}>
       <DenizModel />
       
-      {/* Yanlara da ekleyelim ki bitmesin (Opsiyonel, şimdilik tek model yetebilir) */}
-      <group position={[80, 0, 0]}><DenizModel /></group>
-      <group position={[-80, 0, 0]}><DenizModel /></group>
+      {/* İstersen yanlara da koyabilirsin ama küçült dediğin için tek bıraktım */}
+      {/* <group position={[20, 0, 0]}><DenizModel /></group> */}
     </group>
   );
 }
@@ -78,5 +78,4 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-                                 }
-                                        
+}
