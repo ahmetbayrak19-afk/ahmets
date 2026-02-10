@@ -1,12 +1,17 @@
-// 🔥 ÖZEL SINIR AYARLARI 🔥
+// 🔥 ÖZEL SINIR AYARLARI (Senin İstediğin Oranlar) 🔥
 
 // SAĞ / SOL
-export const LIMIT_LEFT = -10000; // Sola 3 kat daha fazla (Çok geniş)
-export const LIMIT_RIGHT = 2000;  // Sağa 3 kat daha az (Hemen çarpacaksın)
+export const LIMIT_LEFT = -10000; // Sola 3 kat daha fazla
+export const LIMIT_RIGHT = 2000;  // Sağa 3 kat daha az
 
 // YUKARI / AŞAĞI
-export const LIMIT_TOP = -2000;   // Yukarı 4 kat daha fazla (Gökyüzü)
-export const LIMIT_BOTTOM = 1500; // Aşağı 2 kat daha az (Hemen zemin gelecek)
+export const LIMIT_TOP = -2000;   // Yukarı 4 kat daha fazla
+export const LIMIT_BOTTOM = 1500; // Aşağı 2 kat daha az
+
+// 🔥 HATA VERMEMESİ İÇİN GERİ EKLEDİĞİMİZ KISIM 🔥
+// EslemeGame.tsx bu değişkenleri arıyor, o yüzden hesaplayıp koyduk.
+export const WORLD_WIDTH = Math.abs(LIMIT_LEFT) + LIMIT_RIGHT; 
+export const WORLD_HEIGHT = Math.abs(LIMIT_TOP) + LIMIT_BOTTOM;
 
 export const SEA_LEVEL = 300; 
 const MARGIN = 100;
@@ -48,7 +53,7 @@ export class PhysicsEngine {
     fish.x += fish.vx;
     fish.y += fish.vy;
 
-    // 🔥 YENİ SINIR KONTROLLERİ (Senin isteğine göre) 🔥
+    // 🔥 SINIR KONTROLLERİ (Özel Limitlere Göre) 🔥
     
     // SOL SINIR (Çok uzak)
     if (fish.x < LIMIT_LEFT + MARGIN) { 
@@ -89,7 +94,7 @@ export class PhysicsEngine {
         fish.rotation *= 0.9;
     }
 
-    // Derinlik Efekti (Basit)
+    // Derinlik Efekti
     fish.scaleY = 1;
 
     // Animasyon
@@ -102,4 +107,3 @@ export class PhysicsEngine {
     }
   }
   }
-        
