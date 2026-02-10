@@ -52,19 +52,19 @@ function MovingScene({ cameraRef }: { cameraRef: any }) {
 
 export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
   return (
-    // 🔥 ARKAPLAN RENGİNİ SİLDİM (Varsayılan şeffaf/beyaz kalsın) 🔥
-    <div className="absolute inset-0 bg-black"> 
+    // 🔥 1. DEĞİŞİKLİK: ARKAPLAN BEYAZ 🔥
+    <div className="absolute inset-0 bg-white"> 
       <Canvas
         camera={{ position: [0, 0, 20], fov: 50 }}
         style={{ pointerEvents: 'none' }}
-        // Arkaplanı tamamen şeffaf yapıyorum ki sadece model görünsün
-        gl={{ alpha: true }} 
       >
-        {/* 🔥 SİSİ (FOG) KALDIRDIM 🔥 */}
-        
-        {/* Işıkları biraz daha doğal (beyaz) yaptım */}
-        <ambientLight intensity={1.5} color="#ffffff" /> 
-        <directionalLight position={[10, 20, 10]} intensity={2} color="#ffffff" />
+        {/* 🔥 2. DEĞİŞİKLİK: CANVAS İÇİNİ DE BEYAZ YAPTIK 🔥 */}
+        <color attach="background" args={["white"]} />
+
+        {/* Işıkları çok güçlü açtım ki model karanlıkta kalmasın */}
+        <ambientLight intensity={2} color="#ffffff" /> 
+        <directionalLight position={[5, 10, 5]} intensity={3} color="#ffffff" />
+        <pointLight position={[0, -10, 5]} intensity={1} color="#ffffff" />
 
         <Suspense fallback={null}>
             <MovingScene cameraRef={cameraRef} />
@@ -72,4 +72,5 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-           }
+}
+  
