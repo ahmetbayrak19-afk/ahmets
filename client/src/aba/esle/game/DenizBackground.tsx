@@ -10,63 +10,43 @@ const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/mas
 
 extend({ Water });
 
+// ☁️ GÖKYÜZÜ
 function Gokyuzu() {
   const texture = useTexture(gokResmi);
   return (
-    <mesh position={[0, 0, -50]}>
+    <mesh position={[0, 40, -50]}>
       <planeGeometry args={[500, 500]} />
       <meshBasicMaterial map={texture} side={THREE.DoubleSide} />
     </mesh>
   );
 }
 
-// 🔥 SU ALTI EFEKT YÖNETİCİSİ (GÜNCELLENDİ) 🔥
+// 🌊 SU ALTI EFEKT YÖNETİCİSİ
 function UnderwaterManager({ cameraRef }: { cameraRef: any }) {
   const { scene } = useThree();
   
   useFrame(() => {
     if (!cameraRef.current) return;
-    
-    // Kameranın Yüksekliği
     const camY = cameraRef.current.y;
 
-    // 🔥 AYAR: Su artık 5. seviyede olduğu için, 6'nın altına inince sis başlasın
-    if (camY < 6) { 
-      // 🌊 SU ALTI MODU
-      scene.fog = new THREE.FogExp2('#001e0f', 0.02); // Biraz daha yoğun sis
+    if (camY < 20) { 
+      // SU ALTI: Sis rengi ve yoğunluğu
+      scene.fog = new THREE.FogExp2('#001e0f', 0.02); 
       scene.background = new THREE.Color('#001e0f'); 
     } else {
-      // ☀️ SU ÜSTÜ MODU
+      // SU ÜSTÜ: Berrak
       scene.fog = new THREE.FogExp2('#ffffff', 0.0005); 
       scene.background = null; 
     }
   });
-
   return null;
 }
 
-// 🔥 SUYUN TAVANI (YÜKSELTİLDİ) 🔥
-function WaterCeiling() {
-  return (
-    // Yüksekliği 0'dan 5'e çektim
-    <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 5, 0]}>
-      <planeGeometry args={[10000, 10000]} />
-      <meshBasicMaterial 
-        color="#00aaff" 
-        transparent={true} 
-        opacity={0.3} 
-        side={THREE.FrontSide} 
-      />
-    </mesh>
-  );
-}
-
-// PERFORMANSLI GERÇEK OKYANUS (YÜKSELTİLDİ)
-function Ocean() {
+// 🌊 DENİZİN ÜST YÜZEYİ (Orjinal)
+function OceanTop() {
   const ref = useRef<any>();
   const gl = useThree((state) => state.gl);
   const waterNormals = useLoader(THREE.TextureLoader, WATER_NORMALS_URL);
-  
   waterNormals.wrapS = waterNormals.wrapT = THREE.RepeatWrapping;
 
   const config = useMemo(
@@ -95,13 +75,54 @@ function Ocean() {
     <water
       ref={ref}
       args={[new THREE.PlaneGeometry(10000, 10000), config]}
-      rotation={[-Math.PI / 2, 0, 0]}
-      // 🔥 İŞTE BURASI: Suyu 0'dan 5'e yükselttim 🔥
-      position={[0, 5, 0]} 
+      rotation={[-Math.PI / 2, 0, 0]} // Yukarı bakıyor
+      position={[0, 20, 0]} 
     />
   );
 }
 
+// 🔥 DENİZİN ALT YÜZEYİ (YENİ - TERS ÇEVRİLMİŞ) 🔥
+function OceanBottom() {
+  const ref = useRef<any>();
+  const gl = useThree((state) => state.gl);
+  const waterNormals = useLoader(THREE.TextureLoader, WATER_NORMALS_URL);
+  waterNormals.wrapS = waterNormals.wrapT = THREE.RepeatWrapping;
+
+  const config = useMemo(
+    () => ({
+      textureWidth: 512,
+      textureHeight: 512,
+      waterNormals,
+      sunDirection: new THREE.Vector3(),
+      sunColor: 0xffffff,
+      // Alt taraf biraz daha açık renk olsun ki yukarıdaki ışık vuruyormuş gibi görünsün
+      waterColor: 0x004040, 
+      distortionScale: 3.7,
+      fog: false,
+      format: gl.outputColorSpace === "srgb" ? THREE.SRGBColorSpace : undefined,
+    }),
+    [waterNormals, gl.outputColorSpace]
+  );
+
+  useFrame((state, delta) => {
+    if (ref.current) {
+      ref.current.material.uniforms.time.value += delta * 0.5;
+    }
+  });
+
+  return (
+    // @ts-ignore
+    <water
+      ref={ref}
+      args={[new THREE.PlaneGeometry(10000, 10000), config]}
+      // 🔥 İŞTE BURASI: Tam tersine çevirdik (PI / 2) 🔥
+      rotation={[Math.PI / 2, 0, 0]} 
+      position={[0, 20, 0]} // Aynı yükseklikte
+    />
+  );
+}
+
+// 🗿 3D MODEL
 function DenizModel() {
   const group = useRef<THREE.Group>(null);
   const { scene, animations } = useGLTF(DENIZ_GLB_URL);
@@ -119,7 +140,7 @@ function DenizModel() {
     <group ref={group}>
       <primitive 
         object={clone} 
-        scale={[1, 1, 1]} 
+        scale={[1.3, 1.3, 1.3]} 
         position={[0, -5, -5]} 
         rotation={[0, -Math.PI / 2, 0]} 
       />
@@ -127,6 +148,7 @@ function DenizModel() {
   );
 }
 
+// 🚶 HAREKETLİ SAHNE
 function MovingScene({ cameraRef }: { cameraRef: any }) {
   const group = useRef<THREE.Group>(null);
 
@@ -135,15 +157,15 @@ function MovingScene({ cameraRef }: { cameraRef: any }) {
     const camX = cameraRef.current.x;
     const camY = cameraRef.current.y;
     
-    group.current.position.x = -camX * 0.015;
-    group.current.position.y = camY * 0.015;
+    group.current.position.x = -camX * 0.007;
+    group.current.position.y = camY * 0.007;
   });
 
   return (
     <group ref={group}>
       <DenizModel />
-      <Ocean /> 
-      <WaterCeiling /> 
+      <OceanTop />    {/* Üst Yüzey */}
+      <OceanBottom /> {/* Alt Yüzey (Ters) */}
     </group>
   );
 }
@@ -152,19 +174,19 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
   return (
     <div className="absolute inset-0 bg-black"> 
       <Canvas
-        camera={{ position: [0, 5, 20], fov: 45 }}
+        camera={{ position: [0, 15, 20], fov: 45 }}
         style={{ pointerEvents: 'none' }}
       >
         <UnderwaterManager cameraRef={cameraRef} />
-
         <Environment preset="city" background={false} />
-
+        
         <Suspense fallback={null}>
            <Gokyuzu />
         </Suspense>
         
-        <ambientLight intensity={1.5} color="#ffffff" />
-        <directionalLight position={[10, 20, 10]} intensity={2} color="#ffffff" />
+        <ambientLight intensity={2} color="#ffffff" />
+        <directionalLight position={[10, 20, 10]} intensity={3} color="#ffffff" />
+        <pointLight position={[0, -10, 0]} intensity={2} color="#00aaff" />
 
         <Suspense fallback={null}>
             <MovingScene cameraRef={cameraRef} />
@@ -172,4 +194,4 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-}
+      }
