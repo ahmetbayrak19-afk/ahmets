@@ -22,7 +22,6 @@ function DenizModel() {
     <group ref={group}>
       <primitive 
         object={clone} 
-        // 🔥 İSTEĞİN ÜZERİNE: BOYUT 1 OLDU 🔥
         scale={[1, 1, 1]} 
         position={[0, 0, 0]} 
         rotation={[0, -Math.PI / 2, 0]} 
@@ -40,7 +39,6 @@ function MovingScene({ cameraRef }: { cameraRef: any }) {
     const camX = cameraRef.current.x;
     const camY = cameraRef.current.y;
 
-    // Parallax hareketi
     group.current.position.x = -camX * 0.015;
     group.current.position.y = camY * 0.015;
   });
@@ -54,14 +52,19 @@ function MovingScene({ cameraRef }: { cameraRef: any }) {
 
 export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
   return (
-    <div className="absolute inset-0 bg-[#001e36]">
+    // 🔥 ARKAPLAN RENGİNİ SİLDİM (Varsayılan şeffaf/beyaz kalsın) 🔥
+    <div className="absolute inset-0 bg-black"> 
       <Canvas
         camera={{ position: [0, 0, 20], fov: 50 }}
         style={{ pointerEvents: 'none' }}
+        // Arkaplanı tamamen şeffaf yapıyorum ki sadece model görünsün
+        gl={{ alpha: true }} 
       >
-        <ambientLight intensity={0.7} color="#004488" />
-        <directionalLight position={[10, 20, 10]} intensity={1.5} color="#00aaff" />
-        <fog attach="fog" args={['#001e36', 15, 90]} />
+        {/* 🔥 SİSİ (FOG) KALDIRDIM 🔥 */}
+        
+        {/* Işıkları biraz daha doğal (beyaz) yaptım */}
+        <ambientLight intensity={1.5} color="#ffffff" /> 
+        <directionalLight position={[10, 20, 10]} intensity={2} color="#ffffff" />
 
         <Suspense fallback={null}>
             <MovingScene cameraRef={cameraRef} />
@@ -69,4 +72,4 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-                      }
+           }
