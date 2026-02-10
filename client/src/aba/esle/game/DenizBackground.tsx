@@ -2,13 +2,14 @@ import React, { Suspense, useRef, useEffect, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, useAnimations, Environment, useTexture } from "@react-three/drei";
 import * as THREE from "three";
-
-// Resmini import ediyoruz
 import gokResmi from "./gok.png";
 
+// ESKİ MODEL
 const DENIZ_GLB_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/deniz.glb?alt=media&token=6ecb1237-70e1-43c8-b997-77b6e3943497";
 
-// --- 1. GÖKYÜZÜ BİLEŞENİ ---
+// 🔥 YENİ TEST MODELİ (Senin verdiğin water.glb) 🔥
+const WATER_GLB_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/water.glb?alt=media&token=8d3f648f-3952-4802-8008-20a8865b0426";
+
 function Gokyuzu() {
   const texture = useTexture(gokResmi);
   return (
@@ -19,41 +20,33 @@ function Gokyuzu() {
   );
 }
 
-// --- 2. DENİZ MODELİ (TAMİR EDİLMİŞ) ---
+// 🔥 YENİ EKLENEN SU MODELİ 🔥
+function TestWaterModel() {
+  const { scene } = useGLTF(WATER_GLB_URL);
+  const clone = useMemo(() => scene.clone(), [scene]);
+
+  return (
+    <primitive 
+      object={clone} 
+      scale={[15, 15, 15]} // BÜYÜKÇE EKLEDİM
+      position={[0, 10, 0]} // Yukarıda dursun, diğerine karışmasın
+    />
+  );
+}
+
+// ESKİ DENİZ MODELİ (Olduğu gibi duruyor)
 function DenizModel() {
   const group = useRef<THREE.Group>(null);
   const { scene, animations } = useGLTF(DENIZ_GLB_URL);
   const { actions } = useAnimations(animations, group);
 
-  // 🔥 İŞTE O SİHİRLİ KOD BURADA 🔥
   useEffect(() => {
-    // Sahnedeki her parçayı tek tek kontrol et
-    scene.traverse((child: any) => {
-      if (child.isMesh) {
-        // Hepsine zorla bu ayarları veriyoruz:
-        
-        // 1. Hem alttan hem üstten görünsün (Ters dursa bile)
-        child.material.side = THREE.DoubleSide; 
-        
-        // 2. Şeffaflık ayarlarını sıfırla, katı olsun
-        child.material.transparent = false; 
-        child.material.opacity = 1;
-        child.material.depthWrite = true;
-
-        // 3. Eğer materyal "Cam" (Transmission) ise onu iptal et
-        if (child.material.transmission) {
-            child.material.transmission = 0; // Cam özelliğini kapat
-            child.material.roughness = 0.3;  // Biraz parlak olsun
-            child.material.metalness = 0;    // Metal olmasın
-        }
-      }
-    });
-
-    // Animasyonları başlat
+    // Burada eski modele yaptığımız materyal zorlamasını kaldırdım,
+    // belki yeni model gelince çakışıyordur. Saf haliyle bırakıyorum.
     Object.keys(actions).forEach((key) => {
       actions[key]?.reset().fadeIn(0.5).play();
     });
-  }, [scene, actions]); // Sahne yüklendiğinde bir kere çalışır
+  }, [actions]);
 
   const clone = useMemo(() => scene.clone(), [scene]);
 
@@ -69,7 +62,6 @@ function DenizModel() {
   );
 }
 
-// --- 3. HAREKETLİ SAHNE ---
 function MovingScene({ cameraRef }: { cameraRef: any }) {
   const group = useRef<THREE.Group>(null);
 
@@ -101,6 +93,11 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
         <Suspense fallback={null}>
            <Gokyuzu />
         </Suspense>
+        
+        {/* 🔥 YENİ SUYU BURAYA EKLEDİM (Hareket etmesin sabit dursun şimdilik) 🔥 */}
+        <Suspense fallback={null}>
+            <TestWaterModel />
+        </Suspense>
 
         <ambientLight intensity={1.5} color="#ffffff" />
         <directionalLight position={[10, 20, 10]} intensity={2} color="#ffffff" />
@@ -111,4 +108,4 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-    }
+        }
