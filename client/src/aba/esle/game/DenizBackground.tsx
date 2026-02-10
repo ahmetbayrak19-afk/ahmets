@@ -10,6 +10,7 @@ function DenizModel() {
   const { scene, animations } = useGLTF(DENIZ_GLB_URL);
   const { actions } = useAnimations(animations, group);
 
+  // Animasyonları başlat (Yosunlar sallansın)
   useEffect(() => {
     Object.keys(actions).forEach((key) => {
       actions[key]?.reset().fadeIn(0.5).play();
@@ -22,15 +23,40 @@ function DenizModel() {
     <group ref={group}>
       <primitive 
         object={clone} 
-        // 🔥 BURAYI KÜÇÜLTTÜM 🔥
-        // Eskiden 35'ti, şimdi 5 yaptık. Oyuncak gibi oldu.
-        scale={[5, 5, 5]} 
-        
-        // Tam ortaya (0,0,0) koydum ki balık etrafında dönsün
-        position={[0, -2, 0]} 
-        
+        // Modeli biraz büyüttük ki etraf dolsun (Hungry Shark hissi)
+        scale={[15, 15, 15]} 
+        // Başlangıç pozisyonu
+        position={[0, -5, -10]} 
         rotation={[0, -Math.PI / 2, 0]} 
       />
+    </group>
+  );
+}
+
+// 🔥 KAMERA HAREKET MANTIĞI BURADA 🔥
+function MovingScene({ cameraRef }: { cameraRef: any }) {
+  const group = useRef<THREE.Group>(null);
+
+  useFrame(() => {
+    if (!group.current || !cameraRef.current) return;
+    
+    // 2D Dünyadaki kamera pozisyonunu al
+    const camX = cameraRef.current.x;
+    const camY = cameraRef.current.y;
+
+    // 3D dünyayı ters yöne kaydır (Parallax efekti)
+    // 0.015 çarpanı: Ne kadar hızlı akacağını belirler.
+    group.current.position.x = -camX * 0.015;
+    group.current.position.y = camY * 0.015; // Y ekseni ters çalışmasın diye + bıraktık
+  });
+
+  return (
+    <group ref={group}>
+      <DenizModel />
+      
+      {/* Yanlara da ekleyelim ki bitmesin (Opsiyonel, şimdilik tek model yetebilir) */}
+      <group position={[80, 0, 0]}><DenizModel /></group>
+      <group position={[-80, 0, 0]}><DenizModel /></group>
     </group>
   );
 }
@@ -39,17 +65,18 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
   return (
     <div className="absolute inset-0 bg-[#001e36]">
       <Canvas
-        camera={{ position: [0, 5, 15], fov: 50 }} // Kamerayı biraz geriye ve yukarı çektim
+        camera={{ position: [0, 0, 20], fov: 50 }}
         style={{ pointerEvents: 'none' }}
       >
-        <ambientLight intensity={0.8} />
-        <directionalLight position={[10, 10, 5]} intensity={1} />
-        
+        <ambientLight intensity={0.7} color="#004488" />
+        <directionalLight position={[10, 20, 10]} intensity={1.5} color="#00aaff" />
+        <fog attach="fog" args={['#001e36', 15, 90]} />
+
         <Suspense fallback={null}>
-            {/* Sonsuz deniz yerine tek bir tane koydum, rahat gör diye */}
-            <DenizModel />
+            <MovingScene cameraRef={cameraRef} />
         </Suspense>
       </Canvas>
     </div>
   );
-}
+                                 }
+                                        
