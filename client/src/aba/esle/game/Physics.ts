@@ -1,23 +1,13 @@
 // Physics.ts
 
-// DÜNYA AYARLARI
-export const WORLD_WIDTH = 12000;   // ✅ sağ/sol daha rahat
-export const WORLD_HEIGHT = 1500;
+// DÜNYA AYARLARI (GENİŞ + YÜKSEK)
+export const WORLD_WIDTH = 8000;   // sağ/sol çok olsun
+export const WORLD_HEIGHT = 2200;  // yukarı/aşağı da büyüsün
 
-// DİKKAT: Resim yüksekliği 500 olduğu için Deniz Seviyesini 500 yapıyoruz.
-export const SEA_LEVEL = 500;
+// Deniz yüzeyi
+export const SEA_LEVEL = 650;
 
-// ✅ Renderer'da zeminleri WORLD_HEIGHT - 300'e çiziyorsun (300px yüksek zemin)
-const FLOOR_HEIGHT = 300;
-const FLOOR_Y = WORLD_HEIGHT - FLOOR_HEIGHT;
-
-// ✅ Balığın “gövde merkezine” göre güvenli boşluklar (sprite boyuna göre)
-const FISH_RADIUS_X = 80;   // balık çizimi -80..+80 idi
-const FISH_RADIUS_Y = 60;   // balık çizimi -60..+60 idi
-
-// ✅ Su üstüne çıkma payı
-const JUMP_HEADROOM = 220; // SEA_LEVEL - 220'ye kadar çıkabilir
-
+// Balık state
 export interface FishState {
   x: number;
   y: number;
@@ -37,66 +27,59 @@ export class PhysicsEngine {
   updateFish(fish: FishState, targetX: number, targetY: number) {
     const inWater = fish.y > SEA_LEVEL;
 
-    // 1. HAREKET
+    // 1) HAREKET
     if (inWater) {
       const dx = targetX - fish.x;
       const dy = targetY - fish.y;
 
+      // su altında hedefe çekim
       fish.vx += dx * 0.0008;
       fish.vy += dy * 0.0008;
 
+      // sürtünme
       fish.vx *= 0.95;
       fish.vy *= 0.95;
 
+      // max hız
       const speed = Math.sqrt(fish.vx ** 2 + fish.vy ** 2);
-      if (speed > 10) {
-        const ratio = 10 / speed;
+      if (speed > 12) {
+        const ratio = 12 / speed;
         fish.vx *= ratio;
         fish.vy *= ratio;
       }
     } else {
-      // Hava (Yerçekimi)
-      fish.vy += 0.5;
-      fish.vx *= 0.98;
+      // hava: yerçekimi
+      fish.vy += 0.55;
+      fish.vx *= 0.985;
     }
 
     fish.x += fish.vx;
     fish.y += fish.vy;
 
-    // 2. SINIRLAR (✅ gerçek sahneye göre)
-    // X sınırları (balık yarıçapını dikkate al)
-    const minX = 0 + FISH_RADIUS_X;
-    const maxX = WORLD_WIDTH - FISH_RADIUS_X;
-    if (fish.x < minX) {
-      fish.x = minX;
-      fish.vx = 0;
-    }
-    if (fish.x > maxX) {
-      fish.x = maxX;
-      fish.vx = 0;
-    }
+    // 2) SINIRLAR (çok yukarı + geniş sağ/sol)
+    const FISH_RADIUS_X = 90;
+    const FISH_RADIUS_Y = 70;
 
-    // Y alt sınır: kumun ÜSTÜ (balığın altı kuma girmesin)
-    const maxY = FLOOR_Y - FISH_RADIUS_Y;
-    if (fish.y > maxY) {
-      fish.y = maxY;
-      fish.vy = 0;
-    }
+    const JUMP_HEADROOM = 1300; // çok yukarı çıkabilsin
+    const FLOOR_PAD = 120;
 
-    // Y üst sınır: su yüzeyinin üstüne “biraz” çıkabilsin ama uçmasın
-    const minY = (SEA_LEVEL - JUMP_HEADROOM) + FISH_RADIUS_Y;
-    if (fish.y < minY) {
-      fish.y = minY;
-      // yukarı çıkmayı kes, hafif aşağı it
-      if (fish.vy < 0) fish.vy = 0.5;
-    }
+    const LEFT_WALL = 0 + FISH_RADIUS_X;
+    const RIGHT_WALL = WORLD_WIDTH - FISH_RADIUS_X;
 
-    // 3. ANİMASYON
+    const MAX_Y = WORLD_HEIGHT - FLOOR_PAD - FISH_RADIUS_Y; // kumun altına inmesin
+    const MIN_Y = (SEA_LEVEL - JUMP_HEADROOM) + FISH_RADIUS_Y; // gökyüzü alanı
+
+    if (fish.x < LEFT_WALL) { fish.x = LEFT_WALL; fish.vx = 0; }
+    if (fish.x > RIGHT_WALL) { fish.x = RIGHT_WALL; fish.vx = 0; }
+
+    if (fish.y > MAX_Y) { fish.y = MAX_Y; fish.vy = 0; }
+    if (fish.y < MIN_Y) { fish.y = MIN_Y; fish.vy = 0; }
+
+    // 3) ANİMASYON
     fish.timer++;
     const animSpeed = 4;
 
-    const currentDir =
-      fish.vx > 0.1 ? 1 : fish.vx < -0.1 ? -1 : fish.lastDirection;
+    const currentDir = fish.vx > 0.1 ? 1 : (fish.vx < -0.1 ? -1 : fish.lastDirection);
 
     if (fish.state === "SWIM") {
       if (fish.lastDirection === 1 && currentDir === -1) {
@@ -132,11 +115,8 @@ export class PhysicsEngine {
       fish.scaleX = fish.lastDirection;
     }
 
-    // Derinlik ölçeği (SEA_LEVEL altına göre)
-    const depthRatio = Math.max(
-      0,
-      (fish.y - SEA_LEVEL) / (FLOOR_Y - SEA_LEVEL)
-    );
-    fish.scaleY = 1 - depthRatio * 0.1;
+    // derinlikte minik squash
+    const depthRatio = Math.max(0, (fish.y - SEA_LEVEL) / (WORLD_HEIGHT - SEA_LEVEL));
+    fish.scaleY = 1 - (depthRatio * 0.1);
   }
-          }
+        }
