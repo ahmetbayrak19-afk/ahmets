@@ -14,10 +14,12 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLandscape, setIsLandscape] = useState(true);
 
+  // Motor
   const assets = useRef<AssetLibrary | null>(null);
   const physics = useRef(new PhysicsEngine());
   const renderer = useRef<GameRenderer | null>(null);
 
+  // Oyun Durumu
   const fish = useRef({
     x: 2000,
     y: 700,
@@ -33,10 +35,14 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   });
 
   const camera = useRef({ x: fish.current.x, y: fish.current.y });
-  const mousePos = useRef({ x: fish.current.x, y: fish.current.y });
   const targets = useRef<any[]>([]);
   const reqRef = useRef<number>();
 
+  // ✅ Pointer ile hedef
+  const pointerDownRef = useRef(false);
+  const targetRef = useRef({ x: fish.current.x, y: fish.current.y });
+
+  // 1) Orientation
   useEffect(() => {
     const checkOrientation = () => setIsLandscape(window.innerWidth > window.innerHeight);
     checkOrientation();
@@ -44,6 +50,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("resize", checkOrientation);
   }, []);
 
+  // 2) Load assets
   useEffect(() => {
     const init = async () => {
       assets.current = await loadAssets();
@@ -52,44 +59,65 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     init();
   }, []);
 
-  const handleInput = (e: any) => {
-    if (!isPlaying || !canvasRef.current) return;
+  // ✅ dünya koordinatına çevir
+  const setWorldTargetFromClient = (clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    let clientX: number, clientY: number;
-    if (e.touches && e.touches.length > 0) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
+    const rect = canvas.getBoundingClientRect();
+    const sx = clientX - rect.left;
+    const sy = clientY - rect.top;
 
-    const rect = canvasRef.current.getBoundingClientRect();
-    const screenX = clientX - rect.left;
-    const screenY = clientY - rect.top;
+    const w = canvas.width;
+    const h = canvas.height;
 
-    const w = canvasRef.current.width;
-    const h = canvasRef.current.height;
-
-    mousePos.current.x = camera.current.x + (screenX - w / 2);
-    mousePos.current.y = camera.current.y + (screenY - h / 2);
+    // ekran merkezine göre dünya noktası
+    targetRef.current.x = camera.current.x + (sx - w / 2);
+    targetRef.current.y = camera.current.y + (sy - h / 2);
   };
 
+  // ✅ Pointer Events (Android WebView’de en stabil)
+  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isPlaying) return;
+    pointerDownRef.current = true;
+    (e.currentTarget as any).setPointerCapture?.(e.pointerId);
+    setWorldTargetFromClient(e.clientX, e.clientY);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isPlaying) return;
+    // ister basılı ister değil, hareket ettikçe hedefi güncelle
+    setWorldTargetFromClient(e.clientX, e.clientY);
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    pointerDownRef.current = false;
+    (e.currentTarget as any).releasePointerCapture?.(e.pointerId);
+  };
+
+  // 3) Game loop
   useEffect(() => {
     if (!isPlaying || !isLoaded || !canvasRef.current || !assets.current) return;
 
     renderer.current = new GameRenderer(canvasRef.current);
 
     const loop = () => {
-      if (!canvasRef.current) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
 
-      const w = canvasRef.current.clientWidth;
-      const h = canvasRef.current.clientHeight;
+      // resize (canvas width/height = gerçek piksel)
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
       renderer.current?.resize(w, h);
 
-      physics.current.updateFish(fish.current as any, mousePos.current.x, mousePos.current.y);
+      // ✅ Fizik: hedefi targetRef’ten al
+      physics.current.updateFish(
+        fish.current as any,
+        targetRef.current.x,
+        targetRef.current.y
+      );
 
-      // ✅ Kamera: balığı takip (clamp’ı gevşetiyoruz)
+      // ✅ Kamera: balığı takip (WORLD içinde clamp)
       const halfW = w / 2;
       const halfH = h / 2;
 
@@ -126,16 +154,22 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
         <DenizBackground />
       </div>
 
-      {/* 2D üstte (transparan) */}
+      {/* 2D üstte */}
       {isLoaded ? (
         <>
           <canvas
             ref={canvasRef}
-            className="absolute inset-0 w-full h-full block touch-none"
-            style={{ background: "transparent" }}
-            onMouseMove={handleInput}
-            onTouchMove={handleInput}
-            onClick={handleInput}
+            className="absolute inset-0 w-full h-full block"
+            style={{
+              background: "transparent",
+              touchAction: "none", // ✅ çok kritik
+              WebkitUserSelect: "none",
+              userSelect: "none",
+            }}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
           />
 
           <button onClick={onClose} className="fixed top-5 right-5 z-50 bg-white p-2 rounded-full">
@@ -146,9 +180,9 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
               <button
                 onClick={() => {
-                  // ilk hedefi balığın olduğu yer yap (zıplamasın)
-                  mousePos.current.x = fish.current.x;
-                  mousePos.current.y = fish.current.y;
+                  // ✅ Başlayınca hedefi balığa eşitle (zıplamasın)
+                  targetRef.current.x = fish.current.x;
+                  targetRef.current.y = fish.current.y;
                   camera.current.x = fish.current.x;
                   camera.current.y = fish.current.y;
                   setIsPlaying(true);
