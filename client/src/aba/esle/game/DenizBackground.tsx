@@ -1,91 +1,75 @@
-// client/src/aba/esle/game/DenizBackground.tsx
-import React, { Suspense, useMemo, useRef, useState } from "react";
+import React, { Suspense, useRef, useLayoutEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 
-type Props = {
-  cameraRef: React.MutableRefObject<{ x: number; y: number }>;
-};
+// NOT: Modelin adresi doğru olmalı. Hata verirse localdeki bir dosyayı kullan.
+const DENIZ_GLB_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/deniz.glb?alt=media&token=6ecb1237-70e1-43c8-b997-77b6e3943497";
 
-const DENIZ_GLB_URL =
-  "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/deniz.glb?alt=media&token=6ecb1237-70e1-43c8-b997-77b6e3943497";
+// DÜNYA ÖLÇEKLERİ (Physics ile uyumlu olmalı)
+// 3D dünyada 1 birim, 2D dünyada yaklaşık 100 piksel gibi düşünelim.
+const SCALE_FACTOR = 0.015; 
 
-function FallbackBg() {
-  // 3D yüklenmezse arkaplan tamamen siyah olmasın
+function DenizModel({ offset = 0 }) {
+  const { scene } = useGLTF(DENIZ_GLB_URL);
+  
+  // Modeli klonlayalım ki aynısından 3 tane koyabilelim
+  const clone = React.useMemo(() => scene.clone(), [scene]);
+
   return (
-    <mesh position={[0, 0, 0]}>
-      <planeGeometry args={[50, 50]} />
-      <meshBasicMaterial color={"#0b1b2a"} />
-    </mesh>
+    <primitive 
+      object={clone} 
+      position={[offset, -8, -10]} // Biraz aşağı ve geriye ittik
+      scale={[20, 20, 20]}         // Modeli kocaman yaptık
+      rotation={[0, -Math.PI / 2, 0]} 
+    />
   );
 }
 
-function DenizModel({ cameraRef }: { cameraRef: Props["cameraRef"] }) {
+function InfiniteSea({ cameraRef }: { cameraRef: any }) {
   const group = useRef<THREE.Group>(null);
-  const gltf = useGLTF(DENIZ_GLB_URL);
 
-  const baseRotation = useMemo(() => new THREE.Euler(0, -Math.PI / 2, 0), []);
-  const PARALLAX_X = 0.03;
-  const PARALLAX_Y = 0.02;
-
+  // Hungry Shark Hissiyatı: Kamera balığı takip ederken
+  // Arkaplan (Kayalıklar) daha yavaş hareket etmeli (Parallax)
   useFrame(() => {
-    const g = group.current;
-    if (!g) return;
+    if (!group.current || !cameraRef.current) return;
 
-    const camX = cameraRef.current.x;
-    const camY = cameraRef.current.y;
-
-    g.position.x = -camX * PARALLAX_X;
-    g.position.y = camY * PARALLAX_Y;
+    // Kameranın 2D dünyadaki pozisyonunu 3D'ye çevir
+    const camX = cameraRef.current.x * SCALE_FACTOR;
+    
+    // Kamerayı takip et
+    group.current.position.x = camX;
   });
 
   return (
     <group ref={group}>
-      <primitive
-        object={gltf.scene}
-        rotation={baseRotation}
-        scale={1.25}
-        position={[0, -2.2, 0]}
-      />
+      {/* 3 Tane Yan Yana Deniz Koyuyoruz (Sonsuzluk İçin) */}
+      <DenizModel offset={-60} />
+      <DenizModel offset={0} />
+      <DenizModel offset={60} />
     </group>
   );
 }
 
-export default function DenizBackground({ cameraRef }: Props) {
-  const [glError, setGlError] = useState<string | null>(null);
-
+export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
   return (
-    <div className="absolute inset-0">
-      {/* Hata olursa üstte minicik yaz */}
-      {glError && (
-        <div className="absolute top-2 left-2 z-50 bg-black/60 text-red-200 text-[10px] px-2 py-1 rounded">
-          3D HATA: {glError}
-        </div>
-      )}
-
+    <div className="absolute inset-0 bg-[#06121c]">
       <Canvas
-        style={{ width: "100%", height: "100%", pointerEvents: "none" }}
-        gl={{
-          antialias: true,
-          alpha: false,
-          // bazı Android WebView’da context kayması için:
-          preserveDrawingBuffer: false,
-        }}
-        onCreated={({ gl }) => {
-          gl.setClearColor(new THREE.Color("#06121c"), 1);
-        }}
-        camera={{ position: [0, 0, 10], fov: 45 }}
-        onError={(e) => setGlError(String(e))}
+        gl={{ antialias: false, powerPreference: "high-performance" }}
+        camera={{ position: [0, 0, 20], fov: 50 }}
+        style={{ pointerEvents: 'none' }}
       >
-        <ambientLight intensity={0.9} />
-        <directionalLight position={[6, 10, 8]} intensity={1.2} />
-        <directionalLight position={[-8, 4, -6]} intensity={0.6} />
+        <color attach="background" args={["#06121c"]} />
+        
+        {/* Işıklandırma (Dramatik Su Altı) */}
+        <ambientLight intensity={0.5} color="#004080" />
+        <directionalLight position={[10, 20, 10]} intensity={1.5} color="#00aaff" />
+        <fog attach="fog" args={['#06121c', 10, 90]} /> {/* İlerisi sisli olsun */}
 
-        <Suspense fallback={<FallbackBg />}>
-          <DenizModel cameraRef={cameraRef} />
+        <Suspense fallback={null}>
+            <InfiniteSea cameraRef={cameraRef} />
         </Suspense>
       </Canvas>
     </div>
   );
-        }
+}
