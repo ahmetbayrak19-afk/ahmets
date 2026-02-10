@@ -17,7 +17,7 @@ function Gokyuzu() {
   );
 }
 
-// 🔥 YENİ SU MODELİ (Ayarlarıyla oynamadım) 🔥
+// 🔥 YENİ SU MODELİ 🔥
 function TestWaterModel() {
   const { scene } = useGLTF(WATER_GLB_URL);
   const clone = useMemo(() => scene.clone(), [scene]);
@@ -25,21 +25,21 @@ function TestWaterModel() {
   return (
     <primitive 
       object={clone} 
-      scale={[15, 15, 15]} 
-      // 🔥 KONUM GÜNCELLENDİ: 10'dan 0'a indirdim. 🔥
-      position={[0, 0, 0]} 
+      // AYAR 1: Boyutu 3'te 1'ine düşürdüm (15 -> 5)
+      scale={[5, 5, 5]} 
+      // AYAR 2: Yüksekliği 5 yaptım
+      position={[0, 5, 0]} 
     />
   );
 }
 
-// ESKİ DENİZ MODELİ (Saf Hali)
+// ESKİ DENİZ MODELİ
 function DenizModel() {
   const group = useRef<THREE.Group>(null);
   const { scene, animations } = useGLTF(DENIZ_GLB_URL);
   const { actions } = useAnimations(animations, group);
 
   useEffect(() => {
-    // Materyal zorlama KODU YOK. Sadece animasyon.
     Object.keys(actions).forEach((key) => {
       actions[key]?.reset().fadeIn(0.5).play();
     });
@@ -59,6 +59,7 @@ function DenizModel() {
   );
 }
 
+// 🔥 HAREKETLİ GRUP (MovingScene) 🔥
 function MovingScene({ cameraRef }: { cameraRef: any }) {
   const group = useRef<THREE.Group>(null);
 
@@ -67,14 +68,16 @@ function MovingScene({ cameraRef }: { cameraRef: any }) {
     const camX = cameraRef.current.x;
     const camY = cameraRef.current.y;
     
+    // Dünyayı ters yöne kaydırarak hareket hissi veriyoruz
     group.current.position.x = -camX * 0.015;
     group.current.position.y = camY * 0.015;
   });
 
   return (
     <group ref={group}>
+      {/* İkisini de bu grubun içine koydum ki beraber hareket etsinler */}
       <DenizModel />
-      {/* Test suyunu hareketli gruba dahil etmedim, sabit dursun şimdilik */}
+      <TestWaterModel />
     </group>
   );
 }
@@ -91,11 +94,6 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
         <Suspense fallback={null}>
            <Gokyuzu />
         </Suspense>
-        
-        {/* YENİ SU MODELİ */}
-        <Suspense fallback={null}>
-            <TestWaterModel />
-        </Suspense>
 
         <ambientLight intensity={1.5} color="#ffffff" />
         <directionalLight position={[10, 20, 10]} intensity={2} color="#ffffff" />
@@ -106,4 +104,4 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-      }
+}
