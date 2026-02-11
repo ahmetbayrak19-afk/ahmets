@@ -6,11 +6,13 @@ import { Water } from "three-stdlib";
 
 extend({ Water });
 
-const SU_SEVIYESI = 20;
+// --- AYARLAR ---
+const SU_SEVIYESI = 0;      // Su tam merkezde (0)
+const ZEMIN_DERINLIGI = -10; // 3D Modeli 10 birim aşağı ittik (Modelin boyuna göre bunu değiştirirsin)
 const DENIZ_GLB_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/deniz.glb?alt=media&token=6ecb1237-70e1-43c8-b997-77b6e3943497";
 const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/water/Water_1_M_Normal.jpg";
 
-// 1. SU YÜZEYİ (Hareketli - Sonsuzluk için balığı takip eder)
+// 1. SU YÜZEYİ (TAVAN)
 function OceanTop({ targetRef }) {
   const ref = useRef();
   const gl = useThree((state) => state.gl);
@@ -33,12 +35,10 @@ function OceanTop({ targetRef }) {
   );
 
   useFrame((state, delta) => {
-    // Dalga animasyonu
     if (ref.current) {
       ref.current.material.uniforms.time.value += delta * 0.5;
       
-      // SUYU BALIKLA BERABER GÖTÜR (X Ekseninde)
-      // Böylece sağa ne kadar gidersen git deniz bitmez.
+      // Suyu seninle beraber sağa sola taşıyoruz ki deniz bitmesin
       if (targetRef.current) {
         ref.current.position.x = targetRef.current.x;
       }
@@ -50,15 +50,39 @@ function OceanTop({ targetRef }) {
       ref={ref}
       args={[new THREE.PlaneGeometry(10000, 10000), config]}
       rotation={[-Math.PI / 2, 0, 0]} 
-      position={[0, SU_SEVIYESI, 0]} 
+      position={[0, SU_SEVIYESI, 0]} // SIFIR NOKTASI
     />
   );
 }
 
-// 2. BALIK ve HAREKET SİSTEMİ
-function BalikVeHareket({ cameraRef }) {
+// 2. 3D MODEL (ZEMİN)
+function ZeminModel({ targetRef }) {
+  const { scene } = useGLTF(DENIZ_GLB_URL);
+  const clone = useMemo(() => scene.clone(), [scene]);
+  const ref = useRef();
+
+  useFrame(() => {
+    // Modeli de seninle beraber sağa sola taşıyoruz ki zemin bitmesin
+    if (ref.current && targetRef.current) {
+        ref.current.position.x = targetRef.current.x;
+    }
+  });
+
+  return (
+    <primitive 
+      ref={ref}
+      object={clone} 
+      scale={[1.5, 1.5, 1.5]} 
+      position={[0, ZEMIN_DERINLIGI, 0]} // Modeli aşağı itiyoruz
+      rotation={[0, -Math.PI / 2, 0]} 
+    />
+  );
+}
+
+// 3. BALIK VE OYUN MANTIĞI
+function GameContent({ cameraRef }) {
   const group = useRef(null);
-  const { scene, animations } = useGLTF(DENIZ_GLB_URL);
+  const { scene, animations } = useGLTF(DENIZ_GLB_URL); // Balık için aynı modeli kullanıyorum, farklıysa değiştir
   const { actions } = useAnimations(animations, group);
   const { camera } = useThree();
 
@@ -68,36 +92,41 @@ function BalikVeHareket({ cameraRef }) {
     });
   }, [actions]);
 
+  // Balık Modelini Klonla (Zeminle karışmasın diye)
+  const fishClone = useMemo(() => scene.clone(), [scene]);
+
   useFrame(() => {
     if (!cameraRef.current || !group.current) return;
 
     const targetX = cameraRef.current.x;
     const targetY = cameraRef.current.y;
 
-    // A) BALIĞI HAREKET ETTİR
-    // Balık senin klavyedeki konumuna gitsin
+    // A) Balığı hareket ettir
     group.current.position.x = targetX;
     group.current.position.y = targetY;
 
-    // B) KAMERAYI HAREKET ETTİR (Paralel Takip)
+    // B) Kamerayı hareket ettir (Paralel Takip)
     camera.position.x = targetX;
-    camera.position.y = targetY; // Balıkla aynı yükseklik (Tam karşı)
-    camera.position.z = 30;      // Mesafe
-    
-    // Kamera dümdüz baksın
+    camera.position.y = targetY; // Balıkla aynı kata çık
+    camera.position.z = 30;      // Karşıdan bak
     camera.lookAt(targetX, targetY, 0);
   });
 
-  const clone = useMemo(() => scene.clone(), [scene]);
-
   return (
-    <group ref={group}>
-      <primitive 
-        object={clone} 
-        scale={[1.3, 1.3, 1.3]} 
-        rotation={[0, -Math.PI / 2, 0]} 
-      />
-    </group>
+    <>
+      {/* BALIK (Ortada yüzüyor) */}
+      <group ref={group}>
+        <primitive 
+          object={fishClone} 
+          scale={[1, 1, 1]} 
+          rotation={[0, -Math.PI / 2, 0]} 
+        />
+      </group>
+
+      {/* DÜNYA (Su tavanda, Zemin dipte) */}
+      <OceanTop targetRef={cameraRef} />
+      <ZeminModel targetRef={cameraRef} />
+    </>
   );
 }
 
@@ -111,18 +140,13 @@ export default function DenizBackground({ cameraRef }) {
         <ambientLight intensity={2} color="#ffffff" />
         <directionalLight position={[10, 20, 10]} intensity={3} color="#ffffff" />
 
-        {/* 1. Su (Balığı takip etmesi için cameraRef'i veriyoruz) */}
-        <OceanTop targetRef={cameraRef} />
-
-        {/* 2. Balık Modeli ve Hareket Mantığı */}
         <Suspense fallback={null}>
-            <BalikVeHareket cameraRef={cameraRef} />
+            <GameContent cameraRef={cameraRef} />
         </Suspense>
 
-        {/* Sadece balık parlasın diye environment (Arka plan kapalı) */}
         <Environment preset="city" background={false} />
       </Canvas>
     </div>
   );
-        }
-          
+      }
+      
