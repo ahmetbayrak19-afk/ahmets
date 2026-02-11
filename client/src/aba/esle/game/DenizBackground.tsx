@@ -1,13 +1,31 @@
 import React, { Suspense, useRef, useEffect, useMemo } from "react";
 import { Canvas, useFrame, extend, useThree, useLoader } from "@react-three/fiber";
-import { useGLTF, useAnimations, Environment } from "@react-three/drei";
+import { useGLTF, useAnimations, Environment, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import { Water } from "three-stdlib"; 
+
+// Resim dosyanı import ediyoruz
+import gokResmi from "./gok.png";
 
 const DENIZ_GLB_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/deniz.glb?alt=media&token=6ecb1237-70e1-43c8-b997-77b6e3943497";
 const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/water/Water_1_M_Normal.jpg";
 
 extend({ Water });
+
+// ☁️ GÖKYÜZÜ (HESAPLANDI: TAM SU YÜZEYİNDEN BAŞLAR) ☁️
+function Gokyuzu() {
+  const texture = useTexture(gokResmi);
+  return (
+    // Z=-100: Arkada dursun.
+    // Y=65: (Su seviyesi 15) + (Resim Yüksekliği 100 / 2) = 65.
+    // Böylece resmin alt ucu tam 15.0 noktasına değer.
+    <mesh position={[0, 65, -100]}>
+      {/* 3010x500 pixel resim için 600x100 boyut (6:1 oranı korundu) */}
+      <planeGeometry args={[600, 100]} />
+      <meshBasicMaterial map={texture} transparent={true} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
 
 // 🔥 ÇİFT TARAFLI OKYANUS (PIRPIRLANMA GİDERİLDİ) 🔥
 function Ocean() {
@@ -42,7 +60,7 @@ function Ocean() {
   return (
     <group position={[0, 15, 0]}>
       
-      {/* 1. ÜST YÜZEY (0 noktasında duruyor) */}
+      {/* 1. ÜST YÜZEY */}
       {/* @ts-ignore */}
       <water
         ref={refTop}
@@ -50,13 +68,12 @@ function Ocean() {
         rotation={[-Math.PI / 2, 0, 0]} 
       />
 
-      {/* 2. ALT YÜZEY (MİKROSKOBİK AŞAĞI ALINDI) */}
+      {/* 2. ALT YÜZEY (0.05 birim aşağıda) */}
       {/* @ts-ignore */}
       <water
         ref={refBottom}
         args={[new THREE.PlaneGeometry(10000, 10000), config]} 
         rotation={[Math.PI / 2, 0, 0]} 
-        // 🔥 ÇÖZÜM BURADA: 0.05 birim aşağı indirdik. Göz görmez ama GPU görür.
         position={[0, -0.05, 0]} 
       />
     </group>
@@ -118,6 +135,10 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       >
         <Environment preset="city" background={false} />
         
+        <Suspense fallback={null}>
+           <Gokyuzu />
+        </Suspense>
+
         <ambientLight intensity={1.5} color="#ffffff" />
         <directionalLight position={[10, 20, 10]} intensity={2} color="#ffffff" />
 
@@ -127,4 +148,4 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-}
+    }
