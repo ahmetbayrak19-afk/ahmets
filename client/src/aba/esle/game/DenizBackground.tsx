@@ -1,18 +1,17 @@
 import React, { Suspense, useRef, useEffect, useMemo } from "react";
-import { Canvas, useFrame } from "@react-three/fiber"; // useThree, useLoader sildim
+import { Canvas, useFrame } from "@react-three/fiber"; 
 import { useGLTF, useAnimations, Environment } from "@react-three/drei";
 import * as THREE from "three";
 
 const DENIZ_GLB_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/deniz.glb?alt=media&token=6ecb1237-70e1-43c8-b997-77b6e3943497";
 
-// 🗿 SADECE 3D MODEL (Efektsiz)
+// 🗿 BALIK MODELİ
 function DenizModel() {
   const group = useRef(null);
   const { scene, animations } = useGLTF(DENIZ_GLB_URL);
   const { actions } = useAnimations(animations, group);
 
   useEffect(() => {
-    // Animasyon varsa çalıştır
     Object.keys(actions).forEach((key) => {
       actions[key]?.reset().fadeIn(0.5).play();
     });
@@ -22,28 +21,43 @@ function DenizModel() {
 
   return (
     <group ref={group}>
-      {/* Modelin pozisyonunu 0,0,0 yapıyorum ki kamera tam karşısında dursun.
-         Dönme açısı (rotation) sende -Math.PI/2 idi, onu korudum.
-      */}
       <primitive 
         object={clone} 
         scale={[1.3, 1.3, 1.3]} 
-        position={[0, -2, 0]} 
+        position={[0, -2, 0]} // Balık kameranın tam ortasında dursun
         rotation={[0, -Math.PI / 2, 0]} 
       />
     </group>
   );
 }
 
-// 🎥 KAMERA TAKİPÇİSİ (Basit)
-function CameraController({ cameraRef }) {
+// 🎮 OYUN MOTORU (Hareket ve Kamera Kontrolü)
+// İşte burası sildiğimiz için hareket edemiyordun. Şimdi düzelttik.
+function GameLogic({ cameraRef }) {
   useFrame((state) => {
-    // Eğer kameranın balığı takip etmesini istiyorsan buraya kod yazarız.
-    // Şimdilik sabit dursun, açıyı görelim.
+    if (!cameraRef.current) return;
+
+    // 1. Senin ana kodundan gelen X ve Y konumunu alıyoruz
+    const targetX = cameraRef.current.x;
+    const targetY = cameraRef.current.y;
+
+    // 2. KAMERAYI HAREKET ETTİRİYORUZ
+    // Kamera senin gittiğin yere (X, Y) geliyor.
+    state.camera.position.x = targetX;
     
-    // Kamerayı her karede dümdüz baktıralım:
-    state.camera.lookAt(0, 0, 0); 
+    // 🔥 ÖNEMLİ AYAR: Kamera seninle aynı yüksekliğe çıkıyor
+    // (Eskiden burada +15 falan vardı, o yüzden tepeden bakıyordu)
+    state.camera.position.y = targetY; 
+    
+    // Z ekseninde (derinlikte) 25 birim geride sabit duruyor
+    state.camera.position.z = 25; 
+
+    // 3. KAMERA AÇISINI KİLİTLİYORUZ
+    // Kamera her zaman tam karşıya (senin olduğun konuma) baksın.
+    // Böylece yukarı çıkınca aşağı eğilmez, dümdüz bakar.
+    state.camera.lookAt(targetX, targetY, 0);
   });
+
   return null;
 }
 
@@ -51,28 +65,24 @@ export default function DenizBackground({ cameraRef }) {
   return (
     <div className="absolute inset-0 bg-black"> 
       <Canvas
-        // 🔥 KAMERA AYARI BURASI 🔥
-        // Eski: position: [0, 15, 20] -> Tepeden bakıyordu.
-        // Yeni: position: [0, 0, 25] -> Tam karşıdan (Göz hizası).
+        // Başlangıç pozisyonu (GameLogic bunu hemen değiştirecek zaten)
         camera={{ position: [0, 0, 25], fov: 45 }}
         style={{ pointerEvents: 'none' }}
       >
-        {/* Kamerayı sürekli merkeze baktıran kontrolcü */}
-        <CameraController cameraRef={cameraRef} />
+        {/* Hareket Mantığını İçeri Ekledik */}
+        <GameLogic cameraRef={cameraRef} />
 
-        {/* Işıklandırma */}
         <ambientLight intensity={2} color="#ffffff" />
         <directionalLight position={[10, 10, 5]} intensity={2} color="#ffffff" />
 
-        {/* Model */}
         <Suspense fallback={null}>
             <DenizModel />
         </Suspense>
         
-        {/* Şehir yansıması (Balığın üstünde parlama olsun diye bıraktım, istersen sil) */}
+        {/* Balığın üstünde güzel yansıma olsun diye */}
         <Environment preset="city" background={false} />
 
       </Canvas>
     </div>
   );
-      }
+}
