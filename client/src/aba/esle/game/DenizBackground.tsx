@@ -1,82 +1,74 @@
 import React, { Suspense, useRef, useEffect, useMemo } from "react";
 import { Canvas, useFrame, extend, useThree, useLoader } from "@react-three/fiber";
-import { useGLTF, useAnimations, Environment } from "@react-three/drei";
+import { useGLTF, useAnimations, Environment, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import { Water } from "three-stdlib"; 
+
+import gokResmi from "./gok.png";
 
 const DENIZ_GLB_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/deniz.glb?alt=media&token=6ecb1237-70e1-43c8-b997-77b6e3943497";
 const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/water/Water_1_M_Normal.jpg";
 
 extend({ Water });
 
-// 🎨 GRADYAN ARKAPLAN (RESİM YOK, SAF MATEMATİK) 🎨
-function GradientBackground({ cameraRef }: { cameraRef: any }) {
+// ☁️ GÖKYÜZÜ (DEVASA BOYUTLANDIRILDI) ☁️
+function Gokyuzu({ cameraRef }: { cameraRef: any }) {
+  const texture = useTexture(gokResmi);
   const meshRef = useRef<THREE.Mesh>(null);
 
-  // Özel Shader Materyali: Tepeden tırnağa renk geçişi sağlar
-  const shaderArgs = useMemo(() => ({
-    uniforms: {
-      uColorTop: { value: new THREE.Color("#68c3eb") },    // ☀️ ÜST: Açık Mavi
-      uColorBottom: { value: new THREE.Color("#00020a") } // 🌑 ALT: Zifiri Karanlık/Lacivert
-    },
-    vertexShader: `
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform vec3 uColorTop;
-      uniform vec3 uColorBottom;
-      varying vec2 vUv;
-      void main() {
-        // Y koordinatına göre (vUv.y) iki rengi karıştır
-        gl_FragColor = vec4(mix(uColorBottom, uColorTop, vUv.y), 1.0);
-      }
-    `
-  }), []);
+  useEffect(() => {
+    texture.wrapS = THREE.RepeatWrapping; 
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.repeat.set(5, 1); 
+  }, [texture]);
 
   useFrame(() => {
     if (!meshRef.current || !cameraRef.current) return;
     const camX = cameraRef.current.x;
-
-    // 1. X EKSENİ: Arkaplan kamerayla beraber gitsin (Sonsuzluk)
-    meshRef.current.position.x = camX;
     
-    // Y EKSENİ: Sabit. 
-    // Yükseklik 1000 birim. Merkez 0 olsa, -500 ile +500 arasını kapsar.
-    // Deniz 15'te. Yani hem gökyüzünü hem de denizin en dibini kapatır.
+    meshRef.current.position.x = camX;
+    texture.offset.x = camX * 0.0002; 
+
+    // YÜKSEKLİK AYARI:
+    // Resmi Y=500'e koydum, boyutu 1000. Alt ucu 0'a değer.
+    // Su 15'te olduğu için resim suyun içine iyice girer.
+    meshRef.current.position.y = 500; 
   });
 
   return (
-    // Z=-400: En arkada dev bir duvar
-    <mesh ref={meshRef} position={[0, 0, -400]}>
-      <planeGeometry args={[5000, 1000]} /> 
-      <shaderMaterial attach="material" args={[shaderArgs]} side={THREE.DoubleSide} />
+    // Z=-300, Yükseklik=1000 (Daha uzun yaptık ki yukarı bakınca bitmesin)
+    <mesh ref={meshRef} position={[0, 500, -300]}>
+      <planeGeometry args={[10000, 1000]} /> 
+      <meshBasicMaterial map={texture} transparent={true} side={THREE.DoubleSide} />
     </mesh>
   );
 }
 
-// 🌫️ SİS VE ORTAM YÖNETİCİSİ
-function EnvironmentManager({ cameraRef }: { cameraRef: any }) {
+// 🎨 ARKAPLAN & SİS YÖNETİCİSİ (HAYATİ KISIM)
+function BackgroundManager({ cameraRef }: { cameraRef: any }) {
   const { scene } = useThree();
 
   useFrame(() => {
     if (!cameraRef.current) return;
     const camY = cameraRef.current.y;
 
-    // Dinamik Sis Ayarı:
-    // Su altındaysan (14 altı) sis açılır. 
-    // Sis rengi, gradyanın en alt rengiyle (#00020a) AYNI olmalı.
     if (camY < 14) { 
-      scene.fog = new THREE.FogExp2('#00020a', 0.025); 
-    } else {
-      scene.fog = null; // Su üstünde sis yok, gökyüzü net
-    }
-    // Not: scene.background kullanmıyoruz, çünkü arkada GradientBackground var.
-  });
+      // 🌊 SU ALTI MODU:
+      // 1. Arkaplanı Koyu Mavi yap
+      scene.background = new THREE.Color('#004060');
+      
+      // 2. SİS EKLE (FOG): Bu sis, su yüzeyini gizler!
+      // '0.025' yoğunluk ayarıdır. Artırırsan yüzey daha çabuk kaybolur.
+      // Sis rengi ile arkaplan rengi AYNI olmalı (#004060) ki ufuk çizgisi yok olsun.
+      scene.fog = new THREE.FogExp2('#004060', 0.025); 
 
+    } else {
+      // ☀️ SU ÜSTÜ MODU:
+      // Sis yok, arkaplan yok (Gökyüzü resmi görünsün)
+      scene.background = null; 
+      scene.fog = null;
+    }
+  });
   return null;
 }
 
@@ -97,7 +89,7 @@ function Ocean() {
       sunColor: 0x0077ff, // Gökyüzü mavisi yansıma
       waterColor: 0x001e0f, 
       distortionScale: 3.7, 
-      fog: true, // Sis açık ki dibe dalınca yüzey kaybolsun
+      fog: true, // 🔥 SİSİ GERİ AÇTIK (Su altında yüzeyin kaybolması için şart)
       format: gl.outputColorSpace === "srgb" ? THREE.SRGBColorSpace : undefined, 
     }),
     [waterNormals, gl.outputColorSpace]
@@ -166,12 +158,10 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       >
         <Environment preset="city" background={false} />
         
-        {/* Sis Yönetimi */}
-        <EnvironmentManager cameraRef={cameraRef} />
+        <BackgroundManager cameraRef={cameraRef} />
 
-        {/* 🔥 YENİ GRADYAN ARKAPLAN (RESİMSİZ) 🔥 */}
         <Suspense fallback={null}>
-            <GradientBackground cameraRef={cameraRef} />
+            <Gokyuzu cameraRef={cameraRef} />
         </Suspense>
 
         <ambientLight intensity={1.5} color="#ffffff" />
@@ -183,5 +173,4 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-                     }
-      
+      }
