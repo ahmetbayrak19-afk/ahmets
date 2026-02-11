@@ -11,24 +11,31 @@ const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/mas
 
 extend({ Water });
 
-// ☁️ GÖKYÜZÜ (Kamera Takipçisi ve Sabit Arkaplan)
+// ☁️ GÖKYÜZÜ (DÜZELTİLDİ: ARTIK SABİT VE DEVASA) ☁️
 function Gokyuzu({ cameraRef }: { cameraRef: any }) {
   const texture = useTexture(gokResmi);
   const meshRef = useRef<THREE.Mesh>(null);
 
   useFrame(() => {
     if (!meshRef.current || !cameraRef.current) return;
-    const camY = cameraRef.current.y;
+    const camX = cameraRef.current.x;
     
-    // 🔥 ÖNEMLİ: Gökyüzü asansör gibi kamerayla beraber hareket eder.
-    // Alt sınırını deniz yüzeyinde (15) tutmak için camY ekliyoruz.
-    // 50 (resmin yarı boyu) + 15 (su seviyesi) = 65
-    meshRef.current.position.y = 65 + camY;
+    // 1. X EKSENİ: Kamera nereye giderse gökyüzü oraya gelsin (Sonsuzluk hissi)
+    meshRef.current.position.x = camX;
+
+    // 2. Y EKSENİ: KAMERADAN BAĞIMSIZ SABİT!
+    // Hesap şu: Resim yüksekliği 500. Yarısı 250.
+    // Suyun seviyesi 15.
+    // Merkez 250 olursa, alt uç 0'a gelir. Su 15 olduğu için 15 birim içeri girer.
+    // Bu sayede siyahlık oluşma şansı SIFIRDIR.
+    meshRef.current.position.y = 250; 
   });
 
   return (
-    <mesh ref={meshRef} position={[0, 65, -150]}>
-      <planeGeometry args={[1000, 100]} />
+    // Z=-200: İyice arkaya attım.
+    <mesh ref={meshRef} position={[0, 250, -200]}>
+      {/* Resmi devasa yaptım: 2000 genişlik, 500 yükseklik */}
+      <planeGeometry args={[2000, 500]} />
       <meshBasicMaterial map={texture} transparent={true} side={THREE.DoubleSide} />
     </mesh>
   );
@@ -99,7 +106,6 @@ function MovingScene({ cameraRef }: { cameraRef: any }) {
     const camX = cameraRef.current.x;
     const camY = cameraRef.current.y;
     
-    // Deniz ve modelin kendi paralaks hareketi
     group.current.position.x = -camX * 0.015;
     group.current.position.y = camY * 0.015;
   });
@@ -121,7 +127,6 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       >
         <Environment preset="city" background={false} />
         
-        {/* 🔥 GÖKYÜZÜ ARTIK BURADA (MovingScene Dışında) 🔥 */}
         <Suspense fallback={null}>
             <Gokyuzu cameraRef={cameraRef} />
         </Suspense>
@@ -135,4 +140,5 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-    }
+  }
+      
