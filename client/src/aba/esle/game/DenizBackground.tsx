@@ -7,8 +7,7 @@ import { Water } from "three-stdlib";
 extend({ Water });
 
 // --- AYARLAR ---
-const SU_SEVIYESI = 0;      // Su tam merkezde (0)
-const ZEMIN_DERINLIGI = -10; // 3D Modeli 10 birim aşağı ittik (Modelin boyuna göre bunu değiştirirsin)
+const SU_SEVIYESI = 15; // İsteğin üzerine 15 metre yukarı aldım
 const DENIZ_GLB_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/deniz.glb?alt=media&token=6ecb1237-70e1-43c8-b997-77b6e3943497";
 const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/water/Water_1_M_Normal.jpg";
 
@@ -50,39 +49,15 @@ function OceanTop({ targetRef }) {
       ref={ref}
       args={[new THREE.PlaneGeometry(10000, 10000), config]}
       rotation={[-Math.PI / 2, 0, 0]} 
-      position={[0, SU_SEVIYESI, 0]} // SIFIR NOKTASI
+      position={[0, SU_SEVIYESI, 0]} // Y=15 olarak ayarlandı
     />
   );
 }
 
-// 2. 3D MODEL (ZEMİN)
-function ZeminModel({ targetRef }) {
-  const { scene } = useGLTF(DENIZ_GLB_URL);
-  const clone = useMemo(() => scene.clone(), [scene]);
-  const ref = useRef();
-
-  useFrame(() => {
-    // Modeli de seninle beraber sağa sola taşıyoruz ki zemin bitmesin
-    if (ref.current && targetRef.current) {
-        ref.current.position.x = targetRef.current.x;
-    }
-  });
-
-  return (
-    <primitive 
-      ref={ref}
-      object={clone} 
-      scale={[1.5, 1.5, 1.5]} 
-      position={[0, ZEMIN_DERINLIGI, 0]} // Modeli aşağı itiyoruz
-      rotation={[0, -Math.PI / 2, 0]} 
-    />
-  );
-}
-
-// 3. BALIK VE OYUN MANTIĞI
+// 2. BALIK VE OYUN MANTIĞI
 function GameContent({ cameraRef }) {
   const group = useRef(null);
-  const { scene, animations } = useGLTF(DENIZ_GLB_URL); // Balık için aynı modeli kullanıyorum, farklıysa değiştir
+  const { scene, animations } = useGLTF(DENIZ_GLB_URL);
   const { actions } = useAnimations(animations, group);
   const { camera } = useThree();
 
@@ -92,7 +67,7 @@ function GameContent({ cameraRef }) {
     });
   }, [actions]);
 
-  // Balık Modelini Klonla (Zeminle karışmasın diye)
+  // Modeli klonluyoruz
   const fishClone = useMemo(() => scene.clone(), [scene]);
 
   useFrame(() => {
@@ -107,25 +82,24 @@ function GameContent({ cameraRef }) {
 
     // B) Kamerayı hareket ettir (Paralel Takip)
     camera.position.x = targetX;
-    camera.position.y = targetY; // Balıkla aynı kata çık
-    camera.position.z = 30;      // Karşıdan bak
+    camera.position.y = targetY; 
+    camera.position.z = 30;      
     camera.lookAt(targetX, targetY, 0);
   });
 
   return (
     <>
-      {/* BALIK (Ortada yüzüyor) */}
+      {/* SADECE HAREKETLİ BALIK KALDI (Sabit olanı sildim) */}
       <group ref={group}>
         <primitive 
           object={fishClone} 
-          scale={[1, 1, 1]} 
+          scale={[1.3, 1.3, 1.3]} 
           rotation={[0, -Math.PI / 2, 0]} 
         />
       </group>
 
-      {/* DÜNYA (Su tavanda, Zemin dipte) */}
+      {/* Su Yüzeyi */}
       <OceanTop targetRef={cameraRef} />
-      <ZeminModel targetRef={cameraRef} />
     </>
   );
 }
@@ -148,5 +122,4 @@ export default function DenizBackground({ cameraRef }) {
       </Canvas>
     </div>
   );
-      }
-      
+                                 }
