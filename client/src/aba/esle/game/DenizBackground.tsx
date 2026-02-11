@@ -15,13 +15,9 @@ function Ocean() {
   const ref = useRef<any>();
   const gl = useThree((state) => state.gl);
   
-  // Su dokusunu yüklüyoruz
   const waterNormals = useLoader(THREE.TextureLoader, WATER_NORMALS_URL);
-  
-  // Doku ayarları (Tekrar etsin)
   waterNormals.wrapS = waterNormals.wrapT = THREE.RepeatWrapping;
 
-  // Su objesi konfigürasyonu
   const config = useMemo(
     () => ({
       textureWidth: 512,
@@ -29,35 +25,32 @@ function Ocean() {
       waterNormals,
       sunDirection: new THREE.Vector3(),
       sunColor: 0xffffff,
-      waterColor: 0x001e0f, // Koyu Okyanus Yeşili/Mavisi
-      distortionScale: 3.7, // Dalga büyüklüğü
+      waterColor: 0x001e0f, 
+      distortionScale: 3.7, 
       fog: false,
-      format: gl.outputColorSpace === "srgb" ? THREE.SRGBColorSpace : undefined, // Renk uzayı düzeltmesi
+      format: gl.outputColorSpace === "srgb" ? THREE.SRGBColorSpace : undefined, 
     }),
     [waterNormals, gl.outputColorSpace]
   );
 
   useFrame((state, delta) => {
-    // Suyu sürekli hareket ettir (Animasyon)
     if (ref.current) {
       ref.current.material.uniforms.time.value += delta * 0.5;
     }
   });
 
   return (
-    // <water /> etiketi 'extend' sayesinde çalışır
     // @ts-ignore
     <water
       ref={ref}
-      args={[new THREE.PlaneGeometry(10000, 10000), config]} // Sonsuz büyüklükte deniz
-      rotation={[-Math.PI / 2, 0, 0]} // Yatay çevir
-      // 🔥 DEĞİŞİKLİK: Deniz yüzeyi 15 metre yukarı alındı 🔥
+      args={[new THREE.PlaneGeometry(10000, 10000), config]} 
+      rotation={[-Math.PI / 2, 0, 0]} 
       position={[0, 15, 0]} 
     />
   );
 }
 
-// ESKİ DENİZ DİBİ MODELİ (Süs olarak dursun)
+// ESKİ DENİZ DİBİ MODELİ (Genişletildi)
 function DenizModel() {
   const group = useRef<THREE.Group>(null);
   const { scene, animations } = useGLTF(DENIZ_GLB_URL);
@@ -75,7 +68,10 @@ function DenizModel() {
     <group ref={group}>
       <primitive 
         object={clone} 
-        scale={[1, 1, 1]} 
+        // 🔥 DEĞİŞİKLİK: Enine genişletmek için Z eksenini (son değer) artırdım.
+        // Rotation -90 olduğu için Z ekseni ekranın sağına soluna denk gelir.
+        // [1, 1, 4] yaparak yanlara doğru 4 kat uzattım.
+        scale={[1, 1, 4]} 
         position={[0, -5, -5]} 
         rotation={[0, -Math.PI / 2, 0]} 
       />
@@ -91,7 +87,6 @@ function MovingScene({ cameraRef }: { cameraRef: any }) {
     const camX = cameraRef.current.x;
     const camY = cameraRef.current.y;
     
-    // Dünyayı kaydır
     group.current.position.x = -camX * 0.015;
     group.current.position.y = camY * 0.015;
   });
@@ -99,7 +94,7 @@ function MovingScene({ cameraRef }: { cameraRef: any }) {
   return (
     <group ref={group}>
       <DenizModel />
-      <Ocean /> {/* Yeni Hızlı Okyanus */}
+      <Ocean /> 
     </group>
   );
 }
@@ -108,12 +103,10 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
   return (
     <div className="absolute inset-0 bg-black"> 
       <Canvas
-        camera={{ position: [0, 5, 20], fov: 45 }} // Kamerayı biraz yukarı aldım suyu gör diye
+        camera={{ position: [0, 5, 20], fov: 45 }} 
         style={{ pointerEvents: 'none' }}
       >
         <Environment preset="city" background={false} />
-        
-        {/* 🔥 DEĞİŞİKLİK: Gök yüzü ve resmi kaldırıldı 🔥 */}
         
         <ambientLight intensity={1.5} color="#ffffff" />
         <directionalLight position={[10, 20, 10]} intensity={2} color="#ffffff" />
@@ -124,5 +117,5 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-    }
-    
+     }
+     
