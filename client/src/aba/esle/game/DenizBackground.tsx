@@ -9,16 +9,15 @@ const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/mas
 
 extend({ Water });
 
-// 🔥 ÇİFT TARAFLI OKYANUS (KAĞIT GİBİ) 🔥
+// 🔥 ÇİFT TARAFLI OKYANUS (PIRPIRLANMA GİDERİLDİ) 🔥
 function Ocean() {
-  const refTop = useRef<any>();     // Üst yüzey referansı
-  const refBottom = useRef<any>();  // Alt yüzey referansı
+  const refTop = useRef<any>();     
+  const refBottom = useRef<any>();  
   const gl = useThree((state) => state.gl);
   
   const waterNormals = useLoader(THREE.TextureLoader, WATER_NORMALS_URL);
   waterNormals.wrapS = waterNormals.wrapT = THREE.RepeatWrapping;
 
-  // Konfigürasyonu iki yüzey için de kullanacağız
   const config = useMemo(
     () => ({
       textureWidth: 512,
@@ -35,17 +34,15 @@ function Ocean() {
   );
 
   useFrame((state, delta) => {
-    // İki yüzeyi de aynı anda dalgalandırıyoruz
     const timeValue = delta * 0.5;
     if (refTop.current) refTop.current.material.uniforms.time.value += timeValue;
     if (refBottom.current) refBottom.current.material.uniforms.time.value += timeValue;
   });
 
   return (
-    // İkisini bir grup içine aldım, yükseklik ayarını (15) gruba verdim.
     <group position={[0, 15, 0]}>
       
-      {/* 1. ÜST YÜZEY (Yukarı Bakıyor) */}
+      {/* 1. ÜST YÜZEY (0 noktasında duruyor) */}
       {/* @ts-ignore */}
       <water
         ref={refTop}
@@ -53,13 +50,14 @@ function Ocean() {
         rotation={[-Math.PI / 2, 0, 0]} 
       />
 
-      {/* 2. ALT YÜZEY (Aşağı Bakıyor - Tam Tersi) */}
+      {/* 2. ALT YÜZEY (MİKROSKOBİK AŞAĞI ALINDI) */}
       {/* @ts-ignore */}
       <water
         ref={refBottom}
         args={[new THREE.PlaneGeometry(10000, 10000), config]} 
-        // 🔥 SIR BURADA: +PI/2 yaparak tam tersine çevirdik (Tavana bakar gibi)
         rotation={[Math.PI / 2, 0, 0]} 
+        // 🔥 ÇÖZÜM BURADA: 0.05 birim aşağı indirdik. Göz görmez ama GPU görür.
+        position={[0, -0.05, 0]} 
       />
     </group>
   );
@@ -83,7 +81,7 @@ function DenizModel() {
     <group ref={group}>
       <primitive 
         object={clone} 
-        scale={[1, 1, 4]} // Genişletilmiş hali
+        scale={[1, 1, 4]} 
         position={[0, -5, -5]} 
         rotation={[0, -Math.PI / 2, 0]} 
       />
