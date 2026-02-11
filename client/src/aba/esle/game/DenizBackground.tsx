@@ -11,7 +11,7 @@ const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/mas
 
 extend({ Water });
 
-// ☁️ GÖKYÜZÜ (DEVASA VE SONSUZ) ☁️
+// ☁️ GÖKYÜZÜ (DEVASA BOYUTLANDIRILDI) ☁️
 function Gokyuzu({ cameraRef }: { cameraRef: any }) {
   const texture = useTexture(gokResmi);
   const meshRef = useRef<THREE.Mesh>(null);
@@ -19,7 +19,6 @@ function Gokyuzu({ cameraRef }: { cameraRef: any }) {
   useEffect(() => {
     texture.wrapS = THREE.RepeatWrapping; 
     texture.wrapT = THREE.ClampToEdgeWrapping;
-    // Resmi yatayda 5 kere tekrar et (Sıklık ayarı)
     texture.repeat.set(5, 1); 
   }, [texture]);
 
@@ -27,32 +26,25 @@ function Gokyuzu({ cameraRef }: { cameraRef: any }) {
     if (!meshRef.current || !cameraRef.current) return;
     const camX = cameraRef.current.x;
     
-    // 1. Pano seninle gelsin (Asla bitmesin)
     meshRef.current.position.x = camX;
-
-    // 2. Doku kaysın (Paralaks)
-    // Çarpanı artırırsan bulutlar hızlanır.
-    // + veya - yaparak yönü değiştirebilirsin.
     texture.offset.x = camX * 0.0002; 
 
-    // 3. Yükseklik Sabit
-    // Resim yüksekliği 1000. Yarısı 500.
-    // Merkez 485 olursa alt uç -15 olur.
-    // Su seviyesi +15. Yani resim suyun 30 birim altına kadar iner.
-    // ASLA SİYAH BOŞLUK GÖRÜNMEZ.
-    meshRef.current.position.y = 485; 
+    // YÜKSEKLİK AYARI:
+    // Resmi Y=500'e koydum, boyutu 1000. Alt ucu 0'a değer.
+    // Su 15'te olduğu için resim suyun içine iyice girer.
+    meshRef.current.position.y = 500; 
   });
 
   return (
-    <mesh ref={meshRef} position={[0, 485, -300]}>
-      {/* Genişliği 10000 yaptık, Yüksekliği 1000 yaptık */}
+    // Z=-300, Yükseklik=1000 (Daha uzun yaptık ki yukarı bakınca bitmesin)
+    <mesh ref={meshRef} position={[0, 500, -300]}>
       <planeGeometry args={[10000, 1000]} /> 
       <meshBasicMaterial map={texture} transparent={true} side={THREE.DoubleSide} />
     </mesh>
   );
 }
 
-// 🎨 ARKAPLAN RENGİ YÖNETİCİSİ
+// 🎨 ARKAPLAN & SİS YÖNETİCİSİ (HAYATİ KISIM)
 function BackgroundManager({ cameraRef }: { cameraRef: any }) {
   const { scene } = useThree();
 
@@ -60,12 +52,21 @@ function BackgroundManager({ cameraRef }: { cameraRef: any }) {
     if (!cameraRef.current) return;
     const camY = cameraRef.current.y;
 
-    if (camY < 14) { // Su seviyesinin (15) biraz altı
-      // 🌊 SU ALTI: KOYU MAVİ (Fotoğraftaki o siyahlığı maviye çevirir)
-      scene.background = new THREE.Color('#004060'); 
+    if (camY < 14) { 
+      // 🌊 SU ALTI MODU:
+      // 1. Arkaplanı Koyu Mavi yap
+      scene.background = new THREE.Color('#004060');
+      
+      // 2. SİS EKLE (FOG): Bu sis, su yüzeyini gizler!
+      // '0.025' yoğunluk ayarıdır. Artırırsan yüzey daha çabuk kaybolur.
+      // Sis rengi ile arkaplan rengi AYNI olmalı (#004060) ki ufuk çizgisi yok olsun.
+      scene.fog = new THREE.FogExp2('#004060', 0.025); 
+
     } else {
-      // ☀️ SU ÜSTÜ: BOŞ (Gökyüzü resmi görünsün)
+      // ☀️ SU ÜSTÜ MODU:
+      // Sis yok, arkaplan yok (Gökyüzü resmi görünsün)
       scene.background = null; 
+      scene.fog = null;
     }
   });
   return null;
@@ -85,12 +86,10 @@ function Ocean() {
       textureHeight: 512,
       waterNormals,
       sunDirection: new THREE.Vector3(),
-      // 🔥 DÜZELTME: Güneş rengi artık BEYAZ değil, GÖKYÜZÜ MAVİSİ.
-      // Bu sayede suyun üzerindeki o beyaz patlama gidecek.
-      sunColor: 0x0077ff, 
+      sunColor: 0x0077ff, // Gökyüzü mavisi yansıma
       waterColor: 0x001e0f, 
       distortionScale: 3.7, 
-      fog: false,
+      fog: true, // 🔥 SİSİ GERİ AÇTIK (Su altında yüzeyin kaybolması için şart)
       format: gl.outputColorSpace === "srgb" ? THREE.SRGBColorSpace : undefined, 
     }),
     [waterNormals, gl.outputColorSpace]
@@ -105,7 +104,6 @@ function Ocean() {
   return (
     <group position={[0, 15, 0]}>
       <water ref={refTop} args={[new THREE.PlaneGeometry(20000, 20000), config]} rotation={[-Math.PI / 2, 0, 0]} />
-      {/* Alt yüzey mavi arkaplanı yansıtarak daha doğal duracak */}
       <water ref={refBottom} args={[new THREE.PlaneGeometry(20000, 20000), config]} rotation={[Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} />
     </group>
   );
@@ -175,5 +173,5 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-    }
-      
+  }
+                                                                                            
