@@ -11,18 +11,24 @@ const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/mas
 
 extend({ Water });
 
-// ☁️ GÖKYÜZÜ (Takipçi Modu)
-function Gokyuzu({ followY }: { followY: number }) {
+// ☁️ GÖKYÜZÜ (Kamera Takipçisi ve Sabit Arkaplan)
+function Gokyuzu({ cameraRef }: { cameraRef: any }) {
   const texture = useTexture(gokResmi);
-  
-  // Y Hesabı: Su 15'te sabit. Resmin altı 15'e değmeli.
-  // Ancak kamera aşağı indikçe perspektiften dolayı boşluk kalmaması için
-  // resmin Y pozisyonunu kameranın Y pozisyonuna göre offsetliyoruz.
-  const dynamicY = 65 - (15 - followY); 
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  useFrame(() => {
+    if (!meshRef.current || !cameraRef.current) return;
+    const camY = cameraRef.current.y;
+    
+    // 🔥 ÖNEMLİ: Gökyüzü asansör gibi kamerayla beraber hareket eder.
+    // Alt sınırını deniz yüzeyinde (15) tutmak için camY ekliyoruz.
+    // 50 (resmin yarı boyu) + 15 (su seviyesi) = 65
+    meshRef.current.position.y = 65 + camY;
+  });
 
   return (
-    <mesh position={[0, dynamicY, -100]}>
-      <planeGeometry args={[600, 100]} />
+    <mesh ref={meshRef} position={[0, 65, -150]}>
+      <planeGeometry args={[1000, 100]} />
       <meshBasicMaterial map={texture} transparent={true} side={THREE.DoubleSide} />
     </mesh>
   );
@@ -59,8 +65,8 @@ function Ocean() {
 
   return (
     <group position={[0, 15, 0]}>
-      <water ref={refTop} args={[new THREE.PlaneGeometry(10000, 10000), config]} rotation={[-Math.PI / 2, 0, 0]} />
-      <water ref={refBottom} args={[new THREE.PlaneGeometry(10000, 10000), config]} rotation={[Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} />
+      <water ref={refTop} args={[new THREE.PlaneGeometry(20000, 20000), config]} rotation={[-Math.PI / 2, 0, 0]} />
+      <water ref={refBottom} args={[new THREE.PlaneGeometry(20000, 20000), config]} rotation={[Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} />
     </group>
   );
 }
@@ -87,27 +93,21 @@ function DenizModel() {
 
 function MovingScene({ cameraRef }: { cameraRef: any }) {
   const group = useRef<THREE.Group>(null);
-  const [currentY, setCurrentY] = React.useState(15);
 
   useFrame(() => {
     if (!group.current || !cameraRef.current) return;
     const camX = cameraRef.current.x;
     const camY = cameraRef.current.y;
     
+    // Deniz ve modelin kendi paralaks hareketi
     group.current.position.x = -camX * 0.015;
     group.current.position.y = camY * 0.015;
-    
-    // Gökyüzüne kameranın anlık Y bilgisini gönderiyoruz
-    if (Math.abs(currentY - camY) > 0.01) setCurrentY(camY);
   });
 
   return (
     <group ref={group}>
       <DenizModel />
       <Ocean /> 
-      <Suspense fallback={null}>
-        <Gokyuzu followY={currentY} />
-      </Suspense>
     </group>
   );
 }
@@ -121,6 +121,11 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       >
         <Environment preset="city" background={false} />
         
+        {/* 🔥 GÖKYÜZÜ ARTIK BURADA (MovingScene Dışında) 🔥 */}
+        <Suspense fallback={null}>
+            <Gokyuzu cameraRef={cameraRef} />
+        </Suspense>
+
         <ambientLight intensity={1.5} color="#ffffff" />
         <directionalLight position={[10, 20, 10]} intensity={2} color="#ffffff" />
 
@@ -130,5 +135,4 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-}
-  
+    }
