@@ -11,41 +11,42 @@ const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/mas
 
 extend({ Water });
 
-// ☁️ GÖKYÜZÜ (DÜZELTİLDİ: TERS YÖNE AKAN SONSUZ BULUTLAR) ☁️
+// ☁️ GÖKYÜZÜ (DEVASA VE SONSUZ) ☁️
 function Gokyuzu({ cameraRef }: { cameraRef: any }) {
   const texture = useTexture(gokResmi);
   const meshRef = useRef<THREE.Mesh>(null);
 
   useEffect(() => {
-    // Resmi yan yana döşemek için ayarlar
-    texture.wrapS = THREE.RepeatWrapping; // Yatayda sürekli tekrar et
+    texture.wrapS = THREE.RepeatWrapping; 
     texture.wrapT = THREE.ClampToEdgeWrapping;
-    // Resmi 3 kere yan yana sığdır (Sıklığını buradan ayarlayabilirsin)
-    texture.repeat.set(3, 1); 
+    // Resmi yatayda 5 kere tekrar et (Sıklık ayarı)
+    texture.repeat.set(5, 1); 
   }, [texture]);
 
   useFrame(() => {
     if (!meshRef.current || !cameraRef.current) return;
     const camX = cameraRef.current.x;
     
-    // 1. PANOYU TAŞI: Pano hep seninle gelsin ki asla boşluğa düşme.
+    // 1. Pano seninle gelsin (Asla bitmesin)
     meshRef.current.position.x = camX;
 
-    // 2. RESMİ KAYDIR (SİHİR BURADA):
-    // Sen SAĞA (+X) gidince, resim ofsetini artırıyoruz.
-    // Three.js'de offset artınca resim SOLA kayar. Tam istediğin gibi.
-    // 0.0005 çarpanı bulutların ne kadar "uzakta" olduğunu hissettirir.
-    // Sayıyı küçültürsen bulutlar çok yavaş (çok uzak), büyütürsen hızlı akar.
-    texture.offset.x = camX * 0.0005; 
+    // 2. Doku kaysın (Paralaks)
+    // Çarpanı artırırsan bulutlar hızlanır.
+    // + veya - yaparak yönü değiştirebilirsin.
+    texture.offset.x = camX * 0.0002; 
 
-    // 3. YÜKSEKLİK: Sabit (Suya gömülü)
-    meshRef.current.position.y = 250; 
+    // 3. Yükseklik Sabit
+    // Resim yüksekliği 1000. Yarısı 500.
+    // Merkez 485 olursa alt uç -15 olur.
+    // Su seviyesi +15. Yani resim suyun 30 birim altına kadar iner.
+    // ASLA SİYAH BOŞLUK GÖRÜNMEZ.
+    meshRef.current.position.y = 485; 
   });
 
   return (
-    // Panoyu yine devasa tutuyoruz
-    <mesh ref={meshRef} position={[0, 250, -200]}>
-      <planeGeometry args={[5000, 500]} /> 
+    <mesh ref={meshRef} position={[0, 485, -300]}>
+      {/* Genişliği 10000 yaptık, Yüksekliği 1000 yaptık */}
+      <planeGeometry args={[10000, 1000]} /> 
       <meshBasicMaterial map={texture} transparent={true} side={THREE.DoubleSide} />
     </mesh>
   );
@@ -59,15 +60,14 @@ function BackgroundManager({ cameraRef }: { cameraRef: any }) {
     if (!cameraRef.current) return;
     const camY = cameraRef.current.y;
 
-    if (camY < 15) {
-      // 🌊 SU ALTI: MAVİ (Aşağıdan bakınca güzel görünsün)
-      scene.background = new THREE.Color('#006994'); 
+    if (camY < 14) { // Su seviyesinin (15) biraz altı
+      // 🌊 SU ALTI: KOYU MAVİ (Fotoğraftaki o siyahlığı maviye çevirir)
+      scene.background = new THREE.Color('#004060'); 
     } else {
-      // ☀️ SU ÜSTÜ: BOŞ (Gökyüzü resmi net görünsün)
+      // ☀️ SU ÜSTÜ: BOŞ (Gökyüzü resmi görünsün)
       scene.background = null; 
     }
   });
-
   return null;
 }
 
@@ -85,7 +85,9 @@ function Ocean() {
       textureHeight: 512,
       waterNormals,
       sunDirection: new THREE.Vector3(),
-      sunColor: 0xffffff,
+      // 🔥 DÜZELTME: Güneş rengi artık BEYAZ değil, GÖKYÜZÜ MAVİSİ.
+      // Bu sayede suyun üzerindeki o beyaz patlama gidecek.
+      sunColor: 0x0077ff, 
       waterColor: 0x001e0f, 
       distortionScale: 3.7, 
       fog: false,
@@ -173,5 +175,5 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-      }
-    
+    }
+      
