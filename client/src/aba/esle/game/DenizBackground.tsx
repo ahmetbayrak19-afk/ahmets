@@ -1,81 +1,86 @@
-// DenizBackground.tsx (gok.png YOK, sürekli su-altı gradient + sis)
 import React, { Suspense, useRef, useEffect, useMemo } from "react";
 import { Canvas, useFrame, extend, useThree, useLoader } from "@react-three/fiber";
 import { useGLTF, useAnimations, Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { Water } from "three-stdlib";
 
-const DENIZ_GLB_URL =
-  "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/deniz.glb?alt=media&token=6ecb1237-70e1-43c8-b997-77b6e3943497";
-
-const WATER_NORMALS_URL =
-  "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/water/Water_1_M_Normal.jpg";
+// --- SABİTLER ---
+const DENIZ_GLB_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/deniz.glb?alt=media&token=6ecb1237-70e1-43c8-b997-77b6e3943497";
+const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/water/Water_1_M_Normal.jpg";
 
 extend({ Water });
 
-// 2D ile uyumlu referans (yüzey)
-const SEA_LEVEL_PX = 500;
+// --- RENK PALETİ (Döngü dışında tanımladık, tekrar tekrar yaratılmasın) ---
+// Bu renkler bellekte sadece 1 kere yer kaplar.
+const C_SHALLOW = new THREE.Color("#0B6F8F"); // Yüzey (Turkuaz)
+const C_MID = new THREE.Color("#074B67");     // Orta (Mavi)
+const C_DEEP = new THREE.Color("#00020a");    // Dip (Zifiri Karanlık)
 
-// 2D px -> 3D birim dönüşümü
-const PX_TO_3D = 0.015;
-
-// Renk yardımcıları
-function color(hex: string) {
-  return new THREE.Color(hex);
-}
-function mix(a: THREE.Color, b: THREE.Color, t: number) {
-  return a.clone().lerp(b, t);
-}
+// Matematiksel yumuşatma fonksiyonu
 function smoothstep(edge0: number, edge1: number, x: number) {
   const t = THREE.MathUtils.clamp((x - edge0) / (edge1 - edge0), 0, 1);
   return t * t * (3 - 2 * t);
 }
 
-/**
- * İSTEDİĞİN LOOK:
- * - Hep "su altı" paleti (asla açık düz gökyüzü yok)
- * - Yüzeye yakın: turkuaz/açık mavi
- * - Aşağı inince: koyu laciverte akar
- * - Sis (fog) hiçbir zaman kapanmaz, derinlikte artar
- */
+// 🚀 OPTİMİZE EDİLMİŞ ARKAPLAN & SİS YÖNETİCİSİ 🚀
 function BackgroundManager({ cameraRef }: { cameraRef: any }) {
   const { scene } = useThree();
 
-  // Senin ekran görüntüsüne yakın palet:
-  // (İstersen sonra ince ayar yaparız)
-  const C_SHALLOW = useMemo(() => color("#0B6F8F"), []); // yüzeye yakın su (turkuaz)
-  const C_MID = useMemo(() => color("#074B67"), []);     // orta derinlik
-  const C_DEEP = useMemo(() => color("#032233"), []);    // derin (koyu mavi)
+  // Geçici renk değişkeni.
+  // Her karede yeni renk yaratmak yerine, bu kutunun içini boyayıp kullanacağız.
+  // Garbage Collector (Çöp Toplayıcı) buna bayılır.
+  const tempColor = useMemo(() => new THREE.Color(), []);
 
+  // 1. ADIM: Sahne açılınca Sisi (Fog) SADECE BİR KERE yarat.
+  useEffect(() => {
+    // Başlangıçta siyah sis, yoğunluk 0.02
+    scene.fog = new THREE.FogExp2(0x000000, 0.02);
+    
+    // Temizlik (Component silinirse sisi kaldır)
+    return () => { scene.fog = null; };
+  }, [scene]);
+
+  // 2. ADIM: Her karede (60 FPS) sadece DEĞERLERİ güncelle.
   useFrame(() => {
-    if (!cameraRef.current) return;
+    if (!cameraRef.current || !scene.fog) return;
 
     const camY = cameraRef.current.y;
+    
+    // Derinlik hesabı (0 ile 1 arası)
+    // Deniz yüzeyi ~15. 1500 birim aşağı inince tam karanlık (1.0) olsun.
+    const depth = THREE.MathUtils.clamp((15 - camY) / 1000, 0, 1);
 
-    // Derinlik metriği:
-    // SEA_LEVEL’de 0, SEA_LEVEL+1200’de 1
-    const rawDepth = (camY - SEA_LEVEL_PX) / 1200;
+    // --- RENK KARIŞTIRMA (ALLOCATION FREE) ---
+    // Önce tempColor'ı Shallow rengine eşitle.
+    // Sonra Mid rengine doğru 'lerp' (yumuşak geçiş) yap.
+    // Sonra Deep rengine doğru 'lerp' yap.
+    // HİÇBİR YERDE "new THREE.Color" YOK!
+    
+    const t1 = smoothstep(0.0, 0.3, depth); // Sığdan ortaya geçiş hızı
+    const t2 = smoothstep(0.3, 1.0, depth); // Ortadan dibe geçiş hızı
 
-    // Yüzeye yakınken bile 0’a kilitleme (negatife inmesin)
-    const depth01 = THREE.MathUtils.clamp(rawDepth, 0, 1);
+    tempColor
+      .copy(C_SHALLOW)      // Kopyala
+      .lerp(C_MID, t1)      // Karıştır 1
+      .lerp(C_DEEP, t2);    // Karıştır 2
 
-    // 2 aşamalı gradyan: shallow->mid->deep
-    const t1 = smoothstep(0.0, 0.55, depth01); // 0..0.55 arası hızla otursun
-    const t2 = smoothstep(0.45, 1.0, depth01); // 0.45..1 arası deep’e gitsin
-    const cSM = mix(C_SHALLOW, C_MID, t1);
-    const bg = mix(cSM, C_DEEP, t2);
+    // --- SİS YOĞUNLUĞU ---
+    // Derine indikçe sis 0.02'den 0.05'e çıksın (daha yoğun olsun)
+    // Böylece yüzey tamamen kaybolur.
+    const targetDensity = THREE.MathUtils.lerp(0.02, 0.05, t2);
 
-    // Sis yoğunluğu: yüzeye yakın da var, aşağı indikçe artıyor
-    // (senin istediğin "sis kaybolmasın" şartı)
-    const fogDensity = THREE.MathUtils.lerp(0.020, 0.045, smoothstep(0.0, 1.0, depth01));
-
-    scene.background = bg;
-    scene.fog = new THREE.FogExp2(bg.getHex(), fogDensity);
+    // --- UYGULAMA ---
+    scene.background = tempColor;          // Arkaplanı boya
+    // @ts-ignore
+    scene.fog.color.copy(tempColor);       // Sisi boya (nesne yaratmadan)
+    // @ts-ignore
+    scene.fog.density = targetDensity;     // Sis yoğunluğunu güncelle
   });
 
   return null;
 }
 
+// --- OKYANUS ---
 function Ocean() {
   const refTop = useRef<any>();
   const refBottom = useRef<any>();
@@ -92,30 +97,32 @@ function Ocean() {
       textureWidth: 512,
       textureHeight: 512,
       waterNormals,
-      sunDirection: new THREE.Vector3(0.2, 1, 0.2),
-      sunColor: 0xffffff,
-      waterColor: 0x0b3a52,       // daha “deniz” hisli
-      distortionScale: 2.6,       // çok kırıp bozmasın
-      fog: true,
-      format:
-        gl.outputColorSpace === THREE.SRGBColorSpace ? THREE.SRGBColorSpace : undefined,
+      sunDirection: new THREE.Vector3(),
+      sunColor: 0x0077ff, // Mavi yansıma (Beyaz parlamayı önler)
+      waterColor: 0x001e0f,
+      distortionScale: 3.7,
+      fog: true, // Sisten etkilensin (Dibe dalınca kaybolması için şart)
+      format: gl.outputColorSpace === "srgb" ? THREE.SRGBColorSpace : undefined,
     }),
     [waterNormals, gl.outputColorSpace]
   );
 
   useFrame((_, delta) => {
-    const t = delta * 0.6;
+    // Delta ile zamanı güncelle (Animasyon)
+    const t = delta * 0.5;
     if (refTop.current) refTop.current.material.uniforms.time.value += t;
     if (refBottom.current) refBottom.current.material.uniforms.time.value += t;
   });
 
   return (
     <group position={[0, 15, 0]}>
+      {/* Üst Yüzey */}
       <water
         ref={refTop}
         args={[new THREE.PlaneGeometry(20000, 20000), config]}
         rotation={[-Math.PI / 2, 0, 0]}
       />
+      {/* Alt Yüzey (Ters) - Mavi boşluğu yansıtması için */}
       <water
         ref={refBottom}
         args={[new THREE.PlaneGeometry(20000, 20000), config]}
@@ -126,6 +133,7 @@ function Ocean() {
   );
 }
 
+// --- DENİZ DİBİ MODELİ ---
 function DenizModel() {
   const group = useRef<THREE.Group>(null);
   const { scene, animations } = useGLTF(DENIZ_GLB_URL);
@@ -135,13 +143,14 @@ function DenizModel() {
     Object.keys(actions).forEach((k) => actions[k]?.reset().fadeIn(0.3).play());
   }, [actions]);
 
+  // Modeli clone'luyoruz ki sahnede çakışma olmasın
   const clone = useMemo(() => scene.clone(true), [scene]);
 
   return (
     <group ref={group}>
       <primitive
         object={clone}
-        scale={[1, 1, 4]}
+        scale={[1, 1, 4]} // Genişletilmiş
         position={[0, -5, -5]}
         rotation={[0, -Math.PI / 2, 0]}
       />
@@ -149,6 +158,7 @@ function DenizModel() {
   );
 }
 
+// --- HAREKETLİ SAHNE (PARALAKS) ---
 function MovingScene({ cameraRef }: { cameraRef: any }) {
   const group = useRef<THREE.Group>(null);
 
@@ -158,8 +168,9 @@ function MovingScene({ cameraRef }: { cameraRef: any }) {
     const camX = cameraRef.current.x;
     const camY = cameraRef.current.y;
 
-    group.current.position.x = -camX * PX_TO_3D;
-    group.current.position.y = camY * PX_TO_3D;
+    // Kameraya göre sahneyi ters yönde kaydır
+    group.current.position.x = -camX * 0.015;
+    group.current.position.y = camY * 0.015;
   });
 
   return (
@@ -170,25 +181,23 @@ function MovingScene({ cameraRef }: { cameraRef: any }) {
   );
 }
 
+// --- ANA COMPONENT ---
 export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
   return (
-    <div className="absolute inset-0">
+    <div className="absolute inset-0 bg-black">
       <Canvas
         camera={{ position: [0, 5, 20], fov: 45 }}
         style={{ pointerEvents: "none" }}
+        // Performance ayarları: Alpha kapalı (daha hızlı), Antialias açık
         gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
-        onCreated={({ gl }) => {
-          gl.outputColorSpace = THREE.SRGBColorSpace;
-          gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.05;
-        }}
       >
         <Environment preset="city" background={false} />
 
+        {/* Optimize edilmiş yönetici */}
         <BackgroundManager cameraRef={cameraRef} />
 
-        <ambientLight intensity={1.1} />
-        <directionalLight position={[10, 20, 10]} intensity={2.0} />
+        <ambientLight intensity={1.5} color="#ffffff" />
+        <directionalLight position={[10, 20, 10]} intensity={2} color="#ffffff" />
 
         <Suspense fallback={null}>
           <MovingScene cameraRef={cameraRef} />
@@ -196,4 +205,5 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-}
+  }
+      
