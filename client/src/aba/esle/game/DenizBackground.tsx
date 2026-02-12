@@ -10,8 +10,7 @@ const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/mas
 
 extend({ Water });
 
-// --- RENK PALETİ (Döngü dışında tanımladık, tekrar tekrar yaratılmasın) ---
-// Bu renkler bellekte sadece 1 kere yer kaplar.
+// --- RENK PALETİ ---
 const C_SHALLOW = new THREE.Color("#0B6F8F"); // Yüzey (Turkuaz)
 const C_MID = new THREE.Color("#074B67");     // Orta (Mavi)
 const C_DEEP = new THREE.Color("#00020a");    // Dip (Zifiri Karanlık)
@@ -26,55 +25,48 @@ function smoothstep(edge0: number, edge1: number, x: number) {
 function BackgroundManager({ cameraRef }: { cameraRef: any }) {
   const { scene } = useThree();
 
-  // Geçici renk değişkeni.
-  // Her karede yeni renk yaratmak yerine, bu kutunun içini boyayıp kullanacağız.
-  // Garbage Collector (Çöp Toplayıcı) buna bayılır.
+  // Bellek optimizasyonu için renk nesnesi
   const tempColor = useMemo(() => new THREE.Color(), []);
 
-  // 1. ADIM: Sahne açılınca Sisi (Fog) SADECE BİR KERE yarat.
+  // 1. ADIM: Sahne açılınca Sisi yarat.
   useEffect(() => {
-    // Başlangıçta siyah sis, yoğunluk 0.02
     scene.fog = new THREE.FogExp2(0x000000, 0.02);
-    
-    // Temizlik (Component silinirse sisi kaldır)
     return () => { scene.fog = null; };
   }, [scene]);
 
-  // 2. ADIM: Her karede (60 FPS) sadece DEĞERLERİ güncelle.
+  // 2. ADIM: Her karede güncelle.
   useFrame(() => {
     if (!cameraRef.current || !scene.fog) return;
 
     const camY = cameraRef.current.y;
     
-    // Derinlik hesabı (0 ile 1 arası)
-    // Deniz yüzeyi ~15. 1500 birim aşağı inince tam karanlık (1.0) olsun.
-    const depth = THREE.MathUtils.clamp((15 - camY) / 1000, 0, 1);
+    // 🔥 DÜZELTME BURADA YAPILDI 🔥
+    // Eskisi: (15 - camY) idi. 
+    // Yenisi: (camY - 15) oldu.
+    // Mantık: Kamera Y değeri arttıkça (aşağı indikçe), depth değeri artsın (koyulaşsın).
+    // 15: Yüzey seviyesi.
+    // 1500: Tam karanlığa ulaşılacak derinlik mesafesi.
+    const depth = THREE.MathUtils.clamp((camY - 15) / 1500, 0, 1);
 
-    // --- RENK KARIŞTIRMA (ALLOCATION FREE) ---
-    // Önce tempColor'ı Shallow rengine eşitle.
-    // Sonra Mid rengine doğru 'lerp' (yumuşak geçiş) yap.
-    // Sonra Deep rengine doğru 'lerp' yap.
-    // HİÇBİR YERDE "new THREE.Color" YOK!
-    
-    const t1 = smoothstep(0.0, 0.3, depth); // Sığdan ortaya geçiş hızı
-    const t2 = smoothstep(0.3, 1.0, depth); // Ortadan dibe geçiş hızı
+    // --- RENK KARIŞTIRMA ---
+    const t1 = smoothstep(0.0, 0.3, depth); 
+    const t2 = smoothstep(0.3, 1.0, depth); 
 
     tempColor
-      .copy(C_SHALLOW)      // Kopyala
-      .lerp(C_MID, t1)      // Karıştır 1
-      .lerp(C_DEEP, t2);    // Karıştır 2
+      .copy(C_SHALLOW)      // Yüzey rengiyle başla
+      .lerp(C_MID, t1)      // Orta renge git
+      .lerp(C_DEEP, t2);    // Dibe doğru koyulaş
 
     // --- SİS YOĞUNLUĞU ---
-    // Derine indikçe sis 0.02'den 0.05'e çıksın (daha yoğun olsun)
-    // Böylece yüzey tamamen kaybolur.
+    // Derine indikçe sis artsın
     const targetDensity = THREE.MathUtils.lerp(0.02, 0.05, t2);
 
     // --- UYGULAMA ---
-    scene.background = tempColor;          // Arkaplanı boya
+    scene.background = tempColor;
     // @ts-ignore
-    scene.fog.color.copy(tempColor);       // Sisi boya (nesne yaratmadan)
+    scene.fog.color.copy(tempColor);
     // @ts-ignore
-    scene.fog.density = targetDensity;     // Sis yoğunluğunu güncelle
+    scene.fog.density = targetDensity;
   });
 
   return null;
@@ -98,17 +90,16 @@ function Ocean() {
       textureHeight: 512,
       waterNormals,
       sunDirection: new THREE.Vector3(),
-      sunColor: 0x0077ff, // Mavi yansıma (Beyaz parlamayı önler)
+      sunColor: 0x0077ff, 
       waterColor: 0x001e0f,
       distortionScale: 3.7,
-      fog: true, // Sisten etkilensin (Dibe dalınca kaybolması için şart)
+      fog: true, 
       format: gl.outputColorSpace === "srgb" ? THREE.SRGBColorSpace : undefined,
     }),
     [waterNormals, gl.outputColorSpace]
   );
 
   useFrame((_, delta) => {
-    // Delta ile zamanı güncelle (Animasyon)
     const t = delta * 0.5;
     if (refTop.current) refTop.current.material.uniforms.time.value += t;
     if (refBottom.current) refBottom.current.material.uniforms.time.value += t;
@@ -116,13 +107,11 @@ function Ocean() {
 
   return (
     <group position={[0, 15, 0]}>
-      {/* Üst Yüzey */}
       <water
         ref={refTop}
         args={[new THREE.PlaneGeometry(20000, 20000), config]}
         rotation={[-Math.PI / 2, 0, 0]}
       />
-      {/* Alt Yüzey (Ters) - Mavi boşluğu yansıtması için */}
       <water
         ref={refBottom}
         args={[new THREE.PlaneGeometry(20000, 20000), config]}
@@ -143,14 +132,13 @@ function DenizModel() {
     Object.keys(actions).forEach((k) => actions[k]?.reset().fadeIn(0.3).play());
   }, [actions]);
 
-  // Modeli clone'luyoruz ki sahnede çakışma olmasın
   const clone = useMemo(() => scene.clone(true), [scene]);
 
   return (
     <group ref={group}>
       <primitive
         object={clone}
-        scale={[1, 1, 4]} // Genişletilmiş
+        scale={[1, 1, 4]} 
         position={[0, -5, -5]}
         rotation={[0, -Math.PI / 2, 0]}
       />
@@ -158,7 +146,7 @@ function DenizModel() {
   );
 }
 
-// --- HAREKETLİ SAHNE (PARALAKS) ---
+// --- HAREKETLİ SAHNE ---
 function MovingScene({ cameraRef }: { cameraRef: any }) {
   const group = useRef<THREE.Group>(null);
 
@@ -168,7 +156,6 @@ function MovingScene({ cameraRef }: { cameraRef: any }) {
     const camX = cameraRef.current.x;
     const camY = cameraRef.current.y;
 
-    // Kameraya göre sahneyi ters yönde kaydır
     group.current.position.x = -camX * 0.015;
     group.current.position.y = camY * 0.015;
   });
@@ -188,12 +175,10 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       <Canvas
         camera={{ position: [0, 5, 20], fov: 45 }}
         style={{ pointerEvents: "none" }}
-        // Performance ayarları: Alpha kapalı (daha hızlı), Antialias açık
         gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
       >
         <Environment preset="city" background={false} />
 
-        {/* Optimize edilmiş yönetici */}
         <BackgroundManager cameraRef={cameraRef} />
 
         <ambientLight intensity={1.5} color="#ffffff" />
@@ -205,5 +190,5 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-  }
+                               }
       
