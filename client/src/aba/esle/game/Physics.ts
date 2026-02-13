@@ -1,14 +1,14 @@
 // 🔥 GÜNCELLENMİŞ SINIRLAR (SON İSTEĞİN) 🔥
 
 // SOL SINIR: -3000
-export const LIMIT_LEFT = -3000; 
+export const LIMIT_LEFT = -5400; 
 
 // SAĞ SINIR: 5500
-export const LIMIT_RIGHT = 5500;  
+export const LIMIT_RIGHT = 5400;  
 
 // YUKARI (TAVAN): -1100 
 // (Eksi değer yukarı demektir. Sudan yükseğe zıplarsın.)
-export const LIMIT_TOP = -1100;    
+export const LIMIT_TOP = -700;    
 
 // AŞAĞI (TABAN): 400
 // (Deniz sığ, 400 birim aşağı inince dibe değer.)
