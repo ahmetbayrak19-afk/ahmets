@@ -6,7 +6,7 @@ export const LIMIT_BOTTOM = 400;
 
 // 🎯 YENİ ZIPLAMA EŞİĞİ
 // Balık bu noktayı geçince (Y < -750) yerçekimi başlar.
-const WATER_SURFACE = -750; 
+const WATER_SURFACE = -680; 
 
 export const WORLD_WIDTH = Math.abs(LIMIT_LEFT) + LIMIT_RIGHT; 
 export const WORLD_HEIGHT = Math.abs(LIMIT_TOP) + LIMIT_BOTTOM;
