@@ -190,5 +190,5 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       </Canvas>
     </div>
   );
-                               }
-      
+}
+  
