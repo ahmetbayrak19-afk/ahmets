@@ -1,20 +1,20 @@
-// 🔥 SENİN İSTEDİĞİN ÖZEL AYARLAR 🔥
+// 🔥 GÜNCELLENMİŞ SINIRLAR (SON İSTEĞİN) 🔥
 
-// SOL SINIR: -2000
-export const LIMIT_LEFT = -2000; 
+// SOL SINIR: -3000
+export const LIMIT_LEFT = -3000; 
 
-// SAĞ SINIR: 7000
-export const LIMIT_RIGHT = 7000;  
+// SAĞ SINIR: 5500
+export const LIMIT_RIGHT = 5500;  
 
-// YUKARI (TAVAN): -1600 
-// (Eksi değer yukarı demektir. Sudan bayağı yükseğe zıplarsın.)
-export const LIMIT_TOP = -1600;    
+// YUKARI (TAVAN): -1100 
+// (Eksi değer yukarı demektir. Sudan yükseğe zıplarsın.)
+export const LIMIT_TOP = -1100;    
 
-// AŞAĞI (TABAN): 200
-// (Deniz çok sığ, hemen dibe değer.)
-export const LIMIT_BOTTOM = 200; 
+// AŞAĞI (TABAN): 400
+// (Deniz sığ, 400 birim aşağı inince dibe değer.)
+export const LIMIT_BOTTOM = 400; 
 
-// Harita boyutlarını otomatik hesapla
+// Harita boyutlarını hesapla
 export const WORLD_WIDTH = Math.abs(LIMIT_LEFT) + LIMIT_RIGHT; 
 export const WORLD_HEIGHT = Math.abs(LIMIT_TOP) + LIMIT_BOTTOM;
 
@@ -57,7 +57,7 @@ export class PhysicsEngine {
     fish.x += fish.vx;
     fish.y += fish.vy;
 
-    // 🔥 SINIR KONTROLLERİ (Senin Değerlerinle) 🔥
+    // 🔥 SINIR KONTROLLERİ 🔥
     
     // SOL
     if (fish.x < LIMIT_LEFT + MARGIN) { 
@@ -109,4 +109,3 @@ export class PhysicsEngine {
     }
   }
       }
-  
