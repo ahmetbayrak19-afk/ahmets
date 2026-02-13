@@ -1,3 +1,4 @@
+// EslemeGame.tsx
 import { useEffect, useRef, useState } from "react";
 import { XCircle, Play } from "lucide-react";
 
@@ -17,10 +18,10 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const renderer = useRef<GameRenderer | null>(null);
   const reqRef = useRef<number>();
 
-  // Balık Başlangıçta tam ortada
+  // 🔥 BALIK BAŞLANGIÇ AYARI 🔥
   const fish = useRef({
-    x: WORLD_WIDTH / 2,
-    y: WORLD_HEIGHT / 2,
+    x: 0,  // Haritanın ortası (yatayda)
+    y: 5,  // YÜZEYİN HEMEN ALTI (0 yüzeydir, 5 biraz altıdır)
     vx: 0,
     vy: 0,
     rotation: 0,
@@ -32,9 +33,10 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     lastDirection: 1 as any,
   });
 
-  // Kamera da tam balığın olduğu yerde başlasın
-  const camera = useRef({ x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 });
-  const mousePos = useRef({ x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 });
+  // 🔥 KAMERA BAŞLANGIÇ AYARI 🔥
+  // Kamerayı da balıkla aynı yere koyuyoruz ki oyun açılınca balığı aramayalım
+  const camera = useRef({ x: 0, y: 5 });
+  const mousePos = useRef({ x: 0, y: 5 });
 
   useEffect(() => {
     loadAssets().then((loaded) => {
@@ -56,8 +58,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     const w = canvasRef.current.clientWidth;
     const h = canvasRef.current.clientHeight;
 
-    // 🔥 KRİTİK NOKTA: Mouse pozisyonu hesaplanırken kameranın güncel yerini ekliyoruz
-    // Böylece kamera kaydıkça hedefimiz de ileri gidiyor.
+    // Mouse pozisyonunu dünya koordinatlarına çevir
     mousePos.current.x = camera.current.x + (screenX - w / 2);
     mousePos.current.y = camera.current.y + (screenY - h / 2);
   };
@@ -79,8 +80,6 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
       physics.current.updateFish(fish.current as any, mousePos.current.x, mousePos.current.y);
 
       // 2. KAMERA TAKİBİ (Yumuşak Geçiş)
-      // Balık nereye, kamera oraya. 
-      // 0.1 değeri takip hızını belirler (daha yüksek = daha sıkı takip)
       camera.current.x += (fish.current.x - camera.current.x) * 0.1;
       camera.current.y += (fish.current.y - camera.current.y) * 0.1;
 
@@ -99,12 +98,12 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black overflow-hidden select-none touch-none">
       
-      {/* ARKAPLAN */}
+      {/* 3D ARKAPLAN */}
       <div className="absolute inset-0 z-0">
         <DenizBackground cameraRef={camera} />
       </div>
 
-      {/* OYUN ALANI */}
+      {/* 2D OYUN ALANI (CANVAS) */}
       <div className="absolute inset-0 z-10">
         {isLoaded ? (
           <>
@@ -119,14 +118,14 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
               }}
               onMouseUp={() => fish.current.state = "SWIM"}
             />
-            <button onClick={onClose} className="fixed top-6 right-6 z-50 bg-white/20 backdrop-blur p-3 rounded-full">
+            <button onClick={onClose} className="fixed top-6 right-6 z-50 bg-white/20 backdrop-blur p-3 rounded-full hover:bg-white/40 transition">
               <XCircle className="text-white w-8 h-8" />
             </button>
             {!isPlaying && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                 <button
                   onClick={() => setIsPlaying(true)}
-                  className="bg-orange-500 text-white px-10 py-5 rounded-2xl text-3xl font-black animate-bounce flex gap-2"
+                  className="bg-orange-500 text-white px-10 py-5 rounded-2xl text-3xl font-black animate-bounce flex gap-2 hover:bg-orange-600 transition"
                 >
                   <Play size={32} /> BAŞLA
                 </button>
@@ -134,12 +133,12 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
             )}
           </>
         ) : (
-          <div className="flex items-center justify-center h-full text-white animate-pulse">
+          <div className="flex items-center justify-center h-full text-white animate-pulse text-2xl font-bold">
             YÜKLENİYOR...
           </div>
         )}
       </div>
     </div>
   );
-}
-  
+    }
+      
