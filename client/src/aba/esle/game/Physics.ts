@@ -1,20 +1,24 @@
-// 🔥 ÖZEL SINIR AYARLARI (Senin İstediğin Oranlar) 🔥
+// Physics.ts
 
-// SAĞ / SOL
-export const LIMIT_LEFT = -10000; // Sola 3 kat daha fazla
-export const LIMIT_RIGHT = 2000;  // Sağa 3 kat daha az
+// 🔥 AYARLANMIŞ YENİ SINIRLAR 🔥
 
-// YUKARI / AŞAĞI
-export const LIMIT_TOP = -2000;   // Yukarı 4 kat daha fazla
-export const LIMIT_BOTTOM = 1500; // Aşağı 2 kat daha az
+// SOL SINIR: -500 (Fazla sola gidemesin, hemen duvara çarpsın)
+export const LIMIT_LEFT = -500; 
 
-// 🔥 HATA VERMEMESİ İÇİN GERİ EKLEDİĞİMİZ KISIM 🔥
-// EslemeGame.tsx bu değişkenleri arıyor, o yüzden hesaplayıp koyduk.
+// SAĞ SINIR: 10000 (Sağa doğru çok uzun bir yolun var)
+export const LIMIT_RIGHT = 10000;  
+
+// YUKARI SINIR (YÜZEY): 0 (Suyun yüzeyi 0 noktasıdır. Eksiye düşerse uçar, o yüzden 0'da tutuyoruz.)
+export const LIMIT_TOP = 0;    
+
+// AŞAĞI SINIR (DİP): 2000 (Denizin dibi)
+export const LIMIT_BOTTOM = 2000; 
+
+// Harita boyutlarını hesapla
 export const WORLD_WIDTH = Math.abs(LIMIT_LEFT) + LIMIT_RIGHT; 
 export const WORLD_HEIGHT = Math.abs(LIMIT_TOP) + LIMIT_BOTTOM;
 
-export const SEA_LEVEL = 300; 
-const MARGIN = 100;
+const MARGIN = 50; // Duvara yumuşak çarpma payı
 
 export interface FishState {
   x: number;
@@ -37,7 +41,7 @@ export class PhysicsEngine {
     const dy = targetY - fish.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Hareket (İvme)
+    // --- HAREKET ---
     if (dist > 10) {
       const force = Math.min(dist * 0.05, 1.2); 
       const angle = Math.atan2(dy, dx);
@@ -45,45 +49,49 @@ export class PhysicsEngine {
       fish.vy += Math.sin(angle) * force;
     }
 
-    // Sürtünme
+    // Sürtünme (Yavaşlama)
     fish.vx *= 0.93; 
     fish.vy *= 0.93;
 
-    // Pozisyon
+    // Pozisyonu uygula
     fish.x += fish.vx;
     fish.y += fish.vy;
 
-    // 🔥 SINIR KONTROLLERİ (Özel Limitlere Göre) 🔥
+    // 🔥 SINIR KONTROLLERİ (DUVARLAR) 🔥
     
-    // SOL SINIR (Çok uzak)
+    // 1. SOL DUVAR (Daraltıldı)
     if (fish.x < LIMIT_LEFT + MARGIN) { 
         fish.x = LIMIT_LEFT + MARGIN; 
-        fish.vx *= -0.5; 
+        fish.vx *= -0.5; // Çarpınca geri seksin
     }
-    // SAĞ SINIR (Çok yakın)
+    
+    // 2. SAĞ DUVAR (Genişletildi)
     if (fish.x > LIMIT_RIGHT - MARGIN) { 
         fish.x = LIMIT_RIGHT - MARGIN; 
         fish.vx *= -0.5; 
     }
     
-    // TAVAN (Gökyüzü - Çok yüksek)
+    // 3. TAVAN (SU YÜZEYİ - ÖNEMLİ!)
+    // Balık Y < 0 olursa (eksiye düşerse) sudan çıkmış olur.
+    // Bunu engelliyoruz.
     if (fish.y < LIMIT_TOP) { 
-        fish.y = LIMIT_TOP; 
-        fish.vy += 0.5; 
+        fish.y = LIMIT_TOP; // 0 noktasına sabitle
+        fish.vy *= -0.3;    // Tavana çarpınca hafif aşağı seksin
     }
     
-    // TABAN (Zemin - Daha sığ)
+    // 4. TABAN (DENİZ DİBİ)
     if (fish.y > LIMIT_BOTTOM - MARGIN) { 
         fish.y = LIMIT_BOTTOM - MARGIN; 
         fish.vy *= -0.5; 
     }
 
-    // Yön ve Rotasyon
+    // --- YÖN VE ANİMASYON ---
     if (fish.vx > 0.5) fish.lastDirection = 1;
     if (fish.vx < -0.5) fish.lastDirection = -1;
 
     fish.scaleX = fish.lastDirection; 
 
+    // Dönüş açısı hesaplama (Burnunu gittiği yere çevir)
     const speed = Math.sqrt(fish.vx * fish.vx + fish.vy * fish.vy);
     
     if (speed > 1) {
@@ -94,10 +102,9 @@ export class PhysicsEngine {
         fish.rotation *= 0.9;
     }
 
-    // Derinlik Efekti
     fish.scaleY = 1;
 
-    // Animasyon
+    // Kuyruk sallama animasyonu
     fish.timer++;
     const animSpeed = speed > 10 ? 3 : 5; 
     if (fish.timer > animSpeed) {
@@ -106,4 +113,4 @@ export class PhysicsEngine {
         if (fish.state === "EAT" && fish.frame > 5) fish.state = "SWIM";
     }
   }
-  }
+}
