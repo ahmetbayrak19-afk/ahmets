@@ -1,21 +1,20 @@
-// Physics.ts
+// 🔥 SENİN İSTEDİĞİN ÖZEL AYARLAR 🔥
 
-// 🔥 GÜNCELLENMİŞ SINIRLAR 🔥
+// SOL SINIR: -2000
+export const LIMIT_LEFT = -2000; 
 
-// SOL SINIR: Eskiden -500 idi.
-// Şimdi -1500 yaptık. (Böylece sola doğru epey bir alan açıldı, hemen çarpmaz)
-export const LIMIT_LEFT = -1500; 
+// SAĞ SINIR: 7000
+export const LIMIT_RIGHT = 7000;  
 
-// SAĞ SINIR: 10000 (Sağa gidiş serbest)
-export const LIMIT_RIGHT = 10000;  
+// YUKARI (TAVAN): -1600 
+// (Eksi değer yukarı demektir. Sudan bayağı yükseğe zıplarsın.)
+export const LIMIT_TOP = -1600;    
 
-// YUKARI (TAVAN): -300 (Su yüzeyine hafif zıplama payı)
-export const LIMIT_TOP = -300;    
+// AŞAĞI (TABAN): 200
+// (Deniz çok sığ, hemen dibe değer.)
+export const LIMIT_BOTTOM = 200; 
 
-// AŞAĞI (TABAN): 300 (Sığ deniz, dibe çabuk değer)
-export const LIMIT_BOTTOM = 300; 
-
-// Harita boyutlarını hesapla
+// Harita boyutlarını otomatik hesapla
 export const WORLD_WIDTH = Math.abs(LIMIT_LEFT) + LIMIT_RIGHT; 
 export const WORLD_HEIGHT = Math.abs(LIMIT_TOP) + LIMIT_BOTTOM;
 
@@ -54,31 +53,31 @@ export class PhysicsEngine {
     fish.vx *= 0.93; 
     fish.vy *= 0.93;
 
-    // Pozisyon
+    // Pozisyon Güncelleme
     fish.x += fish.vx;
     fish.y += fish.vy;
 
-    // 🔥 SINIR KONTROLLERİ 🔥
+    // 🔥 SINIR KONTROLLERİ (Senin Değerlerinle) 🔥
     
-    // 1. SOL DUVAR (Genişletildi)
+    // SOL
     if (fish.x < LIMIT_LEFT + MARGIN) { 
         fish.x = LIMIT_LEFT + MARGIN; 
         fish.vx *= -0.5; 
     }
     
-    // 2. SAĞ DUVAR
+    // SAĞ
     if (fish.x > LIMIT_RIGHT - MARGIN) { 
         fish.x = LIMIT_RIGHT - MARGIN; 
         fish.vx *= -0.5; 
     }
     
-    // 3. TAVAN (YUKARI)
+    // YUKARI (TAVAN)
     if (fish.y < LIMIT_TOP) { 
         fish.y = LIMIT_TOP; 
         fish.vy *= -0.3; 
     }
     
-    // 4. TABAN (AŞAĞI)
+    // AŞAĞI (TABAN)
     if (fish.y > LIMIT_BOTTOM - MARGIN) { 
         fish.y = LIMIT_BOTTOM - MARGIN; 
         fish.vy *= -0.5; 
@@ -109,4 +108,5 @@ export class PhysicsEngine {
         if (fish.state === "EAT" && fish.frame > 5) fish.state = "SWIM";
     }
   }
-        }
+      }
+  
