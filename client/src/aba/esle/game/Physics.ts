@@ -1,17 +1,18 @@
-// 🔥 SINIRLAR (DEĞİŞTİRİLMEDİ) 🔥
+// 🔥 GÜNCELLENMİŞ SINIRLAR 🔥
 export const LIMIT_LEFT = -5400; 
 export const LIMIT_RIGHT = 5400;  
-export const LIMIT_TOP = -700;    
+export const LIMIT_TOP = -900;    // Dünya tavanı yükseltildi
 export const LIMIT_BOTTOM = 400;  
 
-// 🎯 DENEY NOKTASI: Yerçekimi buradan başlasın
-const WATER_SURFACE = -650; 
+// 🎯 YENİ ZIPLAMA EŞİĞİ
+// Balık bu noktayı geçince (Y < -750) yerçekimi başlar.
+const WATER_SURFACE = -750; 
 
 export const WORLD_WIDTH = Math.abs(LIMIT_LEFT) + LIMIT_RIGHT; 
 export const WORLD_HEIGHT = Math.abs(LIMIT_TOP) + LIMIT_BOTTOM;
 
 const MARGIN = 50; 
-const GRAVITY = 0.45; // Yerçekimini biraz artırdım ki tepkiyi net gör
+const GRAVITY = 0.5; // Zıplama alanı daraldığı için yerçekimini biraz hissettirelim
 
 export class PhysicsEngine {
   
@@ -20,12 +21,12 @@ export class PhysicsEngine {
     const dy = targetY - fish.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // 🚀 TEST: Balık -650 çizgisini geçti mi?
+    // 🚀 HAVA KONTROLÜ
     const isInAir = fish.y < WATER_SURFACE;
 
-    // --- HAREKET ---
+    // --- HAREKET VE FİZİK ---
     if (!isInAir) {
-      // 🐟 SU ALTI FİZİĞİ (Y > -650)
+      // 🐟 SU ALTI (Y >= -750)
       if (dist > 10) {
         const force = Math.min(dist * 0.05, 1.2); 
         const angle = Math.atan2(dy, dx);
@@ -35,10 +36,10 @@ export class PhysicsEngine {
       fish.vx *= 0.93; 
       fish.vy *= 0.93;
     } else {
-      // 🚀 HAVA FİZİĞİ (Y < -650)
-      // Yerçekimi balığı aşağı (-650'ye doğru) çeker
+      // 🚀 HAVA (Y < -750)
       fish.vy += GRAVITY; 
       
+      // Havada kontrol azalır, sürtünme düşer
       fish.vx *= 0.98; 
       fish.vy *= 0.99;
     }
@@ -46,23 +47,23 @@ export class PhysicsEngine {
     fish.x += fish.vx;
     fish.y += fish.vy;
 
-    // 🔥 SINIRLAR
+    // --- SINIR KONTROLLERİ ---
     if (fish.x < LIMIT_LEFT + MARGIN) { fish.x = LIMIT_LEFT + MARGIN; fish.vx *= -0.5; }
     if (fish.x > LIMIT_RIGHT - MARGIN) { fish.x = LIMIT_RIGHT - MARGIN; fish.vx *= -0.5; }
     
-    // Tavan (-700'de balık durur)
+    // Tavan kontrolü (-900)
     if (fish.y < LIMIT_TOP) { 
         fish.y = LIMIT_TOP; 
         fish.vy = 0; 
     }
     
-    // Taban (400)
+    // Taban kontrolü (400)
     if (fish.y > LIMIT_BOTTOM - MARGIN) { 
         fish.y = LIMIT_BOTTOM - MARGIN; 
         fish.vy *= -0.5; 
     }
 
-    // YÖN VE ROTASYON
+    // --- ROTASYON VE ANİMASYON ---
     if (fish.vx > 0.5) fish.lastDirection = 1;
     if (fish.vx < -0.5) fish.lastDirection = -1;
     fish.scaleX = fish.lastDirection; 
@@ -70,7 +71,7 @@ export class PhysicsEngine {
     const speed = Math.sqrt(fish.vx * fish.vx + fish.vy * fish.vy);
     
     if (isInAir) {
-        // Havadaki kavisli dönüş
+        // Havada burnunu aşağı büken o estetik atlayış
         let jumpAngle = Math.atan2(fish.vy, Math.abs(fish.vx)) * (180 / Math.PI);
         if (fish.lastDirection === -1) jumpAngle *= -1;
         fish.rotation += (jumpAngle - fish.rotation) * 0.2;
@@ -90,4 +91,4 @@ export class PhysicsEngine {
         if (fish.state === "EAT" && fish.frame > 5) fish.state = "SWIM";
     }
   }
-          }
+               }
