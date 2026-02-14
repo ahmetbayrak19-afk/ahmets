@@ -4,6 +4,9 @@ import { useGLTF, useAnimations, Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { Water } from "three-stdlib";
 
+// 🔥 YENİ: 3D Balık Bileşenini İçe Aktar
+import { Fish3D } from "./Fish3D";
+
 // --- SABİTLER ---
 const DENIZ_GLB_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/deniz.glb?alt=media&token=6ecb1237-70e1-43c8-b997-77b6e3943497";
 const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/water/Water_1_M_Normal.jpg";
@@ -21,47 +24,33 @@ function smoothstep(edge0: number, edge1: number, x: number) {
   return t * t * (3 - 2 * t);
 }
 
-// 🚀 OPTİMİZE EDİLMİŞ ARKAPLAN & SİS YÖNETİCİSİ 🚀
+// 🚀 OPTİMİZE EDİLMİŞ ARKAPLAN & SİS YÖNETİCİSİ
 function BackgroundManager({ cameraRef }: { cameraRef: any }) {
   const { scene } = useThree();
-
-  // Bellek optimizasyonu için renk nesnesi
   const tempColor = useMemo(() => new THREE.Color(), []);
 
-  // 1. ADIM: Sahne açılınca Sisi yarat.
   useEffect(() => {
     scene.fog = new THREE.FogExp2(0x000000, 0.02);
     return () => { scene.fog = null; };
   }, [scene]);
 
-  // 2. ADIM: Her karede güncelle.
   useFrame(() => {
     if (!cameraRef.current || !scene.fog) return;
 
     const camY = cameraRef.current.y;
-    
-    // 🔥 DÜZELTME BURADA YAPILDI 🔥
-    // Eskisi: (15 - camY) idi. 
-    // Yenisi: (camY - 15) oldu.
-    // Mantık: Kamera Y değeri arttıkça (aşağı indikçe), depth değeri artsın (koyulaşsın).
-    // 15: Yüzey seviyesi.
-    // 1500: Tam karanlığa ulaşılacak derinlik mesafesi.
+    // Derinlik hesaplama (Aşağı indikçe kararır)
     const depth = THREE.MathUtils.clamp((camY - 15) / 1500, 0, 1);
 
-    // --- RENK KARIŞTIRMA ---
     const t1 = smoothstep(0.0, 0.3, depth); 
     const t2 = smoothstep(0.3, 1.0, depth); 
 
     tempColor
-      .copy(C_SHALLOW)      // Yüzey rengiyle başla
-      .lerp(C_MID, t1)      // Orta renge git
-      .lerp(C_DEEP, t2);    // Dibe doğru koyulaş
+      .copy(C_SHALLOW)
+      .lerp(C_MID, t1)
+      .lerp(C_DEEP, t2);
 
-    // --- SİS YOĞUNLUĞU ---
-    // Derine indikçe sis artsın
     const targetDensity = THREE.MathUtils.lerp(0.02, 0.05, t2);
 
-    // --- UYGULAMA ---
     scene.background = tempColor;
     // @ts-ignore
     scene.fog.color.copy(tempColor);
@@ -69,6 +58,25 @@ function BackgroundManager({ cameraRef }: { cameraRef: any }) {
     scene.fog.density = targetDensity;
   });
 
+  return null;
+}
+
+// 🎥 KAMERA TAKİPÇİSİ (YENİ)
+// 3D Kameranın 2D Kamerayı (dolayısıyla balığı) takip etmesini sağlar.
+function CameraRig({ cameraRef }: { cameraRef: any }) {
+  useFrame((state) => {
+    if (!cameraRef.current) return;
+    
+    // Fish3D dosyasındaki SCALE_FACTOR ile uyumlu olmalı (0.015)
+    const SCALE = 0.015;
+
+    // Kamerayı balığın X pozisyonuna götür
+    state.camera.position.x = cameraRef.current.x * SCALE;
+    
+    // Kamerayı balığın Y pozisyonuna göre ayarla (Hafif yukarıdan bakış +5)
+    // Fizikte Y aşağı doğru artıyorsa buraya dikkat (- ile çarpma gerekebilir)
+    state.camera.position.y = (cameraRef.current.y * SCALE) + 5; 
+  });
   return null;
 }
 
@@ -146,30 +154,9 @@ function DenizModel() {
   );
 }
 
-// --- HAREKETLİ SAHNE ---
-function MovingScene({ cameraRef }: { cameraRef: any }) {
-  const group = useRef<THREE.Group>(null);
-
-  useFrame(() => {
-    if (!group.current || !cameraRef.current) return;
-
-    const camX = cameraRef.current.x;
-    const camY = cameraRef.current.y;
-
-    group.current.position.x = -camX * 0.015;
-    group.current.position.y = camY * 0.015;
-  });
-
-  return (
-    <group ref={group}>
-      <DenizModel />
-      <Ocean />
-    </group>
-  );
-}
-
 // --- ANA COMPONENT ---
-export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
+// Artık fishRef parametresini de alıyor
+export default function DenizBackground({ cameraRef, fishRef }: { cameraRef: any, fishRef: any }) {
   return (
     <div className="absolute inset-0 bg-black">
       <Canvas
@@ -179,16 +166,24 @@ export default function DenizBackground({ cameraRef }: { cameraRef: any }) {
       >
         <Environment preset="city" background={false} />
 
+        {/* Arka plan rengini ve sisi yönetir */}
         <BackgroundManager cameraRef={cameraRef} />
+
+        {/* 3D Kameranın balığı takip etmesini sağlar */}
+        <CameraRig cameraRef={cameraRef} />
 
         <ambientLight intensity={1.5} color="#ffffff" />
         <directionalLight position={[10, 20, 10]} intensity={2} color="#ffffff" />
 
         <Suspense fallback={null}>
-          <MovingScene cameraRef={cameraRef} />
+            {/* Dekorlar (Deniz, Kayalar) */}
+            <DenizModel />
+            <Ocean />
+            
+            {/* 🔥 BİZİM YENİ BALIK 🔥 */}
+            <Fish3D fishRef={fishRef} />
         </Suspense>
       </Canvas>
     </div>
   );
-                  }
-      
+    }
