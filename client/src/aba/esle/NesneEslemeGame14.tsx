@@ -1,288 +1,372 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Box, Mic2, Image, Volume2, RefreshCcw, Lightbulb, Coins, Settings } from 'lucide-react';
+import { ArrowLeft, RefreshCcw } from 'lucide-react';
 
-// --- TİPLER ---
-interface GameProps {
-  mode: 'assessment' | 'instruction';
-  onClose: () => void;
-  onComplete: (success: boolean) => void;
-}
+// ---------------------------------------------------------------------------
+// 🔥 VARLIKLAR (Assets)
+// ---------------------------------------------------------------------------
 
-interface GameBox {
+// GÖRSELLER
+import bgImage from './sesesleme/sesarkaplan.png';
+import imgCerceve from './sesesleme/eslekutucuk.png'; // "Eşleştir" yazan çerçeve
+
+// Sandık Aşamaları
+import sandik1 from './sesesleme/sandik1.png'; // Kapalı
+import sandik2 from './sesesleme/sandik2.png'; // 1 Işık
+import sandik3 from './sesesleme/sandik3.png'; // 2 Işık
+import sandik4 from './sesesleme/sandik4.png'; // 3 Işık
+import sandik5 from './sesesleme/sandik5.png'; // 4 Işık (Hepsi Sarı)
+import sandik6 from './sesesleme/sandik6.png'; // 4 Işık (Yeşil - Onay)
+import sandik7 from './sesesleme/sandik7.png'; // Açık Sandık (Ödül)
+
+// Kutular
+import imgKutuSol from './sesesleme/kutusol.png';
+import imgKutuOrta from './sesesleme/kutuorta.png';
+import imgKutuSag from './sesesleme/kutusag.png';
+
+// SESLER (1-7)
+import snd1 from './sesesleme/1siseici.mp3';
+import snd2 from './sesesleme/2siseici.mp3';
+import snd3 from './sesesleme/3siseici.mp3';
+import snd4 from './sesesleme/4siseici.mp3';
+import snd5 from './sesesleme/5siseici.mp3';
+import snd6 from './sesesleme/6siseici.mp3';
+import snd7 from './sesesleme/7siseici.mp3';
+
+// Ses Dizisi (Index 0 boş)
+const SOUNDS = [null, snd1, snd2, snd3, snd4, snd5, snd6, snd7];
+const CHEST_IMAGES = [sandik1, sandik2, sandik3, sandik4, sandik5, sandik6, sandik7];
+
+// ---------------------------------------------------------------------------
+// TİPLER
+// ---------------------------------------------------------------------------
+interface DraggableBox {
   id: string;
   soundId: number;
-  status: 'idle' | 'selected' | 'matched';
+  visualType: 'left' | 'mid' | 'right';
+  x: number; // Görsel X pozisyonu (CSS için değil, mantık için)
+  y: number; 
 }
 
-// --- DOSYA YOLLARI ---
-const BASE_PATH = "/client/src/aba/esle/sesesleme";
-const getSoundPath = (id: number) => `${BASE_PATH}/${id}siseici.mp3`;
-const getSmallBoxImage = () => `${BASE_PATH}/eslekutucuk.png`;
-const getChestParts = () => ({
-  left: `${BASE_PATH}/kutusol.png`,
-  mid: `${BASE_PATH}/kutuorta.png`,
-  right: `${BASE_PATH}/kutusag.png`
-});
+interface GameProps {
+  onClose: () => void;
+}
 
-export default function NesneEslemeGame14({ mode, onClose, onComplete }: GameProps) {
-  // --- EKRAN YÖNÜ KONTROLÜ (ZORLA YATAY) ---
+export default function NesneEslemeGame14({ onClose }: GameProps) {
+  // --- EKRAN YÖNÜ ---
   const [isPortrait, setIsPortrait] = useState(false);
   const [windowSize, setWindowSize] = useState({ w: window.innerWidth, h: window.innerHeight });
 
+  // --- OYUN STATE ---
+  const [chestStage, setChestStage] = useState(0); // 0..6 arası
+  const [targetSoundId, setTargetSoundId] = useState<number>(1); // Soldaki kutunun sesi
+  const [bottomBoxes, setBottomBoxes] = useState<DraggableBox[]>([]);
+  const [isGameWon, setIsGameWon] = useState(false);
+  
+  // Sürükleme State'i
+  const [draggedBoxId, setDraggedBoxId] = useState<string | null>(null);
+  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
+  const dragOffset = useRef({ x: 0, y: 0 }); // Tutulan yerin kutu merkezine uzaklığı
+  
+  // Referanslar (Drop Zone Tespiti İçin)
+  const dropZoneRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // --- İLK AÇILIŞ VE RESIZE ---
   useEffect(() => {
     const handleResize = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      setWindowSize({ w, h });
-      setIsPortrait(h > w); // Yükseklik genişlikten büyükse diktir
+      setWindowSize({ w: window.innerWidth, h: window.innerHeight });
+      setIsPortrait(window.innerHeight > window.innerWidth);
     };
     handleResize();
     window.addEventListener('resize', handleResize);
+    initRound(); // Oyunu Başlat
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const [selectedLevel, setSelectedLevel] = useState<1 | 2 | 3 | null>(null);
-
-  // --- OYUN STATE ---
-  const [boxes, setBoxes] = useState<GameBox[]>([]);
-  const [selectedBoxIds, setSelectedBoxIds] = useState<string[]>([]);
-  const [isChecking, setIsChecking] = useState(false);
-  const [score, setScore] = useState(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  const playSound = (soundId: number) => {
+  // --- SES ÇALMA ---
+  const playSound = (id: number) => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
-    const audio = new Audio(getSoundPath(soundId));
-    audioRef.current = audio;
-    audio.play().catch(e => console.error("Ses hatası:", e));
-  };
-
-  const initLevel1 = () => {
-    const availableSounds = [1, 2, 3, 4, 5, 6, 7];
-    const chosenSounds = availableSounds.sort(() => 0.5 - Math.random()).slice(0, 4);
-    
-    const gameDeck: GameBox[] = [...chosenSounds, ...chosenSounds]
-      .map((soundId, index) => ({
-        id: `box-${index}`,
-        soundId,
-        status: 'idle'
-      }))
-      .sort(() => 0.5 - Math.random());
-
-    setBoxes(gameDeck);
-    setSelectedBoxIds([]);
-    setIsChecking(false);
-    setScore(0);
-  };
-
-  const handleBoxClick = (boxId: string) => {
-    const box = boxes.find(b => b.id === boxId);
-    if (isChecking || !box || box.status !== 'idle') return;
-    if (selectedBoxIds.length >= 2) return;
-
-    playSound(box.soundId);
-    setBoxes(prev => prev.map(b => b.id === boxId ? { ...b, status: 'selected' } : b));
-    
-    const newSelected = [...selectedBoxIds, boxId];
-    setSelectedBoxIds(newSelected);
-
-    if (newSelected.length === 2) {
-      setIsChecking(true);
-      checkMatch(newSelected[0], newSelected[1]);
+    const src = SOUNDS[id];
+    if (src) {
+      const audio = new Audio(src);
+      audioRef.current = audio;
+      audio.play().catch(() => {});
     }
   };
 
-  const checkMatch = (id1: string, id2: string) => {
-    const box1 = boxes.find(b => b.id === id1);
-    const box2 = boxes.find(b => b.id === id2);
+  // --- TUR HAZIRLAMA ---
+  const initRound = (nextStage = 0) => {
+    // 1. Hedef Sesi Seç (1-7 arası rastgele)
+    const target = Math.floor(Math.random() * 7) + 1;
+    setTargetSoundId(target);
 
-    if (!box1 || !box2) return;
-
-    if (box1.soundId === box2.soundId) {
-      setTimeout(() => {
-        setBoxes(prev => prev.map(b => 
-          (b.id === id1 || b.id === id2) ? { ...b, status: 'matched' } : b
-        ));
-        setSelectedBoxIds([]);
-        setIsChecking(false);
-        setScore(prev => prev + 20);
-
-        const remaining = boxes.filter(b => b.status === 'idle' && b.id !== id1 && b.id !== id2).length;
-        if (remaining === 0) setTimeout(() => alert("Tebrikler! Hepsini buldun!"), 500);
-      }, 1000);
-    } else {
-      setTimeout(() => {
-        setBoxes(prev => prev.map(b => 
-          (b.id === id1 || b.id === id2) ? { ...b, status: 'idle' } : b
-        ));
-        setSelectedBoxIds([]);
-        setIsChecking(false);
-      }, 1500);
+    // 2. Yanıltıcı Sesleri Seç (Hedef olmayan rastgele 2 ses)
+    const distractors: number[] = [];
+    while (distractors.length < 2) {
+      const r = Math.floor(Math.random() * 7) + 1;
+      if (r !== target && !distractors.includes(r)) distractors.push(r);
     }
+
+    // 3. Kutuları Oluştur (1 Doğru, 2 Yanlış)
+    let boxesData: DraggableBox[] = [
+      { id: 'correct', soundId: target, visualType: 'mid', x: 0, y: 0 },
+      { id: 'wrong1', soundId: distractors[0], visualType: 'left', x: 0, y: 0 },
+      { id: 'wrong2', soundId: distractors[1], visualType: 'right', x: 0, y: 0 },
+    ];
+
+    // 4. Karıştır
+    boxesData = boxesData.sort(() => Math.random() - 0.5);
+
+    // 5. Görsel Tipleri Ata (Sıraya göre Sol-Orta-Sağ görünsünler diye)
+    // Ama soundId'leri karışmış durumda.
+    const visualOrder: ('left' | 'mid' | 'right')[] = ['left', 'mid', 'right'];
+    boxesData = boxesData.map((box, idx) => ({
+      ...box,
+      visualType: visualOrder[idx], // Görsel yerini sabitle
+    }));
+
+    setBottomBoxes(boxesData);
+    if (nextStage === 0) setChestStage(0); // Oyun yenileniyorsa sandığı sıfırla
   };
 
-  useEffect(() => {
-    if (selectedLevel === 1) initLevel1();
-  }, [selectedLevel]);
-
-  // --- İÇERİK OLUŞTURUCU ---
-  const renderGameContent = () => {
-    switch (selectedLevel) {
-      case 1:
-        const slot1Box = boxes.find(b => b.id === selectedBoxIds[0]);
-        const slot2Box = boxes.find(b => b.id === selectedBoxIds[1]);
-
-        return (
-          <div className="flex flex-col h-full relative">
-            <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
-                <div className="bg-slate-900/80 backdrop-blur border border-yellow-600/50 px-4 py-2 rounded-full flex items-center gap-2 text-yellow-400 font-bold shadow-lg">
-                    <Coins size={20} />
-                    <span>{score}</span>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={initLevel1} className="p-3 bg-blue-900/80 rounded-full border border-blue-500 text-blue-300 hover:bg-blue-800 transition shadow-lg">
-                        <RefreshCcw size={24} />
-                    </button>
-                </div>
-            </div>
-
-            <div className="flex-1 flex items-center justify-center relative">
-                <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 opacity-90 -z-10"></div>
-                {/* Işık Efekti */}
-                <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[60%] h-[60%] bg-blue-500/10 blur-[100px] rounded-full -z-10"></div>
-
-                {/* --- BÜYÜK SANDIK --- */}
-                <div className="relative flex items-end justify-center drop-shadow-2xl scale-90 md:scale-100 transition-transform duration-500">
-                    <h1 className="absolute -top-16 text-4xl font-black text-amber-400 tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" style={{ textShadow: '0 0 10px #d97706' }}>
-                        SESLİ SANDIK
-                    </h1>
-
-                    <img src={getChestParts().left} alt="Chest Left" className="h-48 md:h-64 object-contain translate-x-1" />
-                    
-                    <div className="h-48 md:h-64 relative flex items-center justify-center bg-repeat-x" 
-                         style={{ backgroundImage: `url(${getChestParts().mid})`, backgroundSize: 'auto 100%', minWidth: '300px' }}>
-                        
-                        <div className="flex gap-8 mt-8 z-10">
-                            {/* SOL SLOT */}
-                            <div className="flex flex-col items-center gap-2">
-                                <span className="text-amber-200 font-bold text-xs bg-black/50 px-2 py-0.5 rounded border border-amber-700/50">EŞLEŞTİR</span>
-                                <div className="w-20 h-20 md:w-24 md:h-24 bg-black/40 border-4 border-amber-900/60 rounded-lg shadow-inner flex items-center justify-center relative transition-all duration-300">
-                                    {slot1Box && <img src={getSmallBoxImage()} alt="Box" className="w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-xl animate-in zoom-in duration-300" />}
-                                    {slot1Box && <Settings className="absolute -top-4 -right-4 text-cyan-400 animate-spin opacity-50" size={20} />}
-                                </div>
-                            </div>
-                            
-                            {/* KİLİT */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/3">
-                                <div className="w-10 h-14 bg-gradient-to-b from-yellow-600 to-yellow-800 rounded-b-xl border-2 border-yellow-300 shadow-xl flex items-center justify-center">
-                                    <div className="w-2 h-5 bg-black/60 rounded-full"></div>
-                                </div>
-                            </div>
-
-                            {/* SAĞ SLOT */}
-                            <div className="flex flex-col items-center gap-2">
-                                <span className="text-amber-200 font-bold text-xs bg-black/50 px-2 py-0.5 rounded border border-amber-700/50">EŞLEŞTİR</span>
-                                <div className="w-20 h-20 md:w-24 md:h-24 bg-black/40 border-4 border-amber-900/60 rounded-lg shadow-inner flex items-center justify-center transition-all duration-300">
-                                    {slot2Box && <img src={getSmallBoxImage()} alt="Box" className="w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-xl animate-in zoom-in duration-300" />}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <img src={getChestParts().right} alt="Chest Right" className="h-48 md:h-64 object-contain -translate-x-1" />
-                </div>
-            </div>
-
-            {/* ALT KUTULAR */}
-            <div className="h-40 bg-slate-950/80 backdrop-blur-md border-t border-slate-800 p-4 flex items-center justify-center gap-4 overflow-x-auto">
-                {boxes.map((box) => (
-                    <div key={box.id} className="relative w-20 h-20 md:w-24 md:h-24 flex-shrink-0 transition-all duration-300">
-                       {box.status === 'idle' ? (
-                           <button onClick={() => handleBoxClick(box.id)} className="w-full h-full group hover:-translate-y-2 transition-transform duration-300">
-                               <img src={getSmallBoxImage()} alt="Kutu" className="w-full h-full object-contain drop-shadow-lg group-hover:drop-shadow-[0_10px_10px_rgba(59,130,246,0.5)]" />
-                           </button>
-                       ) : (
-                           <div className="w-full h-full border-2 border-slate-800 border-dashed rounded-lg opacity-20"></div>
-                       )}
-                    </div>
-                ))}
-            </div>
-          </div>
-        );
-      default: return null;
-    }
-  };
-
-  // --- 🔥 ANA RETURN (ZORLA YÖN DÖNDÜRME MANTIĞI) 🔥 ---
-  // Ekran dik olsa bile CSS ile zorla 90 derece döndürerek yataymış gibi gösteriyoruz.
+  // --- SÜRÜKLEME MANTIĞI (POINTER EVENTS) ---
   
-  const containerStyle: React.CSSProperties = isPortrait
-  ? {
-      position: 'fixed',
-      top: '50%',
-      left: '50%',
-      // Dik ekranda: Genişlik ekranın boyu kadar, Yükseklik ekranın eni kadar olur.
-      width: `${windowSize.h}px`,
-      height: `${windowSize.w}px`,
-      // Ortadan 90 derece döndür
-      transform: 'translate(-50%, -50%) rotate(90deg)',
-      zIndex: 100,
-      backgroundColor: '#020617', // Arka plan rengi (kenarlar için)
-    }
-  : {
-      // Yatay ekranda normal davran
-      position: 'fixed',
-      inset: 0,
-      zIndex: 100,
-      backgroundColor: '#020617',
+  const handlePointerDown = (e: React.PointerEvent, box: DraggableBox) => {
+    e.preventDefault(); // Kaydırmayı engelle
+    // Sesi Çal
+    playSound(box.soundId);
+
+    // Sürüklemeyi Başlat
+    const element = e.currentTarget as HTMLElement;
+    const rect = element.getBoundingClientRect();
+    
+    setDraggedBoxId(box.id);
+    setDragPosition({ x: e.clientX, y: e.clientY });
+    
+    // Tıkladığımız yerin kutunun sol üst köşesine uzaklığı
+    dragOffset.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
     };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!draggedBoxId) return;
+    e.preventDefault();
+    setDragPosition({ x: e.clientX, y: e.clientY });
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (!draggedBoxId) return;
+    
+    // --- BIRAKILDIĞINDA KONTROL ---
+    const dropZone = dropZoneRef.current;
+    
+    if (dropZone) {
+      const dropRect = dropZone.getBoundingClientRect();
+      const pointerX = e.clientX;
+      const pointerY = e.clientY;
+
+      // Pointer (Parmak/Mouse) DropZone sınırları içinde mi?
+      const isInside = 
+        pointerX >= dropRect.left && 
+        pointerX <= dropRect.right && 
+        pointerY >= dropRect.top && 
+        pointerY <= dropRect.bottom;
+
+      if (isInside) {
+        checkAnswer(draggedBoxId);
+      }
+    }
+
+    setDraggedBoxId(null); // Sürüklemeyi bitir
+  };
+
+  // --- CEVAP KONTROLÜ ---
+  const checkAnswer = (boxId: string) => {
+    const box = bottomBoxes.find(b => b.id === boxId);
+    if (!box) return;
+
+    if (box.soundId === targetSoundId) {
+      // ✅ DOĞRU CEVAP
+      const nextStage = chestStage + 1;
+      setChestStage(nextStage);
+
+      // Final Kontrolü (4 ışık yandıysa = index 4)
+      if (nextStage >= 4) {
+        handleWin();
+      } else {
+        // Bir sonraki tura geç
+        setTimeout(() => {
+          initRound(nextStage);
+        }, 500);
+      }
+    } else {
+      // ❌ YANLIŞ CEVAP
+      // Burada hata sesi eklenebilir
+      const failAudio = new Audio(SOUNDS[box.soundId] || ""); // Kendi sesini tekrar çalsın veya hata sesi
+      failAudio.play().catch(()=>{});
+    }
+  };
+
+  const handleWin = () => {
+    // Sandık 5 (Sarı) -> Sandık 6 (Yeşil) -> Sandık 7 (Açık)
+    // Bu geçişleri animasyonlu yapıyoruz
+    setTimeout(() => setChestStage(5), 500); // Yeşil Işık
+    setTimeout(() => setChestStage(6), 1500); // Sandık Açıl
+    setTimeout(() => setIsGameWon(true), 2500); // Tebrikler
+  };
+
+  // --- GÖRSEL HELPER ---
+  const getBoxImage = (type: 'left' | 'mid' | 'right') => {
+    if (type === 'left') return imgKutuSol;
+    if (type === 'right') return imgKutuSag;
+    return imgKutuOrta;
+  };
+
+  // --- ZORLA YATAY STİLİ ---
+  const containerStyle: React.CSSProperties = isPortrait
+    ? {
+        position: 'fixed', top: '50%', left: '50%',
+        width: `${windowSize.h}px`, height: `${windowSize.w}px`,
+        transform: 'translate(-50%, -50%) rotate(90deg)',
+        zIndex: 100, backgroundColor: '#000',
+      }
+    : { position: 'fixed', inset: 0, zIndex: 100, backgroundColor: '#000' };
 
   return (
-    <div style={containerStyle} className="text-white flex flex-col font-sans select-none overflow-hidden">
+    <div style={containerStyle} 
+         className="text-white font-sans select-none overflow-hidden touch-none"
+         onPointerMove={handlePointerMove}
+         onPointerUp={handlePointerUp} // Ekranın herhangi bir yerinde bırakırsa
+    >
       
-      {/* HEADER (Menüdeyken) */}
-      {!selectedLevel ? (
-        <div className="p-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between shadow-lg">
-            <button onClick={onClose} className="p-3 bg-slate-800 rounded-full hover:bg-slate-700 transition border border-slate-700">
-                <ArrowLeft size={24} />
-            </button>
-            <h2 className="text-xl font-bold text-slate-200">Ses Eşleme Becerileri</h2>
-            <div className="w-12" />
+      {/* ARKAPLAN */}
+      <div className="absolute inset-0 w-full h-full">
+        <img src={bgImage} className="w-full h-full object-cover opacity-80" alt="Background" />
+        <div className="absolute inset-0 bg-black/30" /> {/* Karartma */}
+      </div>
+
+      {/* --- OYUN ALANI --- */}
+      <div className="relative w-full h-full flex flex-col items-center justify-between py-6">
+        
+        {/* 1. ÜST: SANDIK (PUAN) */}
+        <div className="relative z-10 animate-in zoom-in duration-500">
+           <img 
+             src={CHEST_IMAGES[chestStage]} 
+             alt="Sandık" 
+             className="h-32 md:h-48 object-contain drop-shadow-[0_0_20px_rgba(255,200,0,0.3)] transition-all duration-500"
+           />
         </div>
-      ) : (
-         <button onClick={() => setSelectedLevel(null)} className="absolute top-4 left-4 z-50 p-2 bg-slate-800/80 rounded-full text-slate-300 hover:bg-red-900/80 hover:text-white transition">
-            <ArrowLeft size={20} />
-         </button>
+
+        {/* 2. ORTA: GÖREV ALANI */}
+        <div className="flex w-full justify-center gap-16 md:gap-32 items-center z-10">
+            
+            {/* SOL: REFERANS KUTUSU (Play Button) */}
+            <div className="flex flex-col items-center gap-2">
+                <span className="text-amber-200 font-bold text-sm bg-black/60 px-3 py-1 rounded-full border border-amber-500/50">DİNLE</span>
+                <div 
+                   className="relative w-28 h-28 cursor-pointer active:scale-95 transition-transform"
+                   onPointerDown={() => playSound(targetSoundId)} // Sadece dinlemek için
+                >
+                    {/* Çerçeve */}
+                    <img src={imgCerceve} className="absolute inset-0 w-full h-full object-contain" alt="Çerçeve" />
+                    {/* İçindeki Kutu */}
+                    <div className="absolute inset-0 flex items-center justify-center p-4">
+                        <img src={imgKutuOrta} className="w-full h-full object-contain animate-pulse" alt="Referans" />
+                    </div>
+                </div>
+            </div>
+
+            {/* SAĞ: DROP ZONE (Bırakma Alanı) */}
+            <div className="flex flex-col items-center gap-2">
+                <span className="text-amber-200 font-bold text-sm bg-black/60 px-3 py-1 rounded-full border border-amber-500/50">EŞLEŞTİR</span>
+                <div ref={dropZoneRef} className="relative w-28 h-28">
+                    {/* Çerçeve */}
+                    <img src={imgCerceve} className="w-full h-full object-contain opacity-80" alt="Hedef" />
+                    {/* İçi Boş - Buraya sürüklenecek */}
+                    <div className="absolute inset-0 bg-yellow-500/10 rounded-lg animate-pulse border-2 border-dashed border-yellow-500/30"></div>
+                </div>
+            </div>
+
+        </div>
+
+        {/* 3. ALT: SEÇENEKLER (Sürüklenebilir Kutular) */}
+        <div className="flex gap-4 md:gap-8 items-end justify-center pb-4 z-20 h-32">
+           {bottomBoxes.map((box) => {
+             // Eğer bu kutu şu an sürükleniyorsa, orijinal yerini 'görünmez' yap (Hayalet)
+             // Ama DOM'da yer kaplamaya devam etsin ki düzen bozulmasın.
+             const isDragging = draggedBoxId === box.id;
+
+             return (
+               <div 
+                 key={box.id} 
+                 className={`relative w-24 h-24 transition-opacity ${isDragging ? 'opacity-0' : 'opacity-100'}`}
+               >
+                  <div 
+                    className="w-full h-full cursor-grab active:cursor-grabbing hover:-translate-y-2 transition-transform"
+                    onPointerDown={(e) => handlePointerDown(e, box)}
+                  >
+                      <img 
+                        src={getBoxImage(box.visualType)} 
+                        alt="Kutu" 
+                        className="w-full h-full object-contain drop-shadow-xl"
+                        style={{ pointerEvents: 'none' }} // Resim sürüklemeyi engellemesin
+                      />
+                  </div>
+               </div>
+             );
+           })}
+        </div>
+
+        {/* --- SÜRÜKLENEN HAYALET KUTU (CURSOR TAKİPÇİSİ) --- */}
+        {draggedBoxId && (
+            <div 
+              className="fixed z-50 pointer-events-none w-24 h-24 drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
+              style={{
+                left: dragPosition.x - dragOffset.current.x,
+                top: dragPosition.y - dragOffset.current.y,
+              }}
+            >
+               <img 
+                 src={getBoxImage(bottomBoxes.find(b=>b.id === draggedBoxId)?.visualType || 'mid')} 
+                 className="w-full h-full object-contain"
+                 alt="Dragged"
+               />
+            </div>
+        )}
+
+      </div>
+
+      {/* --- GERİ DÖN BUTONU --- */}
+      <button onClick={onClose} className="absolute top-4 left-4 z-50 p-3 bg-slate-900/80 rounded-full border border-slate-600 text-white hover:bg-slate-700">
+         <ArrowLeft size={24} />
+      </button>
+
+      {/* --- KAZANMA EKRANI --- */}
+      {isGameWon && (
+        <div className="absolute inset-0 z-[60] bg-black/80 flex flex-col items-center justify-center animate-in fade-in duration-500">
+            <h2 className="text-4xl md:text-6xl font-black text-yellow-400 mb-8 drop-shadow-lg animate-bounce">
+                HARİKA! 🎉
+            </h2>
+            <img src={sandik7} className="w-64 md:w-96 object-contain mb-8 animate-pulse" alt="Açık Sandık" />
+            <button 
+              onClick={() => {
+                  setChestStage(0); 
+                  setIsGameWon(false); 
+                  initRound(0);
+              }}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-8 py-4 rounded-full text-xl font-bold transition shadow-lg hover:scale-105"
+            >
+                <RefreshCcw size={24} />
+                TEKRAR OYNA
+            </button>
+        </div>
       )}
 
-      {/* İÇERİK */}
-      <div className="flex-1 relative bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-800 via-slate-950 to-black w-full h-full overflow-hidden">
-        
-        {/* --- ANA MENÜ --- */}
-        {!selectedLevel && (
-            <div className="h-full flex flex-col items-center justify-center p-6 gap-6 animate-in fade-in zoom-in duration-300">
-                <button onClick={() => setSelectedLevel(1)} className="w-full max-w-md bg-gradient-to-r from-amber-900 to-slate-900 border border-amber-700 p-6 rounded-2xl flex items-center gap-6 hover:scale-105 active:scale-95 transition-all shadow-xl group">
-                    <div className="w-16 h-16 rounded-full bg-amber-600 flex items-center justify-center shadow-lg group-hover:bg-amber-500 transition-colors">
-                        <Box size={32} className="text-white animate-bounce" />
-                    </div>
-                    <div className="text-left">
-                        <h4 className="text-xl font-bold text-white">Sesli Sandık</h4>
-                        <p className="text-sm text-amber-300">Aynı sesi çıkaran kutuları bul.</p>
-                    </div>
-                </button>
-                {/* Diğer menü öğeleri... */}
-            </div>
-        )}
-
-        {/* --- OYUN ALANI --- */}
-        {selectedLevel && (
-            <div className="w-full h-full animate-in slide-in-from-bottom duration-500">
-                {renderGameContent()}
-            </div>
-        )}
-      </div>
     </div>
   );
 }
