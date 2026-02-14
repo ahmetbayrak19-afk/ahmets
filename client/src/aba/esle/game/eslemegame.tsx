@@ -18,10 +18,10 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   const renderer = useRef<GameRenderer | null>(null);
   const reqRef = useRef<number>();
 
-  // 🔥 BALIK BAŞLANGIÇ AYARI 🔥
+  // 🔥 BALIK FİZİK NESNESİ
   const fish = useRef({
-    x: 0,  // Haritanın ortası (yatayda)
-    y: 5,  // YÜZEYİN HEMEN ALTI (0 yüzeydir, 5 biraz altıdır)
+    x: 0,
+    y: 5, // Başlangıç konumu
     vx: 0,
     vy: 0,
     rotation: 0,
@@ -33,8 +33,7 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     lastDirection: 1 as any,
   });
 
-  // 🔥 KAMERA BAŞLANGIÇ AYARI 🔥
-  // Kamerayı da balıkla aynı yere koyuyoruz ki oyun açılınca balığı aramayalım
+  // KAMERA
   const camera = useRef({ x: 0, y: 5 });
   const mousePos = useRef({ x: 0, y: 5 });
 
@@ -58,7 +57,6 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
     const w = canvasRef.current.clientWidth;
     const h = canvasRef.current.clientHeight;
 
-    // Mouse pozisyonunu dünya koordinatlarına çevir
     mousePos.current.x = camera.current.x + (screenX - w / 2);
     mousePos.current.y = camera.current.y + (screenY - h / 2);
   };
@@ -79,11 +77,13 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
       // 1. Fizik Güncelle
       physics.current.updateFish(fish.current as any, mousePos.current.x, mousePos.current.y);
 
-      // 2. KAMERA TAKİBİ (Yumuşak Geçiş)
+      // 2. Kamera Takibi
       camera.current.x += (fish.current.x - camera.current.x) * 0.1;
       camera.current.y += (fish.current.y - camera.current.y) * 0.1;
 
-      // 3. Çizim
+      // 3. Çizim (2D Canvas)
+      // NOT: 3D Balık geldiği için buradaki 2D çizimi istersen iptal edebilirsin.
+      // Şimdilik kalsın, arkada 3D balığı göreceksin.
       if (assets.current) {
         renderer.current?.draw(assets.current, fish.current as any, camera.current);
       }
@@ -98,12 +98,13 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black overflow-hidden select-none touch-none">
       
-      {/* 3D ARKAPLAN */}
+      {/* 3D DÜNYA */}
       <div className="absolute inset-0 z-0">
-        <DenizBackground cameraRef={camera} />
+        {/* 🔥 ÖNEMLİ: fishRef'i buraya prop olarak gönderiyoruz */}
+        <DenizBackground cameraRef={camera} fishRef={fish} />
       </div>
 
-      {/* 2D OYUN ALANI (CANVAS) */}
+      {/* 2D ARAYÜZ ve KONTROL */}
       <div className="absolute inset-0 z-10">
         {isLoaded ? (
           <>
@@ -140,5 +141,4 @@ export default function EslemeGame({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
-    }
-      
+      }
