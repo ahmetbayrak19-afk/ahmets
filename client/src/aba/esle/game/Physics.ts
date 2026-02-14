@@ -1,12 +1,12 @@
 // 🔥 GÜNCELLENMİŞ SINIRLAR 🔥
 export const LIMIT_LEFT = -5400; 
 export const LIMIT_RIGHT = 5400;  
-export const LIMIT_TOP = -1050;    // Dünya tavanı yükseltildi
+export const LIMIT_TOP = -1200;    // Dünya tavanı yükseltildi
 export const LIMIT_BOTTOM = 1000;  
 
 // 🎯 YENİ ZIPLAMA EŞİĞİ
-// Balık bu noktayı geçince (Y < -750) yerçekimi başlar.
-const WATER_SURFACE = -1200; 
+// Balık bu noktayı geçince (Y < -1) yerçekimi başlar.
+const WATER_SURFACE = -1030; 
 
 export const WORLD_WIDTH = Math.abs(LIMIT_LEFT) + LIMIT_RIGHT; 
 export const WORLD_HEIGHT = Math.abs(LIMIT_TOP) + LIMIT_BOTTOM;
