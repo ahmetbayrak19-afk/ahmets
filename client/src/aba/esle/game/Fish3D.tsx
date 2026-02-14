@@ -26,12 +26,10 @@ export function Fish3D({ fishRef }: { fishRef: any }) {
     const fish = fishRef.current;
     const SCALE_FACTOR = 0.015; 
 
-    // Pozisyon Eşleme
     meshRef.current.position.x = fish.x * SCALE_FACTOR;
     meshRef.current.position.y = -fish.y * SCALE_FACTOR; 
     meshRef.current.position.z = 0; 
 
-    // Dönüşler
     const targetY = fish.lastDirection === 1 ? Math.PI / 2 : -Math.PI / 2;
     meshRef.current.rotation.y += (targetY - meshRef.current.rotation.y) * 0.1;
     
@@ -39,9 +37,8 @@ export function Fish3D({ fishRef }: { fishRef: any }) {
     meshRef.current.rotation.z = targetZ;
   });
 
-  // 🔥 DÜZELTME: Balık boyutunu 5 katına çıkardım (0.5 -> 2.5)
-  return <primitive object={scene} ref={meshRef} scale={2.5} />;
+  // 🔥 GÜNCELLEME: Boyut 2 katına çıktı (2.5 -> 5.0)
+  return <primitive object={scene} ref={meshRef} scale={5.0} />;
 }
 
 useGLTF.preload(FISH_URL);
-      
