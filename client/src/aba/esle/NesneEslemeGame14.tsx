@@ -87,7 +87,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     const src = SOUNDS[id];
     if (src) {
       const audio = new Audio(src);
-      audio.loop = true; // Basılı tuttukça çalar
+      audio.loop = true; 
       audioRef.current = audio;
       audio.play().catch(() => {});
     }
@@ -130,11 +130,9 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
   };
 
   // --- POINTER EVENTS ---
-  
-  // 1. BASMA
   const handlePointerDown = (e: React.PointerEvent, boxId: string, soundId: number) => {
     e.preventDefault();
-    e.stopPropagation(); // Olayın yukarı taşmasını engelle
+    e.stopPropagation();
 
     const element = e.currentTarget as HTMLElement;
     const rect = element.getBoundingClientRect();
@@ -142,7 +140,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     setActiveBoxId(boxId); 
     startSound(soundId);   
 
-    // Sürükleme verilerini hazırla (Sadece alt kutular için anlamlı ama hepsi için set ediyoruz)
     setDraggedBoxId(boxId);
     setDragPosition({ x: e.clientX, y: e.clientY });
     dragStartPos.current = { x: e.clientX, y: e.clientY }; 
@@ -154,12 +151,10 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     };
   };
 
-  // 2. HAREKET
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!draggedBoxId) return;
     e.preventDefault();
 
-    // Referans kutusu ('ref-box') ASLA sürüklenmez
     if (draggedBoxId === 'ref-box') return;
 
     const moveX = Math.abs(e.clientX - dragStartPos.current.x);
@@ -168,23 +163,21 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     if (moveX > 5 || moveY > 5) {
         if (!isDraggingRef.current) {
             isDraggingRef.current = true;
-            setActiveBoxId(null); // Sallanma biter
-            stopSound();          // Sürüklerken ses susar
+            setActiveBoxId(null); 
+            stopSound();          
         }
     }
 
     setDragPosition({ x: e.clientX, y: e.clientY });
   };
 
-  // 3. BIRAKMA
   const handlePointerUp = (e: React.PointerEvent) => {
-    // 🔥 HER DURUMDA ÖNCE SESİ VE ANİMASYONU DURDUR
+    // 🔥 PARMAK KALKTIĞINDA HER ŞEY DURUR
     setActiveBoxId(null); 
     stopSound();          
 
     if (!draggedBoxId) return;
 
-    // Drop Kontrolü
     const dropZone = dropZoneRef.current;
     if (dropZone && isDraggingRef.current && draggedBoxId !== 'ref-box') {
       const dropRect = dropZone.getBoundingClientRect();
@@ -253,6 +246,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
          onPointerMove={handlePointerMove}
          onPointerUp={handlePointerUp}
     >
+      {/* 🔥 CSS GÜNCELLEMESİ: Resim seçimini engelleme */}
       <style>{`
         @keyframes shake {
           0% { transform: translate(1px, 1px) rotate(0deg); }
@@ -271,6 +265,10 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
             animation: shake 0.5s;
             animation-iteration-count: infinite;
         }
+        img {
+            -webkit-user-drag: none;
+            user-select: none;
+        }
       `}</style>
 
       {/* ARKAPLAN */}
@@ -281,7 +279,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
 
       <div className="relative w-full h-full flex flex-col items-center justify-between py-6">
         
-        {/* 1. SANDIK - YERİ SABİT */}
+        {/* 1. SANDIK */}
         <div className="relative z-10 animate-in zoom-in duration-500 mt-12">
            <img 
              src={CHEST_IMAGES[chestStage]} 
@@ -290,28 +288,23 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
            />
         </div>
 
-        {/* 2. ÇERÇEVELER - GAP ARTIRILDI (SANDIKTAN UZAKLAŞTI) */}
-        {/* gap-96 yapıldı (önceki 64'tü), sandığın önünü açmak için */}
-        {/* -mt-24 sabit bırakıldı */}
+        {/* 2. ÇERÇEVELER */}
         <div className="flex w-full justify-center gap-96 items-center z-10 -mt-24">
             
             {/* SOL: DİNLE KUTUSU */}
             <div className="relative w-36 h-36">
                 <img src={imgDinleKutucuk} className="absolute inset-0 w-full h-full object-contain" alt="Dinle Çerçeve" />
                 
-                {/* 🔥 KUTU AYARI GÜNCELLENDİ 🔥
-                   1. Çerçevenin içinde değil, 'absolute' ile konumlandırıldı.
-                   2. -bottom-4 ile çerçevenin alt kenarına oturtuldu.
-                   3. left-1/2 -translate-x-1/2 ile ortalandı.
-                   4. onPointerDown ARTIK SADECE KUTUDA (Çerçeveye basınca ses çıkmaz).
-                */}
+                {/* 🔥 GÜNCELLEME: Kutu Konumu ve Tıklama Alanı */}
+                {/* Kutu artık çerçevenin içinde, hafifçe aşağı taşıyor (translate-y-1/3) */}
                 <div 
-                   className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-28 h-28 flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+                   className="absolute inset-0 flex items-end justify-center cursor-pointer active:scale-95 transition-transform z-20"
                    onPointerDown={(e) => handlePointerDown(e, 'ref-box', targetSoundId)} 
                 >
                     <img 
                       src={imgKutuOrta} 
-                      className={`w-full h-full object-contain ${activeBoxId === 'ref-box' ? 'shake-box' : ''}`} 
+                      // w-28 h-28: Biraz küçültüldü ki çerçeveden çok taşmasın
+                      className={`w-28 h-28 object-contain translate-y-1/3 ${activeBoxId === 'ref-box' ? 'shake-box' : ''}`} 
                       alt="Referans" 
                     />
                 </div>
@@ -320,13 +313,13 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
             {/* SAĞ: DROP ZONE */}
             <div ref={dropZoneRef} className="relative w-36 h-36">
                 <img src={imgEsleKutucuk} className="w-full h-full object-contain opacity-80" alt="Hedef Çerçeve" />
-                <div className="absolute inset-0 bg-yellow-500/10 rounded-lg animate-pulse border-2 border-dashed border-yellow-500/30"></div>
+                {/* 🔥 GÜNCELLEME: Kesik çizgiler kaldırıldı, sadece hafif sarı parıltı */}
+                <div className="absolute inset-0 bg-yellow-500/10 rounded-lg animate-pulse"></div>
             </div>
 
         </div>
 
-        {/* 3. ALT SEÇENEKLER - YÜKSEKLİK AYARI */}
-        {/* pb-32 yerine pb-12 yapıldı. Bu sayede kutular aşağı indi ama en alta yapışmadı. */}
+        {/* 3. ALT SEÇENEKLER */}
         <div className="flex gap-4 md:gap-8 items-end justify-center pb-12 z-20 h-32 w-full">
            {bottomBoxes.map((box) => {
              const isDragging = draggedBoxId === box.id && isDraggingRef.current;
@@ -353,7 +346,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
            })}
         </div>
 
-        {/* HAYALET KUTU (SÜRÜKLENEN) */}
+        {/* HAYALET KUTU */}
         {draggedBoxId && isDraggingRef.current && draggedBoxId !== 'ref-box' && (
             <div 
               className="fixed z-50 pointer-events-none w-24 h-24 drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
