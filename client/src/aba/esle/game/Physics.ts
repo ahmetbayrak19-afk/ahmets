@@ -2,7 +2,7 @@
 export const LIMIT_LEFT = -5400; 
 export const LIMIT_RIGHT = 5400;  
 export const LIMIT_TOP = -900;    // Dünya tavanı yükseltildi
-export const LIMIT_BOTTOM = 800;  
+export const LIMIT_BOTTOM = 1000;  
 
 // 🎯 YENİ ZIPLAMA EŞİĞİ
 // Balık bu noktayı geçince (Y < -750) yerçekimi başlar.
