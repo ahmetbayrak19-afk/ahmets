@@ -56,8 +56,13 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
   const [bottomBoxes, setBottomBoxes] = useState<DraggableBox[]>([]);
   const [isGameWon, setIsGameWon] = useState(false);
   
+  // Sürükleme State'leri
   const [draggedBoxId, setDraggedBoxId] = useState<string | null>(null);
   const [activeBoxId, setActiveBoxId] = useState<string | null>(null);
+
+  // 🔥 YENİ STATE: Doğru eşleşme animasyonu için
+  // Eğer bu doluysa, 1 saniyelik kutlama animasyonu oynuyor demektir.
+  const [successMatch, setSuccessMatch] = useState<{ visualType: 'left' | 'mid' | 'right' } | null>(null);
 
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
   const dragOffset = useRef({ x: 0, y: 0 }); 
@@ -104,6 +109,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
   const initRound = (nextStage = 0) => {
     const target = Math.floor(Math.random() * 7) + 1;
     setTargetSoundId(target);
+    setSuccessMatch(null); // Animasyonu temizle
 
     const distractors: number[] = [];
     while (distractors.length < 2) {
@@ -131,6 +137,9 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
 
   // --- POINTER EVENTS ---
   const handlePointerDown = (e: React.PointerEvent, boxId: string, soundId: number) => {
+    // Animasyon oynarken tıklamayı engelle
+    if (successMatch) return;
+
     e.preventDefault();
     e.stopPropagation();
 
@@ -172,7 +181,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    // 🔥 PARMAK KALKTIĞINDA HER ŞEY DURUR
     setActiveBoxId(null); 
     stopSound();          
 
@@ -199,21 +207,32 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     isDraggingRef.current = false;
   };
 
+  // --- CEVAP KONTROLÜ ---
   const checkAnswer = (boxId: string) => {
     const box = bottomBoxes.find(b => b.id === boxId);
     if (!box) return;
 
     if (box.soundId === targetSoundId) {
-      const nextStage = chestStage + 1;
-      setChestStage(nextStage);
-      if (nextStage >= 4) {
-        handleWin();
-      } else {
-        setTimeout(() => {
-          initRound(nextStage);
-        }, 500);
-      }
+      // ✅ DOĞRU CEVAP
+      
+      // 1. Animasyonu Başlat (Kutular yerleşsin, parlasın, titresin)
+      setSuccessMatch({ visualType: box.visualType });
+
+      // 2. 1 Saniye Bekle, Sonra İlerle
+      setTimeout(() => {
+          const nextStage = chestStage + 1;
+          setChestStage(nextStage);
+          
+          if (nextStage >= 4) {
+            handleWin();
+            setSuccessMatch(null);
+          } else {
+            initRound(nextStage);
+          }
+      }, 1000); // 1000ms = 1 saniye bekleme
+
     } else {
+      // ❌ YANLIŞ
       const failAudio = new Audio(SOUNDS[box.soundId] || ""); 
       failAudio.play().catch(()=>{});
     }
@@ -246,7 +265,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
          onPointerMove={handlePointerMove}
          onPointerUp={handlePointerUp}
     >
-      {/* 🔥 CSS GÜNCELLEMESİ: Resim seçimini engelleme */}
       <style>{`
         @keyframes shake {
           0% { transform: translate(1px, 1px) rotate(0deg); }
@@ -267,7 +285,12 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
         }
         img {
             -webkit-user-drag: none;
+            -khtml-user-drag: none;
+            -moz-user-drag: none;
+            -o-user-drag: none;
             user-select: none;
+            -webkit-user-select: none;
+            pointer-events: none;
         }
       `}</style>
 
@@ -295,16 +318,14 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
             <div className="relative w-36 h-36">
                 <img src={imgDinleKutucuk} className="absolute inset-0 w-full h-full object-contain" alt="Dinle Çerçeve" />
                 
-                {/* 🔥 GÜNCELLEME: Kutu Konumu ve Tıklama Alanı */}
-                {/* Kutu artık çerçevenin içinde, hafifçe aşağı taşıyor (translate-y-1/3) */}
                 <div 
-                   className="absolute inset-0 flex items-end justify-center cursor-pointer active:scale-95 transition-transform z-20"
+                   className="absolute bottom-3 left-1/2 -translate-x-1/2 w-24 h-24 flex items-center justify-center cursor-pointer active:scale-95 transition-transform z-20 pointer-events-auto"
                    onPointerDown={(e) => handlePointerDown(e, 'ref-box', targetSoundId)} 
                 >
                     <img 
                       src={imgKutuOrta} 
-                      // w-28 h-28: Biraz küçültüldü ki çerçeveden çok taşmasın
-                      className={`w-28 h-28 object-contain translate-y-1/3 ${activeBoxId === 'ref-box' ? 'shake-box' : ''}`} 
+                      // 🔥 SARI IŞIK EKLENDİ (successMatch varsa)
+                      className={`w-full h-full object-contain ${activeBoxId === 'ref-box' || successMatch ? 'shake-box' : ''} ${successMatch ? 'drop-shadow-[0_0_20px_rgba(250,204,21,1)]' : ''}`} 
                       alt="Referans" 
                     />
                 </div>
@@ -313,8 +334,19 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
             {/* SAĞ: DROP ZONE */}
             <div ref={dropZoneRef} className="relative w-36 h-36">
                 <img src={imgEsleKutucuk} className="w-full h-full object-contain opacity-80" alt="Hedef Çerçeve" />
-                {/* 🔥 GÜNCELLEME: Kesik çizgiler kaldırıldı, sadece hafif sarı parıltı */}
-                <div className="absolute inset-0 bg-yellow-500/10 rounded-lg animate-pulse"></div>
+                
+                {/* 🔥 DOĞRU EŞLEŞME ANİMASYONU 🔥 */}
+                {/* Eğer successMatch varsa, bırakılan kutuyu çerçevenin içinde göster */}
+                {successMatch && (
+                   <div className="absolute inset-0 flex items-center justify-center">
+                       <img 
+                         src={getBoxImage(successMatch.visualType)} 
+                         // Hem titrer hem sarı parlar
+                         className="w-24 h-24 object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)]" 
+                         alt="Matched Box" 
+                       />
+                   </div>
+                )}
             </div>
 
         </div>
@@ -325,20 +357,22 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
              const isDragging = draggedBoxId === box.id && isDraggingRef.current;
              const isShaking = activeBoxId === box.id && !isDraggingRef.current;
              
+             // Animasyon sırasında veya sürüklenirken alt kutuyu gizle (hayalet yukarıda veya dropzone'da)
+             const isHidden = isDragging || (successMatch && box.visualType === successMatch.visualType);
+
              return (
                <div 
                  key={box.id} 
-                 className={`relative w-24 h-24 transition-opacity ${isDragging ? 'opacity-0' : 'opacity-100'}`}
+                 className={`relative w-24 h-24 transition-opacity ${isHidden ? 'opacity-0' : 'opacity-100'}`}
                >
                   <div 
-                    className={`w-full h-full cursor-grab active:cursor-grabbing hover:-translate-y-2 transition-transform ${isShaking ? 'shake-box' : ''}`}
+                    className={`w-full h-full cursor-grab active:cursor-grabbing hover:-translate-y-2 transition-transform ${isShaking ? 'shake-box' : ''} pointer-events-auto`}
                     onPointerDown={(e) => handlePointerDown(e, box.id, box.soundId)}
                   >
                       <img 
                         src={getBoxImage(box.visualType)} 
                         alt="Kutu" 
                         className="w-full h-full object-contain drop-shadow-xl"
-                        style={{ pointerEvents: 'none' }} 
                       />
                   </div>
                </div>
@@ -365,7 +399,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
 
       </div>
 
-      <button onClick={onClose} className="absolute top-4 left-4 z-50 p-3 bg-slate-900/80 rounded-full border border-slate-600 text-white hover:bg-slate-700">
+      <button onClick={onClose} className="absolute top-4 left-4 z-50 p-3 bg-slate-900/80 rounded-full border border-slate-600 text-white hover:bg-slate-700 pointer-events-auto">
          <ArrowLeft size={24} />
       </button>
 
@@ -381,7 +415,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
                   setIsGameWon(false); 
                   initRound(0);
               }}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-8 py-4 rounded-full text-xl font-bold transition shadow-lg hover:scale-105"
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-8 py-4 rounded-full text-xl font-bold transition shadow-lg hover:scale-105 pointer-events-auto"
             >
                 <RefreshCcw size={24} />
                 TEKRAR OYNA
