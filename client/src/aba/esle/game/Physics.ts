@@ -1,7 +1,7 @@
 // 🔥 GÜNCELLENMİŞ SINIRLAR 🔥
 export const LIMIT_LEFT = -5400; 
 export const LIMIT_RIGHT = 5400;  
-export const LIMIT_TOP = -900;    // Dünya tavanı yükseltildi
+export const LIMIT_TOP = -1400;    // Dünya tavanı yükseltildi
 export const LIMIT_BOTTOM = 1000;  
 
 // 🎯 YENİ ZIPLAMA EŞİĞİ
