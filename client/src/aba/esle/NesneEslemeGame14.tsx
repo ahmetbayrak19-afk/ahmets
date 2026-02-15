@@ -56,12 +56,9 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
   const [bottomBoxes, setBottomBoxes] = useState<DraggableBox[]>([]);
   const [isGameWon, setIsGameWon] = useState(false);
   
-  // Sürükleme State'leri
   const [draggedBoxId, setDraggedBoxId] = useState<string | null>(null);
   const [activeBoxId, setActiveBoxId] = useState<string | null>(null);
 
-  // 🔥 YENİ STATE: Doğru eşleşme animasyonu için
-  // Eğer bu doluysa, 1 saniyelik kutlama animasyonu oynuyor demektir.
   const [successMatch, setSuccessMatch] = useState<{ visualType: 'left' | 'mid' | 'right' } | null>(null);
 
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
@@ -80,7 +77,14 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     handleResize();
     window.addEventListener('resize', handleResize);
     initRound(); 
-    return () => window.removeEventListener('resize', handleResize);
+    
+    // 🔥 SCROLL ENGELLEME (Gövdeyi kilitler)
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+        window.removeEventListener('resize', handleResize);
+        document.body.style.overflow = ''; // Çıkışta serbest bırak
+    };
   }, []);
 
   // --- SES YÖNETİMİ ---
@@ -109,7 +113,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
   const initRound = (nextStage = 0) => {
     const target = Math.floor(Math.random() * 7) + 1;
     setTargetSoundId(target);
-    setSuccessMatch(null); // Animasyonu temizle
+    setSuccessMatch(null);
 
     const distractors: number[] = [];
     while (distractors.length < 2) {
@@ -137,7 +141,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
 
   // --- POINTER EVENTS ---
   const handlePointerDown = (e: React.PointerEvent, boxId: string, soundId: number) => {
-    // Animasyon oynarken tıklamayı engelle
     if (successMatch) return;
 
     e.preventDefault();
@@ -207,32 +210,23 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     isDraggingRef.current = false;
   };
 
-  // --- CEVAP KONTROLÜ ---
   const checkAnswer = (boxId: string) => {
     const box = bottomBoxes.find(b => b.id === boxId);
     if (!box) return;
 
     if (box.soundId === targetSoundId) {
-      // ✅ DOĞRU CEVAP
-      
-      // 1. Animasyonu Başlat (Kutular yerleşsin, parlasın, titresin)
       setSuccessMatch({ visualType: box.visualType });
-
-      // 2. 1 Saniye Bekle, Sonra İlerle
       setTimeout(() => {
           const nextStage = chestStage + 1;
           setChestStage(nextStage);
-          
           if (nextStage >= 4) {
             handleWin();
             setSuccessMatch(null);
           } else {
             initRound(nextStage);
           }
-      }, 1000); // 1000ms = 1 saniye bekleme
-
+      }, 1000); 
     } else {
-      // ❌ YANLIŞ
       const failAudio = new Audio(SOUNDS[box.soundId] || ""); 
       failAudio.play().catch(()=>{});
     }
@@ -250,178 +244,180 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     return imgKutuOrta;
   };
 
+  // 🔥 ANA OYUN KONTEYNER STİLİ
   const containerStyle: React.CSSProperties = isPortrait
     ? {
         position: 'fixed', top: '50%', left: '50%',
         width: `${windowSize.h}px`, height: `${windowSize.w}px`,
         transform: 'translate(-50%, -50%) rotate(90deg)',
-        zIndex: 100, backgroundColor: '#000',
+        zIndex: 200, // Z-index artırıldı
+        backgroundColor: '#000',
       }
-    : { position: 'fixed', inset: 0, zIndex: 100, backgroundColor: '#000' };
+    : { position: 'fixed', inset: 0, zIndex: 200, backgroundColor: '#000' };
 
   return (
-    <div style={containerStyle} 
-         className="text-white font-sans select-none overflow-hidden touch-none"
-         onPointerMove={handlePointerMove}
-         onPointerUp={handlePointerUp}
-    >
-      <style>{`
-        @keyframes shake {
-          0% { transform: translate(1px, 1px) rotate(0deg); }
-          10% { transform: translate(-1px, -2px) rotate(-1deg); }
-          20% { transform: translate(-3px, 0px) rotate(1deg); }
-          30% { transform: translate(3px, 2px) rotate(0deg); }
-          40% { transform: translate(1px, -1px) rotate(1deg); }
-          50% { transform: translate(-1px, 2px) rotate(-1deg); }
-          60% { transform: translate(-3px, 1px) rotate(0deg); }
-          70% { transform: translate(3px, 1px) rotate(-1deg); }
-          80% { transform: translate(-1px, -1px) rotate(1deg); }
-          90% { transform: translate(1px, 2px) rotate(0deg); }
-          100% { transform: translate(1px, -2px) rotate(-1deg); }
-        }
-        .shake-box {
-            animation: shake 0.5s;
-            animation-iteration-count: infinite;
-        }
-        img {
-            -webkit-user-drag: none;
-            -khtml-user-drag: none;
-            -moz-user-drag: none;
-            -o-user-drag: none;
-            user-select: none;
-            -webkit-user-select: none;
-            pointer-events: none;
-        }
-      `}</style>
+    <>
+      {/* 🔥 GÜVENLİK PERDESİ (Blackout Curtain) 
+         Bu katman, oyunun altında kalan listeyi tamamen kapatır ve tıklanmasını engeller.
+      */}
+      <div className="fixed inset-0 bg-black z-[150] touch-none overscroll-none" />
 
-      {/* ARKAPLAN */}
-      <div className="absolute inset-0 w-full h-full">
-        <img src={bgImage} className="w-full h-full object-cover opacity-80" alt="Background" />
-        <div className="absolute inset-0 bg-black/30" />
-      </div>
+      <div style={containerStyle} 
+           className="text-white font-sans select-none overflow-hidden touch-none"
+           onPointerMove={handlePointerMove}
+           onPointerUp={handlePointerUp}
+      >
+        <style>{`
+          @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+          }
+          .shake-box {
+              animation: shake 0.5s;
+              animation-iteration-count: infinite;
+          }
+          img {
+              -webkit-user-drag: none;
+              user-select: none;
+              -webkit-user-select: none;
+              pointer-events: none;
+          }
+        `}</style>
 
-      <div className="relative w-full h-full flex flex-col items-center justify-between py-6">
-        
-        {/* 1. SANDIK */}
-        <div className="relative z-10 animate-in zoom-in duration-500 mt-12">
-           <img 
-             src={CHEST_IMAGES[chestStage]} 
-             alt="Sandık" 
-             className="h-32 md:h-48 object-contain drop-shadow-[0_0_20px_rgba(255,200,0,0.3)] transition-all duration-500 scale-300"
-           />
+        {/* ARKAPLAN */}
+        <div className="absolute inset-0 w-full h-full">
+          <img src={bgImage} className="w-full h-full object-cover opacity-80" alt="Background" />
+          <div className="absolute inset-0 bg-black/30" />
         </div>
 
-        {/* 2. ÇERÇEVELER */}
-        <div className="flex w-full justify-center gap-96 items-center z-10 -mt-24">
-            
-            {/* SOL: DİNLE KUTUSU */}
-            <div className="relative w-36 h-36">
-                <img src={imgDinleKutucuk} className="absolute inset-0 w-full h-full object-contain" alt="Dinle Çerçeve" />
-                
-                <div 
-                   className="absolute bottom-3 left-1/2 -translate-x-1/2 w-24 h-24 flex items-center justify-center cursor-pointer active:scale-95 transition-transform z-20 pointer-events-auto"
-                   onPointerDown={(e) => handlePointerDown(e, 'ref-box', targetSoundId)} 
-                >
-                    <img 
-                      src={imgKutuOrta} 
-                      // 🔥 SARI IŞIK EKLENDİ (successMatch varsa)
-                      className={`w-full h-full object-contain ${activeBoxId === 'ref-box' || successMatch ? 'shake-box' : ''} ${successMatch ? 'drop-shadow-[0_0_20px_rgba(250,204,21,1)]' : ''}`} 
-                      alt="Referans" 
-                    />
-                </div>
-            </div>
+        <div className="relative w-full h-full flex flex-col items-center justify-between py-6">
+          
+          {/* 1. SANDIK */}
+          <div className="relative z-10 animate-in zoom-in duration-500 mt-12">
+             <img 
+               src={CHEST_IMAGES[chestStage]} 
+               alt="Sandık" 
+               className="h-32 md:h-48 object-contain drop-shadow-[0_0_20px_rgba(255,200,0,0.3)] transition-all duration-500 scale-300"
+             />
+          </div>
 
-            {/* SAĞ: DROP ZONE */}
-            <div ref={dropZoneRef} className="relative w-36 h-36">
-                <img src={imgEsleKutucuk} className="w-full h-full object-contain opacity-80" alt="Hedef Çerçeve" />
-                
-                {/* 🔥 DOĞRU EŞLEŞME ANİMASYONU 🔥 */}
-                {/* Eğer successMatch varsa, bırakılan kutuyu çerçevenin içinde göster */}
-                {successMatch && (
-                   <div className="absolute inset-0 flex items-center justify-center">
-                       <img 
-                         src={getBoxImage(successMatch.visualType)} 
-                         // Hem titrer hem sarı parlar
-                         className="w-24 h-24 object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)]" 
-                         alt="Matched Box" 
-                       />
-                   </div>
-                )}
-            </div>
-
-        </div>
-
-        {/* 3. ALT SEÇENEKLER */}
-        <div className="flex gap-4 md:gap-8 items-end justify-center pb-12 z-20 h-32 w-full">
-           {bottomBoxes.map((box) => {
-             const isDragging = draggedBoxId === box.id && isDraggingRef.current;
-             const isShaking = activeBoxId === box.id && !isDraggingRef.current;
-             
-             // Animasyon sırasında veya sürüklenirken alt kutuyu gizle (hayalet yukarıda veya dropzone'da)
-             const isHidden = isDragging || (successMatch && box.visualType === successMatch.visualType);
-
-             return (
-               <div 
-                 key={box.id} 
-                 className={`relative w-24 h-24 transition-opacity ${isHidden ? 'opacity-0' : 'opacity-100'}`}
-               >
+          {/* 2. ÇERÇEVELER */}
+          <div className="flex w-full justify-center gap-96 items-center z-10 -mt-24">
+              
+              {/* SOL: DİNLE KUTUSU */}
+              {/* 🔥 GÜNCELLEME: translate-x-3 (Sağ) ve translate-y-3 (Aşağı) eklendi */}
+              <div className="relative w-36 h-36 translate-x-3 translate-y-3">
+                  <img src={imgDinleKutucuk} className="absolute inset-0 w-full h-full object-contain" alt="Dinle Çerçeve" />
+                  
                   <div 
-                    className={`w-full h-full cursor-grab active:cursor-grabbing hover:-translate-y-2 transition-transform ${isShaking ? 'shake-box' : ''} pointer-events-auto`}
-                    onPointerDown={(e) => handlePointerDown(e, box.id, box.soundId)}
+                     className="absolute bottom-3 left-1/2 -translate-x-1/2 w-24 h-24 flex items-center justify-center cursor-pointer active:scale-95 transition-transform z-20 pointer-events-auto"
+                     onPointerDown={(e) => handlePointerDown(e, 'ref-box', targetSoundId)} 
                   >
                       <img 
-                        src={getBoxImage(box.visualType)} 
-                        alt="Kutu" 
-                        className="w-full h-full object-contain drop-shadow-xl"
+                        src={imgKutuOrta} 
+                        className={`w-full h-full object-contain ${activeBoxId === 'ref-box' || successMatch ? 'shake-box' : ''} ${successMatch ? 'drop-shadow-[0_0_20px_rgba(250,204,21,1)]' : ''}`} 
+                        alt="Referans" 
                       />
                   </div>
-               </div>
-             );
-           })}
+              </div>
+
+              {/* SAĞ: DROP ZONE */}
+              {/* 🔥 GÜNCELLEME: translate-y-3 (Aşağı) eklendi */}
+              <div ref={dropZoneRef} className="relative w-36 h-36 translate-y-3">
+                  <img src={imgEsleKutucuk} className="w-full h-full object-contain opacity-80" alt="Hedef Çerçeve" />
+                  
+                  {successMatch && (
+                     <div className="absolute inset-0 flex items-center justify-center">
+                         <img 
+                           src={getBoxImage(successMatch.visualType)} 
+                           className="w-24 h-24 object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)]" 
+                           alt="Matched Box" 
+                         />
+                     </div>
+                  )}
+              </div>
+
+          </div>
+
+          {/* 3. ALT SEÇENEKLER */}
+          <div className="flex gap-4 md:gap-8 items-end justify-center pb-12 z-20 h-32 w-full">
+             {bottomBoxes.map((box) => {
+               const isDragging = draggedBoxId === box.id && isDraggingRef.current;
+               const isShaking = activeBoxId === box.id && !isDraggingRef.current;
+               const isHidden = isDragging || (successMatch && box.visualType === successMatch.visualType);
+
+               return (
+                 <div 
+                   key={box.id} 
+                   className={`relative w-24 h-24 transition-opacity ${isHidden ? 'opacity-0' : 'opacity-100'}`}
+                 >
+                    <div 
+                      className={`w-full h-full cursor-grab active:cursor-grabbing hover:-translate-y-2 transition-transform ${isShaking ? 'shake-box' : ''} pointer-events-auto`}
+                      onPointerDown={(e) => handlePointerDown(e, box.id, box.soundId)}
+                    >
+                        <img 
+                          src={getBoxImage(box.visualType)} 
+                          alt="Kutu" 
+                          className="w-full h-full object-contain drop-shadow-xl"
+                        />
+                    </div>
+                 </div>
+               );
+             })}
+          </div>
+
+          {/* HAYALET KUTU */}
+          {draggedBoxId && isDraggingRef.current && draggedBoxId !== 'ref-box' && (
+              <div 
+                className="fixed z-50 pointer-events-none w-24 h-24 drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
+                style={{
+                  left: dragPosition.x - dragOffset.current.x,
+                  top: dragPosition.y - dragOffset.current.y,
+                }}
+              >
+                 <img 
+                   src={getBoxImage(bottomBoxes.find(b=>b.id === draggedBoxId)?.visualType || 'mid')} 
+                   className="w-full h-full object-contain"
+                   alt="Dragged"
+                 />
+              </div>
+          )}
+
         </div>
 
-        {/* HAYALET KUTU */}
-        {draggedBoxId && isDraggingRef.current && draggedBoxId !== 'ref-box' && (
-            <div 
-              className="fixed z-50 pointer-events-none w-24 h-24 drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
-              style={{
-                left: dragPosition.x - dragOffset.current.x,
-                top: dragPosition.y - dragOffset.current.y,
-              }}
-            >
-               <img 
-                 src={getBoxImage(bottomBoxes.find(b=>b.id === draggedBoxId)?.visualType || 'mid')} 
-                 className="w-full h-full object-contain"
-                 alt="Dragged"
-               />
-            </div>
+        <button onClick={onClose} className="absolute top-4 left-4 z-50 p-3 bg-slate-900/80 rounded-full border border-slate-600 text-white hover:bg-slate-700 pointer-events-auto">
+           <ArrowLeft size={24} />
+        </button>
+
+        {isGameWon && (
+          <div className="absolute inset-0 z-[60] bg-black/80 flex flex-col items-center justify-center animate-in fade-in duration-500">
+              <h2 className="text-4xl md:text-6xl font-black text-yellow-400 mb-8 drop-shadow-lg animate-bounce">
+                  HARİKA! 🎉
+              </h2>
+              <img src={sandik7} className="w-64 md:w-96 object-contain mb-8 animate-pulse" alt="Açık Sandık" />
+              <button 
+                onClick={() => {
+                    setChestStage(0); 
+                    setIsGameWon(false); 
+                    initRound(0);
+                }}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-8 py-4 rounded-full text-xl font-bold transition shadow-lg hover:scale-105 pointer-events-auto"
+              >
+                  <RefreshCcw size={24} />
+                  TEKRAR OYNA
+              </button>
+          </div>
         )}
-
       </div>
-
-      <button onClick={onClose} className="absolute top-4 left-4 z-50 p-3 bg-slate-900/80 rounded-full border border-slate-600 text-white hover:bg-slate-700 pointer-events-auto">
-         <ArrowLeft size={24} />
-      </button>
-
-      {isGameWon && (
-        <div className="absolute inset-0 z-[60] bg-black/80 flex flex-col items-center justify-center animate-in fade-in duration-500">
-            <h2 className="text-4xl md:text-6xl font-black text-yellow-400 mb-8 drop-shadow-lg animate-bounce">
-                HARİKA! 🎉
-            </h2>
-            <img src={sandik7} className="w-64 md:w-96 object-contain mb-8 animate-pulse" alt="Açık Sandık" />
-            <button 
-              onClick={() => {
-                  setChestStage(0); 
-                  setIsGameWon(false); 
-                  initRound(0);
-              }}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-8 py-4 rounded-full text-xl font-bold transition shadow-lg hover:scale-105 pointer-events-auto"
-            >
-                <RefreshCcw size={24} />
-                TEKRAR OYNA
-            </button>
-        </div>
-      )}
-    </div>
+    </>
   );
 }
