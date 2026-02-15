@@ -53,8 +53,8 @@ interface GameProps {
 }
 
 export default function NesneEslemeGame14({ onClose }: GameProps) {
-  const [isPortrait, setIsPortrait] = useState(false);
-  const [windowSize, setWindowSize] = useState({ w: window.innerWidth, h: window.innerHeight });
+  // Ekran boyutlarını takip ediyoruz
+  const [screenSize, setScreenSize] = useState({ w: window.innerWidth, h: window.innerHeight });
 
   const [chestStage, setChestStage] = useState(0); 
   const [targetSoundId, setTargetSoundId] = useState<number>(1); 
@@ -76,9 +76,11 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
 
   useEffect(() => {
     const handleResize = () => {
-      setWindowSize({ w: window.innerWidth, h: window.innerHeight });
-      setIsPortrait(window.innerHeight > window.innerWidth);
+      // Her resize işleminde ekran boyutunu güncelliyoruz
+      setScreenSize({ w: window.innerWidth, h: window.innerHeight });
     };
+    
+    // İlk açılışta boyutları al
     handleResize();
     window.addEventListener('resize', handleResize);
     
@@ -165,6 +167,9 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     startSound(soundId);    
 
     setDraggedBoxId(boxId);
+    
+    // Konumu alırken dönüşümleri hesaba katmamız gerekebilir ama
+    // clientX/Y global koordinatlardır, sürükleme mantığı için yeterlidir.
     setDragPosition({ x: e.clientX, y: e.clientY });
     dragStartPos.current = { x: e.clientX, y: e.clientY }; 
     isDraggingRef.current = false; 
@@ -227,48 +232,38 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     if (!box) return;
 
     if (box.soundId === targetSoundId) {
-      // Doğru eşleşme
       setSuccessMatch({ visualType: box.visualType });
       
       setTimeout(() => {
           const nextStage = chestStage + 1;
           
           if (nextStage >= 4) {
-            // 🔥 FİNAL BAŞLIYOR (Sandık 5'e geldik, indeks 4)
-            // Artık soru sormayı bırakıyoruz.
-            setChestStage(4); // sandik5.png
-            new Audio(sndKilit).play().catch(()=>{}); // Sandık 5'e geçiş sesi
-            
-            // Otomatik finali başlat
+            // 🔥 FİNAL BAŞLIYOR (Sandık 5)
+            setChestStage(4); 
+            new Audio(sndKilit).play().catch(()=>{}); 
             startFinaleSequence();
           } else {
-            // 🔥 NORMAL İLERLEME (Sandık 1, 2, 3, 4 arası)
+            // 🔥 NORMAL İLERLEME
             setChestStage(nextStage);
-            new Audio(sndKilit).play().catch(()=>{}); // Ara geçiş kilit sesi
+            new Audio(sndKilit).play().catch(()=>{}); 
             initRound(nextStage);
           }
       }, 1000); 
 
     } else {
-      // Yanlış eşleşme
       const failAudio = new Audio(SOUNDS[box.soundId] || ""); 
       failAudio.play().catch(()=>{});
     }
   };
 
   const startFinaleSequence = () => {
-      // Şu an Sandık 5 ekranda.
-      // 1.5 saniye sonra Sandık 6'ya geç ve kilit sesi çal.
       setTimeout(() => {
-          setChestStage(5); // sandik6.png
-          new Audio(sndKilit).play().catch(()=>{}); // SON KİLİT SESİ
+          setChestStage(5); // Sandık 6
+          new Audio(sndKilit).play().catch(()=>{}); 
           
-          // 1.5 saniye sonra Sandık 7'ye geç ve AÇILMA sesi çal.
           setTimeout(() => {
-              setChestStage(6); // sandik7.png
-              new Audio(sndSandikAc).play().catch(()=>{}); // SANDIK AÇILMA SESİ
-              
-              // 2.5 saniye sonra Kazanma Ekranı
+              setChestStage(6); // Sandık 7
+              new Audio(sndSandikAc).play().catch(()=>{}); 
               setTimeout(() => setIsGameWon(true), 2500);
           }, 1500);
 
@@ -281,22 +276,35 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     return imgKutuOrta;
   };
 
-  const containerStyle: React.CSSProperties = isPortrait
-    ? {
-        position: 'fixed', top: '50%', left: '50%',
-        width: `${windowSize.h}px`, height: `${windowSize.w}px`,
-        transform: 'translate(-50%, -50%) rotate(90deg)',
-        zIndex: 200, 
-        backgroundColor: '#000',
-      }
-    : { position: 'fixed', inset: 0, zIndex: 200, backgroundColor: '#000' };
+  // 🔥 MECBURİ YATAY DÜZEN MANTIĞI 🔥
+  // Ekranın kısa kenarı her zaman Yükseklik, uzun kenarı Genişlik olacak.
+  const isPortrait = screenSize.h > screenSize.w;
+  const gameWidth = isPortrait ? screenSize.h : screenSize.w;
+  const gameHeight = isPortrait ? screenSize.w : screenSize.h;
+
+  const containerStyle: React.CSSProperties = {
+      position: 'fixed',
+      top: '50%',
+      left: '50%',
+      // Eğer dikse: Genişlik=EkranBoyu, Yükseklik=EkranEni
+      // Eğer yansa: Genişlik=EkranEni, Yükseklik=EkranBoyu
+      width: `${gameWidth}px`,
+      height: `${gameHeight}px`,
+      // Dikse çevir, yansa çevirme (ama hep aynı boyutta kal)
+      transform: isPortrait 
+        ? 'translate(-50%, -50%) rotate(90deg)' 
+        : 'translate(-50%, -50%) rotate(0deg)',
+      zIndex: 200,
+      backgroundColor: '#000',
+      overflow: 'hidden',
+  };
 
   return (
     <>
       <div className="fixed inset-0 bg-black z-[150] touch-none overscroll-none" />
 
       <div style={containerStyle} 
-           className="text-white font-sans select-none overflow-hidden touch-none"
+           className="text-white font-sans select-none touch-none"
            onPointerMove={handlePointerMove}
            onPointerUp={handlePointerUp}
       >
@@ -371,7 +379,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
                       
                       {successMatch && (
                           <div className="absolute inset-0 flex items-center justify-center">
-                              {/* 🔥 GÜNCELLEME: translate-y-2 ile kutuyu 2 birim aşağı aldık */}
+                              {/* Kutu 2 birim aşağıda */}
                               <img 
                                 src={getBoxImage(successMatch.visualType)} 
                                 className="w-24 h-24 object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)] translate-y-2" 
@@ -412,7 +420,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
             </>
           )}
 
-          {/* HAYALET KUTU */}
+          {/* HAYALET KUTU - Pointer Events'in çalıştığı alanda */}
           {draggedBoxId && isDraggingRef.current && draggedBoxId !== 'ref-box' && (
               <div 
                 className="fixed z-50 pointer-events-none w-24 h-24 drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
@@ -457,4 +465,4 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
       </div>
     </>
   );
-}
+    }
