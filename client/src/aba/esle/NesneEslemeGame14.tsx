@@ -23,7 +23,7 @@ import imgKutuSag from './sesesleme/kutusag.png';
 
 // 🔥 SES DOSYALARI
 import sndGiris from './sesesleme/sesgiris.mp3';    // Oyun başı
-import sndKilit from './sesesleme/kilit.mp3';       // Ara geçişler (Sandık 1->6 arası)
+import sndKilit from './sesesleme/kilit.mp3';       // Ara geçişler
 import sndSandikAc from './sesesleme/sandikac.mp3'; // Final (Sandık 7)
 
 import snd1 from './sesesleme/1siseici.mp3';
@@ -124,9 +124,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
 
   // --- TUR HAZIRLAMA ---
   const initRound = (nextStage = 0) => {
-    // Eğer oyun bittiyse yeni tur hazırlama
-    if (nextStage >= 6 && isGameWon) return;
-
     const target = Math.floor(Math.random() * 7) + 1;
     setTargetSoundId(target);
     setSuccessMatch(null);
@@ -152,7 +149,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     }));
 
     setBottomBoxes(boxesData);
-    // Sandık aşamasını güncellemiyoruz burada, checkAnswer içinde güncelliyoruz.
   };
 
   // --- POINTER EVENTS ---
@@ -236,34 +232,47 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
       
       setTimeout(() => {
           const nextStage = chestStage + 1;
-
-          // CHEST_IMAGES dizisi 0-6 arası (toplam 7 eleman).
-          // 0: sandik1, 1: sandik2, ..., 5: sandik6, 6: sandik7 (AÇIK)
           
-          if (nextStage >= 6) {
-            // 🔥 FİNAL AŞAMASI (Sandık 7 - Açık)
-            setChestStage(6); // sandik7.png
-            const finalAudio = new Audio(sndSandikAc);
-            finalAudio.play().catch(()=>{});
+          if (nextStage >= 4) {
+            // 🔥 FİNAL BAŞLIYOR (Sandık 5'e geldik, indeks 4)
+            // Artık soru sormayı bırakıyoruz.
+            setChestStage(4); // sandik5.png
+            new Audio(sndKilit).play().catch(()=>{}); // Sandık 5'e geçiş sesi
             
-            setTimeout(() => setIsGameWon(true), 2000); // 2 sn sonra kazanma ekranı
+            // Otomatik finali başlat
+            startFinaleSequence();
           } else {
-            // 🔥 ARA AŞAMALAR (Sandık 2, 3, 4, 5, 6)
-            // Kilit açılma sesi
+            // 🔥 NORMAL İLERLEME (Sandık 1, 2, 3, 4 arası)
             setChestStage(nextStage);
-            const kilitAudio = new Audio(sndKilit);
-            kilitAudio.play().catch(()=>{});
-            
-            // Yeni tura başla
+            new Audio(sndKilit).play().catch(()=>{}); // Ara geçiş kilit sesi
             initRound(nextStage);
           }
-      }, 1000); // 1 saniye bekle (görsel efekt için)
+      }, 1000); 
 
     } else {
       // Yanlış eşleşme
       const failAudio = new Audio(SOUNDS[box.soundId] || ""); 
       failAudio.play().catch(()=>{});
     }
+  };
+
+  const startFinaleSequence = () => {
+      // Şu an Sandık 5 ekranda.
+      // 1.5 saniye sonra Sandık 6'ya geç ve kilit sesi çal.
+      setTimeout(() => {
+          setChestStage(5); // sandik6.png
+          new Audio(sndKilit).play().catch(()=>{}); // SON KİLİT SESİ
+          
+          // 1.5 saniye sonra Sandık 7'ye geç ve AÇILMA sesi çal.
+          setTimeout(() => {
+              setChestStage(6); // sandik7.png
+              new Audio(sndSandikAc).play().catch(()=>{}); // SANDIK AÇILMA SESİ
+              
+              // 2.5 saniye sonra Kazanma Ekranı
+              setTimeout(() => setIsGameWon(true), 2500);
+          }, 1500);
+
+      }, 1500);
   };
 
   const getBoxImage = (type: 'left' | 'mid' | 'right') => {
@@ -334,69 +343,74 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
              />
           </div>
 
-          {/* 2. ÇERÇEVELER */}
-          <div className="flex w-full justify-center gap-96 items-center z-10 -mt-24">
-              
-              {/* SOL: DİNLE KUTUSU */}
-              <div className="relative w-36 h-36 translate-x-3 translate-y-3">
-                  <img src={imgDinleKutucuk} className="absolute inset-0 w-full h-full object-contain" alt="Dinle Çerçeve" />
+          {/* 🔥 SORU KISMI SADECE SANDIK 5'TEN ÖNCE GÖSTERİLİR */}
+          {chestStage < 4 && (
+            <>
+              {/* 2. ÇERÇEVELER */}
+              <div className="flex w-full justify-center gap-96 items-center z-10 -mt-24 animate-in fade-in duration-500">
                   
-                  <div 
-                      className="absolute bottom-3 left-1/2 -translate-x-1/2 w-24 h-24 flex items-center justify-center cursor-pointer active:scale-95 transition-transform z-20 pointer-events-auto"
-                      onPointerDown={(e) => handlePointerDown(e, 'ref-box', targetSoundId)} 
-                  >
-                      <img 
-                        src={imgKutuOrta} 
-                        className={`w-full h-full object-contain ${activeBoxId === 'ref-box' || successMatch ? 'shake-box' : ''} ${successMatch ? 'drop-shadow-[0_0_20px_rgba(250,204,21,1)]' : ''}`} 
-                        alt="Referans" 
-                      />
-                  </div>
-              </div>
-
-              {/* SAĞ: DROP ZONE */}
-              <div ref={dropZoneRef} className="relative w-36 h-36 translate-y-3">
-                  <img src={imgEsleKutucuk} className="w-full h-full object-contain opacity-80" alt="Hedef Çerçeve" />
-                  
-                  {successMatch && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                          {/* 🔥 GÜNCELLEME: translate-y-2 ile kutuyu 2 birim aşağı aldık */}
+                  {/* SOL: DİNLE KUTUSU */}
+                  <div className="relative w-36 h-36 translate-x-3 translate-y-3">
+                      <img src={imgDinleKutucuk} className="absolute inset-0 w-full h-full object-contain" alt="Dinle Çerçeve" />
+                      
+                      <div 
+                          className="absolute bottom-3 left-1/2 -translate-x-1/2 w-24 h-24 flex items-center justify-center cursor-pointer active:scale-95 transition-transform z-20 pointer-events-auto"
+                          onPointerDown={(e) => handlePointerDown(e, 'ref-box', targetSoundId)} 
+                      >
                           <img 
-                            src={getBoxImage(successMatch.visualType)} 
-                            className="w-24 h-24 object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)] translate-y-2" 
-                            alt="Matched Box" 
+                            src={imgKutuOrta} 
+                            className={`w-full h-full object-contain ${activeBoxId === 'ref-box' || successMatch ? 'shake-box' : ''} ${successMatch ? 'drop-shadow-[0_0_20px_rgba(250,204,21,1)]' : ''}`} 
+                            alt="Referans" 
                           />
                       </div>
-                  )}
+                  </div>
+
+                  {/* SAĞ: DROP ZONE */}
+                  <div ref={dropZoneRef} className="relative w-36 h-36 translate-y-3">
+                      <img src={imgEsleKutucuk} className="w-full h-full object-contain opacity-80" alt="Hedef Çerçeve" />
+                      
+                      {successMatch && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                              {/* 🔥 GÜNCELLEME: translate-y-2 ile kutuyu 2 birim aşağı aldık */}
+                              <img 
+                                src={getBoxImage(successMatch.visualType)} 
+                                className="w-24 h-24 object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)] translate-y-2" 
+                                alt="Matched Box" 
+                              />
+                          </div>
+                      )}
+                  </div>
+
               </div>
 
-          </div>
+              {/* 3. ALT SEÇENEKLER */}
+              <div className="flex gap-4 md:gap-8 items-end justify-center pb-12 z-20 h-32 w-full animate-in fade-in duration-500">
+                 {bottomBoxes.map((box) => {
+                   const isDragging = draggedBoxId === box.id && isDraggingRef.current;
+                   const isShaking = activeBoxId === box.id && !isDraggingRef.current;
+                   const isHidden = isDragging || (successMatch && box.visualType === successMatch.visualType);
 
-          {/* 3. ALT SEÇENEKLER */}
-          <div className="flex gap-4 md:gap-8 items-end justify-center pb-12 z-20 h-32 w-full">
-             {bottomBoxes.map((box) => {
-               const isDragging = draggedBoxId === box.id && isDraggingRef.current;
-               const isShaking = activeBoxId === box.id && !isDraggingRef.current;
-               const isHidden = isDragging || (successMatch && box.visualType === successMatch.visualType);
-
-               return (
-                 <div 
-                   key={box.id} 
-                   className={`relative w-24 h-24 transition-opacity ${isHidden ? 'opacity-0' : 'opacity-100'}`}
-                 >
-                    <div 
-                      className={`w-full h-full cursor-grab active:cursor-grabbing hover:-translate-y-2 transition-transform ${isShaking ? 'shake-box' : ''} pointer-events-auto`}
-                      onPointerDown={(e) => handlePointerDown(e, box.id, box.soundId)}
-                    >
-                        <img 
-                          src={getBoxImage(box.visualType)} 
-                          alt="Kutu" 
-                          className="w-full h-full object-contain drop-shadow-xl"
-                        />
-                    </div>
-                 </div>
-               );
-             })}
-          </div>
+                   return (
+                     <div 
+                       key={box.id} 
+                       className={`relative w-24 h-24 transition-opacity ${isHidden ? 'opacity-0' : 'opacity-100'}`}
+                     >
+                        <div 
+                          className={`w-full h-full cursor-grab active:cursor-grabbing hover:-translate-y-2 transition-transform ${isShaking ? 'shake-box' : ''} pointer-events-auto`}
+                          onPointerDown={(e) => handlePointerDown(e, box.id, box.soundId)}
+                        >
+                            <img 
+                              src={getBoxImage(box.visualType)} 
+                              alt="Kutu" 
+                              className="w-full h-full object-contain drop-shadow-xl"
+                            />
+                        </div>
+                     </div>
+                   );
+                 })}
+              </div>
+            </>
+          )}
 
           {/* HAYALET KUTU */}
           {draggedBoxId && isDraggingRef.current && draggedBoxId !== 'ref-box' && (
