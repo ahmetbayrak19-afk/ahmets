@@ -21,6 +21,9 @@ import imgKutuSol from './sesesleme/kutusol.png';
 import imgKutuOrta from './sesesleme/kutuorta.png';
 import imgKutuSag from './sesesleme/kutusag.png';
 
+// 🔥 YENİ EKLENEN GİRİŞ SESİ
+import sndGiris from './sesesleme/sesgiris.mp3';
+
 import snd1 from './sesesleme/1siseici.mp3';
 import snd2 from './sesesleme/2siseici.mp3';
 import snd3 from './sesesleme/3siseici.mp3';
@@ -76,7 +79,16 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     };
     handleResize();
     window.addEventListener('resize', handleResize);
+    
+    // Oyun mantığını başlat
     initRound(); 
+    
+    // 🔥 GİRİŞ SESİNİ ÇAL (Intro Sound)
+    const introAudio = new Audio(sndGiris);
+    introAudio.play().catch((e) => {
+        // Tarayıcı otomatik oynatmayı engellerse buraya düşer
+        console.log("Ses otomatik başlatılamadı:", e);
+    });
     
     // 🔥 SCROLL ENGELLEME (Gövdeyi kilitler)
     document.body.style.overflow = 'hidden';
@@ -84,6 +96,10 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     return () => {
         window.removeEventListener('resize', handleResize);
         document.body.style.overflow = ''; // Çıkışta serbest bırak
+        
+        // Eğer kullanıcı oyun yüklenir yüklenmez çıkarsa giriş sesini sustur
+        introAudio.pause();
+        introAudio.currentTime = 0;
     };
   }, []);
 
@@ -150,7 +166,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     const rect = element.getBoundingClientRect();
     
     setActiveBoxId(boxId); 
-    startSound(soundId);   
+    startSound(soundId);    
 
     setDraggedBoxId(boxId);
     setDragPosition({ x: e.clientX, y: e.clientY });
@@ -319,8 +335,8 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
                   <img src={imgDinleKutucuk} className="absolute inset-0 w-full h-full object-contain" alt="Dinle Çerçeve" />
                   
                   <div 
-                     className="absolute bottom-3 left-1/2 -translate-x-1/2 w-24 h-24 flex items-center justify-center cursor-pointer active:scale-95 transition-transform z-20 pointer-events-auto"
-                     onPointerDown={(e) => handlePointerDown(e, 'ref-box', targetSoundId)} 
+                      className="absolute bottom-3 left-1/2 -translate-x-1/2 w-24 h-24 flex items-center justify-center cursor-pointer active:scale-95 transition-transform z-20 pointer-events-auto"
+                      onPointerDown={(e) => handlePointerDown(e, 'ref-box', targetSoundId)} 
                   >
                       <img 
                         src={imgKutuOrta} 
@@ -336,13 +352,13 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
                   <img src={imgEsleKutucuk} className="w-full h-full object-contain opacity-80" alt="Hedef Çerçeve" />
                   
                   {successMatch && (
-                     <div className="absolute inset-0 flex items-center justify-center">
-                         <img 
-                           src={getBoxImage(successMatch.visualType)} 
-                           className="w-24 h-24 object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)]" 
-                           alt="Matched Box" 
-                         />
-                     </div>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                          <img 
+                            src={getBoxImage(successMatch.visualType)} 
+                            className="w-24 h-24 object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)]" 
+                            alt="Matched Box" 
+                          />
+                      </div>
                   )}
               </div>
 
