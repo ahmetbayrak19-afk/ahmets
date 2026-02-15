@@ -21,8 +21,10 @@ import imgKutuSol from './sesesleme/kutusol.png';
 import imgKutuOrta from './sesesleme/kutuorta.png';
 import imgKutuSag from './sesesleme/kutusag.png';
 
-// 🔥 YENİ EKLENEN GİRİŞ SESİ
-import sndGiris from './sesesleme/sesgiris.mp3';
+// 🔥 SES DOSYALARI
+import sndGiris from './sesesleme/sesgiris.mp3';    // Oyun başı
+import sndKilit from './sesesleme/kilit.mp3';       // Ara geçişler (Sandık 1->6 arası)
+import sndSandikAc from './sesesleme/sandikac.mp3'; // Final (Sandık 7)
 
 import snd1 from './sesesleme/1siseici.mp3';
 import snd2 from './sesesleme/2siseici.mp3';
@@ -80,24 +82,19 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     handleResize();
     window.addEventListener('resize', handleResize);
     
-    // Oyun mantığını başlat
     initRound(); 
     
-    // 🔥 GİRİŞ SESİNİ ÇAL (Intro Sound)
+    // 🔥 OYUN BAŞLANGICINDA GİRİŞ SESİ
     const introAudio = new Audio(sndGiris);
     introAudio.play().catch((e) => {
-        // Tarayıcı otomatik oynatmayı engellerse buraya düşer
         console.log("Ses otomatik başlatılamadı:", e);
     });
     
-    // 🔥 SCROLL ENGELLEME (Gövdeyi kilitler)
     document.body.style.overflow = 'hidden';
 
     return () => {
         window.removeEventListener('resize', handleResize);
-        document.body.style.overflow = ''; // Çıkışta serbest bırak
-        
-        // Eğer kullanıcı oyun yüklenir yüklenmez çıkarsa giriş sesini sustur
+        document.body.style.overflow = ''; 
         introAudio.pause();
         introAudio.currentTime = 0;
     };
@@ -127,6 +124,9 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
 
   // --- TUR HAZIRLAMA ---
   const initRound = (nextStage = 0) => {
+    // Eğer oyun bittiyse yeni tur hazırlama
+    if (nextStage >= 6 && isGameWon) return;
+
     const target = Math.floor(Math.random() * 7) + 1;
     setTargetSoundId(target);
     setSuccessMatch(null);
@@ -152,7 +152,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     }));
 
     setBottomBoxes(boxesData);
-    if (nextStage === 0) setChestStage(0); 
+    // Sandık aşamasını güncellemiyoruz burada, checkAnswer içinde güncelliyoruz.
   };
 
   // --- POINTER EVENTS ---
@@ -231,27 +231,39 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     if (!box) return;
 
     if (box.soundId === targetSoundId) {
+      // Doğru eşleşme
       setSuccessMatch({ visualType: box.visualType });
+      
       setTimeout(() => {
           const nextStage = chestStage + 1;
-          setChestStage(nextStage);
-          if (nextStage >= 4) {
-            handleWin();
-            setSuccessMatch(null);
+
+          // CHEST_IMAGES dizisi 0-6 arası (toplam 7 eleman).
+          // 0: sandik1, 1: sandik2, ..., 5: sandik6, 6: sandik7 (AÇIK)
+          
+          if (nextStage >= 6) {
+            // 🔥 FİNAL AŞAMASI (Sandık 7 - Açık)
+            setChestStage(6); // sandik7.png
+            const finalAudio = new Audio(sndSandikAc);
+            finalAudio.play().catch(()=>{});
+            
+            setTimeout(() => setIsGameWon(true), 2000); // 2 sn sonra kazanma ekranı
           } else {
+            // 🔥 ARA AŞAMALAR (Sandık 2, 3, 4, 5, 6)
+            // Kilit açılma sesi
+            setChestStage(nextStage);
+            const kilitAudio = new Audio(sndKilit);
+            kilitAudio.play().catch(()=>{});
+            
+            // Yeni tura başla
             initRound(nextStage);
           }
-      }, 1000); 
+      }, 1000); // 1 saniye bekle (görsel efekt için)
+
     } else {
+      // Yanlış eşleşme
       const failAudio = new Audio(SOUNDS[box.soundId] || ""); 
       failAudio.play().catch(()=>{});
     }
-  };
-
-  const handleWin = () => {
-    setTimeout(() => setChestStage(5), 500); 
-    setTimeout(() => setChestStage(6), 1500); 
-    setTimeout(() => setIsGameWon(true), 2500); 
   };
 
   const getBoxImage = (type: 'left' | 'mid' | 'right') => {
@@ -260,22 +272,18 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     return imgKutuOrta;
   };
 
-  // 🔥 ANA OYUN KONTEYNER STİLİ
   const containerStyle: React.CSSProperties = isPortrait
     ? {
         position: 'fixed', top: '50%', left: '50%',
         width: `${windowSize.h}px`, height: `${windowSize.w}px`,
         transform: 'translate(-50%, -50%) rotate(90deg)',
-        zIndex: 200, // Z-index artırıldı
+        zIndex: 200, 
         backgroundColor: '#000',
       }
     : { position: 'fixed', inset: 0, zIndex: 200, backgroundColor: '#000' };
 
   return (
     <>
-      {/* 🔥 GÜVENLİK PERDESİ (Blackout Curtain) 
-         Bu katman, oyunun altında kalan listeyi tamamen kapatır ve tıklanmasını engeller.
-      */}
       <div className="fixed inset-0 bg-black z-[150] touch-none overscroll-none" />
 
       <div style={containerStyle} 
@@ -330,7 +338,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
           <div className="flex w-full justify-center gap-96 items-center z-10 -mt-24">
               
               {/* SOL: DİNLE KUTUSU */}
-              {/* 🔥 GÜNCELLEME: translate-x-3 (Sağ) ve translate-y-3 (Aşağı) eklendi */}
               <div className="relative w-36 h-36 translate-x-3 translate-y-3">
                   <img src={imgDinleKutucuk} className="absolute inset-0 w-full h-full object-contain" alt="Dinle Çerçeve" />
                   
@@ -347,15 +354,15 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
               </div>
 
               {/* SAĞ: DROP ZONE */}
-              {/* 🔥 GÜNCELLEME: translate-y-3 (Aşağı) eklendi */}
               <div ref={dropZoneRef} className="relative w-36 h-36 translate-y-3">
                   <img src={imgEsleKutucuk} className="w-full h-full object-contain opacity-80" alt="Hedef Çerçeve" />
                   
                   {successMatch && (
                       <div className="absolute inset-0 flex items-center justify-center">
+                          {/* 🔥 GÜNCELLEME: translate-y-2 ile kutuyu 2 birim aşağı aldık */}
                           <img 
                             src={getBoxImage(successMatch.visualType)} 
-                            className="w-24 h-24 object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)]" 
+                            className="w-24 h-24 object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)] translate-y-2" 
                             alt="Matched Box" 
                           />
                       </div>
