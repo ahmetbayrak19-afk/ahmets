@@ -5,7 +5,8 @@ import { ArrowLeft, RefreshCcw, Smartphone, Star } from 'lucide-react';
 // 🔥 VARLIKLAR (Assets)
 // ---------------------------------------------------------------------------
 
-import bgImage from './sesesleme/sesarkaplan.jpeg'; 
+// --- ORTAK & SANDIK TEMASI ---
+import bgSes from './sesesleme/sesarkaplan.jpeg'; 
 import imgDinleKutucuk from './sesesleme/dinlekutucuk.png'; 
 import imgEsleKutucuk from './sesesleme/eslekutucuk.png';   
 
@@ -21,11 +22,32 @@ import imgKutuSol from './sesesleme/kutusol.png';
 import imgKutuOrta from './sesesleme/kutuorta.png';
 import imgKutuSag from './sesesleme/kutusag.png';
 
-// 🔥 SES DOSYALARI
+// --- UZAY TEMASI (YENİ) ---
+import uzay1 from './sesesleme/uzay1.jpg';
+import uzay2 from './sesesleme/uzay2.jpg';
+import uzay3 from './sesesleme/uzay3.jpg';
+import uzay4 from './sesesleme/uzay4.jpg';
+import uzay5 from './sesesleme/uzay5.jpg';
+import uzay6 from './sesesleme/uzay6.jpg';
+
+import imgUzayDinle from './sesesleme/uzaydinlekutucuk.png';
+import imgUzayEsle from './sesesleme/uzayeslekutucuk.png';
+import imgUzaySol from './sesesleme/uzaysolkutu.png';
+import imgUzayOrta from './sesesleme/uzayortakutu.png';
+import imgUzaySag from './sesesleme/uzaysagkutu.png';
+
+// --- SES DOSYALARI ---
+// Sandık Sesleri
 import sndGiris from './sesesleme/sesgiris.mp3';    
 import sndKilit from './sesesleme/kilit.mp3';       
 import sndSandikAc from './sesesleme/sandikac.mp3'; 
 
+// Uzay Sesleri
+import sndUzayGiris from './sesesleme/uzaygiris.mp3';
+import sndUzaySes from './sesesleme/uzayses.mp3';
+import sndUzaySon from './sesesleme/uzaysonses.mp3';
+
+// Kutu Sesleri (Ortak)
 import snd1 from './sesesleme/1siseici.mp3';
 import snd2 from './sesesleme/2siseici.mp3';
 import snd3 from './sesesleme/3siseici.mp3';
@@ -35,7 +57,10 @@ import snd6 from './sesesleme/6siseici.mp3';
 import snd7 from './sesesleme/7siseici.mp3';
 
 const SOUNDS = [null, snd1, snd2, snd3, snd4, snd5, snd6, snd7];
+
+// Görsel Dizileri
 const CHEST_IMAGES = [sandik1, sandik2, sandik3, sandik4, sandik5, sandik6, sandik7];
+const SPACE_IMAGES = [uzay1, uzay2, uzay3, uzay4, uzay5, uzay6]; // Uzayda 6 görsel var
 
 // ---------------------------------------------------------------------------
 // TİPLER
@@ -52,12 +77,15 @@ interface GameProps {
   onClose: () => void;
 }
 
+type ThemeType = 'chest' | 'space';
+
 export default function NesneEslemeGame14({ onClose }: GameProps) {
   const [screenSize, setScreenSize] = useState({ w: window.innerWidth, h: window.innerHeight });
 
   // OYUN DURUMLARI
-  const [gameLevel, setGameLevel] = useState(1); 
-  const [chestStage, setChestStage] = useState(0); 
+  const [currentTheme, setCurrentTheme] = useState<ThemeType>('chest'); // 'chest' veya 'space'
+  const [gameLevel, setGameLevel] = useState(1); // Zorluk: 1, 2, 3
+  const [stage, setStage] = useState(0); // Aşama (Sandık büyümesi veya Uzay değişimi)
   const [targetSoundId, setTargetSoundId] = useState<number>(1); 
   const [bottomBoxes, setBottomBoxes] = useState<DraggableBox[]>([]);
   const [isGameWon, setIsGameWon] = useState(false);
@@ -74,7 +102,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
   
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const introAudioRef = useRef<HTMLAudioElement | null>(null); // Giriş sesi referansı
+  const introAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // 🔥 EKRAN YÖNÜ KONTROLÜ
   const isPortrait = screenSize.h > screenSize.w;
@@ -87,10 +115,10 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     handleResize();
     window.addEventListener('resize', handleResize);
     
-    // Oyun mantığını başlat
+    // Oyunu başlat
     initRound(0, 1); 
     
-    // Sayfanın kaymasını engelle
+    // Scroll engelle
     document.body.style.overflow = 'hidden';
     document.body.style.touchAction = 'none';
 
@@ -99,7 +127,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
         document.body.style.overflow = ''; 
         document.body.style.touchAction = '';
         
-        // Temizlik: Çıkışta sesi durdur
         if (introAudioRef.current) {
             introAudioRef.current.pause();
             introAudioRef.current.currentTime = 0;
@@ -107,28 +134,66 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     };
   }, []);
 
-  // 🔥 SESİ EKRAN YÖNÜNE GÖRE YÖNETME (useEffect)
+  // 🔥 TEMA DEĞİŞTİĞİNDE MÜZİĞİ AYARLA
   useEffect(() => {
-    // Ses nesnesi yoksa oluştur
-    if (!introAudioRef.current) {
-        introAudioRef.current = new Audio(sndGiris);
-        // İstersen loop koyabilirsin: introAudioRef.current.loop = true;
-    }
+     // Önceki müziği durdur
+     if (introAudioRef.current) {
+         introAudioRef.current.pause();
+         introAudioRef.current.currentTime = 0;
+     }
+
+     // Yeni tema müziğini seç
+     const musicSrc = currentTheme === 'chest' ? sndGiris : sndUzayGiris;
+     introAudioRef.current = new Audio(musicSrc);
+     
+     // Eğer ekran yan ise çal, dik ise bekle
+     if (!isPortrait) {
+        introAudioRef.current.play().catch(e => console.log("Otomatik oynatma engellendi:", e));
+     }
+
+  }, [currentTheme]);
+
+  // 🔥 EKRAN DÖNÜNCE MÜZİĞİ YÖNET
+  useEffect(() => {
+    if (!introAudioRef.current) return;
 
     if (isPortrait) {
-        // DİK İSE: Sesi durdur
         introAudioRef.current.pause();
-        introAudioRef.current.currentTime = 0; // Başa sar (isteğe bağlı)
     } else {
-        // YAN İSE: Sesi çal (eğer çalmıyorsa)
-        introAudioRef.current.play().catch((e) => {
-            // Tarayıcı otomatik oynatmayı engelleyebilir, kullanıcı etkileşimi bekler
-            console.log("Ses otomatik başlatılamadı (Etkileşim bekleniyor):", e);
-        });
+        introAudioRef.current.play().catch(e => console.log("Müzik başlatılamadı:", e));
     }
-  }, [isPortrait]); // isPortrait değiştiğinde çalışır
+  }, [isPortrait]);
 
-  // --- SES YÖNETİMİ (Kutular için) ---
+  // --- HELPER: Tema Varlıklarını Getir ---
+  const getAssets = () => {
+    if (currentTheme === 'space') {
+        return {
+            bg: SPACE_IMAGES[Math.min(stage, SPACE_IMAGES.length - 1)], // Arkaplan değişir
+            frameListen: imgUzayDinle,
+            frameMatch: imgUzayEsle,
+            boxLeft: imgUzaySol,
+            boxMid: imgUzayOrta,
+            boxRight: imgUzaySag,
+            sndProgress: sndUzaySes,
+            sndWin: sndUzaySon
+        };
+    }
+    // Default: Chest
+    return {
+        bg: bgSes, // Arkaplan sabit
+        frameListen: imgDinleKutucuk,
+        frameMatch: imgEsleKutucuk,
+        boxLeft: imgKutuSol,
+        boxMid: imgKutuOrta,
+        boxRight: imgKutuSag,
+        sndProgress: sndKilit,
+        sndWin: sndSandikAc
+    };
+  };
+
+  const assets = getAssets();
+
+  // --- SES YÖNETİMİ ---
   const startSound = (id: number) => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -193,7 +258,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
 
   // --- POINTER EVENTS ---
   const handlePointerDown = (e: React.PointerEvent, boxId: string, soundId: number) => {
-    // Giriş sesi hala çalıyorsa durdur
     if (introAudioRef.current && !introAudioRef.current.paused) {
         introAudioRef.current.pause();
     }
@@ -275,15 +339,15 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
       setSuccessMatch({ visualType: box.visualType });
       
       setTimeout(() => {
-          const nextStage = chestStage + 1;
+          const nextStage = stage + 1;
           
           if (nextStage >= 4) {
-            setChestStage(4); 
-            new Audio(sndKilit).play().catch(()=>{}); 
+            setStage(4); 
+            new Audio(assets.sndProgress).play().catch(()=>{}); 
             startFinaleSequence();
           } else {
-            setChestStage(nextStage);
-            new Audio(sndKilit).play().catch(()=>{}); 
+            setStage(nextStage);
+            new Audio(assets.sndProgress).play().catch(()=>{}); 
             initRound(nextStage, gameLevel);
           }
       }, 1000); 
@@ -295,43 +359,61 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
   };
 
   const startFinaleSequence = () => {
+      // 1. Adım: Sondan bir önceki aşama
       setTimeout(() => {
-          setChestStage(5); 
-          new Audio(sndKilit).play().catch(()=>{}); 
+          setStage(5); 
+          new Audio(assets.sndProgress).play().catch(()=>{}); 
           
+          // 2. Adım: Bitiş aşaması (Sandık açılır veya Uzay son resim)
           setTimeout(() => {
-              setChestStage(6); 
-              new Audio(sndSandikAc).play().catch(()=>{}); 
+              setStage(6); 
+              new Audio(assets.sndWin).play().catch(()=>{}); 
               setTimeout(() => setIsGameWon(true), 2500);
           }, 1500);
 
       }, 1500);
   };
 
+  // Sonraki Seviye / Tema Değişimi
   const handleNextLevel = () => {
-      let nextLvl = gameLevel + 1;
-      if (nextLvl > 3) nextLvl = 1; 
-      setGameLevel(nextLvl);
-      setChestStage(0);
-      setIsGameWon(false);
-      initRound(0, nextLvl);
+      // Eğer Sandık temasındaysak -> Uzay'a geç
+      if (currentTheme === 'chest') {
+          setCurrentTheme('space');
+          setStage(0);
+          setGameLevel(1); // Uzay 1. seviyeden başlasın mı? Evet.
+          setIsGameWon(false);
+          initRound(0, 1);
+      } 
+      // Eğer Uzay'daysak -> Zorluğu artır veya başa dön
+      else {
+          let nextLvl = gameLevel + 1;
+          if (nextLvl > 3) {
+              nextLvl = 1; 
+              setCurrentTheme('chest'); // 3. seviyeden sonra tekrar Sandık'a dön
+          }
+          setGameLevel(nextLvl);
+          setStage(0);
+          setIsGameWon(false);
+          initRound(0, nextLvl);
+      }
   };
 
   const getBoxImage = (type: 'left' | 'mid' | 'right') => {
-    if (type === 'left') return imgKutuSol;
-    if (type === 'right') return imgKutuSag;
-    return imgKutuOrta;
+    if (type === 'left') return assets.boxLeft;
+    if (type === 'right') return assets.boxRight;
+    return assets.boxMid;
   };
 
+  // 🔥 DİK TUTUŞ UYARISI (TAM EKRAN VE GÜÇLÜ Z-INDEX)
   if (isPortrait) {
     return (
-      <div className="fixed inset-0 bg-black z-[9999] flex flex-col items-center justify-center text-white p-6 text-center">
+      <div className="fixed inset-0 z-[10000] bg-black h-[100dvh] w-screen flex flex-col items-center justify-center text-white p-6 text-center touch-none">
          <div className="animate-spin duration-1000 mb-6">
             <Smartphone size={64} className="text-yellow-400" />
          </div>
          <h2 className="text-2xl font-bold mb-2">Lütfen Telefonu Yan Çevirin</h2>
          <p className="text-gray-400">Oyunu oynamak için cihazınızı yatay konuma getirin.</p>
-         <button onClick={onClose} className="mt-12 p-3 bg-slate-800 rounded-full border border-slate-600 text-white">
+         <button onClick={onClose} className="mt-12 p-3 bg-slate-800 rounded-full border border-slate-600 text-white pointer-events-auto">
             <ArrowLeft size={24} />
          </button>
       </div>
@@ -372,9 +454,9 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
           }
         `}</style>
 
-        {/* ARKAPLAN */}
+        {/* ARKAPLAN - Dinamik */}
         <div className="absolute inset-0 w-full h-full">
-          <img src={bgImage} className="w-full h-full object-cover opacity-80" alt="Background" />
+          <img src={assets.bg} className="w-full h-full object-cover opacity-80" alt="Background" />
           <div className="absolute inset-0 bg-black/30" />
         </div>
 
@@ -383,9 +465,10 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
             {[1, 2, 3].map((lvl) => (
                 <div 
                     key={lvl}
+                    // Tıklanınca sadece zorluk değişir, tema değişmez
                     onClick={() => {
                         setGameLevel(lvl);
-                        setChestStage(0);
+                        setStage(0);
                         setIsGameWon(false);
                         initRound(0, lvl);
                     }}
@@ -401,21 +484,21 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
         </div>
 
         {/* =========================================================================
-            BÖLÜM 1: ÇERÇEVELER (EN ÜSTTE) (%25 Yükseklik)
+            BÖLÜM 1: ÇERÇEVELER (EN ÜSTTE)
            ========================================================================= */}
-        {chestStage < 4 && (
+        {stage < 4 && (
           <div className="relative w-full h-[25%] flex justify-between items-start px-6 md:px-24 z-20 pt-16 md:pt-12">
               
               {/* SOL TARAF: DİNLE KUTUSU */}
               <div className="relative w-28 h-28 md:w-36 md:h-36 bg-black/20 rounded-xl p-1">
-                  <img src={imgDinleKutucuk} className="absolute inset-0 w-full h-full object-contain opacity-90" alt="Dinle Çerçeve" />
+                  <img src={assets.frameListen} className="absolute inset-0 w-full h-full object-contain opacity-90" alt="Dinle Çerçeve" />
                   
                   <div 
                       className="absolute inset-0 flex items-center justify-center cursor-pointer active:scale-95 transition-transform z-20 pointer-events-auto"
                       onPointerDown={(e) => handlePointerDown(e, 'ref-box', targetSoundId)} 
                   >
                       <img 
-                        src={imgKutuOrta} 
+                        src={assets.boxMid} 
                         className={`w-[55%] h-[55%] object-contain translate-y-6 ${activeBoxId === 'ref-box' || successMatch ? 'shake-box' : ''} ${successMatch ? 'drop-shadow-[0_0_20px_rgba(250,204,21,1)]' : ''}`} 
                         alt="Referans" 
                       />
@@ -424,7 +507,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
 
               {/* SAĞ TARAF: EŞLE (DROP ZONE) */}
               <div ref={dropZoneRef} className="relative w-28 h-28 md:w-36 md:h-36 bg-black/20 rounded-xl p-1">
-                  <img src={imgEsleKutucuk} className="absolute inset-0 w-full h-full object-contain opacity-90" alt="Hedef Çerçeve" />
+                  <img src={assets.frameMatch} className="absolute inset-0 w-full h-full object-contain opacity-90" alt="Hedef Çerçeve" />
                   
                   {successMatch && (
                       <div className="absolute inset-0 flex items-center justify-center z-30">
@@ -440,21 +523,22 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
         )}
         
         {/* =========================================================================
-            BÖLÜM 2: SANDIK (ORTA) (%50 Yükseklik)
+            BÖLÜM 2: ORTA ALAN (Sandık varsa göster, yoksa boş)
            ========================================================================= */}
-        <div className={`relative w-full h-[50%] flex items-end justify-center z-10 pb-2 ${chestStage >= 4 ? 'h-full items-center' : ''}`}>
-             <img 
-               src={CHEST_IMAGES[chestStage]} 
-               alt="Sandık" 
-               className={`object-contain drop-shadow-[0_0_20px_rgba(255,200,0,0.3)] transition-all duration-500 origin-bottom ${chestStage >= 4 ? 'h-[70%]' : 'h-[160%]'}`}
-             />
+        <div className={`relative w-full h-[50%] flex items-end justify-center z-10 pb-2 ${stage >= 4 ? 'h-full items-center' : ''}`}>
+             {currentTheme === 'chest' && (
+                 <img 
+                   src={CHEST_IMAGES[stage]} 
+                   alt="Sandık" 
+                   className={`object-contain drop-shadow-[0_0_20px_rgba(255,200,0,0.3)] transition-all duration-500 origin-bottom ${stage >= 4 ? 'h-[70%]' : 'h-[160%]'}`}
+                 />
+             )}
         </div>
 
         {/* =========================================================================
-            BÖLÜM 3: ALT KUTULAR (%25 Yükseklik)
-            pb-8 md:pb-12 ile alttan boşluk verildi
+            BÖLÜM 3: ALT KUTULAR
            ========================================================================= */}
-        {chestStage < 4 && (
+        {stage < 4 && (
           <div className="relative w-full h-[25%] flex gap-2 md:gap-6 items-center justify-center z-30 px-4 pb-8 md:pb-12">
              {bottomBoxes.map((box) => {
                const isDragging = draggedBoxId === box.id && isDraggingRef.current;
@@ -512,16 +596,21 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
                   HARİKA! 🎉
               </h2>
               
-              {/* Sandık küçültüldü: max-h-[40vh] */}
               <div className="flex-grow-0 flex-shrink flex items-center justify-center mb-6">
-                <img src={sandik7} className="max-h-[40vh] w-auto object-contain animate-pulse" alt="Açık Sandık" />
+                 {/* Eğer Sandık temasındaysak sandığı göster, Uzay ise son uzay resmini göster */}
+                 {currentTheme === 'chest' ? (
+                    <img src={sandik7} className="max-h-[40vh] w-auto object-contain animate-pulse" alt="Açık Sandık" />
+                 ) : (
+                    // Uzay temasında kutlama görseli olarak son arkaplan veya özel bir ikon kullanılabilir
+                    // Şimdilik sadece yazılar ve butonlar ortada duracak, veya son uzay görseli arkada kalabilir
+                    <div className="text-6xl">🚀</div>
+                 )}
               </div>
 
-              {/* Butonlar artık daha yukarıda */}
               <div className="flex gap-4">
                   <button 
                     onClick={() => {
-                        setChestStage(0); 
+                        setStage(0); 
                         setIsGameWon(false); 
                         initRound(0, gameLevel); 
                     }}
@@ -536,7 +625,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
                     className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-full text-lg font-bold transition shadow-lg hover:scale-105 pointer-events-auto"
                   >
                       <Star size={20} fill="white" />
-                      SONRAKİ SEVİYE
+                      {currentTheme === 'chest' ? 'UZAY MODU' : 'SONRAKİ'}
                   </button>
               </div>
           </div>
@@ -544,4 +633,4 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
       </div>
     </>
   );
-                }
+}
