@@ -56,7 +56,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
   const [screenSize, setScreenSize] = useState({ w: window.innerWidth, h: window.innerHeight });
 
   // OYUN DURUMLARI
-  const [gameLevel, setGameLevel] = useState(1); // 1, 2, 3
+  const [gameLevel, setGameLevel] = useState(1); 
   const [chestStage, setChestStage] = useState(0); 
   const [targetSoundId, setTargetSoundId] = useState<number>(1); 
   const [bottomBoxes, setBottomBoxes] = useState<DraggableBox[]>([]);
@@ -90,6 +90,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
         console.log("Ses otomatik başlatılamadı:", e);
     });
     
+    // Sayfanın kaymasını engelle
     document.body.style.overflow = 'hidden';
     document.body.style.touchAction = 'none';
 
@@ -101,6 +102,16 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
         introAudio.currentTime = 0;
     };
   }, []);
+
+  // --- TAM EKRAN İSTEĞİ ---
+  const requestFullScreen = () => {
+    const element = document.documentElement;
+    if (element.requestFullscreen) {
+      element.requestFullscreen().catch(() => {});
+    } else if ((element as any).webkitRequestFullscreen) {
+      (element as any).webkitRequestFullscreen();
+    }
+  };
 
   // --- SES YÖNETİMİ ---
   const startSound = (id: number) => {
@@ -167,6 +178,8 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
 
   // --- POINTER EVENTS ---
   const handlePointerDown = (e: React.PointerEvent, boxId: string, soundId: number) => {
+    requestFullScreen(); // Dokununca tam ekran yapmayı dene
+
     if (successMatch) return;
 
     e.preventDefault();
@@ -296,7 +309,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
 
   if (isPortrait) {
     return (
-      <div className="fixed inset-0 bg-black z-[999] flex flex-col items-center justify-center text-white p-6 text-center">
+      <div className="fixed inset-0 bg-black z-[9999] flex flex-col items-center justify-center text-white p-6 text-center">
          <div className="animate-spin duration-1000 mb-6">
             <Smartphone size={64} className="text-yellow-400" />
          </div>
@@ -312,12 +325,16 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
   // OYUN ALANI
   return (
     <>
-      <div className="fixed inset-0 bg-black z-[150] touch-none overscroll-none" />
-
-      {/* Ana Konteyner */}
-      <div className="fixed inset-0 bg-black z-[200] text-white font-sans select-none touch-none overflow-hidden flex flex-col"
-           onPointerMove={handlePointerMove}
-           onPointerUp={handlePointerUp}
+      {/* 🔥 DÜZELTME: 
+          - fixed inset-0: Dört köşeye yapıştırır.
+          - h-[100dvh]: Mobil tarayıcı çubuklarını (adres barı vb.) hesaba katan dinamik yükseklik.
+          - w-screen: Tam genişlik.
+          - bg-black: Arka planı tamamen kapatır, liste görünmez.
+      */}
+      <div 
+        className="fixed inset-0 w-screen h-[100dvh] bg-black z-[9999] text-white font-sans select-none touch-none overflow-hidden flex flex-col"
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
       >
         <style>{`
           @keyframes shake {
@@ -375,7 +392,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
 
         {/* =========================================================================
             BÖLÜM 1: ÇERÇEVELER (EN ÜSTTE) (%25 Yükseklik)
-            Yukarı alındı.
            ========================================================================= */}
         {chestStage < 4 && (
           <div className="relative w-full h-[25%] flex justify-between items-start px-6 md:px-24 z-20 pt-16 md:pt-12">
@@ -388,9 +404,13 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
                       className="absolute inset-0 flex items-center justify-center cursor-pointer active:scale-95 transition-transform z-20 pointer-events-auto"
                       onPointerDown={(e) => handlePointerDown(e, 'ref-box', targetSoundId)} 
                   >
+                      {/* 🔥 HİZALAMA DÜZELTMESİ: 
+                          Önceki: translate-y-1
+                          Yeni: translate-y-6 (Daha da aşağı indirildi)
+                      */}
                       <img 
                         src={imgKutuOrta} 
-                        className={`w-[55%] h-[55%] object-contain translate-y-1 ${activeBoxId === 'ref-box' || successMatch ? 'shake-box' : ''} ${successMatch ? 'drop-shadow-[0_0_20px_rgba(250,204,21,1)]' : ''}`} 
+                        className={`w-[55%] h-[55%] object-contain translate-y-6 ${activeBoxId === 'ref-box' || successMatch ? 'shake-box' : ''} ${successMatch ? 'drop-shadow-[0_0_20px_rgba(250,204,21,1)]' : ''}`} 
                         alt="Referans" 
                       />
                   </div>
@@ -402,9 +422,10 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
                   
                   {successMatch && (
                       <div className="absolute inset-0 flex items-center justify-center z-30">
+                          {/* Sağ tarafta eşleşen kutu da aynı hizaya getirildi */}
                           <img 
                             src={getBoxImage(successMatch.visualType)} 
-                            className="w-[55%] h-[55%] object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)] translate-y-3" 
+                            className="w-[55%] h-[55%] object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)] translate-y-6" 
                             alt="Matched Box" 
                           />
                       </div>
@@ -415,13 +436,11 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
         
         {/* =========================================================================
             BÖLÜM 2: SANDIK (ORTA) (%50 Yükseklik)
-            Sandık 2 kat büyütüldü ve 'items-end' ile alttaki kutuların tepesine oturtuldu.
            ========================================================================= */}
         <div className={`relative w-full h-[50%] flex items-end justify-center z-10 pb-2 ${chestStage >= 4 ? 'h-full items-center' : ''}`}>
              <img 
                src={CHEST_IMAGES[chestStage]} 
                alt="Sandık" 
-               // h-[160%] ile devasa yapıldı. origin-bottom ile aşağıdan yukarı büyüyor.
                className={`object-contain drop-shadow-[0_0_20px_rgba(255,200,0,0.3)] transition-all duration-500 origin-bottom ${chestStage >= 4 ? 'h-[70%]' : 'h-[160%]'}`}
              />
         </div>
@@ -517,4 +536,4 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
       </div>
     </>
   );
-}
+      }
