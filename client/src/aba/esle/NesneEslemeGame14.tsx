@@ -74,6 +74,10 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
   
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const introAudioRef = useRef<HTMLAudioElement | null>(null); // Giriş sesi referansı
+
+  // 🔥 EKRAN YÖNÜ KONTROLÜ
+  const isPortrait = screenSize.h > screenSize.w;
 
   useEffect(() => {
     const handleResize = () => {
@@ -83,12 +87,8 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     handleResize();
     window.addEventListener('resize', handleResize);
     
+    // Oyun mantığını başlat
     initRound(0, 1); 
-    
-    const introAudio = new Audio(sndGiris);
-    introAudio.play().catch((e) => {
-        console.log("Ses otomatik başlatılamadı:", e);
-    });
     
     // Sayfanın kaymasını engelle
     document.body.style.overflow = 'hidden';
@@ -98,22 +98,37 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
         window.removeEventListener('resize', handleResize);
         document.body.style.overflow = ''; 
         document.body.style.touchAction = '';
-        introAudio.pause();
-        introAudio.currentTime = 0;
+        
+        // Temizlik: Çıkışta sesi durdur
+        if (introAudioRef.current) {
+            introAudioRef.current.pause();
+            introAudioRef.current.currentTime = 0;
+        }
     };
   }, []);
 
-  // --- TAM EKRAN İSTEĞİ ---
-  const requestFullScreen = () => {
-    const element = document.documentElement;
-    if (element.requestFullscreen) {
-      element.requestFullscreen().catch(() => {});
-    } else if ((element as any).webkitRequestFullscreen) {
-      (element as any).webkitRequestFullscreen();
+  // 🔥 SESİ EKRAN YÖNÜNE GÖRE YÖNETME (useEffect)
+  useEffect(() => {
+    // Ses nesnesi yoksa oluştur
+    if (!introAudioRef.current) {
+        introAudioRef.current = new Audio(sndGiris);
+        // İstersen loop koyabilirsin: introAudioRef.current.loop = true;
     }
-  };
 
-  // --- SES YÖNETİMİ ---
+    if (isPortrait) {
+        // DİK İSE: Sesi durdur
+        introAudioRef.current.pause();
+        introAudioRef.current.currentTime = 0; // Başa sar (isteğe bağlı)
+    } else {
+        // YAN İSE: Sesi çal (eğer çalmıyorsa)
+        introAudioRef.current.play().catch((e) => {
+            // Tarayıcı otomatik oynatmayı engelleyebilir, kullanıcı etkileşimi bekler
+            console.log("Ses otomatik başlatılamadı (Etkileşim bekleniyor):", e);
+        });
+    }
+  }, [isPortrait]); // isPortrait değiştiğinde çalışır
+
+  // --- SES YÖNETİMİ (Kutular için) ---
   const startSound = (id: number) => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -178,7 +193,10 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
 
   // --- POINTER EVENTS ---
   const handlePointerDown = (e: React.PointerEvent, boxId: string, soundId: number) => {
-    requestFullScreen(); // Dokununca tam ekran yapmayı dene
+    // Giriş sesi hala çalıyorsa durdur
+    if (introAudioRef.current && !introAudioRef.current.paused) {
+        introAudioRef.current.pause();
+    }
 
     if (successMatch) return;
 
@@ -305,8 +323,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     return imgKutuOrta;
   };
 
-  const isPortrait = screenSize.h > screenSize.w;
-
   if (isPortrait) {
     return (
       <div className="fixed inset-0 bg-black z-[9999] flex flex-col items-center justify-center text-white p-6 text-center">
@@ -325,12 +341,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
   // OYUN ALANI
   return (
     <>
-      {/* 🔥 DÜZELTME: 
-          - fixed inset-0: Dört köşeye yapıştırır.
-          - h-[100dvh]: Mobil tarayıcı çubuklarını (adres barı vb.) hesaba katan dinamik yükseklik.
-          - w-screen: Tam genişlik.
-          - bg-black: Arka planı tamamen kapatır, liste görünmez.
-      */}
       <div 
         className="fixed inset-0 w-screen h-[100dvh] bg-black z-[9999] text-white font-sans select-none touch-none overflow-hidden flex flex-col"
         onPointerMove={handlePointerMove}
@@ -404,10 +414,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
                       className="absolute inset-0 flex items-center justify-center cursor-pointer active:scale-95 transition-transform z-20 pointer-events-auto"
                       onPointerDown={(e) => handlePointerDown(e, 'ref-box', targetSoundId)} 
                   >
-                      {/* 🔥 HİZALAMA DÜZELTMESİ: 
-                          Önceki: translate-y-1
-                          Yeni: translate-y-6 (Daha da aşağı indirildi)
-                      */}
                       <img 
                         src={imgKutuOrta} 
                         className={`w-[55%] h-[55%] object-contain translate-y-6 ${activeBoxId === 'ref-box' || successMatch ? 'shake-box' : ''} ${successMatch ? 'drop-shadow-[0_0_20px_rgba(250,204,21,1)]' : ''}`} 
@@ -422,7 +428,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
                   
                   {successMatch && (
                       <div className="absolute inset-0 flex items-center justify-center z-30">
-                          {/* Sağ tarafta eşleşen kutu da aynı hizaya getirildi */}
                           <img 
                             src={getBoxImage(successMatch.visualType)} 
                             className="w-[55%] h-[55%] object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)] translate-y-6" 
@@ -447,9 +452,10 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
 
         {/* =========================================================================
             BÖLÜM 3: ALT KUTULAR (%25 Yükseklik)
+            pb-8 md:pb-12 ile alttan boşluk verildi
            ========================================================================= */}
         {chestStage < 4 && (
-          <div className="relative w-full h-[25%] flex gap-2 md:gap-6 items-center justify-center z-30 px-4 pb-4">
+          <div className="relative w-full h-[25%] flex gap-2 md:gap-6 items-center justify-center z-30 px-4 pb-8 md:pb-12">
              {bottomBoxes.map((box) => {
                const isDragging = draggedBoxId === box.id && isDraggingRef.current;
                const isShaking = activeBoxId === box.id && !isDraggingRef.current;
@@ -506,10 +512,12 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
                   HARİKA! 🎉
               </h2>
               
+              {/* Sandık küçültüldü: max-h-[40vh] */}
               <div className="flex-grow-0 flex-shrink flex items-center justify-center mb-6">
-                <img src={sandik7} className="max-h-48 md:max-h-64 w-auto object-contain animate-pulse" alt="Açık Sandık" />
+                <img src={sandik7} className="max-h-[40vh] w-auto object-contain animate-pulse" alt="Açık Sandık" />
               </div>
 
+              {/* Butonlar artık daha yukarıda */}
               <div className="flex gap-4">
                   <button 
                     onClick={() => {
@@ -536,4 +544,4 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
       </div>
     </>
   );
-      }
+                }
