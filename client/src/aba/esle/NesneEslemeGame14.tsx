@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, RefreshCcw, Smartphone } from 'lucide-react';
+import { ArrowLeft, RefreshCcw, Smartphone, Star } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // 🔥 VARLIKLAR (Assets)
@@ -55,14 +55,16 @@ interface GameProps {
 export default function NesneEslemeGame14({ onClose }: GameProps) {
   const [screenSize, setScreenSize] = useState({ w: window.innerWidth, h: window.innerHeight });
 
+  // OYUN DURUMLARI
+  const [gameLevel, setGameLevel] = useState(1); // 1, 2, 3
   const [chestStage, setChestStage] = useState(0); 
   const [targetSoundId, setTargetSoundId] = useState<number>(1); 
   const [bottomBoxes, setBottomBoxes] = useState<DraggableBox[]>([]);
   const [isGameWon, setIsGameWon] = useState(false);
   
+  // SÜRÜKLEME VE ETKİLEŞİM
   const [draggedBoxId, setDraggedBoxId] = useState<string | null>(null);
   const [activeBoxId, setActiveBoxId] = useState<string | null>(null);
-
   const [successMatch, setSuccessMatch] = useState<{ visualType: 'left' | 'mid' | 'right' } | null>(null);
 
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
@@ -81,7 +83,8 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     handleResize();
     window.addEventListener('resize', handleResize);
     
-    initRound(); 
+    // İlk başlangıç
+    initRound(0, 1); 
     
     const introAudio = new Audio(sndGiris);
     introAudio.play().catch((e) => {
@@ -122,31 +125,52 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     }
   }
 
-  // --- TUR HAZIRLAMA ---
-  const initRound = (nextStage = 0) => {
+  // --- TUR HAZIRLAMA (SEVİYEYE GÖRE) ---
+  const initRound = (nextStage = 0, level = gameLevel) => {
     const target = Math.floor(Math.random() * 7) + 1;
     setTargetSoundId(target);
     setSuccessMatch(null);
 
+    // Seviyeye göre kutu sayısı belirleme
+    // Seviye 1: 1 Doğru + 2 Yanlış = 3 Kutu
+    // Seviye 2: 1 Doğru + 3 Yanlış = 4 Kutu
+    // Seviye 3: 1 Doğru + 4 Yanlış = 5 Kutu
+    let distractorCount = 2;
+    if (level === 2) distractorCount = 3;
+    if (level === 3) distractorCount = 4;
+
     const distractors: number[] = [];
-    while (distractors.length < 2) {
+    while (distractors.length < distractorCount) {
       const r = Math.floor(Math.random() * 7) + 1;
       if (r !== target && !distractors.includes(r)) distractors.push(r);
     }
 
     let boxesData: DraggableBox[] = [
       { id: 'correct', soundId: target, visualType: 'mid', x: 0, y: 0 },
-      { id: 'wrong1', soundId: distractors[0], visualType: 'left', x: 0, y: 0 },
-      { id: 'wrong2', soundId: distractors[1], visualType: 'right', x: 0, y: 0 },
     ];
 
+    // Yanlış kutuları ekle
+    distractors.forEach((dId, index) => {
+        // Görsel tipleri rastgele dağıtmak yerine basit bir sıra veya random atayabiliriz
+        const types: ('left'|'mid'|'right')[] = ['left', 'right', 'mid', 'left', 'right'];
+        boxesData.push({ 
+            id: `wrong${index}`, 
+            soundId: dId, 
+            visualType: types[index % 3], 
+            x: 0, 
+            y: 0 
+        });
+    });
+
+    // Kutuları karıştır
     boxesData = boxesData.sort(() => Math.random() - 0.5);
 
-    const visualOrder: ('left' | 'mid' | 'right')[] = ['left', 'mid', 'right'];
-    boxesData = boxesData.map((box, idx) => ({
-      ...box,
-      visualType: visualOrder[idx],
-    }));
+    // Görsel tipleri dengelemek için (opsiyonel, hepsi aynı tip de olabilir ama çeşitlilik iyidir)
+    // Basitçe: 3 tip var, sırayla ata
+    boxesData = boxesData.map((box, idx) => {
+        const visualOrder: ('left' | 'mid' | 'right')[] = ['left', 'mid', 'right'];
+        return { ...box, visualType: visualOrder[idx % 3] };
+    });
 
     setBottomBoxes(boxesData);
   };
@@ -184,7 +208,9 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     const moveX = Math.abs(e.clientX - dragStartPos.current.x);
     const moveY = Math.abs(e.clientY - dragStartPos.current.y);
 
-    if (moveX > 5 || moveY > 5) {
+    // 🔥 HASSASİYET AYARI: 5px yerine 20px yaptık.
+    // Parmağın hafif kaymasına izin veriyoruz, böylece ses hemen kesilmiyor.
+    if (moveX > 20 || moveY > 20) {
         if (!isDraggingRef.current) {
             isDraggingRef.current = true;
             setActiveBoxId(null); 
@@ -232,16 +258,15 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
       setTimeout(() => {
           const nextStage = chestStage + 1;
           
+          // Sandık 5'e gelince Final başlar
           if (nextStage >= 4) {
-            // FİNAL
             setChestStage(4); 
             new Audio(sndKilit).play().catch(()=>{}); 
             startFinaleSequence();
           } else {
-            // NORMAL
             setChestStage(nextStage);
             new Audio(sndKilit).play().catch(()=>{}); 
-            initRound(nextStage);
+            initRound(nextStage, gameLevel);
           }
       }, 1000); 
 
@@ -265,6 +290,16 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
       }, 1500);
   };
 
+  // Bir sonraki seviyeye geçiş
+  const handleNextLevel = () => {
+      let nextLvl = gameLevel + 1;
+      if (nextLvl > 3) nextLvl = 1; // 3'ten sonra başa dön
+      setGameLevel(nextLvl);
+      setChestStage(0);
+      setIsGameWon(false);
+      initRound(0, nextLvl);
+  };
+
   const getBoxImage = (type: 'left' | 'mid' | 'right') => {
     if (type === 'left') return imgKutuSol;
     if (type === 'right') return imgKutuSag;
@@ -274,7 +309,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
   // 🔥 EKRAN DİK Mİ? KONTROLÜ
   const isPortrait = screenSize.h > screenSize.w;
 
-  // EĞER DİK İSE -> UYARI GÖSTER
   if (isPortrait) {
     return (
       <div className="fixed inset-0 bg-black z-[999] flex flex-col items-center justify-center text-white p-6 text-center">
@@ -283,7 +317,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
          </div>
          <h2 className="text-2xl font-bold mb-2">Lütfen Telefonu Yan Çevirin</h2>
          <p className="text-gray-400">Oyunu oynamak için cihazınızı yatay konuma getirin.</p>
-         
          <button onClick={onClose} className="mt-12 p-3 bg-slate-800 rounded-full border border-slate-600 text-white">
             <ArrowLeft size={24} />
          </button>
@@ -291,12 +324,12 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     );
   }
 
-  // EĞER YAN İSE (Landscape) -> OYUNU GÖSTER
+  // OYUN ALANI
   return (
     <>
       <div className="fixed inset-0 bg-black z-[150] touch-none overscroll-none" />
 
-      {/* Ana Konteyner - Dikey eksende 3 bölüme ayrıldı */}
+      {/* Ana Konteyner */}
       <div className="fixed inset-0 bg-black z-[200] text-white font-sans select-none touch-none overflow-hidden flex flex-col"
            onPointerMove={handlePointerMove}
            onPointerUp={handlePointerUp}
@@ -333,54 +366,77 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
           <div className="absolute inset-0 bg-black/30" />
         </div>
 
+        {/* SEVİYE GÖSTERGESİ (SAĞ ÜST) */}
+        <div className="absolute top-4 right-4 z-50 flex gap-2 pointer-events-auto">
+            {[1, 2, 3].map((lvl) => (
+                <div 
+                    key={lvl}
+                    onClick={() => {
+                        setGameLevel(lvl);
+                        setChestStage(0);
+                        setIsGameWon(false);
+                        initRound(0, lvl);
+                    }}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center font-bold border-2 cursor-pointer transition-all ${
+                        gameLevel === lvl 
+                        ? 'bg-yellow-500 border-white text-black scale-110 shadow-[0_0_15px_rgba(250,204,21,0.8)]' 
+                        : 'bg-black/50 border-gray-500 text-gray-400 hover:bg-black/70'
+                    }`}
+                >
+                    {lvl}
+                </div>
+            ))}
+        </div>
+
         {/* =========================================================================
-            BÖLÜM 1: ÜST KISIM - SANDIK (%35 Yükseklik)
-            Sandık artık en tepede ve ortada.
+            BÖLÜM 1: ÜST KISIM - SANDIK (%45 Yükseklik)
+            Genişletildi ve Sandık daha büyük.
            ========================================================================= */}
-        <div className="relative w-full h-[35%] flex items-end justify-center z-10">
+        <div className="relative w-full h-[45%] flex items-end justify-center z-10 pb-2">
              <img 
                src={CHEST_IMAGES[chestStage]} 
                alt="Sandık" 
-               className="h-full object-contain drop-shadow-[0_0_20px_rgba(255,200,0,0.3)] transition-all duration-500 scale-90 origin-bottom"
+               // Sandığı büyüttük (h-[120%]) ve bottom-0 ile aşağı sabitledik
+               className="h-[120%] object-contain drop-shadow-[0_0_20px_rgba(255,200,0,0.3)] transition-all duration-500 origin-bottom translate-y-4"
              />
         </div>
 
-        {/* 🔥 OYUN ALANI (Sadece Sandık 5'ten önce) */}
+        {/* 🔥 OYUN ALANI */}
         {chestStage < 4 && (
             <>
               {/* =========================================================================
-                  BÖLÜM 2: ORTA KISIM - DİNLE ve EŞLE ÇERÇEVELERİ (%40 Yükseklik)
-                  Burada 'justify-between' ve 'px-8' ile kutuları EN SOLA ve EN SAĞA itiyoruz.
-                  Böylece ortadaki sandığın önü kapanmıyor.
+                  BÖLÜM 2: ORTA KISIM - DİNLE ve EŞLE (%30 Yükseklik)
+                  Çerçeveler yukarı alındı.
                  ========================================================================= */}
-              <div className="relative w-full h-[40%] flex justify-between items-center px-6 md:px-16 z-20">
+              <div className="relative w-full h-[30%] flex justify-between items-start px-6 md:px-24 z-20 pt-2">
                   
                   {/* SOL TARAF: DİNLE KUTUSU */}
-                  <div className="relative w-28 h-28 md:w-40 md:h-40 bg-black/20 rounded-xl p-2">
+                  <div className="relative w-28 h-28 md:w-36 md:h-36 bg-black/20 rounded-xl p-1">
                       <img src={imgDinleKutucuk} className="absolute inset-0 w-full h-full object-contain opacity-90" alt="Dinle Çerçeve" />
                       
-                      {/* Tıklanabilir Alan */}
+                      {/* İçerik: Flex ile tam ortalıyoruz */}
                       <div 
                           className="absolute inset-0 flex items-center justify-center cursor-pointer active:scale-95 transition-transform z-20 pointer-events-auto"
                           onPointerDown={(e) => handlePointerDown(e, 'ref-box', targetSoundId)} 
                       >
+                          {/* İç kutuyu biraz aşağı aldık: translate-y-1 */}
                           <img 
                             src={imgKutuOrta} 
-                            className={`w-[60%] h-[60%] object-contain ${activeBoxId === 'ref-box' || successMatch ? 'shake-box' : ''} ${successMatch ? 'drop-shadow-[0_0_20px_rgba(250,204,21,1)]' : ''}`} 
+                            className={`w-[55%] h-[55%] object-contain translate-y-1 ${activeBoxId === 'ref-box' || successMatch ? 'shake-box' : ''} ${successMatch ? 'drop-shadow-[0_0_20px_rgba(250,204,21,1)]' : ''}`} 
                             alt="Referans" 
                           />
                       </div>
                   </div>
 
                   {/* SAĞ TARAF: EŞLE (DROP ZONE) */}
-                  <div ref={dropZoneRef} className="relative w-28 h-28 md:w-40 md:h-40 bg-black/20 rounded-xl p-2">
+                  <div ref={dropZoneRef} className="relative w-28 h-28 md:w-36 md:h-36 bg-black/20 rounded-xl p-1">
                       <img src={imgEsleKutucuk} className="absolute inset-0 w-full h-full object-contain opacity-90" alt="Hedef Çerçeve" />
                       
                       {successMatch && (
                           <div className="absolute inset-0 flex items-center justify-center z-30">
                               <img 
                                 src={getBoxImage(successMatch.visualType)} 
-                                className="w-[60%] h-[60%] object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)] translate-y-2" 
+                                className="w-[55%] h-[55%] object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)] translate-y-3" 
                                 alt="Matched Box" 
                               />
                           </div>
@@ -391,18 +447,21 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
 
               {/* =========================================================================
                   BÖLÜM 3: ALT KISIM - SEÇENEKLER (%25 Yükseklik)
-                  Alt kutular artık ekranın en altında, rahat bir alanda duruyor.
+                  Seviyeye göre kutular sığsın diye gap azaltılabilir.
                  ========================================================================= */}
-              <div className="relative w-full h-[25%] flex gap-4 md:gap-12 items-center justify-center z-30">
+              <div className="relative w-full h-[25%] flex gap-2 md:gap-6 items-center justify-center z-30 px-4">
                  {bottomBoxes.map((box) => {
                    const isDragging = draggedBoxId === box.id && isDraggingRef.current;
                    const isShaking = activeBoxId === box.id && !isDraggingRef.current;
                    const isHidden = isDragging || (successMatch && box.visualType === successMatch.visualType);
+                   
+                   // Kutuların boyutu seviye arttıkça (kutu sayısı artınca) hafif küçülebilir
+                   const boxSizeClass = gameLevel === 3 ? "w-16 h-16 md:w-20 md:h-20" : "w-20 h-20 md:w-24 md:h-24";
 
                    return (
                      <div 
                        key={box.id} 
-                       className={`relative w-20 h-20 md:w-24 md:h-24 transition-opacity ${isHidden ? 'opacity-0' : 'opacity-100'}`}
+                       className={`relative ${boxSizeClass} transition-opacity ${isHidden ? 'opacity-0' : 'opacity-100'}`}
                      >
                         <div 
                           className={`w-full h-full cursor-grab active:cursor-grabbing hover:-translate-y-2 transition-transform ${isShaking ? 'shake-box' : ''} pointer-events-auto`}
@@ -421,7 +480,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
             </>
         )}
 
-        {/* HAYALET KUTU (Sürüklenen) */}
+        {/* HAYALET KUTU */}
         {draggedBoxId && isDraggingRef.current && draggedBoxId !== 'ref-box' && (
             <div 
               className="fixed z-50 pointer-events-none w-24 h-24 drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
@@ -442,26 +501,12 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
            <ArrowLeft size={24} />
         </button>
 
+        {/* KAZANMA EKRANI - DÜZENLENDİ */}
         {isGameWon && (
-          <div className="absolute inset-0 z-[60] bg-black/80 flex flex-col items-center justify-center animate-in fade-in duration-500">
-              <h2 className="text-4xl md:text-6xl font-black text-yellow-400 mb-8 drop-shadow-lg animate-bounce">
+          <div className="absolute inset-0 z-[60] bg-black/85 flex flex-col items-center justify-center p-4 animate-in fade-in duration-500">
+              <h2 className="text-4xl md:text-5xl font-black text-yellow-400 mb-4 drop-shadow-lg animate-bounce text-center">
                   HARİKA! 🎉
               </h2>
-              <img src={sandik7} className="w-64 md:w-96 object-contain mb-8 animate-pulse" alt="Açık Sandık" />
-              <button 
-                onClick={() => {
-                    setChestStage(0); 
-                    setIsGameWon(false); 
-                    initRound(0);
-                }}
-                className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-8 py-4 rounded-full text-xl font-bold transition shadow-lg hover:scale-105 pointer-events-auto"
-              >
-                  <RefreshCcw size={24} />
-                  TEKRAR OYNA
-              </button>
-          </div>
-        )}
-      </div>
-    </>
-  );
-      }
+              
+              {/* Sandık görselini sınırlandırarak butonların ekrana sığmasını sağla */}
+              <div className="flex-grow-0 flex-shrink flex items-center jus
