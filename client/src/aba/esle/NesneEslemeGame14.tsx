@@ -509,4 +509,34 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
               </h2>
               
               {/* Sandık görselini sınırlandırarak butonların ekrana sığmasını sağla */}
-              <div className="flex-grow-0 flex-shrink flex items-center jus
+              <div className="flex-grow-0 flex-shrink flex items-center justify-center mb-6">
+                <img src={sandik7} className="max-h-48 md:max-h-64 w-auto object-contain animate-pulse" alt="Açık Sandık" />
+              </div>
+
+              <div className="flex gap-4">
+                  <button 
+                    onClick={() => {
+                        setChestStage(0); 
+                        setIsGameWon(false); 
+                        initRound(0, gameLevel); // Aynı seviyeyi tekrarla
+                    }}
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-full text-lg font-bold transition shadow-lg hover:scale-105 pointer-events-auto"
+                  >
+                      <RefreshCcw size={20} />
+                      TEKRAR
+                  </button>
+
+                  <button 
+                    onClick={handleNextLevel}
+                    className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-full text-lg font-bold transition shadow-lg hover:scale-105 pointer-events-auto"
+                  >
+                      <Star size={20} fill="white" />
+                      SONRAKİ SEVİYE
+                  </button>
+              </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
