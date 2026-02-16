@@ -83,7 +83,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     handleResize();
     window.addEventListener('resize', handleResize);
     
-    // İlk başlangıç
     initRound(0, 1); 
     
     const introAudio = new Audio(sndGiris);
@@ -125,16 +124,12 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     }
   }
 
-  // --- TUR HAZIRLAMA (SEVİYEYE GÖRE) ---
+  // --- TUR HAZIRLAMA ---
   const initRound = (nextStage = 0, level = gameLevel) => {
     const target = Math.floor(Math.random() * 7) + 1;
     setTargetSoundId(target);
     setSuccessMatch(null);
 
-    // Seviyeye göre kutu sayısı belirleme
-    // Seviye 1: 1 Doğru + 2 Yanlış = 3 Kutu
-    // Seviye 2: 1 Doğru + 3 Yanlış = 4 Kutu
-    // Seviye 3: 1 Doğru + 4 Yanlış = 5 Kutu
     let distractorCount = 2;
     if (level === 2) distractorCount = 3;
     if (level === 3) distractorCount = 4;
@@ -149,9 +144,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
       { id: 'correct', soundId: target, visualType: 'mid', x: 0, y: 0 },
     ];
 
-    // Yanlış kutuları ekle
     distractors.forEach((dId, index) => {
-        // Görsel tipleri rastgele dağıtmak yerine basit bir sıra veya random atayabiliriz
         const types: ('left'|'mid'|'right')[] = ['left', 'right', 'mid', 'left', 'right'];
         boxesData.push({ 
             id: `wrong${index}`, 
@@ -162,11 +155,8 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
         });
     });
 
-    // Kutuları karıştır
     boxesData = boxesData.sort(() => Math.random() - 0.5);
 
-    // Görsel tipleri dengelemek için (opsiyonel, hepsi aynı tip de olabilir ama çeşitlilik iyidir)
-    // Basitçe: 3 tip var, sırayla ata
     boxesData = boxesData.map((box, idx) => {
         const visualOrder: ('left' | 'mid' | 'right')[] = ['left', 'mid', 'right'];
         return { ...box, visualType: visualOrder[idx % 3] };
@@ -208,8 +198,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     const moveX = Math.abs(e.clientX - dragStartPos.current.x);
     const moveY = Math.abs(e.clientY - dragStartPos.current.y);
 
-    // 🔥 HASSASİYET AYARI: 5px yerine 20px yaptık.
-    // Parmağın hafif kaymasına izin veriyoruz, böylece ses hemen kesilmiyor.
     if (moveX > 20 || moveY > 20) {
         if (!isDraggingRef.current) {
             isDraggingRef.current = true;
@@ -258,7 +246,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
       setTimeout(() => {
           const nextStage = chestStage + 1;
           
-          // Sandık 5'e gelince Final başlar
           if (nextStage >= 4) {
             setChestStage(4); 
             new Audio(sndKilit).play().catch(()=>{}); 
@@ -278,11 +265,11 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
 
   const startFinaleSequence = () => {
       setTimeout(() => {
-          setChestStage(5); // Sandık 6
+          setChestStage(5); 
           new Audio(sndKilit).play().catch(()=>{}); 
           
           setTimeout(() => {
-              setChestStage(6); // Sandık 7
+              setChestStage(6); 
               new Audio(sndSandikAc).play().catch(()=>{}); 
               setTimeout(() => setIsGameWon(true), 2500);
           }, 1500);
@@ -290,10 +277,9 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
       }, 1500);
   };
 
-  // Bir sonraki seviyeye geçiş
   const handleNextLevel = () => {
       let nextLvl = gameLevel + 1;
-      if (nextLvl > 3) nextLvl = 1; // 3'ten sonra başa dön
+      if (nextLvl > 3) nextLvl = 1; 
       setGameLevel(nextLvl);
       setChestStage(0);
       setIsGameWon(false);
@@ -306,7 +292,6 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     return imgKutuOrta;
   };
 
-  // 🔥 EKRAN DİK Mİ? KONTROLÜ
   const isPortrait = screenSize.h > screenSize.w;
 
   if (isPortrait) {
@@ -366,7 +351,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
           <div className="absolute inset-0 bg-black/30" />
         </div>
 
-        {/* SEVİYE GÖSTERGESİ (SAĞ ÜST) */}
+        {/* SEVİYE GÖSTERGESİ */}
         <div className="absolute top-4 right-4 z-50 flex gap-2 pointer-events-auto">
             {[1, 2, 3].map((lvl) => (
                 <div 
@@ -389,95 +374,89 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
         </div>
 
         {/* =========================================================================
-            BÖLÜM 1: ÜST KISIM - SANDIK (%45 Yükseklik)
-            Genişletildi ve Sandık daha büyük.
+            BÖLÜM 1: ÇERÇEVELER (EN ÜSTTE) (%25 Yükseklik)
+            Yukarı alındı.
            ========================================================================= */}
-        <div className="relative w-full h-[45%] flex items-end justify-center z-10 pb-2">
+        {chestStage < 4 && (
+          <div className="relative w-full h-[25%] flex justify-between items-start px-6 md:px-24 z-20 pt-16 md:pt-12">
+              
+              {/* SOL TARAF: DİNLE KUTUSU */}
+              <div className="relative w-28 h-28 md:w-36 md:h-36 bg-black/20 rounded-xl p-1">
+                  <img src={imgDinleKutucuk} className="absolute inset-0 w-full h-full object-contain opacity-90" alt="Dinle Çerçeve" />
+                  
+                  <div 
+                      className="absolute inset-0 flex items-center justify-center cursor-pointer active:scale-95 transition-transform z-20 pointer-events-auto"
+                      onPointerDown={(e) => handlePointerDown(e, 'ref-box', targetSoundId)} 
+                  >
+                      <img 
+                        src={imgKutuOrta} 
+                        className={`w-[55%] h-[55%] object-contain translate-y-1 ${activeBoxId === 'ref-box' || successMatch ? 'shake-box' : ''} ${successMatch ? 'drop-shadow-[0_0_20px_rgba(250,204,21,1)]' : ''}`} 
+                        alt="Referans" 
+                      />
+                  </div>
+              </div>
+
+              {/* SAĞ TARAF: EŞLE (DROP ZONE) */}
+              <div ref={dropZoneRef} className="relative w-28 h-28 md:w-36 md:h-36 bg-black/20 rounded-xl p-1">
+                  <img src={imgEsleKutucuk} className="absolute inset-0 w-full h-full object-contain opacity-90" alt="Hedef Çerçeve" />
+                  
+                  {successMatch && (
+                      <div className="absolute inset-0 flex items-center justify-center z-30">
+                          <img 
+                            src={getBoxImage(successMatch.visualType)} 
+                            className="w-[55%] h-[55%] object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)] translate-y-3" 
+                            alt="Matched Box" 
+                          />
+                      </div>
+                  )}
+              </div>
+          </div>
+        )}
+        
+        {/* =========================================================================
+            BÖLÜM 2: SANDIK (ORTA) (%50 Yükseklik)
+            Sandık 2 kat büyütüldü ve 'items-end' ile alttaki kutuların tepesine oturtuldu.
+           ========================================================================= */}
+        <div className={`relative w-full h-[50%] flex items-end justify-center z-10 pb-2 ${chestStage >= 4 ? 'h-full items-center' : ''}`}>
              <img 
                src={CHEST_IMAGES[chestStage]} 
                alt="Sandık" 
-               // Sandığı büyüttük (h-[120%]) ve bottom-0 ile aşağı sabitledik
-               className="h-[120%] object-contain drop-shadow-[0_0_20px_rgba(255,200,0,0.3)] transition-all duration-500 origin-bottom translate-y-4"
+               // h-[160%] ile devasa yapıldı. origin-bottom ile aşağıdan yukarı büyüyor.
+               className={`object-contain drop-shadow-[0_0_20px_rgba(255,200,0,0.3)] transition-all duration-500 origin-bottom ${chestStage >= 4 ? 'h-[70%]' : 'h-[160%]'}`}
              />
         </div>
 
-        {/* 🔥 OYUN ALANI */}
+        {/* =========================================================================
+            BÖLÜM 3: ALT KUTULAR (%25 Yükseklik)
+           ========================================================================= */}
         {chestStage < 4 && (
-            <>
-              {/* =========================================================================
-                  BÖLÜM 2: ORTA KISIM - DİNLE ve EŞLE (%30 Yükseklik)
-                  Çerçeveler yukarı alındı.
-                 ========================================================================= */}
-              <div className="relative w-full h-[30%] flex justify-between items-start px-6 md:px-24 z-20 pt-2">
-                  
-                  {/* SOL TARAF: DİNLE KUTUSU */}
-                  <div className="relative w-28 h-28 md:w-36 md:h-36 bg-black/20 rounded-xl p-1">
-                      <img src={imgDinleKutucuk} className="absolute inset-0 w-full h-full object-contain opacity-90" alt="Dinle Çerçeve" />
-                      
-                      {/* İçerik: Flex ile tam ortalıyoruz */}
-                      <div 
-                          className="absolute inset-0 flex items-center justify-center cursor-pointer active:scale-95 transition-transform z-20 pointer-events-auto"
-                          onPointerDown={(e) => handlePointerDown(e, 'ref-box', targetSoundId)} 
-                      >
-                          {/* İç kutuyu biraz aşağı aldık: translate-y-1 */}
-                          <img 
-                            src={imgKutuOrta} 
-                            className={`w-[55%] h-[55%] object-contain translate-y-1 ${activeBoxId === 'ref-box' || successMatch ? 'shake-box' : ''} ${successMatch ? 'drop-shadow-[0_0_20px_rgba(250,204,21,1)]' : ''}`} 
-                            alt="Referans" 
-                          />
-                      </div>
-                  </div>
+          <div className="relative w-full h-[25%] flex gap-2 md:gap-6 items-center justify-center z-30 px-4 pb-4">
+             {bottomBoxes.map((box) => {
+               const isDragging = draggedBoxId === box.id && isDraggingRef.current;
+               const isShaking = activeBoxId === box.id && !isDraggingRef.current;
+               const isHidden = isDragging || (successMatch && box.visualType === successMatch.visualType);
+               
+               const boxSizeClass = gameLevel === 3 ? "w-16 h-16 md:w-20 md:h-20" : "w-20 h-20 md:w-24 md:h-24";
 
-                  {/* SAĞ TARAF: EŞLE (DROP ZONE) */}
-                  <div ref={dropZoneRef} className="relative w-28 h-28 md:w-36 md:h-36 bg-black/20 rounded-xl p-1">
-                      <img src={imgEsleKutucuk} className="absolute inset-0 w-full h-full object-contain opacity-90" alt="Hedef Çerçeve" />
-                      
-                      {successMatch && (
-                          <div className="absolute inset-0 flex items-center justify-center z-30">
-                              <img 
-                                src={getBoxImage(successMatch.visualType)} 
-                                className="w-[55%] h-[55%] object-contain shake-box drop-shadow-[0_0_20px_rgba(250,204,21,1)] translate-y-3" 
-                                alt="Matched Box" 
-                              />
-                          </div>
-                      )}
-                  </div>
-
-              </div>
-
-              {/* =========================================================================
-                  BÖLÜM 3: ALT KISIM - SEÇENEKLER (%25 Yükseklik)
-                  Seviyeye göre kutular sığsın diye gap azaltılabilir.
-                 ========================================================================= */}
-              <div className="relative w-full h-[25%] flex gap-2 md:gap-6 items-center justify-center z-30 px-4">
-                 {bottomBoxes.map((box) => {
-                   const isDragging = draggedBoxId === box.id && isDraggingRef.current;
-                   const isShaking = activeBoxId === box.id && !isDraggingRef.current;
-                   const isHidden = isDragging || (successMatch && box.visualType === successMatch.visualType);
-                   
-                   // Kutuların boyutu seviye arttıkça (kutu sayısı artınca) hafif küçülebilir
-                   const boxSizeClass = gameLevel === 3 ? "w-16 h-16 md:w-20 md:h-20" : "w-20 h-20 md:w-24 md:h-24";
-
-                   return (
-                     <div 
-                       key={box.id} 
-                       className={`relative ${boxSizeClass} transition-opacity ${isHidden ? 'opacity-0' : 'opacity-100'}`}
-                     >
-                        <div 
-                          className={`w-full h-full cursor-grab active:cursor-grabbing hover:-translate-y-2 transition-transform ${isShaking ? 'shake-box' : ''} pointer-events-auto`}
-                          onPointerDown={(e) => handlePointerDown(e, box.id, box.soundId)}
-                        >
-                            <img 
-                              src={getBoxImage(box.visualType)} 
-                              alt="Kutu" 
-                              className="w-full h-full object-contain drop-shadow-xl"
-                            />
-                        </div>
-                     </div>
-                   );
-                 })}
-              </div>
-            </>
+               return (
+                 <div 
+                   key={box.id} 
+                   className={`relative ${boxSizeClass} transition-opacity ${isHidden ? 'opacity-0' : 'opacity-100'}`}
+                 >
+                    <div 
+                      className={`w-full h-full cursor-grab active:cursor-grabbing hover:-translate-y-2 transition-transform ${isShaking ? 'shake-box' : ''} pointer-events-auto`}
+                      onPointerDown={(e) => handlePointerDown(e, box.id, box.soundId)}
+                    >
+                        <img 
+                          src={getBoxImage(box.visualType)} 
+                          alt="Kutu" 
+                          className="w-full h-full object-contain drop-shadow-xl"
+                        />
+                    </div>
+                 </div>
+               );
+             })}
+          </div>
         )}
 
         {/* HAYALET KUTU */}
@@ -501,14 +480,13 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
            <ArrowLeft size={24} />
         </button>
 
-        {/* KAZANMA EKRANI - DÜZENLENDİ */}
+        {/* KAZANMA EKRANI */}
         {isGameWon && (
           <div className="absolute inset-0 z-[60] bg-black/85 flex flex-col items-center justify-center p-4 animate-in fade-in duration-500">
               <h2 className="text-4xl md:text-5xl font-black text-yellow-400 mb-4 drop-shadow-lg animate-bounce text-center">
                   HARİKA! 🎉
               </h2>
               
-              {/* Sandık görselini sınırlandırarak butonların ekrana sığmasını sağla */}
               <div className="flex-grow-0 flex-shrink flex items-center justify-center mb-6">
                 <img src={sandik7} className="max-h-48 md:max-h-64 w-auto object-contain animate-pulse" alt="Açık Sandık" />
               </div>
@@ -518,7 +496,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
                     onClick={() => {
                         setChestStage(0); 
                         setIsGameWon(false); 
-                        initRound(0, gameLevel); // Aynı seviyeyi tekrarla
+                        initRound(0, gameLevel); 
                     }}
                     className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-full text-lg font-bold transition shadow-lg hover:scale-105 pointer-events-auto"
                   >
