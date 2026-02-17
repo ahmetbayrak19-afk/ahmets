@@ -1,28 +1,39 @@
 import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import * as THREE from "three";
 
-// Aşağıdaki satırı sırayla değiştirerek dene:
-// const FISH_URL = "/models/balik.glb";                 // (şu anki)
-// const FISH_URL = "file:///android_asset/models/balik.glb";
-// const FISH_URL = "/public/models/balik.glb";
-// const FISH_URL = "models/balik.glb";
-// const FISH_URL = "file:///android_asset/public/models/balik.glb";
+// Bu satırı her denemede değiştir
 const FISH_URL = "/models/balik.glb";
 
 export function Fish3D({ fishRef }: { fishRef: any }) {
-  // useGLTF'den scene ve error'ü al
+  const [loadError, setLoadError] = useState(null);
   const { scene, error } = useGLTF(FISH_URL);
   const meshRef = useRef<THREE.Group>(null);
 
-  // Hata veya başarı durumunu logla
+  // Fetch ile dosya erişimini test et
+  useEffect(() => {
+    fetch(FISH_URL)
+      .then(res => {
+        if (!res.ok) {
+          console.error(`❌ HTTP ${res.status}: ${FISH_URL}`);
+          setLoadError(`HTTP ${res.status}`);
+        } else {
+          console.log(`✅ Dosya bulundu: ${FISH_URL}, boyut: ${res.headers.get('content-length')}`);
+        }
+      })
+      .catch(err => {
+        console.error(`❌ Fetch hatası: ${FISH_URL}`, err);
+        setLoadError(err.message);
+      });
+  }, []);
+
   useEffect(() => {
     if (error) {
-      console.error("❌ Model yüklenemedi:", error);
-      alert("Model yüklenemedi: " + error.message);
+      console.error("❌ useGLTF hatası:", error);
+      alert("useGLTF hatası: " + error.message);
     } else if (scene) {
-      console.log("✅ Model yüklendi:", FISH_URL);
+      console.log("✅ useGLTF yüklendi:", FISH_URL);
       scene.traverse((child: any) => {
         if (child.isMesh) {
           child.castShadow = true;
@@ -34,7 +45,6 @@ export function Fish3D({ fishRef }: { fishRef: any }) {
 
   useFrame(() => {
     if (!meshRef.current || !fishRef.current) return;
-    
     const fish = fishRef.current;
     const SCALE_FACTOR = 0.015; 
 
