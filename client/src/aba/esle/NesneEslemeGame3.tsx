@@ -149,42 +149,30 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
     return () => { document.body.style.overflow = originalStyle; };
   }, []);
 
-  // --- SORU ÜRETME MANTIĞI (DÜZELTİLDİ: TEKİL GRUP SEÇİMİ) ---
+  // --- SORU ÜRETME MANTIĞI ---
   const generateQuestion = () => {
-    // 1. Rastgele bir hedef video seç
     const randomTarget = OBJECTS[Math.floor(Math.random() * OBJECTS.length)];
     
-    // Level'a göre çeldirici sayısı
     let optionCount = 3; 
     if (level === 2) optionCount = 4;
     if (level === 3) optionCount = 6;
     const distractorCount = optionCount - 1;
 
-    // 2. TÜM BENZERSİZ GRUPLARI BUL (groupId'ye göre)
-    // Örneğin: ['kos', 'gitarcal', 'elmaye'...]
     const allGroupIds = Array.from(new Set(OBJECTS.map(item => item.groupId)));
-
-    // 3. Hedefin grubunu bu listeden çıkar (Hedefin aynısı veya kardeşi seçeneklere girmesin diye)
     const availableGroups = allGroupIds.filter(id => id !== randomTarget.groupId);
 
-    // 4. Kalan grupları karıştır ve ihtiyaç kadar grup seç
     const selectedDistractorGroups = availableGroups
         .sort(() => 0.5 - Math.random())
         .slice(0, distractorCount);
 
-    // 5. Seçilen her gruptan RASTGELE BİR VİDEO al
     const distractors = selectedDistractorGroups.map(groupId => {
-        // Bu gruba ait videoları bul (Örn: gitarcal ve gitarcal1)
         const videosInGroup = OBJECTS.filter(item => item.groupId === groupId);
-        // Aralarından birini rastgele seç
         return videosInGroup[Math.floor(Math.random() * videosInGroup.length)];
     });
 
-    // 6. Hedefi ve çeldiricileri birleştirip karıştır
     setTargetItem(randomTarget);
     setOptions([randomTarget, ...distractors].sort(() => 0.5 - Math.random()));
     
-    // Sıfırlamalar
     setShowFeedback(null);
     setIsModeling(false);
     setFlashCorrect(false);
@@ -320,7 +308,8 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
 
   return (
     <div className={twMerge(
-        "fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
+        // 🔥 DÜZELTME: h-[100dvh] ve w-screen ile mobil tarayıcı çubukları sorunu çözüldü
+        "fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
         (level === 3 && mode === 'instruction') 
             ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" 
             : "bg-slate-50"
@@ -391,7 +380,11 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
             {!isMatched && <p className="mt-4 text-slate-400 font-bold text-xs tracking-widest uppercase animate-pulse">Aynısını Üzerine Bırak</p>}
           </div>
 
-          <div className={twMerge("grid gap-3 w-full px-1 justify-items-center mx-auto", getGridClass())}>
+          <div className={twMerge(
+              // 🔥 DÜZELTME: pb-8 eklenerek en alttaki videoların yukarı kalkması sağlandı
+              "grid gap-3 w-full px-1 justify-items-center mx-auto pb-8", 
+              getGridClass()
+          )}>
             {options.map((item) => {
               const isCorrectItem = item.id === targetItem.id;
               const isLocked = mode === 'instruction' && instructionMistakeCount >= 2 && !isCorrectItem;
@@ -477,4 +470,4 @@ export default function NesneEslemeGame3({ mode, onClose, onComplete }: GameProp
       </AnimatePresence>
     </div>
   );
-}
+    }
