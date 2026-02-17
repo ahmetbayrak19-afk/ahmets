@@ -3,7 +3,8 @@ import { useFrame } from "@react-three/fiber";
 import { useRef, useEffect } from "react";
 import * as THREE from "three";
 
-const FISH_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/cartoon%20fish%203d%20model.glb?alt=media&token=537af2d2-8ae8-4c9e-bff5-3c86368c658c";
+// Firebase URL'si kaldırıldı, local model kullanılıyor
+const FISH_URL = "/models/balik.glb";
 
 export function Fish3D({ fishRef }: { fishRef: any }) {
   const { scene } = useGLTF(FISH_URL);
@@ -37,7 +38,6 @@ export function Fish3D({ fishRef }: { fishRef: any }) {
     meshRef.current.rotation.z = targetZ;
   });
 
-  // 🔥 GÜNCELLEME: Boyut 2 katına çıktı (2.5 -> 5.0)
   return <primitive object={scene} ref={meshRef} scale={5.0} />;
 }
 
