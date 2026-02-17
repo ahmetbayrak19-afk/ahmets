@@ -111,7 +111,7 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
         newTarget = WORDS[Math.floor(Math.random() * WORDS.length)];
     }
 
-    // Aynı sorunun üst üste gelmesini engelle (Opsiyonel ama iyi olur)
+    // Aynı sorunun üst üste gelmesini engelle
     if (newTarget === targetString && LETTERS.length > 1) {
        generateQuestion(); 
        return;
@@ -140,7 +140,7 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
   // --- SES EFEKTLERİ ---
   const playSoundEffect = (type: 'success' | 'fail' | 'click') => {
     let soundSrc;
-    if (type === 'click') return; // Tıklama sesi istenirse eklenebilir
+    if (type === 'click') return; 
 
     if (type === 'success') {
         soundSrc = POSITIVE_SOUNDS[Math.floor(Math.random() * POSITIVE_SOUNDS.length)];
@@ -162,7 +162,6 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
         // --- DOĞRU HARF ---
         const nextIndex = currentIndex + 1;
         
-        // ÖNEMLİ: Doğru basınca hemen durumu temizle (Rengi beyaza döndür)
         setDisabledKeys([]);
         setMistakeCount(0);
         setCurrentIndex(nextIndex);
@@ -212,14 +211,12 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
     if (mode === 'instruction') {
         const expectedChar = targetString[currentIndex];
 
-        // 2. Yanlış: Harflerin yarısını kapat
         if (newMistakeCount === 2) {
             const wrongKeys = LETTERS.filter(l => l !== expectedChar);
             const keysToDisable = wrongKeys.sort(() => 0.5 - Math.random()).slice(0, Math.floor(wrongKeys.length / 2));
             setDisabledKeys(keysToDisable);
         }
 
-        // 3. Yanlış: Sadece doğru harf kalsın
         if (newMistakeCount >= 3) {
             const allWrongKeys = LETTERS.filter(l => l !== expectedChar);
             setDisabledKeys(allWrongKeys);
@@ -244,15 +241,9 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
     const isDisabled = disabledKeys.includes(letter);
     const expectedChar = targetString[currentIndex];
     
-    // Şu anki harf hedef mi?
     const isTarget = letter === expectedChar && !isSuccessAnim;
-    
-    // İpucu Yanıp Sönmesi (Sadece Öğretim modu + Hata varsa + Hedefse)
     const shouldFlash = mode === 'instruction' && mistakeCount > 0 && isTarget;
 
-    // ÖNEMLİ: Key prop'una currentIndex ekleyerek her harf geçişinde
-    // butonun React tarafından tamamen yenilenmesini (remount) sağlıyoruz.
-    // Bu, takılı kalan animasyonları ve renkleri %100 temizler.
     const uniqueKey = `${letter}-${currentIndex}-${targetString}`;
 
     return (
@@ -271,13 +262,9 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
             }}
             transition={shouldFlash ? { duration: 0.5, repeat: Infinity } : { duration: 0.2 }}
             className={twMerge(
-                // Temel Tasarım
                 "relative rounded-md sm:rounded-xl font-bold text-lg sm:text-2xl md:text-3xl flex items-center justify-center select-none border-b-2 sm:border-b-4",
-                // Gölge ve Hareket
                 isDisabled ? "shadow-none" : "shadow-[0_2px_0_0_#cbd5e1] sm:shadow-[0_4px_0_0_#cbd5e1] active:shadow-none active:translate-y-1 transition-all",
-                // Boyutlar (Responsive VW kullanımı)
                 "w-[8.5vw] h-[10.5vw] sm:w-14 sm:h-16 max-w-[55px] max-h-[65px]", 
-                // Renkler
                 isDisabled ? "opacity-30 text-slate-400 pointer-events-none" : "text-slate-700 hover:bg-slate-50 active:bg-blue-50"
             )}
         >
@@ -287,7 +274,7 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800">
+    <div className="fixed inset-0 h-[100dvh] w-screen z-[100] bg-slate-50 flex flex-col font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800">
       
       {/* ÜST BAR */}
       <div className="w-full flex justify-between items-center p-2 sm:p-4 z-10 bg-white/50 backdrop-blur-sm border-b border-slate-200 shadow-sm h-16 shrink-0">
@@ -298,7 +285,8 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
         {/* ORTA KISIM - SEVİYE VE BİLGİ */}
         <div className="flex items-center gap-2 sm:gap-4">
             
-            <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+            {/* LEVEL BUTONLARI */}
+            <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 items-center">
                 {[1, 2, 3].map((lvl) => (
                     <button
                         key={lvl}
@@ -336,7 +324,7 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
       {/* --- OYUN ALANI --- */}
       <div className="flex-1 flex flex-col w-full max-w-4xl mx-auto overflow-hidden">
           
-          {/* HEDEF KELİME KUTUSU (Ortalanmış ve Esnek) */}
+          {/* HEDEF KELİME KUTUSU */}
           <div className="flex-1 flex flex-col items-center justify-center gap-4 w-full px-4 min-h-[150px]">
               <span className="text-slate-400 text-xs sm:text-sm font-bold tracking-widest uppercase">
                   {level === 1 ? "Harfi Bul" : "Yaz"}
@@ -355,9 +343,9 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
                   {targetString.split('').map((char, index) => (
                       <span key={index} className={twMerge(
                           "text-4xl sm:text-6xl md:text-7xl font-black transition-colors",
-                          index < currentIndex ? "text-green-500" : // Yazılmış olanlar
-                          index === currentIndex && !isSuccessAnim && !isShake ? "text-slate-800 underline decoration-4 decoration-blue-300 underline-offset-8" : // Sıradaki
-                          "text-slate-300" // Henüz yazılmayanlar
+                          index < currentIndex ? "text-green-500" : 
+                          index === currentIndex && !isSuccessAnim && !isShake ? "text-slate-800 underline decoration-4 decoration-blue-300 underline-offset-8" : 
+                          "text-slate-300"
                       )}>
                           {char}
                       </span>
