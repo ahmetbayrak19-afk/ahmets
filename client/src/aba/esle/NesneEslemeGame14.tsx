@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, RefreshCcw, Smartphone, Star } from 'lucide-react';
+import { twMerge } from 'tailwind-merge';
 
 // ---------------------------------------------------------------------------
 // 🔥 VARLIKLAR (Assets)
@@ -460,27 +461,29 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
           <div className="absolute inset-0 bg-black/30" />
         </div>
 
-        {/* SEVİYE GÖSTERGESİ */}
-        <div className="absolute top-4 right-4 z-50 flex gap-2 pointer-events-auto">
-            {[1, 2, 3].map((lvl) => (
-                <div 
-                    key={lvl}
-                    // Tıklanınca sadece zorluk değişir, tema değişmez
-                    onClick={() => {
-                        setGameLevel(lvl);
-                        setStage(0);
-                        setIsGameWon(false);
-                        initRound(0, lvl);
-                    }}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center font-bold border-2 cursor-pointer transition-all ${
-                        gameLevel === lvl 
-                        ? 'bg-yellow-500 border-white text-black scale-110 shadow-[0_0_15px_rgba(250,204,21,0.8)]' 
-                        : 'bg-black/50 border-gray-500 text-gray-400 hover:bg-black/70'
-                    }`}
-                >
-                    {lvl}
-                </div>
-            ))}
+        {/* SEVİYE GÖSTERGESİ (PILL STYLE) */}
+        <div className="absolute top-4 right-4 z-50 pointer-events-auto">
+            <div className="flex bg-white/20 backdrop-blur-md p-1 rounded-full border border-white/30 items-center">
+                {[1, 2, 3].map((lvl) => (
+                    <button
+                        key={lvl}
+                        onClick={() => {
+                            setGameLevel(lvl);
+                            setStage(0);
+                            setIsGameWon(false);
+                            initRound(0, lvl);
+                        }}
+                        className={twMerge(
+                            "px-4 py-1.5 text-xs font-bold rounded-full transition-all",
+                            gameLevel === lvl 
+                                ? "bg-yellow-500 text-black shadow-lg" 
+                                : "text-white/70 hover:text-white hover:bg-white/10"
+                        )}
+                    >
+                        LVL {lvl}
+                    </button>
+                ))}
+            </div>
         </div>
 
         {/* =========================================================================
@@ -601,8 +604,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
                  {currentTheme === 'chest' ? (
                     <img src={sandik7} className="max-h-[40vh] w-auto object-contain animate-pulse" alt="Açık Sandık" />
                  ) : (
-                    // Uzay temasında kutlama görseli olarak son arkaplan veya özel bir ikon kullanılabilir
-                    // Şimdilik sadece yazılar ve butonlar ortada duracak, veya son uzay görseli arkada kalabilir
+                    // Uzay temasında kutlama görseli
                     <div className="text-6xl">🚀</div>
                  )}
               </div>
