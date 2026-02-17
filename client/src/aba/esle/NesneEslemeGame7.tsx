@@ -149,51 +149,39 @@ export default function NesneEslemeGame7({ mode, onClose, onComplete }: GameProp
     return () => { document.body.style.overflow = originalStyle; };
   }, []);
 
-  // --- SORU ÜRETME MANTIĞI (FARKLI EYLEM) ---
+  // --- SORU ÜRETME MANTIĞI ---
   const generateQuestion = () => {
-    // 1. Rastgele bir hedef video seç
     const randomTarget = OBJECTS[Math.floor(Math.random() * OBJECTS.length)];
     const targetGroupId = randomTarget.groupId;
 
-    // 2. Doğru Cevap: Aynı groupId'ye sahip ama farklı ID'si olan video
-    // (Örn: hedef 'disfircala' ise cevap 'disfircala1' olmalı)
+    // Doğru cevap: Aynı grup, farklı ID
     const correctAnswer = OBJECTS.find(item => item.groupId === targetGroupId && item.id !== randomTarget.id);
 
-    // Eğer veri setinde eşi yoksa (güvenlik) tekrar dene
     if (!correctAnswer) {
         generateQuestion();
         return;
     }
     
-    // Level'a göre çeldirici sayısı
     let optionCount = 3; 
     if (level === 2) optionCount = 4;
     if (level === 3) optionCount = 6;
     const distractorCount = optionCount - 1;
 
-    // 3. Çeldiricileri Bul: Farklı groupId'ye sahip videolar
-    // Önce tüm benzersiz grup ID'lerini al
     const allGroupIds = Array.from(new Set(OBJECTS.map(item => item.groupId)));
-    
-    // Hedefin grubunu çıkar
     const availableGroups = allGroupIds.filter(id => id !== targetGroupId);
 
-    // Rastgele gruplar seç
     const selectedDistractorGroups = availableGroups
         .sort(() => 0.5 - Math.random())
         .slice(0, distractorCount);
 
-    // Seçilen gruplardan rastgele bir video al
     const distractors = selectedDistractorGroups.map(groupId => {
         const videosInGroup = OBJECTS.filter(item => item.groupId === groupId);
         return videosInGroup[Math.floor(Math.random() * videosInGroup.length)];
     });
 
-    // 4. Hedefi ve seçenekleri ayarla
     setTargetItem(randomTarget);
     setOptions([correctAnswer, ...distractors].sort(() => 0.5 - Math.random()));
     
-    // Sıfırlamalar
     setShowFeedback(null);
     setIsModeling(false);
     setFlashCorrect(false);
@@ -233,7 +221,6 @@ export default function NesneEslemeGame7({ mode, onClose, onComplete }: GameProp
 
     if (!isInside) return;
 
-    // KONTROL: Aynı grup ID'sine sahip mi? (Ama birebir aynı video olmamalı)
     const isCorrect = droppedItem.groupId === targetItem.groupId;
 
     if (isCorrect) {
@@ -330,7 +317,8 @@ export default function NesneEslemeGame7({ mode, onClose, onComplete }: GameProp
 
   return (
     <div className={twMerge(
-        "fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
+        // 🔥 DÜZELTME: h-[100dvh] ve w-screen (Tam Ekran ve Alt Çubuk Çözümü)
+        "fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
         (level === 3 && mode === 'instruction') 
             ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" 
             : "bg-slate-50"
@@ -401,11 +389,13 @@ export default function NesneEslemeGame7({ mode, onClose, onComplete }: GameProp
             {!isMatched && <p className="mt-4 text-slate-400 font-bold text-xs tracking-widest uppercase animate-pulse">Aynısını Üzerine Bırak (Farklı Kişi)</p>}
           </div>
 
-          <div className={twMerge("grid gap-3 w-full px-1 justify-items-center mx-auto", getGridClass())}>
+          <div className={twMerge(
+              // 🔥 DÜZELTME: pb-8 eklenerek en alttaki videolar yukarı kaydırıldı
+              "grid gap-3 w-full px-1 justify-items-center mx-auto pb-8",
+              getGridClass() 
+          )}>
             {options.map((item) => {
-              // KONTROL: Aynı grup ID'sine sahip mi?
               const isCorrectItem = item.groupId === targetItem.groupId;
-              
               const isLocked = mode === 'instruction' && instructionMistakeCount >= 2 && !isCorrectItem;
               const isHidden = isMatched && isCorrectItem;
               const canDrag = !isModeling && !isLocked && !isMatched;
@@ -478,11 +468,25 @@ export default function NesneEslemeGame7({ mode, onClose, onComplete }: GameProp
         </div>
       )}
 
+      {/* FEEDBACK OVERLAY */}
       <AnimatePresence>
         {showFeedback && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[110] flex flex-col items-center justify-start pt-32 pointer-events-none">
-            <div className={`px-10 py-5 rounded-full shadow-2xl flex items-center gap-4 ${showFeedback === 'correct' ? 'bg-green-500' : 'bg-red-500'}`}>
-                {showFeedback === 'correct' ? <Check size={48} className="text-white"/> : <><XCircle size={36} className="text-white"/><span className="text-white text-3xl font-black tracking-widest">HAYIR</span></>}
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[110] flex flex-col items-center justify-start pt-32 pointer-events-none"
+          >
+            <div className={`
+                px-10 py-5 rounded-full shadow-2xl flex items-center gap-4
+                ${showFeedback === 'correct' ? 'bg-green-500' : 'bg-red-500'}
+            `}>
+                {showFeedback === 'correct' ? (
+                    <Check size={48} className="text-white"/> 
+                ) : (
+                    <>
+                        <XCircle size={36} className="text-white"/>
+                        <span className="text-white text-3xl font-black tracking-widest">HAYIR</span>
+                    </>
+                )}
             </div>
           </motion.div>
         )}
