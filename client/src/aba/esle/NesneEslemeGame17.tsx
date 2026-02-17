@@ -229,8 +229,8 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
   }, [assessmentCount, assessmentScore, mode]);
 
   return (
-    // 🔥 CSS GÜNCELLEMESİ: touch-none, overscroll-none, overflow-hidden
-    <div className="fixed inset-0 z-[100] flex flex-col bg-slate-50 font-sans select-none overflow-hidden touch-none overscroll-none">
+    // 🔥 DÜZELTME: h-[100dvh] ve w-screen
+    <div className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-50 font-sans select-none overflow-hidden touch-none overscroll-none">
       
       {/* Üst Bar */}
       <div className="p-4 flex justify-between items-center relative z-10 shrink-0">
@@ -239,6 +239,7 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
         </button>
         
         <div className="flex items-center gap-3">
+             {/* --- DÜZELTME: LEVEL BUTONLARI (Kapsül) --- */}
              {mode === 'instruction' && (
                  <div className="flex bg-slate-200 p-1 rounded-full items-center">
                      {[1, 2, 3].map(l => (
@@ -247,7 +248,7 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
                             onClick={() => setLevel(l)} 
                             className={twMerge(
                                 "px-4 py-1.5 text-xs font-bold rounded-full transition-all",
-                                level === l ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"
+                                level === l ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
                             )}
                          >
                             LVL {l}
@@ -289,7 +290,8 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
 
           {/* SEÇENEKLER (GRID) */}
           <div className={twMerge(
-              "grid gap-4 w-full px-4",
+              // 🔥 DÜZELTME: pb-8 eklenerek alt boşluk verildi
+              "grid gap-4 w-full px-4 pb-8",
               level === 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2" // 3. seviyede 3 kolon
           )}>
             {options.map((word, idx) => {
@@ -368,5 +370,4 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
       </AnimatePresence>
     </div>
   );
-  }
-    
+}
