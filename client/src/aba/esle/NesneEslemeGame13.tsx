@@ -89,7 +89,6 @@ export default function NesneEslemeGame13({ mode, onClose, onComplete }: GamePro
 
   // Arkaplan Müziği ve Scroll Reset
   useEffect(() => {
-    // 1. ÖNLEM: Sayfayı en başa sar
     window.scrollTo(0, 0);
 
     bgMusicRef.current = new Audio(arkaplanMusic);
@@ -133,7 +132,6 @@ export default function NesneEslemeGame13({ mode, onClose, onComplete }: GamePro
     audio.play().catch(e => console.log("Ses oynatılamadı", e));
   };
 
-  // Scroll kilitleme
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
     document.body.style.overflow = 'hidden';
@@ -172,10 +170,8 @@ export default function NesneEslemeGame13({ mode, onClose, onComplete }: GamePro
     const dropZone = dropZoneRef.current;
     if (!dropZone) return;
     
-    // 1. Kutunun Sınırları
     const dropRect = dropZone.getBoundingClientRect();
     
-    // 2. Garantili Koordinat Okuma
     let clientX = 0;
     let clientY = 0;
 
@@ -190,7 +186,6 @@ export default function NesneEslemeGame13({ mode, onClose, onComplete }: GamePro
         clientY = info.point.y;
     }
 
-    // 3. İçine Bırakıldı mı? (+40px Tolerans)
     const isInside = 
         clientX >= dropRect.left - 40 && 
         clientX <= dropRect.right + 40 &&
@@ -220,15 +215,15 @@ export default function NesneEslemeGame13({ mode, onClose, onComplete }: GamePro
         setAssessmentScore(prev => prev + 1);
     }
 
-    // Bekleme süresi (Gölgenin renklenmesini izlesin diye)
     setTimeout(() => {
-      // Level Sistemi (Sadece Öğretimde)
+      // Level Sistemi (Sadece Öğretimde Otomatik Geçiş Mantığı Vardı, ama şimdi buton da var)
       if (mode === 'instruction') {
           const nextQ = questionIndex + 1;
           setQuestionIndex(nextQ);
 
-          if (nextQ === 3) setLevel(2);
-          else if (nextQ === 6) setLevel(3);
+          // Otomatik geçişi koruyalım ama kullanıcı butonla da değiştirebilsin
+          if (nextQ === 3 && level < 2) setLevel(2);
+          else if (nextQ === 6 && level < 3) setLevel(3);
           
           generateQuestion();
       } else {
@@ -294,8 +289,8 @@ export default function NesneEslemeGame13({ mode, onClose, onComplete }: GamePro
 
   return (
     <div className={twMerge(
-        "fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
-        // LEVEL 3 ARKAPLAN
+        // 🔥 DÜZELTME: h-[100dvh] ve w-screen
+        "fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
         (level === 3 && mode === 'instruction') 
             ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" 
             : "bg-slate-50"
@@ -308,11 +303,23 @@ export default function NesneEslemeGame13({ mode, onClose, onComplete }: GamePro
         </button>
         
         <div className="flex items-center gap-3">
-             {/* Seviye Göstergesi */}
+             
+             {/* --- DÜZELTİLDİ: TIKLANABİLİR LEVEL BUTONLARI --- */}
              {mode === 'instruction' && (
-                 <div className="flex gap-1 mr-2">
+                 <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 items-center">
                      {[1, 2, 3].map(l => (
-                         <div key={l} className={twMerge("w-3 h-3 rounded-full transition-colors", level >= l ? "bg-orange-500" : "bg-slate-200")}></div>
+                         <button 
+                            key={l}
+                            onClick={() => setLevel(l)} 
+                            className={twMerge(
+                                "px-4 py-1.5 text-xs font-bold rounded-full transition-all",
+                                level === l 
+                                    ? "bg-white text-blue-600 shadow-sm" 
+                                    : "text-slate-400 hover:text-slate-600"
+                            )}
+                         >
+                            LVL {l}
+                         </button>
                      ))}
                  </div>
             )}
@@ -327,7 +334,6 @@ export default function NesneEslemeGame13({ mode, onClose, onComplete }: GamePro
                 </span>
             </div>
 
-            {/* Ses Butonu */}
             <button onClick={() => setIsMuted(!isMuted)} className="p-2 bg-white border rounded-full shadow-sm active:scale-95">
                  {isMuted ? <VolumeX size={20} className="text-slate-400"/> : <Volume2 size={20} className="text-blue-500"/>}
             </button>
@@ -339,27 +345,23 @@ export default function NesneEslemeGame13({ mode, onClose, onComplete }: GamePro
         <div className="flex-1 flex flex-col justify-around w-full max-w-md h-full">
           
           <div className="flex flex-col items-center">
-            {/* --- HEDEF KUTU (GÖLGE) --- */}
+            {/* HEDEF KUTU */}
             <div 
                 ref={dropZoneRef}
                 className={twMerge(
                     "w-72 h-72 bg-white rounded-[3rem] border-4 flex items-center justify-center shadow-inner relative z-0 transition-all duration-300 overflow-hidden",
-                    // Eşleşince yeşil sınır yap
                     isMatched ? "border-green-500 bg-green-50 border-solid" : "border-dashed border-slate-300"
                 )}
             >
                {/* 1. KATMAN: SİYAH GÖLGE */}
-               {/* key ekledik ki yeni soruda sıfırlansın, flicker yapmasın */}
                <img 
                  key={targetItem.id + '-shadow'}
                  src={targetItem.shadowSrc} 
                  alt="Gölge" 
-                 // Opacity YOK (Tam siyah), pointer-events-none (Tıklanmaz)
                  className="absolute w-56 h-56 object-contain pointer-events-none"
                />
 
                {/* 2. KATMAN: RENKLİ RESİM (Üste Gelen) */}
-               {/* key ekledik, scale 1 yaptık (büyüme yok) */}
                <motion.img 
                   key={targetItem.id + '-color'}
                   src={targetItem.colorSrc}
@@ -367,9 +369,9 @@ export default function NesneEslemeGame13({ mode, onClose, onComplete }: GamePro
                   initial={{ opacity: 0 }}
                   animate={{ 
                       opacity: isMatched ? 1 : 0,
-                      scale: 1 // ARTIK BÜYÜMÜYOR, GÖLGEYLE AYNI BOY
+                      scale: 1 
                   }}
-                  transition={{ duration: 0.5 }} // Yarım saniyede nazikçe beliriyor
+                  transition={{ duration: 0.5 }} 
                   className="absolute w-56 h-56 object-contain z-10 pointer-events-none"
                />
 
@@ -379,16 +381,14 @@ export default function NesneEslemeGame13({ mode, onClose, onComplete }: GamePro
 
           {/* --- SEÇENEKLER --- */}
           <div className={twMerge(
-              "grid gap-2 w-full px-1 justify-items-center",
+              // 🔥 DÜZELTME: pb-8 eklenerek alt boşluk verildi
+              "grid gap-2 w-full px-1 justify-items-center pb-8",
               level === 3 ? "grid-cols-3" : "grid-cols-3"
           )}>
             {options.map((item) => {
               const isCorrectItem = item.id === targetItem.id;
               const isLocked = mode === 'instruction' && instructionMistakeCount >= 2 && !isCorrectItem;
-              
-              // Eşleşme olduğunda aşağıdakini gizle
               const isHidden = isMatched && isCorrectItem;
-              
               const canDrag = !isModeling && !isLocked && !isMatched;
 
               return (
