@@ -202,11 +202,10 @@ export default function NesneEslemeGame8({ mode, onClose, onComplete }: GameProp
 
     // 2. Doğru Cevap: Hedefin ÇİZİM versiyonunu bul (Grup 2'den)
     const drawingObjects = OBJECTS.filter(o => o.type === 'drawing');
-    // Aynı isme sahip (baseId) ama türü drawing olanlardan rastgele birini seç
     const possibleCorrectAnswers = drawingObjects.filter(o => getBaseId(o.id) === targetBase);
     
     if (possibleCorrectAnswers.length === 0) {
-        generateQuestion(); // Güvenlik
+        generateQuestion(); 
         return;
     }
     const correctAnswer = possibleCorrectAnswers[Math.floor(Math.random() * possibleCorrectAnswers.length)];
@@ -217,9 +216,7 @@ export default function NesneEslemeGame8({ mode, onClose, onComplete }: GameProp
     if (level === 3) optionCount = 6;
     const distractorCount = optionCount - 1;
 
-    // 4. Çeldiricileri Belirle (KRİTİK BÖLÜM)
-    // - Çeldiriciler "Drawing" grubundan olmalı (Görsel bütünlük için)
-    // - Hedefin isminde OLMAMALI (Yani 'anahtar' soruluyorsa şıklarda başka anahtar olmamalı)
+    // 4. Çeldiricileri Belirle
     const distractors = drawingObjects.filter(item => {
         return getBaseId(item.id) !== targetBase;
     })
@@ -227,10 +224,8 @@ export default function NesneEslemeGame8({ mode, onClose, onComplete }: GameProp
     .slice(0, distractorCount);
 
     setTargetItem(randomTarget);
-    // Doğru cevap ve çeldiricileri karıştır
     setOptions([correctAnswer, ...distractors].sort(() => 0.5 - Math.random()));
     
-    // Sıfırlamalar
     setShowFeedback(null);
     setIsModeling(false);
     setFlashCorrect(false);
@@ -270,7 +265,6 @@ export default function NesneEslemeGame8({ mode, onClose, onComplete }: GameProp
 
     if (!isInside) return;
 
-    // KONTROL: İsimleri (Base Name) aynı mı?
     const isCorrect = getBaseId(droppedItem.id) === getBaseId(targetItem.id);
 
     if (isCorrect) {
@@ -366,7 +360,8 @@ export default function NesneEslemeGame8({ mode, onClose, onComplete }: GameProp
 
   return (
     <div className={twMerge(
-        "fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
+        // 🔥 DÜZELTME: h-[100dvh] ve w-screen (Tam Ekran ve Alt Çubuk Çözümü)
+        "fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
         (level === 3 && mode === 'instruction') 
             ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" 
             : "bg-slate-50"
@@ -441,7 +436,8 @@ export default function NesneEslemeGame8({ mode, onClose, onComplete }: GameProp
           </div>
 
           <div className={twMerge(
-              "grid gap-3 w-full px-1 justify-items-center mx-auto",
+              // 🔥 DÜZELTME: pb-8 eklenerek alt boşluk sağlandı
+              "grid gap-3 w-full px-1 justify-items-center mx-auto pb-8",
               getGridClass() 
           )}>
             {options.map((item) => {
