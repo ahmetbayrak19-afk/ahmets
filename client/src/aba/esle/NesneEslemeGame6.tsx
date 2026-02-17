@@ -77,7 +77,7 @@ interface GameProps {
 
 export default function NesneEslemeGame6({ mode, onClose, onComplete }: GameProps) {
   // GAME STATES
-  const [level, setLevel] = useState(1); // 1, 2, 3
+  const [level, setLevel] = useState(1); 
   const [questionIndex, setQuestionIndex] = useState(0); 
   const [isMuted, setIsMuted] = useState(false);
 
@@ -148,23 +148,19 @@ export default function NesneEslemeGame6({ mode, onClose, onComplete }: GameProp
     return () => { document.body.style.overflow = originalStyle; };
   }, []);
 
-  // ID'den rakamları atarak temel ismi alıyoruz (örn: "anahtar2" -> "anahtar")
   const getBaseId = (id: string) => {
     return id.replace(/[0-9]/g, ''); 
   };
 
-  // --- SORU ÜRETME (ÖNEMLİ DEĞİŞİKLİK BURADA) ---
+  // --- SORU ÜRETME ---
   const generateQuestion = () => {
-    // 1. Rastgele bir hedef seç (Örn: anahtar2)
     const randomTarget = OBJECTS[Math.floor(Math.random() * OBJECTS.length)];
     const targetBase = getBaseId(randomTarget.id);
 
-    // 2. Doğru Cevabı Bul: Aynı isme sahip ama farklı ID'li olan nesne (Örn: anahtar3)
     const correctAnswer = OBJECTS.find(item => 
         getBaseId(item.id) === targetBase && item.id !== randomTarget.id
     );
 
-    // Eğer veri setinde eşi yoksa (güvenlik için) tekrar dene
     if (!correctAnswer) {
         generateQuestion();
         return;
@@ -174,7 +170,6 @@ export default function NesneEslemeGame6({ mode, onClose, onComplete }: GameProp
     if (level === 2) optionCount = 4;
     if (level === 3) optionCount = 6;
 
-    // 3. Çeldiricileri Bul: İsmi hedef ile aynı olmayanlar
     const distractors = OBJECTS.filter(item => {
         return getBaseId(item.id) !== targetBase;
     })
@@ -182,7 +177,6 @@ export default function NesneEslemeGame6({ mode, onClose, onComplete }: GameProp
     .slice(0, optionCount - 1); 
 
     setTargetItem(randomTarget);
-    // Seçeneklere doğru cevabı (eşini) ve çeldiricileri koy
     setOptions([correctAnswer, ...distractors].sort(() => 0.5 - Math.random()));
     
     setShowFeedback(null);
@@ -224,9 +218,6 @@ export default function NesneEslemeGame6({ mode, onClose, onComplete }: GameProp
 
     if (!isInside) return;
 
-    // KONTROL MANTIĞI DEĞİŞTİ:
-    // Doğrudan ID eşleşmesi değil, "Base Name" eşleşmesi yapıyoruz.
-    // Örn: droppedItem (anahtar3) base'i "anahtar" === targetItem (anahtar2) base'i "anahtar"
     const isCorrect = getBaseId(droppedItem.id) === getBaseId(targetItem.id);
 
     if (isCorrect) {
@@ -322,7 +313,8 @@ export default function NesneEslemeGame6({ mode, onClose, onComplete }: GameProp
 
   return (
     <div className={twMerge(
-        "fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
+        // 🔥 DÜZELTME: h-[100dvh] ve w-screen
+        "fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
         (level === 3 && mode === 'instruction') 
             ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" 
             : "bg-slate-50"
@@ -335,7 +327,6 @@ export default function NesneEslemeGame6({ mode, onClose, onComplete }: GameProp
         </button>
         
         <div className="flex items-center gap-3">
-             
              {mode === 'instruction' && (
                  <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 items-center">
                      {[1, 2, 3].map(l => (
@@ -397,11 +388,11 @@ export default function NesneEslemeGame6({ mode, onClose, onComplete }: GameProp
           </div>
 
           <div className={twMerge(
-              "grid gap-3 w-full px-1 justify-items-center mx-auto",
+              // 🔥 DÜZELTME: pb-8 eklenerek alt boşluk sağlandı
+              "grid gap-3 w-full px-1 justify-items-center mx-auto pb-8",
               getGridClass() 
           )}>
             {options.map((item) => {
-              // Base ID kontrolü: Sürüklenen öğe (item) ile hedef (targetItem) aynı tür mü?
               const isCorrectItem = getBaseId(item.id) === getBaseId(targetItem.id);
               
               const isLocked = mode === 'instruction' && instructionMistakeCount >= 2 && !isCorrectItem;
