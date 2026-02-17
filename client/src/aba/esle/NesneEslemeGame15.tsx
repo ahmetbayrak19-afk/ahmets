@@ -5,7 +5,6 @@ import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
 // --- SES DOSYALARI ---
-// (Yolunu kontrol et: aynı klasörde 'ses' klasörü varsa ./ses/... yoksa ../ses/...)
 import arkaplanMusic from './ses/arkaplanmusic.mp3';
 import aferin1 from './ses/aferin1.mp3';
 import aferin2 from './ses/aferin2.mp3';
@@ -76,7 +75,6 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
 
   const [phase, setPhase] = useState<'playing' | 'success' | 'fail'>('playing');
   
-  // İlk başta boş bir obje ile başlatıyoruz, useEffect içinde dolacak
   const [targetItem, setTargetItem] = useState(WORDS_LVL1[0]);
   const [options, setOptions] = useState<typeof WORDS_LVL1>([]);
   
@@ -154,13 +152,13 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
         optionCount = 4;
     } else if (level === 3) {
         currentPool = WORDS_LVL3;
-        optionCount = 4; // Kelimeler uzun olduğu için 6 yerine 4 seçenek daha iyi sığar
+        optionCount = 4; // Kelimeler uzun olduğu için 4 seçenek daha iyi
     }
 
     // 2. Rastgele hedef seç
     const randomTarget = currentPool[Math.floor(Math.random() * currentPool.length)];
     
-    // 3. Çeldiricileri seç (Hedef hariç diğerleri)
+    // 3. Çeldiricileri seç
     const distractors = currentPool.filter(item => item.id !== randomTarget.id)
                              .sort(() => 0.5 - Math.random())
                              .slice(0, optionCount - 1); 
@@ -175,7 +173,6 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
     setIsMatched(false);
   };
 
-  // Level değişince soru üret
   useEffect(() => { generateQuestion(); }, [level]);
 
   // --- SÜRÜKLE BIRAK MANTIĞI ---
@@ -209,7 +206,6 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
 
     if (!isInside) return;
 
-    // Kelime eşleme olduğu için ID'ler (veya textler) aynı olmalı
     const isCorrect = droppedItem.id === targetItem.id;
 
     if (isCorrect) {
@@ -297,25 +293,23 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
     }
   }, [assessmentCount, assessmentScore, mode]);
 
-  // Grid Stili (Kelimeler uzun olduğu için 2 sütun daha iyi olabilir)
+  // Grid Stili
   const getGridClass = () => {
-      // Level 1 (Kısa): 3 yan yana
       if (level === 1) return "grid-cols-3";
-      // Level 2 (Orta): 2x2
       if (level === 2) return "grid-cols-2 max-w-[320px]"; 
-      // Level 3 (Uzun): 2x2 (daha geniş sığsın)
       if (level === 3) return "grid-cols-2 max-w-[350px]";
       return "grid-cols-3";
   };
 
-  // Okul Fontu (Comic Sans veya benzeri)
+  // Font Stili
   const fontStyle = {
       fontFamily: '"Comic Sans MS", "Chalkboard SE", "Comic Neue", sans-serif'
   };
 
   return (
     <div className={twMerge(
-        "fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
+        // 🔥 DÜZELTME: h-[100dvh] ve w-screen
+        "fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col items-center justify-between p-4 select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
         (level === 3 && mode === 'instruction') 
             ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" 
             : "bg-slate-50"
@@ -329,7 +323,7 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
         
         <div className="flex items-center gap-3">
              
-             {/* LEVEL BUTONLARI (Kapsül) */}
+             {/* --- LEVEL BUTONLARI (Kapsül Tasarım) --- */}
              {mode === 'instruction' && (
                  <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 items-center">
                      {[1, 2, 3].map(l => (
@@ -370,7 +364,7 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
         <div className="flex-1 flex flex-col justify-around w-full max-w-md h-full">
           
           <div className="flex flex-col items-center">
-            {/* HEDEF KELİME KUTUSU */}
+            {/* HEDEF KUTU */}
             <div 
                 ref={dropZoneRef}
                 className={twMerge(
@@ -382,7 +376,6 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
                  style={fontStyle}
                  className={twMerge(
                     "font-bold text-slate-700 transition-all duration-500 pointer-events-none select-none tracking-wider",
-                    // Uzun kelimelerde fontu küçült
                     targetItem.text.length > 5 ? "text-4xl" : "text-6xl",
                     isMatched ? "scale-110 text-green-600 drop-shadow-lg" : "opacity-90"
                  )}
@@ -394,7 +387,8 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
           </div>
 
           <div className={twMerge(
-              "grid gap-3 w-full px-1 justify-items-center mx-auto",
+              // 🔥 DÜZELTME: pb-8 eklenerek en alttaki kelimeler yukarı kaydırıldı
+              "grid gap-3 w-full px-1 justify-items-center mx-auto pb-8",
               getGridClass() 
           )}>
             {options.map((item) => {
@@ -404,8 +398,6 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
               const canDrag = !isModeling && !isLocked && !isMatched;
 
               return (
-                // Kutuların boyutu kelimeye göre değişebilir veya sabit kalabilir.
-                // Kelimeler için h-16 (daha yatay) kullanıyoruz.
                 <div key={item.id} className="relative flex justify-center items-center w-full h-20">
                   <motion.div
                     drag={canDrag}
@@ -421,7 +413,7 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
                         ? { opacity: 0, scale: 0 }
                         : (isModeling && isCorrectItem) 
                         ? { 
-                            y: [0, -320, -320, 0], // Hedefe gitme mesafesini biraz kısalttım (kutular daha yakın)
+                            y: [0, -320, -320, 0], 
                             scale: [1, 1.2, 1.2, 1],
                             x: 0
                           } 
@@ -521,4 +513,3 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
     </div>
   );
 }
-     
