@@ -32,7 +32,6 @@ import yildizShape from './yildiz1.png';
 import kalpShape from './kalp1.png';
 
 // --- ARKAPLAN GÖRSELLERİ ---
-// Lütfen bu dosyaların proje klasöründe olduğundan emin ol
 import bgPortrait from './9_16arkaplan.png';  // Dikey (Mobil)
 import bgLandscape from './16_9arkaplan.png'; // Yatay (Tablet/PC)
 
@@ -73,8 +72,8 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
   const [isMuted, setIsMuted] = useState(false);
   
   // ARKAPLAN STATE'LERİ
-  const [showBackground, setShowBackground] = useState(false); // Arkaplan açık mı?
-  const [currentBg, setCurrentBg] = useState(bgLandscape);     // Hangi resim aktif?
+  const [showBackground, setShowBackground] = useState(false); 
+  const [currentBg, setCurrentBg] = useState(bgLandscape);     
 
   const [phase, setPhase] = useState<'playing' | 'success' | 'fail'>('playing');
   const [targetItem, setTargetItem] = useState(OBJECTS[0]);
@@ -93,27 +92,21 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
 
-  // EKRAN YÖNÜNÜ ALGILA (Dikey mi Yatay mı?)
+  // EKRAN YÖNÜNÜ ALGILA
   useEffect(() => {
     const handleResize = () => {
-      // Eğer yükseklik genişlikten büyükse DİKEY (9:16) kullan
       if (window.innerHeight > window.innerWidth) {
         setCurrentBg(bgPortrait);
       } else {
-        // Değilse YATAY (16:9) kullan
         setCurrentBg(bgLandscape);
       }
     };
-
-    // İlk açılışta kontrol et
     handleResize();
-
-    // Ekran döndürülürse tekrar kontrol et
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Müzik ve Scroll
+  // Müzik
   useEffect(() => {
     window.scrollTo(0, 0);
     bgMusicRef.current = new Audio(arkaplanMusic);
@@ -172,7 +165,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
 
   useEffect(() => { generateQuestion(); }, [level]);
 
-  // --- GPS SÜRÜKLEME ---
+  // --- SÜRÜKLEME ---
   const handleDragEnd = (event: any, info: any, droppedItem: typeof OBJECTS[0]) => {
     if (isModeling || isMatched) return;
 
@@ -278,64 +271,64 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
 
   return (
     <div 
-      // ARKAPLAN RESMİ (Tuş Açıksa)
       style={showBackground ? { backgroundImage: `url(${currentBg})` } : {}}
       className={twMerge(
-        "fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 bg-cover bg-center transition-all duration-500",
-        // Eğer arkaplan kapalıysa düz renk kullan
+        // 🔥 DÜZELTME: h-[100dvh] ve w-screen (Tam ekran yerleşimi için)
+        "fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 bg-cover bg-center transition-all duration-500",
         !showBackground ? "bg-slate-50" : ""
     )}>
       
-      {/* Üst Bar */}
+      {/* ÜST BAR (Menü Hizalama Düzeltildi) */}
       <div className="w-full max-w-2xl flex justify-between items-center text-slate-500 mb-2 relative z-10">
         <button onClick={onClose} className="p-2 bg-white border border-slate-200 rounded-full shadow-sm hover:bg-slate-100">
           <XCircle size={24} className="text-slate-300" />
         </button>
         
         <div className="flex items-center gap-3">
-            {/* --- ÖĞRETİM MODU ARAÇLARI --- */}
+            {/* --- ÖĞRETİM MODU ARAÇLARI (DÜZENLENDİ) --- */}
             {mode === 'instruction' && (
-                 <div className="flex gap-2 mr-2">
-                     {/* LEVEL BUTONLARI */}
-                     {[1, 2, 3].map((l) => (
-                         <button
-                            key={l}
-                            onClick={() => { setLevel(l); setQuestionIndex(0); }}
-                            className={twMerge(
-                                "px-3 py-1 rounded-lg text-xs font-bold transition-all border-2",
-                                level === l 
-                                    ? "bg-orange-500 text-white border-orange-600 scale-105 shadow-md" 
-                                    : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
-                            )}
-                         >
-                             SEVİYE {l}
-                         </button>
-                     ))}
+                 <div className="flex gap-2 mr-1">
+                     {/* Level Butonlarını Grupla */}
+                     <div className="flex bg-white/80 backdrop-blur-sm p-1 rounded-full border border-slate-200 items-center">
+                         {[1, 2, 3].map((l) => (
+                             <button
+                                key={l}
+                                onClick={() => { setLevel(l); setQuestionIndex(0); }}
+                                className={twMerge(
+                                    "px-3 py-1 text-xs font-bold rounded-full transition-all",
+                                    level === l 
+                                        ? "bg-orange-500 text-white shadow-sm" 
+                                        : "text-slate-400 hover:text-slate-600"
+                                )}
+                             >
+                                 LVL {l}
+                             </button>
+                         ))}
+                     </div>
 
-                     {/* --- YENİ EKLENEN: ARKAPLAN AÇ/KAPA TUŞU --- */}
+                     {/* Arkaplan Tuşu */}
                      <button
                         onClick={() => setShowBackground(!showBackground)}
                         className={twMerge(
-                            "p-1.5 rounded-lg border-2 transition-all active:scale-95 shadow-sm",
+                            "p-2 rounded-full border-2 transition-all active:scale-95 shadow-sm flex items-center justify-center",
                             showBackground 
-                                ? "bg-indigo-500 text-white border-indigo-600" // Açıkken
-                                : "bg-white text-slate-400 border-slate-200 hover:bg-slate-50" // Kapalıyken
+                                ? "bg-indigo-500 text-white border-indigo-600" 
+                                : "bg-white text-slate-400 border-slate-200 hover:bg-slate-50"
                         )}
-                        title="Arkaplanı Değiştir"
+                        title="Arkaplan"
                      >
-                        <ImageIcon size={18} />
+                        <ImageIcon size={16} />
                      </button>
                  </div>
             )}
 
-            <div className={twMerge("px-4 py-2 rounded-full shadow-sm border flex items-center gap-2", mode === 'assessment' ? "bg-blue-50 border-blue-100" : "bg-purple-50 border-purple-100")}>
+            <div className={twMerge("px-4 py-2 rounded-full shadow-sm border flex items-center gap-2 bg-white/90 backdrop-blur-sm", mode === 'assessment' ? "border-blue-100" : "border-purple-100")}>
                 {mode === 'assessment' ? <ClipboardCheck size={16} className="text-blue-600"/> : <GraduationCap size={16} className="text-purple-600"/>}
                 <span className={twMerge("font-bold text-xs uppercase", mode === 'assessment' ? "text-blue-600" : "text-purple-600")}>
-                    {mode === 'assessment' ? `TEST: ${Math.min(assessmentCount + 1, 10)}/10` : "ÖĞRETİM"}
+                    {mode === 'assessment' ? `TEST: ${Math.min(assessmentCount + 1, 10)}/10` : "EĞİTİM"}
                 </span>
             </div>
             
-            {/* SES TUŞU */}
             <button onClick={() => setIsMuted(!isMuted)} className="p-2 bg-white border rounded-full shadow-sm active:scale-95">
                  {isMuted ? <VolumeX size={20} className="text-slate-400"/> : <Volume2 size={20} className="text-blue-500"/>}
             </button>
@@ -352,19 +345,13 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                 ref={dropZoneRef}
                 style={{ perspective: '800px' }} 
                 className={twMerge(
-                    "w-72 h-72 bg-white rounded-[3rem] flex items-center justify-center relative z-0 transition-all duration-300 overflow-hidden",
-                    isMatched ? "border-4 border-dashed border-green-500" : "border-4 border-dashed border-slate-300"
+                    "w-64 h-64 md:w-72 md:h-72 bg-white rounded-[3rem] flex items-center justify-center relative z-0 transition-all duration-300 overflow-hidden shadow-lg",
+                    isMatched ? "border-4 border-dashed border-green-500 shadow-green-100" : "border-4 border-dashed border-slate-300"
                 )}
             >
-               {/* KATMAN 3 (EN ÜST): ÇERÇEVE */}
-               <img 
-                 key={targetItem.id + '-frame'}
-                 src={targetItem.frameSrc} 
-                 alt="Çerçeve" 
-                 className="absolute w-56 h-56 object-contain z-20 pointer-events-none"
-               />
+               {/* 3 KATMANLI YAPI */}
+               <img key={targetItem.id + '-frame'} src={targetItem.frameSrc} alt="Çerçeve" className="absolute w-48 h-48 md:w-56 md:h-56 object-contain z-20 pointer-events-none" />
 
-               {/* KATMAN 2 (ARA): EŞLEŞEN PARÇA */}
                <motion.img 
                   key={targetItem.id + '-fill'}
                   src={targetItem.src} 
@@ -377,23 +364,18 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                       y: isMatched ? 10 : -50
                   }}
                   transition={{ duration: 0.5, type: "spring", bounce: 0.2 }} 
-                  className="absolute w-56 h-56 object-contain z-10 pointer-events-none origin-bottom"
+                  className="absolute w-48 h-48 md:w-56 md:h-56 object-contain z-10 pointer-events-none origin-bottom"
                />
 
-               {/* KATMAN 1 (EN ALT): ZEMİN */}
-               <img 
-                 key={targetItem.id + '-bg'}
-                 src={targetItem.bgSrc} 
-                 alt="Zemin" 
-                 className="absolute w-56 h-56 object-contain z-0 pointer-events-none opacity-80"
-               />
+               <img key={targetItem.id + '-bg'} src={targetItem.bgSrc} alt="Zemin" className="absolute w-48 h-48 md:w-56 md:h-56 object-contain z-0 pointer-events-none opacity-80" />
 
             </div>
-            {!isMatched && <p className="mt-4 text-slate-400 font-bold text-xs tracking-widest uppercase animate-pulse">Eşini Kutuya Bırak</p>}
+            {!isMatched && <p className="mt-4 text-slate-400 font-bold text-xs tracking-widest uppercase animate-pulse drop-shadow-md">Eşini Kutuya Bırak</p>}
           </div>
 
+          {/* 🔥 DÜZELTME: pb-8 eklenerek alt kısımdaki şekiller yukarı çekildi */}
           <div className={twMerge(
-              "grid gap-2 w-full px-1 justify-items-center",
+              "grid gap-4 w-full px-1 justify-items-center pb-8",
               level === 2 ? "grid-cols-2" : "grid-cols-3"
           )}>
             {options.map((item) => {
@@ -403,7 +385,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
               const canDrag = !isModeling && !isLocked && !isMatched;
 
               return (
-                <div key={item.id} className="relative flex justify-center items-center h-36 w-full">
+                <div key={item.id} className="relative flex justify-center items-center h-28 w-full">
                   <motion.div
                     drag={canDrag}
                     dragConstraints={false}
@@ -418,7 +400,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                         ? { opacity: 0, scale: 0 }
                         : (isModeling && isCorrectItem) 
                         ? { 
-                            y: [0, -380, -380, 0], 
+                            y: [0, -320, -320, 0], 
                             scale: [1, 1.2, 1.2, 1],
                             x: 0
                           } 
@@ -433,11 +415,12 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                     }
 
                     className={twMerge(
-                      "w-28 h-28 flex items-center justify-center touch-none relative z-10",
+                      "w-24 h-24 flex items-center justify-center touch-none relative z-10",
                       canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed"
                     )}
                   >
-                    <img src={item.src} alt={item.name} className="w-24 h-24 object-contain pointer-events-none drop-shadow-md" />
+                    {/* Sadece dolu şekil gösteriliyor, çünkü sürüklenecek parça bu */}
+                    <img src={item.src} alt={item.name} className="w-20 h-20 object-contain pointer-events-none drop-shadow-xl" />
                     
                     {isModeling && isCorrectItem && (
                         <motion.div 
