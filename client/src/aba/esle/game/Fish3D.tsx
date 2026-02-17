@@ -3,15 +3,26 @@ import { useFrame } from "@react-three/fiber";
 import { useRef, useEffect } from "react";
 import * as THREE from "three";
 
-// Firebase URL'si kaldırıldı, local model kullanılıyor
+// Aşağıdaki satırı sırayla değiştirerek dene:
+// const FISH_URL = "/models/balik.glb";                 // (şu anki)
+// const FISH_URL = "file:///android_asset/models/balik.glb";
+// const FISH_URL = "/public/models/balik.glb";
+// const FISH_URL = "models/balik.glb";
+// const FISH_URL = "file:///android_asset/public/models/balik.glb";
 const FISH_URL = "/models/balik.glb";
 
 export function Fish3D({ fishRef }: { fishRef: any }) {
-  const { scene } = useGLTF(FISH_URL);
+  // useGLTF'den scene ve error'ü al
+  const { scene, error } = useGLTF(FISH_URL);
   const meshRef = useRef<THREE.Group>(null);
 
+  // Hata veya başarı durumunu logla
   useEffect(() => {
-    if (scene) {
+    if (error) {
+      console.error("❌ Model yüklenemedi:", error);
+      alert("Model yüklenemedi: " + error.message);
+    } else if (scene) {
+      console.log("✅ Model yüklendi:", FISH_URL);
       scene.traverse((child: any) => {
         if (child.isMesh) {
           child.castShadow = true;
@@ -19,7 +30,7 @@ export function Fish3D({ fishRef }: { fishRef: any }) {
         }
       });
     }
-  }, [scene]);
+  }, [scene, error]);
 
   useFrame(() => {
     if (!meshRef.current || !fishRef.current) return;
