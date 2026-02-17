@@ -4,9 +4,7 @@ import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, R
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
-// --- DÜZELTİLEN KISIM: DOSYA YOLLARI ---
-// Component: src/aba/esle/NesneEslemeGame9.tsx
-// Resimler: src/colours/
+// --- RENK RESİMLERİ ---
 import beyazImg from '../../colours/beyaz.jpg';
 import kirmiziImg from '../../colours/kirmizi.jpg';
 import maviImg from '../../colours/mavi.jpg';
@@ -112,8 +110,9 @@ export default function NesneEslemeGame9({ mode, onClose, onComplete }: GameProp
   };
 
   useEffect(() => {
+    const originalStyle = window.getComputedStyle(document.body).overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = 'auto'; };
+    return () => { document.body.style.overflow = originalStyle; };
   }, []);
 
   // --- SORU ÜRETME ---
@@ -233,44 +232,138 @@ export default function NesneEslemeGame9({ mode, onClose, onComplete }: GameProp
   };
 
   return (
-    <div className={twMerge("fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000", (level === 3 && mode === 'instruction') ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" : "bg-slate-50")}>
+    <div className={twMerge(
+        // 🔥 DÜZELTME: h-[100dvh] ve w-screen
+        "fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
+        (level === 3 && mode === 'instruction') 
+            ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" 
+            : "bg-slate-50"
+    )}>
+      
+      {/* Üst Bar */}
       <div className="w-full max-w-2xl flex justify-between items-center text-slate-500 mb-2 relative z-10">
-        <button onClick={onClose} className="p-2 bg-white border border-slate-200 rounded-full shadow-sm hover:bg-slate-100"><XCircle size={24} className="text-slate-300" /></button>
+        <button onClick={onClose} className="p-2 bg-white border border-slate-200 rounded-full shadow-sm hover:bg-slate-100">
+          <XCircle size={24} className="text-slate-300" />
+        </button>
+        
         <div className="flex items-center gap-3">
              {mode === 'instruction' && (
                  <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 items-center">
                      {[1, 2, 3].map(l => (
-                         <button key={l} onClick={() => setLevel(l)} className={twMerge("px-4 py-1.5 text-xs font-bold rounded-full transition-all", level === l ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600")}>LVL {l}</button>
+                         <button 
+                            key={l}
+                            onClick={() => setLevel(l)} 
+                            className={twMerge(
+                                "px-4 py-1.5 text-xs font-bold rounded-full transition-all",
+                                level === l ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                            )}
+                         >
+                            LVL {l}
+                         </button>
                      ))}
                  </div>
             )}
-            <div className={twMerge("px-4 py-2 rounded-full shadow-sm border flex items-center gap-2", mode === 'assessment' ? "bg-blue-50 border-blue-100" : "bg-purple-50 border-purple-100")}>
+
+            <div className={twMerge(
+                "px-4 py-2 rounded-full shadow-sm border flex items-center gap-2",
+                mode === 'assessment' ? "bg-blue-50 border-blue-100" : "bg-purple-50 border-purple-100"
+            )}>
                 {mode === 'assessment' ? <ClipboardCheck size={16} className="text-blue-600"/> : <GraduationCap size={16} className="text-purple-600"/>}
-                <span className={twMerge("font-bold text-xs uppercase", mode === 'assessment' ? "text-blue-600" : "text-purple-600")}>{mode === 'assessment' ? `TEST: ${Math.min(assessmentCount + 1, 10)}/10` : "ÖĞRETİM"}</span>
+                <span className={twMerge("font-bold text-xs uppercase", mode === 'assessment' ? "text-blue-600" : "text-purple-600")}>
+                    {mode === 'assessment' ? `TEST: ${Math.min(assessmentCount + 1, 10)}/10` : "ÖĞRETİM"}
+                </span>
             </div>
-            <button onClick={() => setIsMuted(!isMuted)} className="p-2 bg-white border rounded-full shadow-sm active:scale-95">{isMuted ? <VolumeX size={20} className="text-slate-400"/> : <Volume2 size={20} className="text-blue-500"/>}</button>
+            
+            <button onClick={() => setIsMuted(!isMuted)} className="p-2 bg-white border rounded-full shadow-sm active:scale-95">
+                 {isMuted ? <VolumeX size={20} className="text-slate-400"/> : <Volume2 size={20} className="text-blue-500"/>}
+            </button>
         </div>
       </div>
 
+      {/* --- OYUN ALANI --- */}
       {phase === 'playing' && (
         <div className="flex-1 flex flex-col justify-around w-full max-w-md h-full">
+          
           <div className="flex flex-col items-center">
-            <div ref={dropZoneRef} className={twMerge("w-72 h-72 bg-white rounded-[3rem] border-4 border-dashed flex items-center justify-center shadow-inner relative z-0 transition-all duration-300", isMatched ? "border-green-500 bg-green-50 border-solid" : "border-slate-300")}>
-               <img src={targetItem.src} alt={targetItem.name} className={twMerge("object-contain transition-all duration-500 pointer-events-none", isMatched ? "w-56 h-56 opacity-100 scale-110 drop-shadow-2xl" : "w-48 h-48 opacity-90")} />
+            {/* HEDEF KUTU */}
+            <div 
+                ref={dropZoneRef}
+                className={twMerge(
+                    "w-72 h-72 bg-white rounded-[3rem] border-4 border-dashed flex items-center justify-center shadow-inner relative z-0 transition-all duration-300",
+                    isMatched ? "border-green-500 bg-green-50 border-solid" : "border-slate-300"
+                )}
+            >
+               <img 
+                 src={targetItem.src} 
+                 alt={targetItem.name} 
+                 className={twMerge(
+                    "object-contain transition-all duration-500 pointer-events-none",
+                    isMatched ? "w-56 h-56 opacity-100 scale-110 drop-shadow-2xl" : "w-48 h-48 opacity-90"
+                 )} 
+               />
             </div>
             {!isMatched && <p className="mt-4 text-slate-400 font-bold text-xs tracking-widest uppercase animate-pulse">Eşini Üzerine Bırak</p>}
           </div>
-          <div className={twMerge("grid gap-3 w-full px-1 justify-items-center mx-auto", getGridClass())}>
+
+          <div className={twMerge(
+              // 🔥 DÜZELTME: pb-8 eklenerek en alttaki renkler yukarı kaydırıldı
+              "grid gap-3 w-full px-1 justify-items-center mx-auto pb-8",
+              getGridClass() 
+          )}>
             {options.map((item) => {
               const isCorrectItem = item.id === targetItem.id;
               const isLocked = mode === 'instruction' && instructionMistakeCount >= 2 && !isCorrectItem;
               const isHidden = isMatched && isCorrectItem;
               const canDrag = !isModeling && !isLocked && !isMatched;
+
               return (
                 <div key={item.id} className="relative flex justify-center items-center h-28 w-full">
-                  <motion.div drag={canDrag} dragConstraints={false} dragSnapToOrigin={true} dragElastic={0.1} dragMomentum={false} onDragEnd={(e, info) => handleDragEnd(e, info, item)} whileDrag={{ scale: 1.1, zIndex: 100 }} animate={isHidden ? { opacity: 0, scale: 0 } : (isModeling && isCorrectItem) ? { y: [0, -380, -380, 0], scale: [1, 1.2, 1.2, 1], x: 0 } : (flashCorrect && isCorrectItem) ? { scale: [1, 1.1, 1], borderColor: ["#e2e8f0", "#22c55e", "#e2e8f0"], borderWidth: [2, 4, 2] } : { scale: 1, opacity: isLocked ? 0.3 : 1 }} transition={(isModeling && isCorrectItem) ? { duration: 2, times: [0, 0.4, 0.7, 1], ease: "easeInOut" } : { duration: 0.3 }} className={twMerge("w-24 h-24 bg-white rounded-2xl shadow-[0_6px_0_0_#e2e8f0] flex items-center justify-center border-2 touch-none relative z-10", canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed", (isModeling && isCorrectItem) ? "border-blue-400 shadow-blue-100 shadow-xl" : (flashCorrect && isCorrectItem) ? "border-green-500 shadow-green-100" : "border-slate-100")}>
+                  <motion.div
+                    drag={canDrag}
+                    dragConstraints={false}
+                    dragSnapToOrigin={true} 
+                    dragElastic={0.1}
+                    dragMomentum={false}
+                    onDragEnd={(e, info) => handleDragEnd(e, info, item)}
+                    whileDrag={{ scale: 1.1, zIndex: 100 }}
+                    
+                    animate={
+                        isHidden
+                        ? { opacity: 0, scale: 0 }
+                        : (isModeling && isCorrectItem) 
+                        ? { 
+                            y: [0, -380, -380, 0], 
+                            scale: [1, 1.2, 1.2, 1],
+                            x: 0
+                          } 
+                        : (flashCorrect && isCorrectItem)
+                        ? { scale: [1, 1.1, 1], borderColor: ["#e2e8f0", "#22c55e", "#e2e8f0"], borderWidth: [2, 4, 2] }
+                        : { scale: 1, opacity: isLocked ? 0.3 : 1 }
+                    }
+                    transition={
+                        (isModeling && isCorrectItem)
+                        ? { duration: 2, times: [0, 0.4, 0.7, 1], ease: "easeInOut" }
+                        : { duration: 0.3 }
+                    }
+
+                    className={twMerge(
+                      "w-24 h-24 bg-white rounded-2xl shadow-[0_6px_0_0_#e2e8f0] flex items-center justify-center border-2 touch-none relative z-10",
+                      canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed",
+                      (isModeling && isCorrectItem) ? "border-blue-400 shadow-blue-100 shadow-xl" : 
+                      (flashCorrect && isCorrectItem) ? "border-green-500 shadow-green-100" : "border-slate-100"
+                    )}
+                  >
                     <img src={item.src} alt={item.name} className="w-16 h-16 object-contain pointer-events-none" />
-                    {isModeling && isCorrectItem && (<motion.div animate={{ opacity: [0, 1, 1, 0] }} transition={{ times: [0, 0.1, 0.8, 1], duration: 2 }} className="absolute -bottom-2 -right-2 text-blue-600 bg-white rounded-full p-2 shadow-lg border border-blue-100"><MousePointer2 size={24} fill="currentColor" /></motion.div>)}
+                    
+                    {isModeling && isCorrectItem && (
+                        <motion.div 
+                           animate={{ opacity: [0, 1, 1, 0] }}
+                           transition={{ times: [0, 0.1, 0.8, 1], duration: 2 }}
+                           className="absolute -bottom-2 -right-2 text-blue-600 bg-white rounded-full p-2 shadow-lg border border-blue-100"
+                        >
+                            <MousePointer2 size={24} fill="currentColor" />
+                        </motion.div>
+                    )}
                   </motion.div>
                 </div>
               );
@@ -279,9 +372,55 @@ export default function NesneEslemeGame9({ mode, onClose, onComplete }: GameProp
         </div>
       )}
 
-      {phase === 'success' && (<div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center p-8"><Trophy size={100} className="text-yellow-500 mb-6 animate-bounce" /><h1 className="text-3xl font-black text-slate-800 mb-2 uppercase">Tamamlandı!</h1><p className="text-slate-500 mb-8 font-medium text-lg">Başarı Oranı: {assessmentScore * 10}%</p><button onClick={() => onComplete(true)} className="bg-green-600 text-white px-12 py-5 rounded-2xl font-bold text-xl shadow-xl active:scale-95 transition-all">KAYDET VE ÇIK</button></div>)}
-      {phase === 'fail' && (<div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center p-8"><div className="text-8xl mb-6 italic font-black text-slate-200">!</div><h1 className="text-2xl font-black text-slate-800 mb-2 uppercase">Tekrar Deneyelim</h1><p className="text-slate-500 mb-10 font-medium">Skor: {assessmentScore} / 10</p><div className="flex gap-4"><button onClick={onClose} className="bg-slate-100 text-slate-600 px-8 py-4 rounded-xl font-bold text-lg">KAPAT</button><button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg flex items-center gap-2"><RefreshCcw size={20}/> YENİDEN BAŞLA</button></div></div>)}
-      <AnimatePresence>{showFeedback && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[110] flex flex-col items-center justify-start pt-32 pointer-events-none"><div className={`px-10 py-5 rounded-full shadow-2xl flex items-center gap-4 ${showFeedback === 'correct' ? 'bg-green-500' : 'bg-red-500'}`}>{showFeedback === 'correct' ? (<Check size={48} className="text-white"/>) : (<><XCircle size={36} className="text-white"/><span className="text-white text-3xl font-black tracking-widest">HAYIR</span></>)}</div></motion.div>)}</AnimatePresence>
+      {/* SONUÇ EKRANLARI */}
+      {phase === 'success' && (
+        <div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center p-8">
+           <Trophy size={100} className="text-yellow-500 mb-6 animate-bounce" />
+           <h1 className="text-3xl font-black text-slate-800 mb-2 uppercase">Tamamlandı!</h1>
+           <p className="text-slate-500 mb-8 font-medium text-lg">Başarı Oranı: {assessmentScore * 10}%</p>
+           <button onClick={() => onComplete(true)} className="bg-green-600 text-white px-12 py-5 rounded-2xl font-bold text-xl shadow-xl active:scale-95 transition-all">
+             KAYDET VE ÇIK
+           </button>
+        </div>
+      )}
+
+      {phase === 'fail' && (
+        <div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center p-8">
+           <div className="text-8xl mb-6 italic font-black text-slate-200">!</div>
+           <h1 className="text-2xl font-black text-slate-800 mb-2 uppercase">Tekrar Deneyelim</h1>
+           <p className="text-slate-500 mb-10 font-medium">Skor: {assessmentScore} / 10</p>
+           <div className="flex gap-4">
+             <button onClick={onClose} className="bg-slate-100 text-slate-600 px-8 py-4 rounded-xl font-bold text-lg">KAPAT</button>
+             <button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg flex items-center gap-2">
+               <RefreshCcw size={20}/> YENİDEN BAŞLA
+             </button>
+           </div>
+        </div>
+      )}
+
+      {/* FEEDBACK OVERLAY */}
+      <AnimatePresence>
+        {showFeedback && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[110] flex flex-col items-center justify-start pt-32 pointer-events-none"
+          >
+            <div className={`
+                px-10 py-5 rounded-full shadow-2xl flex items-center gap-4
+                ${showFeedback === 'correct' ? 'bg-green-500' : 'bg-red-500'}
+            `}>
+                {showFeedback === 'correct' ? (
+                    <Check size={48} className="text-white"/> 
+                ) : (
+                    <>
+                        <XCircle size={36} className="text-white"/>
+                        <span className="text-white text-3xl font-black tracking-widest">HAYIR</span>
+                    </>
+                )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
