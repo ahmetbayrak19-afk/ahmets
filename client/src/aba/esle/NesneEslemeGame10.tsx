@@ -5,7 +5,6 @@ import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
 // --- ŞEKİL RESİMLERİ ---
-// Resimler ve bu kod dosyası AYNI klasörde (client/src/aba/esle) olduğu için:
 import daireImg from './sekildaire.jpg';
 import dikdortgenImg from './sekildikdortgen.jpg';
 import kalpImg from './sekilkalp.jpg';
@@ -15,7 +14,6 @@ import yamukImg from './sekilyamuk.jpg';
 import yildizImg from './sekilyildiz.jpg';
 
 // --- SES DOSYALARI ---
-// Ses klasörü muhtemelen bir üstte veya yanında. Hata alırsan burayı kontrol et.
 import arkaplanMusic from './ses/arkaplanmusic.mp3';
 import aferin1 from './ses/aferin1.mp3';
 import aferin2 from './ses/aferin2.mp3';
@@ -70,18 +68,15 @@ export default function NesneEslemeGame10({ mode, onClose, onComplete }: GamePro
 
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
 
-  // Arkaplan Müziği ve Scroll Reset
+  // Arkaplan Müziği
   useEffect(() => {
     window.scrollTo(0, 0);
-
     bgMusicRef.current = new Audio(arkaplanMusic);
     bgMusicRef.current.loop = true; 
     bgMusicRef.current.volume = 0.15; 
     
     if (!isMuted) {
-        bgMusicRef.current.play().catch(error => {
-            console.log("Otomatik oynatma engellendi.", error);
-        });
+        bgMusicRef.current.play().catch(() => {});
     }
 
     return () => {
@@ -198,7 +193,6 @@ export default function NesneEslemeGame10({ mode, onClose, onComplete }: GamePro
     }
 
     setTimeout(() => {
-       // Soru Geçişi
        if (mode === 'instruction') {
           const nextQ = questionIndex + 1;
           setQuestionIndex(nextQ);
@@ -264,7 +258,6 @@ export default function NesneEslemeGame10({ mode, onClose, onComplete }: GamePro
     }
   }, [assessmentCount, assessmentScore, mode]);
 
-  // Grid Stili
   const getGridClass = () => {
       if (level === 1) return "grid-cols-3";
       if (level === 2) return "grid-cols-2 max-w-[300px]"; 
@@ -274,7 +267,8 @@ export default function NesneEslemeGame10({ mode, onClose, onComplete }: GamePro
 
   return (
     <div className={twMerge(
-        "fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
+        // 🔥 DÜZELTME: h-[100dvh] ve w-screen
+        "fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
         (level === 3 && mode === 'instruction') 
             ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" 
             : "bg-slate-50"
@@ -288,7 +282,7 @@ export default function NesneEslemeGame10({ mode, onClose, onComplete }: GamePro
         
         <div className="flex items-center gap-3">
              
-             {/* --- LEVEL BUTONLARI --- */}
+             {/* LEVEL BUTONLARI */}
              {mode === 'instruction' && (
                  <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 items-center">
                      {[1, 2, 3].map(l => (
@@ -351,7 +345,8 @@ export default function NesneEslemeGame10({ mode, onClose, onComplete }: GamePro
           </div>
 
           <div className={twMerge(
-              "grid gap-3 w-full px-1 justify-items-center mx-auto",
+              // 🔥 DÜZELTME: pb-8 eklenerek en alttaki seçenekler yukarı kaydırıldı
+              "grid gap-3 w-full px-1 justify-items-center mx-auto pb-8",
               getGridClass() 
           )}>
             {options.map((item) => {
