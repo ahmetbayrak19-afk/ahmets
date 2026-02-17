@@ -162,7 +162,7 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
 
     const targetBase = getBaseId(randomTarget.id);
 
-    // ÇAKIŞMA ÖNLEME: Aynı türden olan diğerlerini (örn: anahtar3) filtrele
+    // ÇAKIŞMA ÖNLEME
     const distractors = OBJECTS.filter(item => {
         const itemBase = getBaseId(item.id);
         return item.id !== randomTarget.id && itemBase !== targetBase;
@@ -308,7 +308,8 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
 
   return (
     <div className={twMerge(
-        "fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
+        // 🔥 DÜZELTME: h-[100dvh] ve w-screen eklenerek mobil tarayıcı çubukları sorunu çözüldü
+        "fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
         (level === 3 && mode === 'instruction') 
             ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" 
             : "bg-slate-50"
@@ -322,7 +323,7 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
         
         <div className="flex items-center gap-3">
              
-             {/* --- GÜNCELLENEN KISIM: LVL BUTONLARI --- */}
+             {/* LVL BUTONLARI */}
              {mode === 'instruction' && (
                  <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 items-center">
                      {[1, 2, 3].map(l => (
@@ -385,7 +386,8 @@ export default function NesneEslemeGame2({ mode, onClose, onComplete }: GameProp
           </div>
 
           <div className={twMerge(
-              "grid gap-3 w-full px-1 justify-items-center mx-auto",
+              // 🔥 DÜZELTME: pb-8 eklenerek alt boşluk sağlandı
+              "grid gap-3 w-full px-1 justify-items-center mx-auto pb-8",
               getGridClass() 
           )}>
             {options.map((item) => {
