@@ -307,7 +307,8 @@ export default function NesneEslemeGame1({ mode, onClose, onComplete }: GameProp
 
   return (
     <div className={twMerge(
-        "fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
+        // 🔥 DÜZELTME: h-[100dvh] ve w-screen eklenerek mobil tarayıcı çubukları sorunu çözüldü
+        "fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col items-center justify-between p-4 font-sans select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
         (level === 3 && mode === 'instruction') 
             ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" 
             : "bg-slate-50"
@@ -321,7 +322,7 @@ export default function NesneEslemeGame1({ mode, onClose, onComplete }: GameProp
         
         <div className="flex items-center gap-3">
             
-            {/* --- GÜNCELLENEN KISIM: LVL 1 - LVL 2 - LVL 3 TASARIMI --- */}
+            {/* LVL 1 - LVL 2 - LVL 3 */}
             {mode === 'instruction' && (
                  <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 items-center">
                      {[1, 2, 3].map(l => (
@@ -331,8 +332,8 @@ export default function NesneEslemeGame1({ mode, onClose, onComplete }: GameProp
                             className={twMerge(
                                 "px-4 py-1.5 text-xs font-bold rounded-full transition-all",
                                 level === l 
-                                    ? "bg-white text-blue-600 shadow-sm" // Aktif: Beyaz buton, mavi yazı
-                                    : "text-slate-400 hover:text-slate-600" // Pasif: Gri yazı
+                                    ? "bg-white text-blue-600 shadow-sm" 
+                                    : "text-slate-400 hover:text-slate-600"
                             )}
                          >
                             LVL {l}
@@ -384,7 +385,8 @@ export default function NesneEslemeGame1({ mode, onClose, onComplete }: GameProp
           </div>
 
           <div className={twMerge(
-              "grid gap-3 w-full px-1 justify-items-center mx-auto",
+              // 🔥 DÜZELTME: pb-8 eklenerek en alttaki kutuların yukarı kalkması sağlandı
+              "grid gap-3 w-full px-1 justify-items-center mx-auto pb-8",
               getGridClass() 
           )}>
             {options.map((item) => {
@@ -475,7 +477,7 @@ export default function NesneEslemeGame1({ mode, onClose, onComplete }: GameProp
         </div>
       )}
 
-      {/* FEEDBACK OVERLAY (SADECE ÖĞRETİM MODUNDA) */}
+      {/* FEEDBACK OVERLAY */}
       <AnimatePresence>
         {showFeedback && (
           <motion.div 
@@ -500,4 +502,5 @@ export default function NesneEslemeGame1({ mode, onClose, onComplete }: GameProp
       </AnimatePresence>
     </div>
   );
-}
+    }
+      
