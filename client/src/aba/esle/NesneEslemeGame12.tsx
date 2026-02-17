@@ -4,6 +4,18 @@ import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, R
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
+// --- HARF LİSTESİ ---
+const LETTERS = [
+  'e', 'l', 'a', 'k', 'i', 'n', 'o', 'm', 'u', 't', 'ü', 'y', 'ö', 'r', 'ı', 'd', 's', 'b', 'z', 'ç', 'g', 'ş', 'c', 'p', 'h', 'v', 'ğ', 'f', 'j'
+];
+
+// Harfleri obje formatına çeviriyoruz
+const OBJECTS = LETTERS.map(char => ({
+  id: char,
+  name: char.toUpperCase(), 
+  text: char
+}));
+
 // --- SES DOSYALARI ---
 import arkaplanMusic from './ses/arkaplanmusic.mp3';
 import aferin1 from './ses/aferin1.mp3';
@@ -18,19 +30,6 @@ import tekrardene2 from './ses/tekrardene2.mp3';
 // --- SES HAVUZLARI ---
 const POSITIVE_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
 const NEGATIVE_SOUNDS = [tekrardene1, tekrardene2];
-
-// --- HARF LİSTESİ ---
-// Not: MEB müfredatına uygun harfler. İstersen burayı değiştirebilirsin.
-const LETTERS = [
-  'e', 'l', 'a', 'k', 'i', 'n', 'o', 'm', 'u', 't', 'ü', 'y', 'ö', 'r', 'ı', 'd', 's', 'b', 'z', 'ç', 'g', 'ş', 'c', 'p', 'h', 'v', 'ğ', 'f', 'j'
-];
-
-// Harfleri obje formatına çeviriyoruz
-const OBJECTS = LETTERS.map(char => ({
-  id: char,
-  name: char.toUpperCase(), // İpucu olarak büyük harf görünebilir veya kullanılabilir
-  text: char
-}));
 
 interface GameProps {
   mode: 'assessment' | 'instruction';
@@ -61,10 +60,9 @@ export default function NesneEslemeGame12({ mode, onClose, onComplete }: GamePro
 
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
 
-  // Arkaplan Müziği ve Scroll Reset
+  // Arkaplan Müziği
   useEffect(() => {
     window.scrollTo(0, 0);
-
     bgMusicRef.current = new Audio(arkaplanMusic);
     bgMusicRef.current.loop = true; 
     bgMusicRef.current.volume = 0.15; 
@@ -115,7 +113,6 @@ export default function NesneEslemeGame12({ mode, onClose, onComplete }: GamePro
   const generateQuestion = () => {
     const randomTarget = OBJECTS[Math.floor(Math.random() * OBJECTS.length)];
     
-    // Level'a göre seçenek sayısı
     let optionCount = 3; 
     if (level === 2) optionCount = 4;
     if (level === 3) optionCount = 6;
@@ -189,7 +186,6 @@ export default function NesneEslemeGame12({ mode, onClose, onComplete }: GamePro
     }
 
     setTimeout(() => {
-       // Soru Geçişi
        if (mode === 'instruction') {
           const nextQ = questionIndex + 1;
           setQuestionIndex(nextQ);
@@ -255,7 +251,6 @@ export default function NesneEslemeGame12({ mode, onClose, onComplete }: GamePro
     }
   }, [assessmentCount, assessmentScore, mode]);
 
-  // Grid Stili
   const getGridClass = () => {
       if (level === 1) return "grid-cols-3";
       if (level === 2) return "grid-cols-2 max-w-[300px]"; 
@@ -263,15 +258,14 @@ export default function NesneEslemeGame12({ mode, onClose, onComplete }: GamePro
       return "grid-cols-3";
   };
 
-  // Harf Stili (MEB fontu için Comic Sans veya benzeri)
-  // Bu font ailesi 'a' harfini yuvarlak (single-story) gösterir.
   const fontStyle = {
       fontFamily: '"Comic Sans MS", "Chalkboard SE", "Comic Neue", sans-serif'
   };
 
   return (
     <div className={twMerge(
-        "fixed inset-0 z-[100] flex flex-col items-center justify-between p-4 select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
+        // 🔥 DÜZELTME: h-[100dvh] ve w-screen
+        "fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col items-center justify-between p-4 select-none overflow-hidden touch-none overscroll-none text-slate-800 transition-colors duration-1000",
         (level === 3 && mode === 'instruction') 
             ? "bg-slate-100 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" 
             : "bg-slate-50"
@@ -285,7 +279,7 @@ export default function NesneEslemeGame12({ mode, onClose, onComplete }: GamePro
         
         <div className="flex items-center gap-3">
              
-             {/* --- LEVEL BUTONLARI --- */}
+             {/* --- LEVEL BUTONLARI (Kapsül Tasarım) --- */}
              {mode === 'instruction' && (
                  <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 items-center">
                      {[1, 2, 3].map(l => (
@@ -315,7 +309,6 @@ export default function NesneEslemeGame12({ mode, onClose, onComplete }: GamePro
                 </span>
             </div>
             
-            {/* Ses Butonu */}
             <button onClick={() => setIsMuted(!isMuted)} className="p-2 bg-white border rounded-full shadow-sm active:scale-95">
                  {isMuted ? <VolumeX size={20} className="text-slate-400"/> : <Volume2 size={20} className="text-blue-500"/>}
             </button>
@@ -335,7 +328,7 @@ export default function NesneEslemeGame12({ mode, onClose, onComplete }: GamePro
                     isMatched ? "border-green-500 bg-green-50 border-solid" : "border-slate-300"
                 )}
             >
-               {/* HARF (TEXT) GÖSTERİMİ */}
+               {/* HARF */}
                <span 
                  style={fontStyle}
                  className={twMerge(
@@ -350,7 +343,8 @@ export default function NesneEslemeGame12({ mode, onClose, onComplete }: GamePro
           </div>
 
           <div className={twMerge(
-              "grid gap-3 w-full px-1 justify-items-center mx-auto",
+              // 🔥 DÜZELTME: pb-8 eklenerek en alttaki harfler yukarı kaydırıldı
+              "grid gap-3 w-full px-1 justify-items-center mx-auto pb-8",
               getGridClass() 
           )}>
             {options.map((item) => {
