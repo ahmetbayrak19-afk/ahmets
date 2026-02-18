@@ -1,17 +1,25 @@
 import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import * as THREE from "three";
-
-// Modeli import et (tıpkı resim/ses dosyaları gibi)
 import balikModel from './balik.glb';
 
 export function Fish3D({ fishRef }: { fishRef: any }) {
-  const { scene } = useGLTF(balikModel);  // direkt import edilen değişkeni kullan
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const { scene, error } = useGLTF(balikModel);
   const meshRef = useRef<THREE.Group>(null);
+  const fallbackRef = useRef<THREE.Mesh>(null);
 
+  // Model yükleme hatası kontrolü
   useEffect(() => {
-    if (scene) {
+    if (error) {
+      console.error('❌ useGLTF hatası:', error);
+      setLoadError(error.message);
+      alert('Model yüklenemedi, yedek küre gösteriliyor: ' + error.message);
+    } else if (scene) {
+      console.log('✅ Model yüklendi:', balikModel);
+      setLoadError(null);
+      // Gölge ayarları
       scene.traverse((child: any) => {
         if (child.isMesh) {
           child.castShadow = true;
@@ -19,25 +27,39 @@ export function Fish3D({ fishRef }: { fishRef: any }) {
         }
       });
     }
-  }, [scene]);
+  }, [scene, error]);
 
+  // Hareket (hem model hem yedek küre için)
   useFrame(() => {
-    if (!meshRef.current || !fishRef.current) return;
-    
+    if (!fishRef.current) return;
     const fish = fishRef.current;
-    const SCALE_FACTOR = 0.015; 
+    const SCALE_FACTOR = 0.015;
 
-    meshRef.current.position.x = fish.x * SCALE_FACTOR;
-    meshRef.current.position.y = -fish.y * SCALE_FACTOR; 
-    meshRef.current.position.z = 0; 
-
-    const targetY = fish.lastDirection === 1 ? Math.PI / 2 : -Math.PI / 2;
-    meshRef.current.rotation.y += (targetY - meshRef.current.rotation.y) * 0.1;
-    
-    const targetZ = fish.rotation * (Math.PI / 180);
-    meshRef.current.rotation.z = targetZ;
+    // Model varsa onu hareket ettir
+    if (!loadError && meshRef.current) {
+      meshRef.current.position.x = fish.x * SCALE_FACTOR;
+      meshRef.current.position.y = -fish.y * SCALE_FACTOR;
+      meshRef.current.rotation.y = fish.lastDirection === 1 ? Math.PI/2 : -Math.PI/2;
+      meshRef.current.rotation.z = fish.rotation * (Math.PI/180);
+    }
+    // Yedek küre varsa onu hareket ettir
+    if (loadError && fallbackRef.current) {
+      fallbackRef.current.position.x = fish.x * SCALE_FACTOR;
+      fallbackRef.current.position.y = -fish.y * SCALE_FACTOR;
+    }
   });
 
+  // Hata varsa kocaman kırmızı bir küre göster
+  if (loadError) {
+    return (
+      <mesh ref={fallbackRef} scale={2.0}>
+        <sphereGeometry args={[1, 32, 16]} />
+        <meshStandardMaterial color="red" emissive="darkred" />
+      </mesh>
+    );
+  }
+
+  // Model yüklendiyse onu göster
   return <primitive object={scene} ref={meshRef} scale={5.0} />;
 }
 
