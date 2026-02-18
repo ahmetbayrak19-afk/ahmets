@@ -3,33 +3,20 @@ import { useRef } from "react";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 
-// ⚠️ DİKKAT: Dosya 'public/models' klasöründe olduğu için
-// build alındığında 'dist/models' içine gider.
-// Başındaki nokta (.) çok önemli, APK içinde "bulunduğun klasörden ara" demektir.
+// Modelin Yeri: client/public/models/balik.glb
 const MODEL_PATH = './models/balik.glb';
 
-interface Fish3DProps {
-  fishRef: React.MutableRefObject<{
-    x: number;
-    y: number;
-    rotation: number;
-    lastDirection: number;
-  }>;
-}
-
-export function Fish3D({ fishRef }: Fish3DProps) {
+export function Fish3D({ fishRef }: { fishRef: any }) {
   const meshRef = useRef<THREE.Group>(null);
 
-  // 1. Modeli Yükle
-  // Import kullanmıyoruz, direkt string path veriyoruz.
-  // Bu sayede "Could not resolve" hatası ALMAZSIN.
-  const { scene } = useGLTF(MODEL_PATH);
+  // 🔥 KRİTİK NOKTA 🔥
+  // 1. Parametre: Modelin yolu ('./models/balik.glb')
+  // 2. Parametre: Draco Decoder yolu ('./') -> Çünkü dosyaları direkt public içine attın.
+  const { scene } = useGLTF(MODEL_PATH, './');
 
-  // 2. Sahneyi Klonla
-  // Aynı balıktan birden fazla olursa veya sahne yönetimi için klonlamak şarttır.
+  // Sahne yönetimi için klonluyoruz
   const clone = scene.clone();
 
-  // 3. Animasyon Döngüsü
   useFrame(() => {
     if (!meshRef.current || !fishRef.current) return;
     
@@ -39,25 +26,22 @@ export function Fish3D({ fishRef }: Fish3DProps) {
     // Pozisyon
     meshRef.current.position.x = fish.x * SCALE_FACTOR;
     meshRef.current.position.y = -fish.y * SCALE_FACTOR;
-
-    // Yön (Sağ/Sol)
+    
+    // Yön
     meshRef.current.rotation.y = fish.lastDirection === 1 ? Math.PI / 2 : -Math.PI / 2;
-
-    // Dönüş (Açı)
+    
+    // Dönüş
     meshRef.current.rotation.z = fish.rotation * (Math.PI / 180);
   });
 
-  // 4. Render
   return (
     <primitive 
       object={clone} 
       ref={meshRef} 
-      scale={5.0} // Balığın boyutunu buradan ayarla
+      scale={5.0} 
     />
   );
 }
 
-// 5. Ön Yükleme (Preload)
-// Modeli önceden hafızaya alır, takılmayı önler.
-useGLTF.preload(MODEL_PATH);
-      
+// Ön Yükleme (Decoder yoluyla birlikte)
+useGLTF.preload(MODEL_PATH, './');
