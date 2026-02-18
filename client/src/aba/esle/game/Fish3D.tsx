@@ -1,14 +1,15 @@
 import { useFrame } from "@react-three/fiber";
-import { useRef, useEffect } from "react";
+import { useRef } from "react";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 
-// 👇 ÖNEMLİ: Dosya yolunu senin klasör yapına göre ayarla.
-// Eğer bu dosya 'client/src/components' içindeyse ve model 'client/src/assets' içindeyse:
-// '../assets/balik.glb' doğru yoldur.
-import balikModelUrl from '../assets/balik.glb'; 
+// 👇 MANUEL HESAPLANMIŞ DOĞRU YOL
+// game -> esle (1 geri)
+// esle -> aba (2 geri)
+// aba -> src (3 geri)
+// src -> assets -> balik.glb
+import balikModelUrl from '../../../assets/balik.glb'; 
 
-// TypeScript için prop tipleri
 interface Fish3DProps {
   fishRef: React.MutableRefObject<{
     x: number;
@@ -21,41 +22,37 @@ interface Fish3DProps {
 export function Fish3D({ fishRef }: Fish3DProps) {
   const meshRef = useRef<THREE.Group>(null);
 
-  // 1. Modeli Yükle (useGLTF otomatik cache yapar ve Suspense tetikler)
+  // Modeli yükle
   const { scene } = useGLTF(balikModelUrl);
 
-  // 2. Modeli Klonla (Her balık için bağımsız bir kopya oluşturur)
-  // useMemo gerekmez, useGLTF zaten optimize eder ama sahne klonlamak iyidir.
+  // Klonla (Sorunsuz render için)
   const clone = scene.clone();
 
-  // 3. Animasyon Döngüsü (Her karede çalışır)
   useFrame(() => {
     if (!meshRef.current || !fishRef.current) return;
     
     const fish = fishRef.current;
-    const SCALE_FACTOR = 0.015; // Balığın ekrandaki hareket hızı/oranı
+    const SCALE_FACTOR = 0.015;
 
-    // Pozisyon Güncelleme
     meshRef.current.position.x = fish.x * SCALE_FACTOR;
     meshRef.current.position.y = -fish.y * SCALE_FACTOR;
-
-    // Yön (Sağ/Sol) Güncelleme
-    // lastDirection 1 ise sağa, -1 ise sola bakar
+    
+    // Yön (Sağa/Sola bakma)
     meshRef.current.rotation.y = fish.lastDirection === 1 ? Math.PI / 2 : -Math.PI / 2;
-
-    // Dönüş (Açı) Güncelleme
+    
+    // Dönüş (Açı)
     meshRef.current.rotation.z = fish.rotation * (Math.PI / 180);
   });
 
-  // 4. Sahneye Yerleştir
   return (
     <primitive 
       object={clone} 
       ref={meshRef} 
-      scale={5.0} // Balığın boyutu (ihtiyaca göre değiştir)
+      scale={5.0} 
     />
   );
 }
 
-// Performans İpucu: Modeli önceden yüklemesi için tarayıcıya/webview'a sinyal gönderir.
+// Preload yapalım ki takılmasın
 useGLTF.preload(balikModelUrl);
+    
