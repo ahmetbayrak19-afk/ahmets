@@ -1,22 +1,67 @@
-import { useGLTF, Html } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useRef, useEffect, useState } from "react";
 import * as THREE from "three";
-import balikModel from './balik.glb';
 
 export function Fish3D({ fishRef }: { fishRef: any }) {
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const { scene, error } = useGLTF(balikModel);
+  const [modelUrl, setModelUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const meshRef = useRef<THREE.Group>(null);
 
   useEffect(() => {
-    console.log('📍 Model URL:', balikModel); // konsola yaz
-    if (error) {
-      console.error('❌ useGLTF hatası:', error);
-      setLoadError(error.message || 'Bilinmeyen hata');
-    } else if (scene) {
-      console.log('✅ Model yüklendi');
-      setLoadError(null);
+    // APK içinde denenebilecek tüm olası yollar
+    const candidatePaths = [
+      '/models/balik.glb',
+      '/assets/models/balik.glb',
+      '/assets/assets/models/balik.glb',
+      '/public/models/balik.glb',
+      'models/balik.glb',
+      './models/balik.glb',
+      'assets/models/balik.glb',
+      './assets/models/balik.glb',
+      'file:///android_asset/models/balik.glb',
+      'file:///android_asset/public/models/balik.glb',
+      'file:///android_asset/assets/models/balik.glb',
+    ];
+
+    let isMounted = true;
+
+    const tryPaths = async () => {
+      for (const path of candidatePaths) {
+        try {
+          const response = await fetch(path, { method: 'HEAD' });
+          if (response.ok) {
+            // Dosya bulundu, şimdi tam fetch yap
+            const fullResponse = await fetch(path);
+            const blob = await fullResponse.blob();
+            if (!isMounted) return;
+            const url = URL.createObjectURL(blob);
+            setModelUrl(url);
+            console.log('✅ Model yüklendi:', path, '->', url);
+            return;
+          }
+        } catch (err) {
+          // sessizce devam et
+        }
+      }
+      // Hiçbir yol çalışmadı
+      if (isMounted) {
+        setError('Model dosyası bulunamadı');
+      }
+    };
+
+    tryPaths();
+
+    return () => {
+      isMounted = false;
+      if (modelUrl) URL.revokeObjectURL(modelUrl);
+    };
+  }, []);
+
+  const { scene } = useGLTF(modelUrl || '');
+
+  useEffect(() => {
+    if (scene) {
       scene.traverse((child: any) => {
         if (child.isMesh) {
           child.castShadow = true;
@@ -24,45 +69,30 @@ export function Fish3D({ fishRef }: { fishRef: any }) {
         }
       });
     }
-  }, [scene, error]);
+  }, [scene]);
 
   useFrame(() => {
-    if (!fishRef.current) return;
+    if (!meshRef.current || !fishRef.current) return;
     const fish = fishRef.current;
     const SCALE_FACTOR = 0.015;
-
-    if (!loadError && meshRef.current) {
-      meshRef.current.position.x = fish.x * SCALE_FACTOR;
-      meshRef.current.position.y = -fish.y * SCALE_FACTOR;
-      meshRef.current.rotation.y = fish.lastDirection === 1 ? Math.PI/2 : -Math.PI/2;
-      meshRef.current.rotation.z = fish.rotation * (Math.PI/180);
-    }
+    meshRef.current.position.x = fish.x * SCALE_FACTOR;
+    meshRef.current.position.y = -fish.y * SCALE_FACTOR;
+    meshRef.current.rotation.y = fish.lastDirection === 1 ? Math.PI / 2 : -Math.PI / 2;
+    meshRef.current.rotation.z = fish.rotation * (Math.PI / 180);
   });
 
-  // Hata varsa ekrana yazı bas
-  if (loadError) {
+  if (error) {
     return (
-      <Html center>
-        <div style={{
-          background: 'rgba(255,0,0,0.8)',
-          color: 'white',
-          padding: '20px',
-          borderRadius: '10px',
-          fontSize: '24px',
-          fontWeight: 'bold',
-          maxWidth: '300px',
-          textAlign: 'center'
-        }}>
-          ❌ Model yüklenemedi<br/>
-          <span style={{ fontSize: '16px' }}>{loadError}</span><br/>
-          <span style={{ fontSize: '14px' }}>Dosya: {balikModel}</span>
-        </div>
-      </Html>
+      <mesh position={[0, 0, 0]} scale={2}>
+        <boxGeometry args={[2, 2, 2]} />
+        <meshStandardMaterial color="red" />
+      </mesh>
     );
   }
 
-  // Normal model
-  return <primitive object={scene} ref={meshRef} scale={5.0} />;
-}
+  if (!modelUrl) {
+    return null; // veya bir yükleniyor göstergesi
+  }
 
-useGLTF.preload(balikModel);
+  return <primitive object={scene} ref={meshRef} scale={5.0} />;
+                 }
