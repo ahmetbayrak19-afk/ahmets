@@ -1,39 +1,17 @@
 import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect } from "react";
 import * as THREE from "three";
 
-// Bu satırı her denemede değiştir
-const FISH_URL = "/models/balik.glb";
+// Modeli import et (tıpkı resim/ses dosyaları gibi)
+import balikModel from './balik.glb';
 
 export function Fish3D({ fishRef }: { fishRef: any }) {
-  const [loadError, setLoadError] = useState(null);
-  const { scene, error } = useGLTF(FISH_URL);
+  const { scene } = useGLTF(balikModel);  // direkt import edilen değişkeni kullan
   const meshRef = useRef<THREE.Group>(null);
 
-  // Fetch ile dosya erişimini test et
   useEffect(() => {
-    fetch(FISH_URL)
-      .then(res => {
-        if (!res.ok) {
-          console.error(`❌ HTTP ${res.status}: ${FISH_URL}`);
-          setLoadError(`HTTP ${res.status}`);
-        } else {
-          console.log(`✅ Dosya bulundu: ${FISH_URL}, boyut: ${res.headers.get('content-length')}`);
-        }
-      })
-      .catch(err => {
-        console.error(`❌ Fetch hatası: ${FISH_URL}`, err);
-        setLoadError(err.message);
-      });
-  }, []);
-
-  useEffect(() => {
-    if (error) {
-      console.error("❌ useGLTF hatası:", error);
-      alert("useGLTF hatası: " + error.message);
-    } else if (scene) {
-      console.log("✅ useGLTF yüklendi:", FISH_URL);
+    if (scene) {
       scene.traverse((child: any) => {
         if (child.isMesh) {
           child.castShadow = true;
@@ -41,10 +19,11 @@ export function Fish3D({ fishRef }: { fishRef: any }) {
         }
       });
     }
-  }, [scene, error]);
+  }, [scene]);
 
   useFrame(() => {
     if (!meshRef.current || !fishRef.current) return;
+    
     const fish = fishRef.current;
     const SCALE_FACTOR = 0.015; 
 
@@ -62,4 +41,4 @@ export function Fish3D({ fishRef }: { fishRef: any }) {
   return <primitive object={scene} ref={meshRef} scale={5.0} />;
 }
 
-useGLTF.preload(FISH_URL);
+useGLTF.preload(balikModel);
