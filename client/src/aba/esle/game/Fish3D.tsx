@@ -1,25 +1,16 @@
 import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect } from "react";
 import * as THREE from "three";
-import balikModel from './balik.glb';
+
+const FISH_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/cartoon%20fish%203d%20model.glb?alt=media&token=537af2d2-8ae8-4c9e-bff5-3c86368c658c";
 
 export function Fish3D({ fishRef }: { fishRef: any }) {
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const { scene, error } = useGLTF(balikModel);
+  const { scene } = useGLTF(FISH_URL);
   const meshRef = useRef<THREE.Group>(null);
-  const fallbackRef = useRef<THREE.Mesh>(null);
 
-  // Model yükleme hatası kontrolü
   useEffect(() => {
-    if (error) {
-      console.error('❌ useGLTF hatası:', error);
-      setLoadError(error.message);
-      alert('Model yüklenemedi, yedek küre gösteriliyor: ' + error.message);
-    } else if (scene) {
-      console.log('✅ Model yüklendi:', balikModel);
-      setLoadError(null);
-      // Gölge ayarları
+    if (scene) {
       scene.traverse((child: any) => {
         if (child.isMesh) {
           child.castShadow = true;
@@ -27,40 +18,27 @@ export function Fish3D({ fishRef }: { fishRef: any }) {
         }
       });
     }
-  }, [scene, error]);
+  }, [scene]);
 
-  // Hareket (hem model hem yedek küre için)
   useFrame(() => {
-    if (!fishRef.current) return;
+    if (!meshRef.current || !fishRef.current) return;
+    
     const fish = fishRef.current;
-    const SCALE_FACTOR = 0.015;
+    const SCALE_FACTOR = 0.015; 
 
-    // Model varsa onu hareket ettir
-    if (!loadError && meshRef.current) {
-      meshRef.current.position.x = fish.x * SCALE_FACTOR;
-      meshRef.current.position.y = -fish.y * SCALE_FACTOR;
-      meshRef.current.rotation.y = fish.lastDirection === 1 ? Math.PI/2 : -Math.PI/2;
-      meshRef.current.rotation.z = fish.rotation * (Math.PI/180);
-    }
-    // Yedek küre varsa onu hareket ettir
-    if (loadError && fallbackRef.current) {
-      fallbackRef.current.position.x = fish.x * SCALE_FACTOR;
-      fallbackRef.current.position.y = -fish.y * SCALE_FACTOR;
-    }
+    meshRef.current.position.x = fish.x * SCALE_FACTOR;
+    meshRef.current.position.y = -fish.y * SCALE_FACTOR; 
+    meshRef.current.position.z = 0; 
+
+    const targetY = fish.lastDirection === 1 ? Math.PI / 2 : -Math.PI / 2;
+    meshRef.current.rotation.y += (targetY - meshRef.current.rotation.y) * 0.1;
+    
+    const targetZ = fish.rotation * (Math.PI / 180);
+    meshRef.current.rotation.z = targetZ;
   });
 
-  // Hata varsa kocaman kırmızı bir küre göster
-  if (loadError) {
-    return (
-      <mesh ref={fallbackRef} scale={2.0}>
-        <sphereGeometry args={[1, 32, 16]} />
-        <meshStandardMaterial color="red" emissive="darkred" />
-      </mesh>
-    );
-  }
-
-  // Model yüklendiyse onu göster
+  // 🔥 GÜNCELLEME: Boyut 2 katına çıktı (2.5 -> 5.0)
   return <primitive object={scene} ref={meshRef} scale={5.0} />;
 }
 
-useGLTF.preload(balikModel);
+useGLTF.preload(FISH_URL);
