@@ -1,16 +1,22 @@
-import { useGLTF } from "@react-three/drei";
+import { useGLTF, Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import * as THREE from "three";
-
-const FISH_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/cartoon%20fish%203d%20model.glb?alt=media&token=537af2d2-8ae8-4c9e-bff5-3c86368c658c";
+import balikModel from './balik.glb';
 
 export function Fish3D({ fishRef }: { fishRef: any }) {
-  const { scene } = useGLTF(FISH_URL);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const { scene, error } = useGLTF(balikModel);
   const meshRef = useRef<THREE.Group>(null);
 
   useEffect(() => {
-    if (scene) {
+    console.log('📍 Model URL:', balikModel); // konsola yaz
+    if (error) {
+      console.error('❌ useGLTF hatası:', error);
+      setLoadError(error.message || 'Bilinmeyen hata');
+    } else if (scene) {
+      console.log('✅ Model yüklendi');
+      setLoadError(null);
       scene.traverse((child: any) => {
         if (child.isMesh) {
           child.castShadow = true;
@@ -18,27 +24,45 @@ export function Fish3D({ fishRef }: { fishRef: any }) {
         }
       });
     }
-  }, [scene]);
+  }, [scene, error]);
 
   useFrame(() => {
-    if (!meshRef.current || !fishRef.current) return;
-    
+    if (!fishRef.current) return;
     const fish = fishRef.current;
-    const SCALE_FACTOR = 0.015; 
+    const SCALE_FACTOR = 0.015;
 
-    meshRef.current.position.x = fish.x * SCALE_FACTOR;
-    meshRef.current.position.y = -fish.y * SCALE_FACTOR; 
-    meshRef.current.position.z = 0; 
-
-    const targetY = fish.lastDirection === 1 ? Math.PI / 2 : -Math.PI / 2;
-    meshRef.current.rotation.y += (targetY - meshRef.current.rotation.y) * 0.1;
-    
-    const targetZ = fish.rotation * (Math.PI / 180);
-    meshRef.current.rotation.z = targetZ;
+    if (!loadError && meshRef.current) {
+      meshRef.current.position.x = fish.x * SCALE_FACTOR;
+      meshRef.current.position.y = -fish.y * SCALE_FACTOR;
+      meshRef.current.rotation.y = fish.lastDirection === 1 ? Math.PI/2 : -Math.PI/2;
+      meshRef.current.rotation.z = fish.rotation * (Math.PI/180);
+    }
   });
 
-  // 🔥 GÜNCELLEME: Boyut 2 katına çıktı (2.5 -> 5.0)
+  // Hata varsa ekrana yazı bas
+  if (loadError) {
+    return (
+      <Html center>
+        <div style={{
+          background: 'rgba(255,0,0,0.8)',
+          color: 'white',
+          padding: '20px',
+          borderRadius: '10px',
+          fontSize: '24px',
+          fontWeight: 'bold',
+          maxWidth: '300px',
+          textAlign: 'center'
+        }}>
+          ❌ Model yüklenemedi<br/>
+          <span style={{ fontSize: '16px' }}>{loadError}</span><br/>
+          <span style={{ fontSize: '14px' }}>Dosya: {balikModel}</span>
+        </div>
+      </Html>
+    );
+  }
+
+  // Normal model
   return <primitive object={scene} ref={meshRef} scale={5.0} />;
 }
 
-useGLTF.preload(FISH_URL);
+useGLTF.preload(balikModel);
