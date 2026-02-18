@@ -1,16 +1,8 @@
 import { useFrame } from "@react-three/fiber";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
-
-/**
- * Bu sürüm "Suspense'e teslim olmaz".
- * - Local URL takılırsa tüm sahneyi kilitlemez.
- * - Hangi path'in çalıştığını / neden çalışmadığını ekrana basar.
- *
- * Not: Bu dosya yalnız başına yeterli. DenizBackground'te Suspense olsa bile,
- * Fish3D artık Suspense tetiklemediği için tüm sahneyi karartmaz.
- */
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 
 type FishState = {
   x: number;
@@ -27,11 +19,8 @@ export function Fish3D({
   const groupRef = useRef<THREE.Group>(null);
 
   const [model, setModel] = useState<THREE.Group | null>(null);
-  const [status, setStatus] = useState<string>("init");
   const [pickedUrl, setPickedUrl] = useState<string | null>(null);
 
-  // APK içinde sen "assets/models" gördüm dediğin için o path'leri de deniyoruz.
-  // Sıra önemli: önce en olasılar.
   const candidates = useMemo(
     () => [
       "models/balik.glb",
@@ -47,8 +36,14 @@ export function Fish3D({
   useEffect(() => {
     let cancelled = false;
 
+    // 1) GLTF + DRACO loader kur
     const loader = new GLTFLoader();
-    loader.setCrossOrigin("anonymous");
+    const dracoLoader = new DRACOLoader();
+
+    // 2) Draco decoder'ı CDN'den al (internet varsa en sorunsuz test)
+    // Alternatif CDN gerekirse: https://unpkg.com/three@0.160.0/examples/jsm/libs/draco/
+    dracoLoader.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
+    loader.setDRACOLoader(dracoLoader);
 
     const tryOne = (url: string) =>
       new Promise<THREE.Group>((resolve, reject) => {
@@ -61,33 +56,28 @@ export function Fish3D({
       });
 
     (async () => {
-      setStatus("loading…");
       for (const url of candidates) {
         try {
           const scene = await tryOne(url);
           if (cancelled) return;
 
-          // Model geldi: klonlayıp state'e koy.
           const cloned = scene.clone(true);
           setModel(cloned);
           setPickedUrl(url);
-          setStatus("loaded ✅");
+
+          console.log("✅ Fish GLB loaded from:", url);
           return;
         } catch (e: any) {
-          // Sıradaki URL'ye geç
-          // (Burada console'a da basıyoruz ki logcat/remote debug'da görünsün.)
-          // eslint-disable-next-line no-console
-          console.warn("GLB load failed:", url, e?.message || e);
+          console.warn("❌ GLB load failed:", url, e?.message || e);
         }
       }
 
-      if (!cancelled) {
-        setStatus("FAILED ❌ (hiçbir URL yüklenmedi)");
-      }
+      console.error("❌ Fish GLB: hiçbir path yüklenmedi.");
     })();
 
     return () => {
       cancelled = true;
+      dracoLoader.dispose();
     };
   }, [candidates]);
 
@@ -104,19 +94,14 @@ export function Fish3D({
     groupRef.current.rotation.z = fish.rotation * (Math.PI / 180);
   });
 
-  // Model yoksa: sahnede KIRMIZI KÜP + Debug yazısı göster.
   if (!model) {
+    // Model yok → kırmızı küp
     return (
       <group ref={groupRef}>
         <mesh scale={[2, 2, 2]}>
           <boxGeometry args={[1, 1, 1]} />
           <meshStandardMaterial color="red" />
         </mesh>
-
-        {/* Basit 3D yazı yerine, debug için console + status yeterli.
-            Eğer ekranda görmek istersen Html kullanırız ama şimdilik kodu minimal tuttum. */}
-        {/* Status’i en azından console’dan takip edeceksin. */}
-        {process.env.NODE_ENV !== "production" ? null : null}
       </group>
     );
   }
@@ -124,9 +109,7 @@ export function Fish3D({
   return (
     <group ref={groupRef}>
       <primitive object={model} scale={5.0} />
-      {/* Hangi URL çalıştı diye console'a basalım */}
-      {/* eslint-disable-next-line no-console */}
-      {pickedUrl ? console.log("Fish GLB loaded from:", pickedUrl) : null}
+      {pickedUrl ? null : null}
     </group>
   );
 }
