@@ -5,13 +5,13 @@ import * as THREE from "three";
 import { Water } from "three-stdlib";
 import { Fish3D } from "./Fish3D";
 
-// 🔥 DÜZELTME: Artık Firebase linki yok, doğrudan yerel dosyayı okuyoruz!
-const DENIZ_GLB_URL = "/models/deniz.glb";
+// 🔥 İŞTE BURADA: Denizi doğrudan import ediyoruz!
+import denizModelUrl from "./deniz.glb";
+
 const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/water/Water_1_M_Normal.jpg";
 
 extend({ Water });
 
-// --- RENK VE SİS ---
 function BackgroundManager({ cameraRef }: { cameraRef: any }) {
   const { scene } = useThree();
   const tempColor = useMemo(() => new THREE.Color(), []);
@@ -35,18 +35,14 @@ function BackgroundManager({ cameraRef }: { cameraRef: any }) {
   return null;
 }
 
-// --- KAMERA RİGİ - BALIK TAKİBİ ---
 function CameraRig({ fishRef }: { fishRef: any }) {
   useFrame((state) => {
     if (!fishRef.current) return;
     const SCALE = 0.015;
     const fish = fishRef.current;
-
-    // Balığın 3D konumu
     const targetX = fish.x * SCALE;
     const targetY = (-fish.y * SCALE) + 2; 
 
-    // Takip Hızı
     state.camera.position.x += (targetX - state.camera.position.x) * 0.1;
     state.camera.position.y += (targetY - state.camera.position.y) * 0.1;
     state.camera.lookAt(targetX, targetY, 0);
@@ -54,10 +50,9 @@ function CameraRig({ fishRef }: { fishRef: any }) {
   return null;
 }
 
-// --- OKYANUS (ÇİFT KATMAN) ---
 function Ocean() {
   const refTop = useRef<any>();
-  const refBottom = useRef<any>(); // İkinci yüzey için referans
+  const refBottom = useRef<any>(); 
   const gl = useThree((s) => s.gl);
   const waterNormals = useLoader(THREE.TextureLoader, WATER_NORMALS_URL);
   
@@ -73,7 +68,6 @@ function Ocean() {
     }), [waterNormals, gl.outputColorSpace]);
 
   useFrame((_, delta) => {
-    // Hem üst hem alt yüzeyi hareketlendir
     const t = delta * 0.5;
     if (refTop.current) refTop.current.material.uniforms.time.value += t;
     if (refBottom.current) refBottom.current.material.uniforms.time.value += t;
@@ -81,31 +75,26 @@ function Ocean() {
 
   return (
     <group position={[0, 15, 0]}>
-      {/* ÜST YÜZEY (Havadan bakınca görünen) */}
       {/* @ts-ignore */}
       <water ref={refTop} args={[new THREE.PlaneGeometry(20000, 20000), config]} rotation={[-Math.PI / 2, 0, 0]} />
-      
-      {/* ALT YÜZEY (Sudan yukarı bakınca görünen - TERS) */}
       {/* @ts-ignore */}
       <water 
         ref={refBottom} 
         args={[new THREE.PlaneGeometry(20000, 20000), config]} 
-        rotation={[Math.PI / 2, 0, 0]} // Tam tersine dönük
-        position={[0, -0.05, 0]}       // Minimal boşluk
+        rotation={[Math.PI / 2, 0, 0]} 
+        position={[0, -0.05, 0]}       
       />
     </group>
   );
 }
 
-// --- DENİZ DİBİ MODELİ ---
 function DenizModel() {
-  const { scene } = useGLTF(DENIZ_GLB_URL);
-  // Modelin sahnede düzgün çalışması için bir kopyasını (clone) alıyoruz
+  // Import ettiğimiz değişkeni kullanıyoruz
+  const { scene } = useGLTF(denizModelUrl);
   const clone = useMemo(() => scene.clone(), [scene]);
   return <primitive object={clone} scale={[5, 5, 5]} position={[0, -20, -10]} rotation={[0, -Math.PI / 2, 0]} />;
 }
 
-// --- ANA COMPONENT ---
 export default function DenizBackground({ cameraRef, fishRef }: { cameraRef: any, fishRef: any }) {
   return (
     <div className="absolute inset-0 bg-black">
@@ -116,7 +105,6 @@ export default function DenizBackground({ cameraRef, fishRef }: { cameraRef: any
         gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
       >
         <Environment preset="city" background={false} />
-        
         <BackgroundManager cameraRef={cameraRef} />
         <CameraRig fishRef={fishRef} />
 
@@ -133,6 +121,6 @@ export default function DenizBackground({ cameraRef, fishRef }: { cameraRef: any
   );
 }
 
-// Oyuna girerken bekleme olmasın diye denizi önceden yüklüyoruz
-useGLTF.preload(DENIZ_GLB_URL);
+// Preload kısmına da aynı değişkeni veriyoruz
+useGLTF.preload(denizModelUrl);
       
