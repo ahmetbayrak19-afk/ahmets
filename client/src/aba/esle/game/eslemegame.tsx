@@ -1,19 +1,18 @@
-import React, { Suspense } from "react";
-import { Canvas } from "@react-three/fiber";
-import { useGLTF, OrbitControls, Environment } from "@react-three/drei";
+import React, { Suspense } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { useGLTF, OrbitControls, Environment } from '@react-three/drei';
 
-// 🔥 BALIK MODELİNİ BURADAN ÇEKİYORUZ
-// Not: balik.glb dosyasının EslemeGame.tsx ile aynı klasörde olduğundan emin ol!
-import balikModelUrl from "./balik.glb";
+// 🔥 İŞTE O SİHİRLİ SATIR: Sonuna ?url ekleyerek dosyayı bir linke dönüştürüyoruz
+import balikModelUrl from './balik.glb?url';
 
-function BalikModeli() {
-  // Modeli yüklüyoruz
+function SadeceBalik() {
+  // balikModelUrl artık bir dosya değil, doğrudan "http://..." veya "file:///..." şeklinde bir linktir.
   const { scene } = useGLTF(balikModelUrl);
 
   return (
     <primitive 
       object={scene} 
-      scale={2.5} 
+      scale={3} 
       position={[0, 0, 0]} 
       rotation={[0, Math.PI / 2, 0]} 
     />
@@ -22,30 +21,25 @@ function BalikModeli() {
 
 export default function EslemeGame() {
   return (
-    <div className="w-full h-screen bg-slate-900">
-      <Canvas camera={{ position: [0, 0, 10], fov: 50 }}>
-        {/* Işıklandırma: Balığı görebilmemiz için şart */}
+    <div style={{ width: '100vw', height: '100vh', backgroundColor: '#020617' }}>
+      <Canvas camera={{ position: [0, 0, 12], fov: 50 }}>
         <ambientLight intensity={1.5} />
-        <directionalLight position={[10, 10, 10]} intensity={1} />
+        <pointLight position={[10, 10, 10]} intensity={2} />
         
-        {/* Çevre aydınlatması: Modelin daha gerçekçi durmasını sağlar */}
-        <Environment preset="city" />
-
         <Suspense fallback={null}>
-          <BalikModeli />
+           <SadeceBalik />
+           <Environment preset="city" />
         </Suspense>
 
-        {/* Fare ile balığı döndürüp her yerine bakabilmen için kontrolcü */}
-        <OrbitControls enableZoom={true} />
+        <OrbitControls makeDefault />
       </Canvas>
 
-      {/* Bilgilendirme Yazısı */}
-      <div className="absolute bottom-10 left-10 text-white font-mono opacity-50">
-        Balığı döndürmek için fareyle sürükle...
+      <div style={{ position: 'absolute', top: '20px', left: '20px', color: 'white' }}>
+        URL Yöntemiyle Yükleniyor: {balikModelUrl}
       </div>
     </div>
   );
 }
 
-// Modeli önceden belleğe alıyoruz
+// Önden yükleme yaparken de URL'i kullanıyoruz
 useGLTF.preload(balikModelUrl);
