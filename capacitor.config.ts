@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     // Yerel dosyaların 'https://localhost/' üzerinden sunulmasını sağlar
-    androidScheme: 'https',
+    androidScheme: 'http',
   },
 };
 
