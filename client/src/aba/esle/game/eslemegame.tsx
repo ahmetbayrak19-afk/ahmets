@@ -1,49 +1,64 @@
-import React, { Suspense } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { useGLTF, OrbitControls, Environment } from '@react-three/drei';
+import React, { Suspense, useRef, useEffect } from "react";
+import { Canvas } from "@react-three/fiber";
+import { useGLTF, useAnimations, OrbitControls, Stage, useProgress, Html } from "@react-three/drei";
+import * as THREE from "three";
 
-function SadeceBalik() {
-  // Capacitor 'https' scheme kullandığında, public klasöründeki her şeye 
-  // bu adres üzerinden erişilebilir. Bu, Firebase yüklemesiyle aynı mantıktır.
-  const modelUrl = "https://localhost/balik.glb";
-  
-  const { scene } = useGLTF(modelUrl);
-
+// Yükleme Göstergesi (Model ağır olduğu için progres bar önemli)
+function Loader() {
+  const { progress } = useProgress();
   return (
-    <primitive 
-      object={scene} 
-      scale={3} 
-      position={[0, 0, 0]} 
-      rotation={[0, Math.PI / 2, 0]} 
-    />
+    <Html center>
+      <div style={{ color: 'white', background: 'rgba(15, 23, 42, 0.9)', padding: '20px', borderRadius: '12px', border: '1px solid #38bdf8' }}>
+        <div style={{ fontSize: '20px', fontWeight: 'bold' }}>%{progress.toFixed(0)}</div>
+        <div style={{ fontSize: '10px', textTransform: 'uppercase' }}>Balık Yükleniyor...</div>
+      </div>
+    </Html>
   );
 }
 
-export default function EslemeGame({ onClose }: { onClose?: () => void }) {
-  return (
-    <div style={{ width: '100vw', height: '100vh', backgroundColor: '#020617' }}>
-      <Canvas camera={{ position: [0, 0, 12], fov: 50 }}>
-        {/* Aydınlatma Ayarları */}
-        <ambientLight intensity={1.5} />
-        <pointLight position={[10, 10, 10]} intensity={2} />
-        
-        <Suspense fallback={null}>
-           <SadeceBalik />
-           <Environment preset="city" />
-        </Suspense>
+function BalikModel({ url }: { url: string }) {
+  const group = useRef<THREE.Group>(null);
+  // Dosya public/models içinde olduğu için yolu buna göre veriyoruz
+  const { scene, animations } = useGLTF(url);
+  const { actions } = useAnimations(animations, group);
 
-        {/* Modeli incelemek için kontrolcü */}
+  useEffect(() => {
+    if (animations.length > 0 && actions) {
+      // Varsa ilk animasyonu (yüzme vb.) başlat
+      const firstAnim = animations[0].name;
+      actions[firstAnim]?.play();
+    }
+  }, [animations, actions]);
+
+  return <primitive ref={group} object={scene} dispose={null} />;
+}
+
+export default function EslemeGame() {
+  // Public klasöründeki tam yolumuz
+  const modelYolu = "/models/balik.glb";
+
+  return (
+    <div className="w-full h-screen bg-[#0f172a]">
+      <Canvas shadows camera={{ position: [0, 2, 5], fov: 45 }}>
+        {/* Stage: Modeli otomatik merkeze alır ve ışıklandırır */}
+        <Stage intensity={0.6} environment="city" adjustCamera={1.8}>
+          <Suspense fallback={<Loader />}>
+            <BalikModel url={modelYolu} />
+          </Suspense>
+        </Stage>
+
         <OrbitControls makeDefault />
       </Canvas>
 
-      {/* Arayüz Elemanları */}
-      <div style={{ position: 'absolute', top: '20px', left: '20px', color: 'white', pointerEvents: 'none' }}>
-        <h1 style={{ margin: 0, fontSize: '20px', opacity: 0.8 }}>3D Test Modu</h1>
-        <p style={{ margin: 0, fontSize: '12px', opacity: 0.5 }}>Yükleme: https://localhost/balik.glb</p>
+      {/* Oyun Bilgisi */}
+      <div className="absolute bottom-10 w-full text-center pointer-events-none">
+        <p className="text-sky-400 font-mono text-sm opacity-60">
+          Kilitli sandığı açmak için sesleri eşle
+        </p>
       </div>
     </div>
   );
 }
 
-// Modelin önceden yüklenmesi için
-useGLTF.preload("https://localhost/balik.glb");
+// Performans için ön yükleme
+useGLTF.preload("/models/balik.glb");
