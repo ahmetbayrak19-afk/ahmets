@@ -5,7 +5,8 @@ import * as THREE from "three";
 import { Water } from "three-stdlib";
 import { Fish3D } from "./Fish3D";
 
-const DENIZ_GLB_URL = "https://firebasestorage.googleapis.com/v0/b/ogrencitakip-2a775.firebasestorage.app/o/deniz.glb?alt=media&token=6ecb1237-70e1-43c8-b997-77b6e3943497";
+// 🔥 DÜZELTME: Artık Firebase linki yok, doğrudan yerel dosyayı okuyoruz!
+const DENIZ_GLB_URL = "/models/deniz.glb";
 const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/water/Water_1_M_Normal.jpg";
 
 extend({ Water });
@@ -34,7 +35,7 @@ function BackgroundManager({ cameraRef }: { cameraRef: any }) {
   return null;
 }
 
-// 🔥 DÜZELTME: KAMERA RİGİ - BALIK TAKİBİ
+// --- KAMERA RİGİ - BALIK TAKİBİ ---
 function CameraRig({ fishRef }: { fishRef: any }) {
   useFrame((state) => {
     if (!fishRef.current) return;
@@ -53,7 +54,7 @@ function CameraRig({ fishRef }: { fishRef: any }) {
   return null;
 }
 
-// 🔥 DÜZELTİLEN KISIM: OKYANUS (ÇİFT KATMAN) 🔥
+// --- OKYANUS (ÇİFT KATMAN) ---
 function Ocean() {
   const refTop = useRef<any>();
   const refBottom = useRef<any>(); // İkinci yüzey için referans
@@ -78,21 +79,20 @@ function Ocean() {
     if (refBottom.current) refBottom.current.material.uniforms.time.value += t;
   });
 
-  // 1. Grup Pozisyonu: 15 (Eski yerinde)
   return (
     <group position={[0, 15, 0]}>
-      
       {/* ÜST YÜZEY (Havadan bakınca görünen) */}
+      {/* @ts-ignore */}
       <water ref={refTop} args={[new THREE.PlaneGeometry(20000, 20000), config]} rotation={[-Math.PI / 2, 0, 0]} />
       
       {/* ALT YÜZEY (Sudan yukarı bakınca görünen - TERS) */}
+      {/* @ts-ignore */}
       <water 
         ref={refBottom} 
         args={[new THREE.PlaneGeometry(20000, 20000), config]} 
         rotation={[Math.PI / 2, 0, 0]} // Tam tersine dönük
         position={[0, -0.05, 0]}       // Minimal boşluk
       />
-      
     </group>
   );
 }
@@ -100,8 +100,9 @@ function Ocean() {
 // --- DENİZ DİBİ MODELİ ---
 function DenizModel() {
   const { scene } = useGLTF(DENIZ_GLB_URL);
-  // Zemin pozisyonunu biraz aşağıda tutuyoruz ki alan geniş olsun
-  return <primitive object={scene} scale={[5, 5, 5]} position={[0, -20, -10]} rotation={[0, -Math.PI / 2, 0]} />;
+  // Modelin sahnede düzgün çalışması için bir kopyasını (clone) alıyoruz
+  const clone = useMemo(() => scene.clone(), [scene]);
+  return <primitive object={clone} scale={[5, 5, 5]} position={[0, -20, -10]} rotation={[0, -Math.PI / 2, 0]} />;
 }
 
 // --- ANA COMPONENT ---
@@ -130,4 +131,8 @@ export default function DenizBackground({ cameraRef, fishRef }: { cameraRef: any
       </Canvas>
     </div>
   );
-            }
+}
+
+// Oyuna girerken bekleme olmasın diye denizi önceden yüklüyoruz
+useGLTF.preload(DENIZ_GLB_URL);
+      
