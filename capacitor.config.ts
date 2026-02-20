@@ -4,10 +4,9 @@ const config: CapacitorConfig = {
   appId: 'com.kazanimtakip.app',
   appName: 'Kazanım Takip',
   webDir: 'dist',
-
-  // ✅ Android’de asset loading için en stabil
   server: {
-    androidScheme: 'http',
+    // Yerel dosyaların 'https://localhost/' üzerinden sunulmasını sağlar
+    androidScheme: 'https',
   },
 };
 
