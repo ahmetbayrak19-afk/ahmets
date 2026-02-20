@@ -5,22 +5,18 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Root 'client' ise index.html mutlaka client klasörünün içinde olmalı
   root: 'client',
-  // Capacitor HTTPS scheme kullandığı için base '/' olmalı
+  // Capacitor'da beyaz ekranı çözmek için en garantisi budur
   base: '/', 
-  assetsInclude: ['**/*.glb'],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'client/src'),
-      '@shared': path.resolve(__dirname, 'shared'),
     },
   },
   build: {
+    // Build çıktısını ana dizindeki dist'e atar
     outDir: '../dist',
     emptyOutDir: true,
-    assetsDir: 'assets',
-    rollupOptions: {
-      input: path.resolve(__dirname, 'client/index.html'),
-    },
   },
 });
