@@ -21,7 +21,6 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        # Sürüm çakışmalarını önlemek için legacy-peer-deps
         run: npm install --legacy-peer-deps
 
       - name: Cache Gradle Wrapper
@@ -41,19 +40,17 @@ jobs:
       - name: Build Web Assets
         run: npm run build
 
-      # ✅ React build çıktısını Android assets'e kopyala
-      # Not: Model artık Firebase URL'den çekiliyor, bu yüzden human.glb kopyalama yok.
-      - name: Sync React Build to Android
+      - name: Sync Capacitor Web Assets
+        run: npx cap sync android
+
+      - name: Verify assets copied
         run: |
-          echo "Eski assets klasörü temizleniyor..."
-          rm -rf android/app/src/main/assets/*
-          mkdir -p android/app/src/main/assets
-
-          echo "Yeni build kopyalanıyor..."
-          cp -r dist/* android/app/src/main/assets/
-
-          echo "📂 Kontrol: assets içeriği"
-          ls -la android/app/src/main/assets/
+          echo "📂 Kontrol: android assets/public"
+          ls -la android/app/src/main/assets/public || true
+          echo "📂 Kontrol: draco"
+          ls -la android/app/src/main/assets/public/draco || true
+          echo "📂 Kontrol: models"
+          ls -la android/app/src/main/assets/public/models || true
 
       - name: Setup Java 17
         uses: actions/setup-java@v3
