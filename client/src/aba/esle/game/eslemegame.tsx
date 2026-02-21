@@ -1,15 +1,47 @@
-import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Canvas } from "@react-three/fiber";
 import { Html, OrbitControls, useGLTF, useProgress } from "@react-three/drei";
+
+/**
+ * Amaç:
+ * - Console yokken bile hatayı ekrana basmak
+ * - Draco decoder'ı APK içinden yüklemek:
+ *   https://appassets.androidplatform.net/assets/public/draco/*
+ * - GLB'yi APK içinden yüklemek:
+ *   https://appassets.androidplatform.net/assets/public/models/balik.glb
+ * - LOG SPAM / OOM / CRASH engellemek (init effect tek sefer)
+ */
 
 type LogItem = { t: number; msg: string; level: "info" | "warn" | "error" };
 
 function useScreenLogger() {
   const [logs, setLogs] = useState<LogItem[]>([]);
-  const push = (msg: string, level: LogItem["level"] = "info") => {
-    setLogs((prev) => [...prev.slice(-40), { t: Date.now(), msg, level }]);
-  };
-  const clear = () => setLogs([]);
+  const lastMsgRef = useRef<string>("");
+
+  const push = useCallback((msg: string, level: LogItem["level"] = "info") => {
+    // aynı mesaj arka arkaya geliyorsa yazma (spam kes)
+    if (lastMsgRef.current === `${level}:${msg}`) return;
+    lastMsgRef.current = `${level}:${msg}`;
+
+    setLogs((prev) => {
+      const next = [...prev, { t: Date.now(), msg, level }];
+      // çok büyümesin (OOM)
+      return next.length > 35 ? next.slice(-35) : next;
+    });
+  }, []);
+
+  const clear = useCallback(() => {
+    lastMsgRef.current = "";
+    setLogs([]);
+  }, []);
+
   return { logs, push, clear };
 }
 
@@ -168,7 +200,7 @@ function Model3D({
 
   const { scene } = useGLTF(url);
 
-  // ✅ spam'i kes: sadece ilk başarılı yüklemede log bas
+  // sadece 1 kez yaz
   const loggedRef = useRef(false);
   useEffect(() => {
     if (loggedRef.current) return;
@@ -185,12 +217,13 @@ export default function EslemeGame() {
   const [dracoBase, setDracoBase] = useState<string>("");
   const [glReady, setGlReady] = useState<boolean>(false);
 
-  // ✅ report referansı sabit
+  // ✅ report artık gerçekten stabil
   const report = useCallback(
     (msg: string, level: "info" | "warn" | "error" = "info") => push(msg, level),
     [push]
   );
 
+  // Global hata yakala (1 kez)
   useEffect(() => {
     const onError = (event: ErrorEvent) => {
       const where = event.filename ? ` @ ${event.filename}:${event.lineno}:${event.colno}` : "";
@@ -214,27 +247,24 @@ export default function EslemeGame() {
     };
   }, [report]);
 
+  // ✅ INIT BLOĞU: SADECE 1 KEZ ÇALIŞSIN
+  const initOnceRef = useRef(false);
   useEffect(() => {
-    report(`href: ${window.location.href}`, "info");
-    report(`origin: ${window.location.origin}`, "info");
+    if (initOnceRef.current) return;
+    initOnceRef.current = true;
 
-    const base = new URL("/assets/public/", window.location.origin).toString();
+    const origin = window.location.origin;
+    const base = new URL("/assets/public/", origin).toString();
     const glb = new URL("models/balik.glb", base).toString();
     const draco = new URL("draco/", base).toString();
 
     setModelUrl(glb);
     setDracoBase(draco);
 
+    report(`origin: ${origin}`, "info");
     report(`BASE: ${base}`, "info");
     report(`GLB URL: ${glb}`, "info");
     report(`DRACO BASE: ${draco}`, "info");
-
-    // preload (doğru path)
-    try {
-      useGLTF.preload(glb);
-    } catch {
-      // preload bazı ortamlarda erken çağrılınca patlayabilir, umursama
-    }
 
     const testFetch = async (path: string, label: string) => {
       try {
@@ -246,10 +276,9 @@ export default function EslemeGame() {
       }
     };
 
+    // sadece temel testler
     testFetch(glb, "GLB fetch");
-    testFetch(new URL("draco_wasm_wrapper.js", draco).toString(), "DRACO wrapper");
     testFetch(new URL("draco_decoder.wasm", draco).toString(), "DRACO wasm");
-    testFetch(new URL("draco_decoder.js", draco).toString(), "DRACO decoder.js");
   }, [report]);
 
   return (
@@ -259,22 +288,18 @@ export default function EslemeGame() {
       <Canvas
         camera={{ position: [0, 0, 6], fov: 45 }}
         onCreated={({ gl }) => {
-          try {
-            setGlReady(true);
-            report("WebGL hazır (onCreated).", "info");
+          setGlReady(true);
+          report("WebGL hazır (onCreated).", "info");
 
-            const canvas = gl.domElement;
-            const onLost = (e: Event) => {
-              e.preventDefault();
-              report("WEBGL CONTEXT LOST (siyah ekran sebebi olabilir).", "error");
-            };
-            const onRestored = () => report("WEBGL CONTEXT RESTORED", "warn");
+          const canvas = gl.domElement;
+          const onLost = (e: Event) => {
+            e.preventDefault();
+            report("WEBGL CONTEXT LOST (siyah ekran sebebi olabilir).", "error");
+          };
+          const onRestored = () => report("WEBGL CONTEXT RESTORED", "warn");
 
-            canvas.addEventListener("webglcontextlost", onLost as any, false);
-            canvas.addEventListener("webglcontextrestored", onRestored as any, false);
-          } catch (e: any) {
-            report(`WebGL init hatası: ${e?.message || String(e)}`, "error");
-          }
+          canvas.addEventListener("webglcontextlost", onLost as any, false);
+          canvas.addEventListener("webglcontextrestored", onRestored as any, false);
         }}
       >
         <ambientLight intensity={0.9} />
@@ -307,7 +332,9 @@ export default function EslemeGame() {
               <Model3D url={modelUrl} dracoBase={dracoBase} report={report} />
             ) : (
               <Html center>
-                <div style={{ color: "white", fontFamily: "monospace" }}>Model URL bekleniyor...</div>
+                <div style={{ color: "white", fontFamily: "monospace" }}>
+                  Model URL bekleniyor...
+                </div>
               </Html>
             )}
           </Suspense>
@@ -337,4 +364,4 @@ export default function EslemeGame() {
       )}
     </div>
   );
-     }
+}
