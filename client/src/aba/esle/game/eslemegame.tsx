@@ -5,8 +5,10 @@ import { Html, OrbitControls, useGLTF, useProgress } from "@react-three/drei";
 /**
  * Amaç:
  * - Console yokken bile hatayı ekrana basmak
- * - Draco decoder'ı localden yüklemek: /draco/
- * - GLB'yi file://, capacitor://, http(s) hepsinde doğru çözmek
+ * - Draco decoder'ı APK içinden yüklemek (WebViewAssetLoader ile):
+ *   https://appassets.androidplatform.net/assets/public/draco/*
+ * - GLB'yi APK içinden yüklemek:
+ *   https://appassets.androidplatform.net/assets/public/models/balik.glb
  */
 
 type LogItem = { t: number; msg: string; level: "info" | "warn" | "error" };
@@ -167,15 +169,18 @@ class ScreenErrorBoundary extends React.Component<
 
 function Model3D({
   url,
+  dracoBase,
   report,
 }: {
   url: string;
+  dracoBase: string;
   report: (msg: string, level?: "info" | "warn" | "error") => void;
 }) {
-  // Draco dosyaları: public/draco/*
+  // Draco dosyaları: /assets/public/draco/*
   useMemo(() => {
-    useGLTF.setDecoderPath("/draco/");
-  }, []);
+    // üç.js DRACOLoader içinden relative fetch yapar, bu yüzden trailing slash şart
+    useGLTF.setDecoderPath(dracoBase.endsWith("/") ? dracoBase : `${dracoBase}/`);
+  }, [dracoBase]);
 
   const { scene } = useGLTF(url);
 
@@ -189,6 +194,7 @@ function Model3D({
 export default function EslemeGame() {
   const { logs, push, clear } = useScreenLogger();
   const [modelUrl, setModelUrl] = useState<string>("");
+  const [dracoBase, setDracoBase] = useState<string>("");
   const [glReady, setGlReady] = useState<boolean>(false);
 
   const report = (msg: string, level: "info" | "warn" | "error" = "info") => push(msg, level);
@@ -221,10 +227,18 @@ export default function EslemeGame() {
     report(`href: ${window.location.href}`, "info");
     report(`origin: ${window.location.origin}`, "info");
 
-    // GLB URL: file/capacitor/http hepsinde doğru çözülür
-    const url = new URL("models/balik.glb", window.location.href).toString();
-    setModelUrl(url);
-    report(`GLB URL: ${url}`, "info");
+    // ✅ WebViewAssetLoader kullanıyorsun: sayfa /assets/public/... altında.
+    // Bu yüzden kaynakları da buradan absolute veriyoruz.
+    const base = new URL("/assets/public/", window.location.origin).toString(); // https://appassets.../assets/public/
+    const glb = new URL("models/balik.glb", base).toString(); // .../assets/public/models/balik.glb
+    const draco = new URL("draco/", base).toString(); // .../assets/public/draco/
+
+    setModelUrl(glb);
+    setDracoBase(draco);
+
+    report(`BASE: ${base}`, "info");
+    report(`GLB URL: ${glb}`, "info");
+    report(`DRACO BASE: ${draco}`, "info");
 
     const testFetch = async (path: string, label: string) => {
       try {
@@ -237,11 +251,11 @@ export default function EslemeGame() {
     };
 
     // GLB erişim
-    testFetch(url, "GLB fetch");
-    // Draco erişim
-    testFetch("/draco/draco_wasm_wrapper.js", "DRACO wrapper");
-    testFetch("/draco/draco_decoder.wasm", "DRACO wasm");
-    testFetch("/draco/draco_decoder.js", "DRACO decoder.js");
+    testFetch(glb, "GLB fetch");
+    // Draco erişim (✅ doğru path)
+    testFetch(new URL("draco_wasm_wrapper.js", draco).toString(), "DRACO wrapper");
+    testFetch(new URL("draco_decoder.wasm", draco).toString(), "DRACO wasm");
+    testFetch(new URL("draco_decoder.js", draco).toString(), "DRACO decoder.js");
   }, []);
 
   return (
@@ -269,7 +283,6 @@ export default function EslemeGame() {
           }
         }}
       >
-        {/* Stage/environment yok: Android’de HDRI/texture indirme işleri siyah ekran yapabiliyor */}
         <ambientLight intensity={0.9} />
         <directionalLight position={[5, 5, 5]} intensity={1.2} />
         <directionalLight position={[-5, -3, 2]} intensity={0.4} />
@@ -296,8 +309,8 @@ export default function EslemeGame() {
           }
         >
           <Suspense fallback={<Loader3D />}>
-            {modelUrl ? (
-              <Model3D url={modelUrl} report={report} />
+            {modelUrl && dracoBase ? (
+              <Model3D url={modelUrl} dracoBase={dracoBase} report={report} />
             ) : (
               <Html center>
                 <div style={{ color: "white", fontFamily: "monospace" }}>Model URL bekleniyor...</div>
@@ -332,5 +345,5 @@ export default function EslemeGame() {
   );
 }
 
-// Optional preload
-useGLTF.preload("/models/balik.glb");
+// Optional preload (✅ doğru path)
+useGLTF.preload("https://appassets.androidplatform.net/assets/public/models/balik.glb");
