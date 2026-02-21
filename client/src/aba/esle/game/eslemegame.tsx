@@ -1,110 +1,102 @@
 import React, { Suspense, useState, useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
 import { useGLTF, OrbitControls, Stage, Html, useProgress } from "@react-three/drei";
+import { Capacitor } from '@capacitor/core'; // Capacitor kütüphanesini ekledik
 
-// --- CANLI HATA VE DURUM PANELİ (EKRANDAN HİÇ GİTMEZ) ---
-function StatusReporter({ logs }: { logs: string[] }) {
+// --- CANLI DURUM RAPORLAYICI ---
+function StatusLog({ logs }: { logs: string[] }) {
   return (
     <Html fullscreen pointerEvents="none">
       <div style={{
         position: 'absolute', top: '10px', left: '10px',
-        background: 'rgba(0,0,0,0.85)', color: '#00ff00',
-        padding: '15px', borderRadius: '8px', border: '1px solid #333',
-        fontFamily: 'monospace', fontSize: '12px', maxWidth: '90vw',
-        zIndex: 9999, pointerEvents: 'none'
+        background: 'rgba(0,0,0,0.8)', color: '#00ff00',
+        padding: '12px', borderRadius: '8px', border: '1px solid #444',
+        fontFamily: 'monospace', fontSize: '11px', zIndex: 9999
       }}>
-        <div style={{ borderBottom: '1px solid #333', marginBottom: '8px', fontWeight: 'bold', color: '#ffcc00' }}>
-          SİSTEM RAPORU // 7/24 CANLI
-        </div>
-        {logs.map((log, i) => (
-          <div key={i} style={{ marginBottom: '4px', color: log.includes('HATA') ? '#ff4444' : '#00ff00' }}>
-            {`> ${log}`}
-          </div>
-        ))}
+        <div style={{ color: '#ffcc00', fontWeight: 'bold', marginBottom: '5px' }}>NATIVE BRIDGE RAPORU</div>
+        {logs.map((l, i) => <div key={i}>{`> ${l}`}</div>)}
       </div>
     </Html>
   );
 }
 
 export default function EslemeGame() {
-  const [logs, setLogs] = useState<string[]>(["Sistem başlatıldı..."]);
+  const [logs, setLogs] = useState<string[]>(["Başlatılıyor..."]);
+  const [finalModelUrl, setFinalModelUrl] = useState<string>("");
   const { progress } = useProgress();
-  
-  // Vite 'base: ./' ayarı için en güvenli yol (Baştaki '/' silindi)
-  const modelUrl = "models/balik.glb";
 
-  const addLog = (msg: string) => {
-    setLogs(prev => [...prev.slice(-8), msg]); // Son 9 mesajı gösterir
-  };
+  const addLog = (msg: string) => setLogs(prev => [...prev.slice(-6), msg]);
 
   useEffect(() => {
-    addLog(`Dosya aranıyor: ${modelUrl}`);
-    
-    // FETCH KONTROLÜ
-    fetch(modelUrl)
+    // 1. ADIM: Ham dosya yolu
+    const rawPath = "models/balik.glb"; 
+    addLog(`Ham yol: ${rawPath}`);
+
+    // 2. ADIM: Native Bridge ile Yolu Dönüştürme
+    // Bu kısım "Failed to fetch" hatasını kırmak için kritik
+    let convertedUrl = rawPath;
+
+    if (Capacitor.isNativePlatform()) {
+      addLog("Platform: Android/iOS (Native)");
+      // window.location.origin ekleyerek WebView'ın kendi sunucusunu hedefliyoruz
+      convertedUrl = `${window.location.origin}/${rawPath}`;
+      addLog("Bridge adresi oluşturuldu.");
+    } else {
+      addLog("Platform: Web Tarayıcı");
+    }
+
+    setFinalModelUrl(convertedUrl);
+    addLog(`Hedef: ${convertedUrl}`);
+
+    // 3. ADIM: Erişim Testi
+    fetch(convertedUrl)
       .then(res => {
-        if (res.ok) {
-          addLog("DOSYA BULUNDU: Sunucu yanıt verdi (200 OK)");
-          const size = res.headers.get("content-length");
-          addLog(`Boyut: ${size ? (parseInt(size) / 1024 / 1024).toFixed(2) + " MB" : "Bilinmiyor"}`);
-        } else {
-          addLog(`HATA 404: Dosya adreste yok! Durum: ${res.status}`);
-        }
+        if (res.ok) addLog("ERİŞİM BAŞARILI: Dosya kilitleri açıldı.");
+        else addLog(`ERİŞİM HATASI: ${res.status} (Dosya yerinde yok)`);
       })
-      .catch(err => addLog(`HATA (Fetch): ${err.message}`));
+      .catch(err => addLog(`NATIVE HATA: ${err.message}`));
+
   }, []);
 
-  useEffect(() => {
-    if (progress > 0) addLog(`Yükleme: %${progress.toFixed(0)}`);
-    if (progress === 100) addLog("Model verisi alındı, çiziliyor...");
-  }, [progress]);
-
   return (
-    <div className="w-full h-screen bg-[#050505]">
-      <Canvas 
-        shadows 
-        camera={{ position: [0, 0, 10] }}
-        onCreated={({ gl }) => {
-          addLog("WebGL Hazır");
-          gl.getContext().canvas.addEventListener('webglcontextlost', () => {
-            addLog("HATA: WebGL Çöktü! (Bellek yetersiz)");
-          }, false);
-        }}
-      >
-        <StatusReporter logs={logs} />
-        
-        <Suspense fallback={null}>
-          <Stage environment="city" intensity={0.5} adjustCamera={1.8}>
-            <ModeliGetir 
-              url={modelUrl} 
-              onReport={(msg) => addLog(msg)} 
-            />
-          </Stage>
-        </Suspense>
-        
-        <OrbitControls makeDefault />
-      </Canvas>
+    <div className="w-full h-screen bg-[#0a0a0a]">
+      {finalModelUrl && (
+        <Canvas shadows camera={{ position: [0, 0, 10] }}>
+          <StatusLog logs={logs} />
+          
+          <Suspense fallback={<Html center><div style={{color:'white'}}>Varlıklar yükleniyor: %{progress.toFixed(0)}</div></Html>}>
+            <Stage environment="city" intensity={0.6} adjustCamera={1.5}>
+              <ModeliCiz 
+                url={finalModelUrl} 
+                onReport={(m) => addLog(m)} 
+              />
+            </Stage>
+          </Suspense>
+          
+          <OrbitControls makeDefault />
+        </Canvas>
+      )}
     </div>
   );
 }
 
-function ModeliGetir({ url, onReport }: { url: string; onReport: (m: string) => void }) {
+function ModeliCiz({ url, onReport }: { url: string; onReport: (m: string) => void }) {
   try {
-    // 286 bin poligonluk model için Draco şart
+    // 286K poligonluk model için Draco desteği
     useGLTF.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
     const { scene } = useGLTF(url);
     
-    // Eğer buraya gelirse model render edilmiştir
     useEffect(() => {
-      onReport("BAŞARILI: Balık ekrana çizildi!");
+      onReport("MODEL AKTİF: Balık sahneye eklendi.");
     }, []);
 
     return <primitive object={scene} />;
   } catch (e: any) {
-    onReport(`HATA (Çizim): ${e.message}`);
+    onReport(`ÇİZİM HATASI: ${e.message}`);
     return null;
   }
 }
 
 // Ön yükleme
 useGLTF.preload("models/balik.glb");
+                  
