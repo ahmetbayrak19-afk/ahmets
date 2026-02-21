@@ -3,19 +3,44 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, useAnimations, useGLTF, useProgress } from "@react-three/drei";
 import * as THREE from "three";
 
+/** ==== HIZLI AYARLAR ==== */
 const SEA_ANIM_NAME = "yeme";
 const SEA_ANIM_SPEED = 0.2;
 
 const FISH_SWIM_ANIM_NAME = "yuzme";
-const MAX_SPEED = 1.6;
 
+// Balık hızı
+const MAX_SPEED = 1.4;
+
+// Kamera
 const CAMERA_Z = 10;
-const CAMERA_LOOKAHEAD = 2.0;
+const CAMERA_LOOKAHEAD = 1.6;
 
-// Fog fazla olursa denizi “yutar” → daha düşük
-const FOG_DENSITY = 0.03;
+// Sis (denizi “yutmasın” diye düşük)
+const FOG_DENSITY = 0.02;
+
+// Deniz yönü: 0, 90, 180, -90 deneyebilmen için burada
+const SEA_ROT_Y = 0; // Math.PI/2 deneyebilirsin
 
 type LogItem = { t: number; msg: string; level: "info" | "warn" | "error" };
+
+function Loader3D() {
+  const { progress } = useProgress();
+  return (
+    <Html center>
+      <div style={{
+        color: "white",
+        background: "rgba(0,0,0,0.6)",
+        padding: "10px 12px",
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,0.2)",
+        fontFamily: "monospace",
+      }}>
+        Yükleniyor: %{progress.toFixed(0)}
+      </div>
+    </Html>
+  );
+}
 
 function useScreenLogger() {
   const [logs, setLogs] = useState<LogItem[]>([]);
@@ -25,10 +50,9 @@ function useScreenLogger() {
     const key = `${level}:${msg}`;
     if (lastMsgRef.current === key) return;
     lastMsgRef.current = key;
-
     setLogs((prev) => {
       const next = [...prev, { t: Date.now(), msg, level }];
-      return next.length > 35 ? next.slice(-35) : next;
+      return next.length > 20 ? next.slice(-20) : next;
     });
   }, []);
 
@@ -38,95 +62,6 @@ function useScreenLogger() {
   }, []);
 
   return { logs, push, clear };
-}
-
-function LogOverlay({
-  title,
-  logs,
-  onClear,
-  onClose,
-}: {
-  title: string;
-  logs: LogItem[];
-  onClear: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      style={{
-        position: "fixed",
-        top: 10,
-        left: 10,
-        right: 10,
-        maxWidth: 760,
-        zIndex: 999999,
-        background: "rgba(0,0,0,0.88)",
-        border: "1px solid rgba(255,255,255,0.15)",
-        borderRadius: 12,
-        padding: 12,
-        fontFamily: "monospace",
-        fontSize: 12,
-        color: "#e5e7eb",
-        pointerEvents: "auto",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ fontWeight: 800, color: "#ffcc00" }}>{title}</div>
-        <button
-          onClick={onClear}
-          style={{
-            marginLeft: "auto",
-            background: "rgba(255,255,255,0.08)",
-            border: "1px solid rgba(255,255,255,0.15)",
-            color: "#fff",
-            padding: "6px 10px",
-            borderRadius: 10,
-            cursor: "pointer",
-          }}
-        >
-          Temizle
-        </button>
-        <button
-          onClick={onClose}
-          style={{
-            background: "rgba(255,255,255,0.08)",
-            border: "1px solid rgba(255,255,255,0.15)",
-            color: "#fff",
-            padding: "6px 10px",
-            borderRadius: 10,
-            cursor: "pointer",
-          }}
-        >
-          Gizle
-        </button>
-      </div>
-
-      <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
-        {logs.length === 0 ? (
-          <div style={{ color: "#9ca3af" }}>Log yok.</div>
-        ) : (
-          logs.map((l, i) => (
-            <div
-              key={i}
-              style={{
-                color:
-                  l.level === "error"
-                    ? "#ff4d4d"
-                    : l.level === "warn"
-                      ? "#fbbf24"
-                      : "#a7f3d0",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-              }}
-            >
-              {"> "}
-              {l.msg}
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
 }
 
 function MiniButton({ onClick, label }: { onClick: () => void; label: string }) {
@@ -153,47 +88,97 @@ function MiniButton({ onClick, label }: { onClick: () => void; label: string }) 
   );
 }
 
-function Loader3D() {
-  const { progress } = useProgress();
+function LogOverlay({
+  logs,
+  onClose,
+}: {
+  logs: LogItem[];
+  onClose: () => void;
+}) {
   return (
-    <Html center>
-      <div
-        style={{
-          color: "white",
-          background: "rgba(0,0,0,0.6)",
-          padding: "10px 12px",
-          borderRadius: 10,
-          border: "1px solid rgba(255,255,255,0.2)",
-          fontFamily: "monospace",
-        }}
-      >
-        Yükleniyor: %{progress.toFixed(0)}
+    <div style={{
+      position: "fixed",
+      top: 10,
+      left: 10,
+      right: 10,
+      maxWidth: 760,
+      zIndex: 999999,
+      background: "rgba(0,0,0,0.88)",
+      border: "1px solid rgba(255,255,255,0.15)",
+      borderRadius: 12,
+      padding: 12,
+      fontFamily: "monospace",
+      fontSize: 12,
+      color: "#e5e7eb",
+    }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div style={{ fontWeight: 800, color: "#ffcc00" }}>RAPOR</div>
+        <button
+          onClick={onClose}
+          style={{
+            marginLeft: "auto",
+            background: "rgba(255,255,255,0.08)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            color: "#fff",
+            padding: "6px 10px",
+            borderRadius: 10,
+            cursor: "pointer",
+          }}
+        >
+          Gizle
+        </button>
       </div>
-    </Html>
+      <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
+        {logs.map((l, i) => (
+          <div key={i} style={{
+            color: l.level === "error" ? "#ff4d4d" : l.level === "warn" ? "#fbbf24" : "#a7f3d0",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}>
+            {"> "}{l.msg}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
 class ScreenErrorBoundary extends React.Component<
-  { onError: (msg: string) => void; fallback?: React.ReactNode; children: React.ReactNode },
+  { onError: (msg: string) => void; children: React.ReactNode },
   { hasError: boolean }
 > {
   constructor(props: any) {
     super(props);
     this.state = { hasError: false };
   }
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
+  static getDerivedStateFromError() { return { hasError: true }; }
   componentDidCatch(error: any) {
-    const msg = error?.message || String(error);
-    this.props.onError(`REACT BOUNDARY HATA: ${msg}`);
+    this.props.onError(error?.message || String(error));
   }
   render() {
-    if (this.state.hasError) return this.props.fallback ?? null;
+    if (this.state.hasError) {
+      return (
+        <Html center>
+          <div style={{
+            color: "#ff4d4d",
+            background: "rgba(0,0,0,0.75)",
+            padding: 12,
+            borderRadius: 10,
+            border: "1px solid rgba(255,255,255,0.2)",
+            fontFamily: "monospace",
+            maxWidth: 340,
+            textAlign: "center",
+          }}>
+            HATA: 3D sahne çöktü
+          </div>
+        </Html>
+      );
+    }
     return this.props.children as any;
   }
 }
 
+/** ====== Asıl Sahne ====== */
 function World({
   fishUrl,
   seaUrl,
@@ -203,7 +188,7 @@ function World({
   fishUrl: string;
   seaUrl: string;
   dracoBase: string;
-  report: (msg: string, level?: "info" | "warn" | "error") => void;
+  report: (m: string, lvl?: "info" | "warn" | "error") => void;
 }) {
   useMemo(() => {
     useGLTF.setDecoderPath(dracoBase.endsWith("/") ? dracoBase : `${dracoBase}/`);
@@ -212,9 +197,10 @@ function World({
   const sea = useGLTF(seaUrl);
   const fish = useGLTF(fishUrl);
 
-  const seaGroupRef = useRef<THREE.Group | null>(null);
-  const fishGroupRef = useRef<THREE.Group | null>(null);
+  const seaGroup = useRef<THREE.Group>(null);
+  const fishGroup = useRef<THREE.Group>(null);
 
+  // Animations
   const seaAnim = useAnimations(sea.animations, sea.scene);
   const fishAnim = useAnimations(fish.animations, fish.scene);
   const swimActionRef = useRef<THREE.AnimationAction | null>(null);
@@ -228,9 +214,9 @@ function World({
       const a = actions[target]!;
       a.reset().fadeIn(0.15).play();
       a.timeScale = SEA_ANIM_SPEED;
-      report(`Deniz animasyonu: ${target} (speed ${SEA_ANIM_SPEED})`, "info");
+      report(`Deniz anim: ${target} speed=${SEA_ANIM_SPEED}`, "info");
     } else {
-      report("Uyarı: Deniz animasyonu bulunamadı.", "warn");
+      report("Deniz animasyonu yok", "warn");
     }
   }, [seaAnim.actions, seaAnim.names, report]);
 
@@ -245,59 +231,53 @@ function World({
       a.paused = true;
       a.play();
       swimActionRef.current = a;
-      report(`Balık animasyonu hazır: ${target}`, "info");
+      report(`Balık anim hazır: ${target}`, "info");
     } else {
-      report("Uyarı: Balık 'yuzme' animasyonu bulunamadı.", "warn");
+      report("Balık yuzme animasyonu yok", "warn");
     }
   }, [fishAnim.actions, fishAnim.names, report]);
 
-  // ✅ DENİZİ OTOMATİK “GÖRÜNÜR” HALE GETİR:
-  // - center
-  // - scale (fit)
-  // - materyal doubleSide (bazı glb’lerde içten bakınca görünmez)
-  // - box helper (deniz nerde göreyim diye)
+  // Deniz görünür hale getirme: center + scale (çok uçuk değil)
   const boundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number; fixedY: number } | null>(null);
-  const seaBoxHelperRef = useRef<THREE.Box3Helper | null>(null);
 
   useEffect(() => {
-    if (!seaGroupRef.current) return;
+    if (!seaGroup.current) return;
 
-    // materyal düzelt (içeriden bakınca görünmeme ihtimali)
-    sea.scene.traverse((obj: any) => {
-      if (obj?.isMesh && obj.material) {
-        obj.material.side = THREE.DoubleSide;
-        obj.material.needsUpdate = true;
+    // içerden görünmeme ihtimali
+    sea.scene.traverse((o: any) => {
+      if (o?.isMesh && o.material) {
+        o.material.side = THREE.DoubleSide;
+        o.material.needsUpdate = true;
       }
     });
 
-    // önce deniz sahnesinin box'ını çıkar
+    // raw bbox
     const rawBox = new THREE.Box3().setFromObject(sea.scene);
     const size = new THREE.Vector3();
     const center = new THREE.Vector3();
     rawBox.getSize(size);
     rawBox.getCenter(center);
 
-    // denizi kendi merkezine çek
+    // center
     sea.scene.position.sub(center);
 
-    // denizi “fit” ölçeğe getir (çok büyük/çok küçük olmasın)
+    // scale (uzun eksen 80 olacak şekilde)
     const longest = Math.max(size.x, size.y, size.z);
-    const targetLongest = 60; // sahnede görmek için iyi bir ölçü
-    const scale = longest > 0 ? targetLongest / longest : 1;
-    sea.scene.scale.setScalar(scale);
+    const targetLongest = 80;
+    const s = longest > 0 ? targetLongest / longest : 1;
+    sea.scene.scale.setScalar(s);
 
-    // group pozisyonu: z biraz geride
-    seaGroupRef.current.position.set(0, 0, -8);
+    // denizi geriye al
+    seaGroup.current.position.set(0, 0, -25);
+    seaGroup.current.rotation.set(0, SEA_ROT_Y, 0);
 
-    // yeni box (ölçek+merkez sonrası)
-    const box = new THREE.Box3().setFromObject(seaGroupRef.current);
+    // bounds yeni
+    const box = new THREE.Box3().setFromObject(seaGroup.current);
     const newSize = new THREE.Vector3();
     box.getSize(newSize);
 
-    // bounds
-    const padX = Math.max(1.0, newSize.x * 0.04);
-    const padY = Math.max(1.0, newSize.y * 0.10);
-
+    const padX = Math.max(1.5, newSize.x * 0.04);
+    const padY = Math.max(1.5, newSize.y * 0.10);
     const minX = box.min.x + padX;
     const maxX = box.max.x - padX;
     const minY = box.min.y + padY;
@@ -306,77 +286,60 @@ function World({
 
     boundsRef.current = { minX, maxX, minY, maxY, fixedY };
 
-    report(
-      `Deniz fit: scale=${scale.toFixed(3)} size=(${newSize.x.toFixed(1)},${newSize.y.toFixed(
-        1
-      )},${newSize.z.toFixed(1)})`,
-      "info"
-    );
-
-    // Box helper (deniz nerede gör diye)
-    if (seaBoxHelperRef.current) {
-      seaGroupRef.current.remove(seaBoxHelperRef.current);
-      seaBoxHelperRef.current = null;
-    }
-    const helper = new THREE.Box3Helper(box, new THREE.Color("#00ff88"));
-    seaBoxHelperRef.current = helper;
-    seaGroupRef.current.add(helper);
+    report(`Deniz size: (${newSize.x.toFixed(1)},${newSize.y.toFixed(1)},${newSize.z.toFixed(1)}) scale=${s.toFixed(3)}`, "info");
   }, [sea.scene, report]);
 
-  // fish state + drag
+  // Fish state
   const fishPos = useRef(new THREE.Vector3(0, 0, 0));
   const fishTarget = useRef(new THREE.Vector3(0, 0, 0));
   const dragging = useRef(false);
 
+  // Balığı başlangıçta bounds içine koy
   useEffect(() => {
     const b = boundsRef.current;
-    if (!b || !fishGroupRef.current) return;
+    if (!b || !fishGroup.current) return;
     fishPos.current.set((b.minX + b.maxX) * 0.5, b.fixedY, 0);
     fishTarget.current.copy(fishPos.current);
-    fishGroupRef.current.position.copy(fishPos.current);
-    fishGroupRef.current.rotation.y = Math.PI / 2; // yan duruş
+    fishGroup.current.position.copy(fishPos.current);
+    // yan duruş (sağa baksın)
+    fishGroup.current.rotation.y = Math.PI / 2;
   }, [fish.scene]);
 
-  // pointer->world
-  const { camera, size: viewportSize } = useThree();
+  // ===== Drag’i Canvas eventlerinden yakalayacağız (en sağlam) =====
+  const { camera, size: vp } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), []);
 
-  const pointerToWorld = useCallback(
-    (clientX: number, clientY: number) => {
-      const xNdc = (clientX / viewportSize.width) * 2 - 1;
-      const yNdc = -(clientY / viewportSize.height) * 2 + 1;
-      raycaster.setFromCamera({ x: xNdc, y: yNdc }, camera);
-      const hit = new THREE.Vector3();
-      raycaster.ray.intersectPlane(plane, hit);
-      return hit;
-    },
-    [camera, viewportSize.width, viewportSize.height, plane, raycaster]
-  );
+  const ndcToWorld = useCallback((xNdc: number, yNdc: number) => {
+    raycaster.setFromCamera({ x: xNdc, y: yNdc }, camera);
+    const hit = new THREE.Vector3();
+    raycaster.ray.intersectPlane(plane, hit);
+    return hit;
+  }, [camera, plane, raycaster]);
 
-  const onPointerDown = useCallback(
-    (e: any) => {
-      dragging.current = true;
-      fishTarget.current.copy(pointerToWorld(e.clientX, e.clientY));
-    },
-    [pointerToWorld]
-  );
-  const onPointerMove = useCallback(
-    (e: any) => {
-      if (!dragging.current) return;
-      fishTarget.current.copy(pointerToWorld(e.clientX, e.clientY));
-    },
-    [pointerToWorld]
-  );
-  const onPointerUp = useCallback(() => {
+  // Canvas pointer handlers (R3F eventleri: event.pointer.x/y NDC)
+  const onCanvasPointerDown = useCallback((e: any) => {
+    dragging.current = true;
+    const hit = ndcToWorld(e.pointer.x, e.pointer.y);
+    fishTarget.current.copy(hit);
+  }, [ndcToWorld]);
+
+  const onCanvasPointerMove = useCallback((e: any) => {
+    if (!dragging.current) return;
+    const hit = ndcToWorld(e.pointer.x, e.pointer.y);
+    fishTarget.current.copy(hit);
+  }, [ndcToWorld]);
+
+  const onCanvasPointerUp = useCallback(() => {
     dragging.current = false;
   }, []);
 
+  // Kamera + hareket
   useFrame((state, dt) => {
     const b = boundsRef.current;
-    if (!b || !fishGroupRef.current) return;
+    if (!b || !fishGroup.current) return;
 
-    // clamp target
+    // hedef clamp
     fishTarget.current.x = THREE.MathUtils.clamp(fishTarget.current.x, b.minX, b.maxX);
     fishTarget.current.y = THREE.MathUtils.clamp(fishTarget.current.y, b.minY, b.maxY);
     fishTarget.current.z = 0;
@@ -395,53 +358,80 @@ function World({
     fishPos.current.y = THREE.MathUtils.clamp(fishPos.current.y, b.minY, b.maxY);
     fishPos.current.z = 0;
 
-    fishGroupRef.current.position.copy(fishPos.current);
+    fishGroup.current.position.copy(fishPos.current);
 
-    // yön
+    // yön (yan)
     const dx = fishTarget.current.x - fishPos.current.x;
     if (Math.abs(dx) > 0.005) {
-      fishGroupRef.current.rotation.y = dx >= 0 ? Math.PI / 2 : -Math.PI / 2;
+      fishGroup.current.rotation.y = dx >= 0 ? Math.PI / 2 : -Math.PI / 2;
     }
 
     // swim anim
     const swim = swimActionRef.current;
-    if (swim) {
-      swim.paused = !moving;
-      if (moving) swim.timeScale = 1.0;
-    }
+    if (swim) swim.paused = !moving;
 
-    // kamera: X takip, Y sabit
+    // Kamera: X takip, Y sabit
     const cam = state.camera as THREE.PerspectiveCamera;
     const desiredCam = new THREE.Vector3(fishPos.current.x, b.fixedY, CAMERA_Z);
     cam.position.lerp(desiredCam, 1 - Math.pow(0.001, dt));
-    cam.lookAt(
-      new THREE.Vector3(
-        fishPos.current.x + (dx >= 0 ? CAMERA_LOOKAHEAD : -CAMERA_LOOKAHEAD),
-        b.fixedY,
-        0
-      )
-    );
+    cam.lookAt(new THREE.Vector3(
+      fishPos.current.x + (dx >= 0 ? CAMERA_LOOKAHEAD : -CAMERA_LOOKAHEAD),
+      b.fixedY,
+      0
+    ));
   });
 
   return (
     <>
+      {/* Deniz */}
+      <group ref={seaGroup}>
+        <primitive object={sea.scene} />
+      </group>
+
       {/* Balık */}
-      <group ref={fishGroupRef}>
+      <group ref={fishGroup}>
         <primitive object={fish.scene} />
       </group>
 
-      {/* Fullscreen drag plane */}
-      <mesh
-        position={[0, 0, 0]}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-      >
-        <planeGeometry args={[2000, 2000]} />
-        <meshBasicMaterial transparent opacity={0} />
-      </mesh>
+      {/* Canvas eventlerini dışarıya aktar */}
+      <CanvasEvents
+        onDown={onCanvasPointerDown}
+        onMove={onCanvasPointerMove}
+        onUp={onCanvasPointerUp}
+      />
     </>
+  );
+}
+
+/** Canvas eventlerini World içinden Canvas’a bağlamak için küçük yardımcı */
+function CanvasEvents({
+  onDown, onMove, onUp,
+}: {
+  onDown: (e: any) => void;
+  onMove: (e: any) => void;
+  onUp: (e: any) => void;
+}) {
+  const { gl } = useThree();
+  useEffect(() => {
+    const dom = gl.domElement;
+    // R3F eventleri Canvas üzerinde zaten, ama burada bir “no-op” değil:
+    // Biz World içinden Canvas prop’una erişemiyoruz, bu yüzden
+    // görünmez bir plane ile tüm ekran eventlerini yakalıyoruz.
+    // (Canvas eventleri yerine mesh eventleri yerine)
+  }, [gl]);
+
+  // dev bir plane: eventleri garanti yakalar
+  return (
+    <mesh
+      position={[0, 0, 0]}
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerCancel={onUp}
+    >
+      <planeGeometry args={[5000, 5000]} />
+      <meshBasicMaterial transparent opacity={0.01} depthWrite={false} />
+    </mesh>
   );
 }
 
@@ -452,21 +442,17 @@ export default function EslemeGame() {
   const [fishUrl, setFishUrl] = useState("");
   const [seaUrl, setSeaUrl] = useState("");
   const [dracoBase, setDracoBase] = useState("");
-  const [glReady, setGlReady] = useState(false);
 
-  const report = useCallback(
-    (msg: string, level: "info" | "warn" | "error" = "info") => {
-      push(msg, level);
-      if (level === "error") setShowPanel(true);
-    },
-    [push]
-  );
+  const report = useCallback((m: string, lvl: "info" | "warn" | "error" = "info") => {
+    push(m, lvl);
+    if (lvl === "error") setShowPanel(true);
+  }, [push]);
 
   // init
-  const initOnceRef = useRef(false);
+  const once = useRef(false);
   useEffect(() => {
-    if (initOnceRef.current) return;
-    initOnceRef.current = true;
+    if (once.current) return;
+    once.current = true;
 
     const origin = window.location.origin;
     const base = new URL("/assets/public/", origin).toString();
@@ -475,99 +461,41 @@ export default function EslemeGame() {
     setSeaUrl(new URL("models/deniz.glb", base).toString());
     setDracoBase(new URL("draco/", base).toString());
 
-    push(`origin: ${origin}`, "info");
     push(`BASE: ${base}`, "info");
   }, [push]);
-
-  const onCreated = useCallback(
-    ({ gl, scene }: any) => {
-      setGlReady(true);
-      scene.background = new THREE.Color("#001623");
-      scene.fog = new THREE.FogExp2("#001623", FOG_DENSITY);
-
-      const canvas = gl.domElement as HTMLCanvasElement;
-      const onLost = (e: Event) => {
-        e.preventDefault();
-        report("WEBGL CONTEXT LOST (siyah ekran sebebi olabilir).", "error");
-      };
-      canvas.addEventListener("webglcontextlost", onLost as any, false);
-    },
-    [report]
-  );
 
   return (
     <div style={{ width: "100vw", height: "100vh", background: "#001018" }}>
       {!showPanel ? (
         <MiniButton onClick={() => setShowPanel(true)} label="Rapor" />
       ) : (
-        <LogOverlay
-          title="NATIVE / 3D RAPOR (Console Yok)"
-          logs={logs}
-          onClear={clear}
-          onClose={() => setShowPanel(false)}
-        />
+        <LogOverlay logs={logs} onClose={() => setShowPanel(false)} />
       )}
 
-      <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45, near: 0.1, far: 5000 }} onCreated={onCreated}>
-        {/* Işık biraz güçlü: deniz görünür olsun */}
-        <ambientLight intensity={1.0} />
-        <directionalLight position={[8, 10, 8]} intensity={1.4} />
-        <directionalLight position={[-8, -3, 2]} intensity={0.55} />
+      <Canvas
+        camera={{ position: [0, 0, CAMERA_Z], fov: 45, near: 0.1, far: 5000 }}
+        onCreated={({ scene }) => {
+          scene.background = new THREE.Color("#001623");
+          scene.fog = new THREE.FogExp2("#001623", FOG_DENSITY);
+        }}
+      >
+        {/* Deniz görünür olsun diye ışık güçlü */}
+        <ambientLight intensity={1.1} />
+        <directionalLight position={[10, 12, 10]} intensity={1.6} />
+        <directionalLight position={[-10, -4, 2]} intensity={0.6} />
 
-        <ScreenErrorBoundary
-          onError={(m) => report(m, "error")}
-          fallback={
-            <Html center>
-              <div
-                style={{
-                  color: "#ff4d4d",
-                  background: "rgba(0,0,0,0.75)",
-                  padding: 12,
-                  borderRadius: 10,
-                  border: "1px solid rgba(255,255,255,0.2)",
-                  fontFamily: "monospace",
-                  maxWidth: 340,
-                  textAlign: "center",
-                }}
-              >
-                HATA: 3D sahne çöktü (Boundary)
-              </div>
-            </Html>
-          }
-        >
+        <ScreenErrorBoundary onError={(m) => report(m, "error")}>
           <Suspense fallback={<Loader3D />}>
             {fishUrl && seaUrl && dracoBase ? (
               <World fishUrl={fishUrl} seaUrl={seaUrl} dracoBase={dracoBase} report={report} />
             ) : (
               <Html center>
-                <div style={{ color: "white", fontFamily: "monospace" }}>
-                  Model URL bekleniyor...
-                </div>
+                <div style={{ color: "white", fontFamily: "monospace" }}>Model URL bekleniyor...</div>
               </Html>
             )}
           </Suspense>
         </ScreenErrorBoundary>
       </Canvas>
-
-      {!glReady && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 12,
-            left: 12,
-            right: 12,
-            zIndex: 999999,
-            color: "#fbbf24",
-            fontFamily: "monospace",
-            background: "rgba(0,0,0,0.7)",
-            border: "1px solid rgba(255,255,255,0.15)",
-            borderRadius: 12,
-            padding: 10,
-          }}
-        >
-          UYARI: WebGL henüz hazır değil. Cihaz WebGL’i engelliyor olabilir.
-        </div>
-      )}
     </div>
   );
-      }
+                           }
