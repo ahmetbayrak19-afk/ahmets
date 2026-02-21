@@ -58,9 +58,9 @@ public class MainActivity extends AppCompatActivity {
         int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? PendingIntent.FLAG_MUTABLE : PendingIntent.FLAG_UPDATE_CURRENT;
         pendingIntent = PendingIntent.getActivity(this, 0, intent, flags);
         intentFiltersArray = new IntentFilter[]{
-            new IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED),
-            new IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED),
-            new IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED)
+                new IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED),
+                new IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED),
+                new IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED)
         };
 
         // 2. TTS (Sesli Okuma) Ayarları
@@ -115,7 +115,7 @@ public class MainActivity extends AppCompatActivity {
                 List<String> grants = new ArrayList<>();
                 for (String resource : request.getResources()) {
                     if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource) ||
-                        PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
+                            PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
                         grants.add(resource);
                     }
                 }
@@ -145,31 +145,31 @@ public class MainActivity extends AppCompatActivity {
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
 
-                // 🔥 GÜNCEL KOD: URL'nin başı ne olursa olsun, sonu /human.glb ise yakala 🔥
+                // URL'nin sonu /human.glb ise yakala
                 if (url.endsWith("/human.glb")) {
                     try {
                         // Assets klasöründen dosyayı aç
+                        // Eğer dosyayı public altına koyduysan: getAssets().open("public/human.glb") veya "public/models/human.glb"
                         InputStream is = getAssets().open("human.glb");
 
-                        // Güvenlik ve Tip Başlıkları
                         Map<String, String> headers = new HashMap<>();
                         headers.put("Access-Control-Allow-Origin", "*");
                         headers.put("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
                         headers.put("Access-Control-Allow-Headers", "*");
-                        headers.put("Content-Type", "model/gltf-binary"); // Tarayıcıya bunun 3D model olduğunu söyle
+                        headers.put("Content-Type", "model/gltf-binary");
 
                         return new WebResourceResponse("model/gltf-binary", "UTF-8", 200, "OK", headers, is);
                     } catch (Exception e) {
                         e.printStackTrace();
-                        return null; // Hata olursa null dön (Logcat'e bakılabilir)
+                        return null;
                     }
                 }
                 return super.shouldInterceptRequest(view, request);
             }
         });
 
-        // Uygulamayı Başlat
-        webView.loadUrl("file:///android_asset/index.html");
+        // ✅ Uygulamayı Başlat (Cap sync web dosyalarını android_asset/public içine koyar)
+        webView.loadUrl("file:///android_asset/public/index.html");
     }
 
     // İzin İsteme Fonksiyonu
@@ -211,15 +211,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onNewIntent(Intent intent) {
+    public void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(intent.getAction()) ||
-            NfcAdapter.ACTION_TECH_DISCOVERED.equals(intent.getAction()) ||
-            NfcAdapter.ACTION_TAG_DISCOVERED.equals(intent.getAction())) {
+                NfcAdapter.ACTION_TECH_DISCOVERED.equals(intent.getAction()) ||
+                NfcAdapter.ACTION_TAG_DISCOVERED.equals(intent.getAction())) {
             Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
             if (tag != null) {
                 String nfcId = bytesToHex(tag.getId());
-                // React tarafındaki global fonksiyona ID gönder
                 webView.evaluateJavascript("window.handleNfcScan(" + JSONObject.quote(nfcId) + ")", null);
             }
         }
@@ -236,5 +235,4 @@ public class MainActivity extends AppCompatActivity {
         if (tts != null) { tts.stop(); tts.shutdown(); }
         super.onDestroy();
     }
-                    }
-            
+            }
