@@ -6,19 +6,9 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Canvas } from "@react-three/fiber";
-import { Html, OrbitControls, useGLTF, useProgress } from "@react-three/drei";
-
-/**
- * Amaç:
- * - Console yokken bile hatayı ekrana basmak (ama normalde panel kapalı)
- * - Draco decoder'ı APK içinden yüklemek:
- *   https://appassets.androidplatform.net/assets/public/draco/*
- * - GLB'yi APK içinden yüklemek:
- *   https://appassets.androidplatform.net/assets/public/models/balik.glb
- *   https://appassets.androidplatform.net/assets/public/models/deniz.glb
- * - Panel: sadece HATA olunca otomatik açılır (veya manuel açılır)
- */
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Html, OrbitControls, useAnimations, useGLTF, useProgress } from "@react-three/drei";
+import * as THREE from "three";
 
 type LogItem = { t: number; msg: string; level: "info" | "warn" | "error" };
 
@@ -27,14 +17,13 @@ function useScreenLogger() {
   const lastMsgRef = useRef<string>("");
 
   const push = useCallback((msg: string, level: LogItem["level"] = "info") => {
-    // Aynı mesaj arka arkaya geliyorsa yazma (spam kes)
     const key = `${level}:${msg}`;
     if (lastMsgRef.current === key) return;
     lastMsgRef.current = key;
 
     setLogs((prev) => {
       const next = [...prev, { t: Date.now(), msg, level }];
-      return next.length > 40 ? next.slice(-40) : next; // OOM engel
+      return next.length > 30 ? next.slice(-30) : next;
     });
   }, []);
 
@@ -137,13 +126,7 @@ function LogOverlay({
   );
 }
 
-function MiniButton({
-  onClick,
-  label,
-}: {
-  onClick: () => void;
-  label: string;
-}) {
+function MiniButton({ onClick, label }: { onClick: () => void; label: string }) {
   return (
     <button
       onClick={onClick}
@@ -195,88 +178,245 @@ class ScreenErrorBoundary extends React.Component<
     super(props);
     this.state = { hasError: false };
   }
-
   static getDerivedStateFromError() {
     return { hasError: true };
   }
-
   componentDidCatch(error: any) {
     const msg = error?.message || String(error);
     this.props.onError(`REACT BOUNDARY HATA: ${msg}`);
   }
-
   render() {
-    if (this.state.hasError) {
-      return (
-        this.props.fallback ?? (
-          <Html center>
-            <div
-              style={{
-                color: "#ff4d4d",
-                background: "rgba(0,0,0,0.75)",
-                padding: 12,
-                borderRadius: 10,
-                border: "1px solid rgba(255,255,255,0.2)",
-                fontFamily: "monospace",
-                maxWidth: 320,
-                textAlign: "center",
-              }}
-            >
-              HATA: 3D sahne çöktü (React ErrorBoundary)
-            </div>
-          </Html>
-        )
-      );
-    }
+    if (this.state.hasError) return this.props.fallback ?? null;
     return this.props.children as any;
   }
 }
 
-function SceneMultiGLB({
+/**
+ * Hungry Shark kontroller:
+ * - pointer drag => hedef world koordinat
+ * - fish dünya içinde hareket eder, ama kamera fish'i takip eder => fish ekranda merkezde
+ * - sea (deniz) modelinin bounds'u => fish clamp
+ * - fish "yuzme" animasyonu sadece hareket ederken oynar
+ */
+function World({
   fishUrl,
   seaUrl,
   dracoBase,
   report,
+  seaAnimName = "yeme",
+  seaAnimSpeed = 0.2,
+  fishSwimAnimName = "yuzme",
 }: {
   fishUrl: string;
   seaUrl: string;
   dracoBase: string;
   report: (msg: string, level?: "info" | "warn" | "error") => void;
+  seaAnimName?: string;
+  seaAnimSpeed?: number;
+  fishSwimAnimName?: string;
 }) {
-  // Decoder path'i sadece değiştiğinde set et
   useMemo(() => {
     useGLTF.setDecoderPath(dracoBase.endsWith("/") ? dracoBase : `${dracoBase}/`);
   }, [dracoBase]);
 
-  const fish = useGLTF(fishUrl);
   const sea = useGLTF(seaUrl);
+  const fish = useGLTF(fishUrl);
 
-  // Loglar sadece 1 kere
-  const loggedRef = useRef(false);
+  // Deniz animasyonu (ot sallanması)
+  const seaAnim = useAnimations(sea.animations, sea.scene);
+
   useEffect(() => {
-    if (loggedRef.current) return;
-    loggedRef.current = true;
-    report("BAŞARILI: balik.glb + deniz.glb yüklendi ve sahneye eklendi.", "info");
-  }, [report]);
+    const actions = seaAnim.actions;
+    const names = seaAnim.names;
+    const target = actions?.[seaAnimName] ? seaAnimName : names?.[0];
+    if (target && actions[target]) {
+      const a = actions[target]!;
+      a.reset().fadeIn(0.2).play();
+      a.timeScale = seaAnimSpeed;
+      report(`Deniz animasyonu: ${target} (speed ${seaAnimSpeed})`, "info");
+    } else {
+      report("Uyarı: Deniz animasyonu bulunamadı.", "warn");
+    }
+  }, [seaAnim.actions, seaAnim.names, seaAnimName, seaAnimSpeed, report]);
+
+  // Balık animasyonu (yuzme)
+  const fishAnim = useAnimations(fish.animations, fish.scene);
+  const swimActionRef = useRef<THREE.AnimationAction | null>(null);
+
+  useEffect(() => {
+    const actions = fishAnim.actions;
+    const names = fishAnim.names;
+    const target = actions?.[fishSwimAnimName] ? fishSwimAnimName : names?.[0];
+    if (target && actions[target]) {
+      const a = actions[target]!;
+      a.reset();
+      a.paused = true; // başlangıçta dur
+      a.play(); // play edip pause etmek, sonra resume etmeyi kolaylaştırır
+      swimActionRef.current = a;
+      report(`Balık animasyonu hazır: ${target} (hareket edince oynar)`, "info");
+    } else {
+      report("Uyarı: Balık 'yuzme' animasyonu bulunamadı.", "warn");
+    }
+  }, [fishAnim.actions, fishAnim.names, fishSwimAnimName, report]);
+
+  // Deniz bounds => balık sınırları
+  const boundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number } | null>(null);
+
+  useEffect(() => {
+    const box = new THREE.Box3().setFromObject(sea.scene);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+
+    // padding: balık duvara girmesin
+    const padX = Math.max(0.6, size.x * 0.03);
+    const padY = Math.max(0.6, size.y * 0.08);
+
+    const minX = box.min.x + padX;
+    const maxX = box.max.x - padX;
+
+    // Y sınırı: suyun alt/üst bandı (deniz glb'ye göre)
+    const minY = box.min.y + padY;
+    const maxY = box.max.y - padY;
+
+    boundsRef.current = { minX, maxX, minY, maxY };
+    report(
+      `Bounds: X[${minX.toFixed(2)}, ${maxX.toFixed(2)}] Y[${minY.toFixed(2)}, ${maxY.toFixed(
+        2
+      )}]`,
+      "info"
+    );
+  }, [sea.scene, report]);
+
+  // Fish state (world coords)
+  const fishPos = useRef(new THREE.Vector3(0, 0, 0));
+  const fishTarget = useRef(new THREE.Vector3(0, 0, 0));
+  const isDragging = useRef(false);
+
+  // İlk yerleşim: denizin orta-üst bandına
+  useEffect(() => {
+    const b = boundsRef.current;
+    if (!b) return;
+    fishPos.current.set((b.minX + b.maxX) * 0.5, (b.minY + b.maxY) * 0.55, 0);
+    fishTarget.current.copy(fishPos.current);
+    fish.scene.position.copy(fishPos.current);
+  }, [fish.scene]);
+
+  // Pointer -> world hedef dönüşümü
+  const { camera, size } = useThree();
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), []); // z=0 düzlemi
+
+  const pointerToWorld = useCallback(
+    (clientX: number, clientY: number) => {
+      const xNdc = (clientX / size.width) * 2 - 1;
+      const yNdc = -(clientY / size.height) * 2 + 1;
+      raycaster.setFromCamera({ x: xNdc, y: yNdc }, camera);
+      const hit = new THREE.Vector3();
+      raycaster.ray.intersectPlane(plane, hit);
+      return hit;
+    },
+    [camera, size.width, size.height, plane, raycaster]
+  );
+
+  // Drag handlers: canvas üzerine bağlayacağız (Html değil)
+  const onPointerDown = useCallback(
+    (e: any) => {
+      isDragging.current = true;
+      const hit = pointerToWorld(e.clientX, e.clientY);
+      fishTarget.current.copy(hit);
+    },
+    [pointerToWorld]
+  );
+
+  const onPointerMove = useCallback(
+    (e: any) => {
+      if (!isDragging.current) return;
+      const hit = pointerToWorld(e.clientX, e.clientY);
+      fishTarget.current.copy(hit);
+    },
+    [pointerToWorld]
+  );
+
+  const onPointerUp = useCallback(() => {
+    isDragging.current = false;
+  }, []);
+
+  // Hareket + animasyon + kamera takip
+  useFrame((state, dt) => {
+    const b = boundsRef.current;
+    if (!b) return;
+
+    // hedefi clamp et
+    fishTarget.current.x = THREE.MathUtils.clamp(fishTarget.current.x, b.minX, b.maxX);
+    fishTarget.current.y = THREE.MathUtils.clamp(fishTarget.current.y, b.minY, b.maxY);
+    fishTarget.current.z = 0;
+
+    // fish -> target yönünde smooth yaklaşım (hungry shark hissi)
+    const speed = 4.0; // arttırırsan daha hızlı takip eder
+    const alpha = 1 - Math.pow(0.001, dt * speed);
+    fishPos.current.lerp(fishTarget.current, alpha);
+
+    // clamp tekrar (duvarın içine sızmasın)
+    fishPos.current.x = THREE.MathUtils.clamp(fishPos.current.x, b.minX, b.maxX);
+    fishPos.current.y = THREE.MathUtils.clamp(fishPos.current.y, b.minY, b.maxY);
+    fishPos.current.z = 0;
+
+    // Balık yönü (sağa/sola dönsün)
+    const dx = fishTarget.current.x - fishPos.current.x;
+    if (Math.abs(dx) > 0.01) {
+      fish.scene.scale.x = dx >= 0 ? 1 : -1; // basit flip
+    }
+
+    fish.scene.position.copy(fishPos.current);
+
+    // ✅ Swim animasyonu: sadece hareket ederken
+    const swim = swimActionRef.current;
+    if (swim) {
+      const moving =
+        isDragging.current &&
+        fishPos.current.distanceToSquared(fishTarget.current) > 0.0005;
+
+      if (moving) {
+        swim.paused = false;
+        swim.timeScale = 1.0;
+      } else {
+        swim.paused = true;
+      }
+    }
+
+    // ✅ Kamera fish'i takip => fish ekranda merkezde
+    const cam = state.camera as THREE.PerspectiveCamera;
+    const desired = new THREE.Vector3(fishPos.current.x, fishPos.current.y + 0.5, 6);
+    cam.position.lerp(desired, 1 - Math.pow(0.001, dt));
+    cam.lookAt(new THREE.Vector3(fishPos.current.x, fishPos.current.y + 0.25, 0));
+  });
 
   return (
     <>
-      {/* Deniz (arka plan / sahne) */}
-      <primitive
-        object={sea.scene}
-        // Deniz modelinin ölçeği cihazına göre büyük/küçük olabilir:
-        scale={1}
-        position={[0, -1.2, -1.5]}
-        rotation={[0, 0, 0]}
-      />
+      {/* Deniz */}
+      <primitive object={sea.scene} scale={1} position={[0, 0, -1]} />
 
-      {/* Balık (ön plan) */}
-      <primitive
-        object={fish.scene}
-        scale={1}
+      {/* Balık (pointer eventleri burada yakalayalım) */}
+      <group
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
+        <primitive object={fish.scene} scale={1} />
+      </group>
+
+      {/* Tüm ekran drag için: boş alanda da çalışsın */}
+      <mesh
         position={[0, 0, 0]}
-        rotation={[0, 0, 0]}
-      />
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
+        <planeGeometry args={[500, 500]} />
+        <meshBasicMaterial transparent opacity={0} />
+      </mesh>
     </>
   );
 }
@@ -290,7 +430,6 @@ export default function EslemeGame() {
   const [dracoBase, setDracoBase] = useState("");
   const [glReady, setGlReady] = useState(false);
 
-  // ✅ report stabil + hata gelince paneli otomatik aç
   const report = useCallback(
     (msg: string, level: "info" | "warn" | "error" = "info") => {
       push(msg, level);
@@ -299,31 +438,7 @@ export default function EslemeGame() {
     [push]
   );
 
-  // Global hata yakala
-  useEffect(() => {
-    const onError = (event: ErrorEvent) => {
-      const where = event.filename ? ` @ ${event.filename}:${event.lineno}:${event.colno}` : "";
-      report(`window.onerror: ${event.message}${where}`, "error");
-    };
-
-    const onRejection = (event: PromiseRejectionEvent) => {
-      const reason =
-        typeof event.reason === "string"
-          ? event.reason
-          : event.reason?.message || JSON.stringify(event.reason);
-      report(`unhandledrejection: ${reason}`, "error");
-    };
-
-    window.addEventListener("error", onError);
-    window.addEventListener("unhandledrejection", onRejection);
-
-    return () => {
-      window.removeEventListener("error", onError);
-      window.removeEventListener("unhandledrejection", onRejection);
-    };
-  }, [report]);
-
-  // INIT: sadece 1 kere
+  // INIT
   const initOnceRef = useRef(false);
   useEffect(() => {
     if (initOnceRef.current) return;
@@ -332,46 +447,18 @@ export default function EslemeGame() {
     const origin = window.location.origin;
     const base = new URL("/assets/public/", origin).toString();
 
-    const fish = new URL("models/balik.glb", base).toString();
-    const sea = new URL("models/deniz.glb", base).toString();
-    const draco = new URL("draco/", base).toString();
+    setFishUrl(new URL("models/balik.glb", base).toString());
+    setSeaUrl(new URL("models/deniz.glb", base).toString());
+    setDracoBase(new URL("draco/", base).toString());
 
-    setFishUrl(fish);
-    setSeaUrl(sea);
-    setDracoBase(draco);
-
-    // info logları sadece panel açıksa gösterelim (normalde sessiz)
-    // ama ilk kurulumda yine de 2-3 satır yazalım (çok kısa)
     push(`origin: ${origin}`, "info");
     push(`BASE: ${base}`, "info");
-
-    const testFetch = async (path: string, label: string) => {
-      try {
-        const res = await fetch(path, { cache: "no-store" });
-        if (res.ok) push(`${label} OK (HTTP ${res.status})`, "info");
-        else {
-          push(`${label} HATA (HTTP ${res.status})`, "error");
-          setShowPanel(true);
-        }
-      } catch (e: any) {
-        push(`${label} FAILED: ${e?.message || String(e)}`, "error");
-        setShowPanel(true);
-      }
-    };
-
-    testFetch(fish, "balik.glb");
-    testFetch(sea, "deniz.glb");
-    testFetch(new URL("draco_decoder.wasm", draco).toString(), "draco_decoder.wasm");
   }, [push]);
 
   return (
-    <div style={{ width: "100vw", height: "100vh", background: "#000" }}>
-      {/* Panel normalde kapalı; hata olunca açılır; istersen manuel aç */}
+    <div style={{ width: "100vw", height: "100vh", background: "#001018" }}>
       {!showPanel ? (
-        <MiniButton
-          onClick={() => setShowPanel(true)}
-          label="Rapor"
-        />
+        <MiniButton onClick={() => setShowPanel(true)} label="Rapor" />
       ) : (
         <LogOverlay
           title="NATIVE / 3D RAPOR (Console Yok)"
@@ -382,25 +469,25 @@ export default function EslemeGame() {
       )}
 
       <Canvas
-        camera={{ position: [0, 0, 6], fov: 45 }}
-        onCreated={({ gl }) => {
+        camera={{ position: [0, 1, 6], fov: 45 }}
+        onCreated={({ gl, scene }) => {
           setGlReady(true);
-          // hata olursa panel açılacak zaten; burayı info olarak basmayalım
-          const canvas = gl.domElement;
 
+          // Sis + mavilik
+          scene.background = new THREE.Color("#001623");
+          scene.fog = new THREE.FogExp2("#001623", 0.08);
+
+          const canvas = gl.domElement;
           const onLost = (e: Event) => {
             e.preventDefault();
             report("WEBGL CONTEXT LOST (siyah ekran sebebi olabilir).", "error");
           };
-          const onRestored = () => report("WEBGL CONTEXT RESTORED", "warn");
-
           canvas.addEventListener("webglcontextlost", onLost as any, false);
-          canvas.addEventListener("webglcontextrestored", onRestored as any, false);
         }}
       >
-        <ambientLight intensity={0.9} />
-        <directionalLight position={[5, 5, 5]} intensity={1.2} />
-        <directionalLight position={[-5, -3, 2]} intensity={0.4} />
+        <ambientLight intensity={0.7} />
+        <directionalLight position={[5, 5, 5]} intensity={1.0} />
+        <directionalLight position={[-5, -3, 2]} intensity={0.35} />
 
         <ScreenErrorBoundary
           onError={(m) => report(m, "error")}
@@ -425,11 +512,14 @@ export default function EslemeGame() {
         >
           <Suspense fallback={<Loader3D />}>
             {fishUrl && seaUrl && dracoBase ? (
-              <SceneMultiGLB
+              <World
                 fishUrl={fishUrl}
                 seaUrl={seaUrl}
                 dracoBase={dracoBase}
                 report={report}
+                seaAnimName="yeme"
+                seaAnimSpeed={0.2}
+                fishSwimAnimName="yuzme"
               />
             ) : (
               <Html center>
@@ -441,7 +531,8 @@ export default function EslemeGame() {
           </Suspense>
         </ScreenErrorBoundary>
 
-        <OrbitControls enablePan enableRotate enableZoom />
+        {/* OrbitControls kapat: hungry shark hissi için */}
+        <OrbitControls enabled={false} />
       </Canvas>
 
       {!glReady && (
@@ -465,4 +556,4 @@ export default function EslemeGame() {
       )}
     </div>
   );
-              }
+}
