@@ -11,12 +11,13 @@ import { Html, OrbitControls, useGLTF, useProgress } from "@react-three/drei";
 
 /**
  * Amaç:
- * - Console yokken bile hatayı ekrana basmak
+ * - Console yokken bile hatayı ekrana basmak (ama normalde panel kapalı)
  * - Draco decoder'ı APK içinden yüklemek:
  *   https://appassets.androidplatform.net/assets/public/draco/*
  * - GLB'yi APK içinden yüklemek:
  *   https://appassets.androidplatform.net/assets/public/models/balik.glb
- * - LOG SPAM / OOM / CRASH engellemek (init effect tek sefer)
+ *   https://appassets.androidplatform.net/assets/public/models/deniz.glb
+ * - Panel: sadece HATA olunca otomatik açılır (veya manuel açılır)
  */
 
 type LogItem = { t: number; msg: string; level: "info" | "warn" | "error" };
@@ -26,14 +27,14 @@ function useScreenLogger() {
   const lastMsgRef = useRef<string>("");
 
   const push = useCallback((msg: string, level: LogItem["level"] = "info") => {
-    // aynı mesaj arka arkaya geliyorsa yazma (spam kes)
-    if (lastMsgRef.current === `${level}:${msg}`) return;
-    lastMsgRef.current = `${level}:${msg}`;
+    // Aynı mesaj arka arkaya geliyorsa yazma (spam kes)
+    const key = `${level}:${msg}`;
+    if (lastMsgRef.current === key) return;
+    lastMsgRef.current = key;
 
     setLogs((prev) => {
       const next = [...prev, { t: Date.now(), msg, level }];
-      // çok büyümesin (OOM)
-      return next.length > 35 ? next.slice(-35) : next;
+      return next.length > 40 ? next.slice(-40) : next; // OOM engel
     });
   }, []);
 
@@ -49,10 +50,12 @@ function LogOverlay({
   title,
   logs,
   onClear,
+  onClose,
 }: {
   title: string;
   logs: LogItem[];
   onClear: () => void;
+  onClose: () => void;
 }) {
   return (
     <div
@@ -75,6 +78,7 @@ function LogOverlay({
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ fontWeight: 800, color: "#ffcc00" }}>{title}</div>
+
         <button
           onClick={onClear}
           style={{
@@ -88,6 +92,20 @@ function LogOverlay({
           }}
         >
           Temizle
+        </button>
+
+        <button
+          onClick={onClose}
+          style={{
+            background: "rgba(255,255,255,0.08)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            color: "#fff",
+            padding: "6px 10px",
+            borderRadius: 10,
+            cursor: "pointer",
+          }}
+        >
+          Gizle
         </button>
       </div>
 
@@ -116,6 +134,36 @@ function LogOverlay({
         )}
       </div>
     </div>
+  );
+}
+
+function MiniButton({
+  onClick,
+  label,
+}: {
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        position: "fixed",
+        top: 10,
+        right: 10,
+        zIndex: 999999,
+        background: "rgba(0,0,0,0.65)",
+        border: "1px solid rgba(255,255,255,0.18)",
+        color: "#fff",
+        padding: "8px 10px",
+        borderRadius: 12,
+        cursor: "pointer",
+        fontFamily: "monospace",
+        fontSize: 12,
+      }}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -184,12 +232,14 @@ class ScreenErrorBoundary extends React.Component<
   }
 }
 
-function Model3D({
-  url,
+function SceneMultiGLB({
+  fishUrl,
+  seaUrl,
   dracoBase,
   report,
 }: {
-  url: string;
+  fishUrl: string;
+  seaUrl: string;
   dracoBase: string;
   report: (msg: string, level?: "info" | "warn" | "error") => void;
 }) {
@@ -198,32 +248,58 @@ function Model3D({
     useGLTF.setDecoderPath(dracoBase.endsWith("/") ? dracoBase : `${dracoBase}/`);
   }, [dracoBase]);
 
-  const { scene } = useGLTF(url);
+  const fish = useGLTF(fishUrl);
+  const sea = useGLTF(seaUrl);
 
-  // sadece 1 kez yaz
+  // Loglar sadece 1 kere
   const loggedRef = useRef(false);
   useEffect(() => {
     if (loggedRef.current) return;
     loggedRef.current = true;
-    report("BAŞARILI: GLB yüklendi ve sahneye eklendi.", "info");
+    report("BAŞARILI: balik.glb + deniz.glb yüklendi ve sahneye eklendi.", "info");
   }, [report]);
 
-  return <primitive object={scene} />;
+  return (
+    <>
+      {/* Deniz (arka plan / sahne) */}
+      <primitive
+        object={sea.scene}
+        // Deniz modelinin ölçeği cihazına göre büyük/küçük olabilir:
+        scale={1}
+        position={[0, -1.2, -1.5]}
+        rotation={[0, 0, 0]}
+      />
+
+      {/* Balık (ön plan) */}
+      <primitive
+        object={fish.scene}
+        scale={1}
+        position={[0, 0, 0]}
+        rotation={[0, 0, 0]}
+      />
+    </>
+  );
 }
 
 export default function EslemeGame() {
   const { logs, push, clear } = useScreenLogger();
-  const [modelUrl, setModelUrl] = useState<string>("");
-  const [dracoBase, setDracoBase] = useState<string>("");
-  const [glReady, setGlReady] = useState<boolean>(false);
 
-  // ✅ report artık gerçekten stabil
+  const [showPanel, setShowPanel] = useState(false);
+  const [fishUrl, setFishUrl] = useState("");
+  const [seaUrl, setSeaUrl] = useState("");
+  const [dracoBase, setDracoBase] = useState("");
+  const [glReady, setGlReady] = useState(false);
+
+  // ✅ report stabil + hata gelince paneli otomatik aç
   const report = useCallback(
-    (msg: string, level: "info" | "warn" | "error" = "info") => push(msg, level),
+    (msg: string, level: "info" | "warn" | "error" = "info") => {
+      push(msg, level);
+      if (level === "error") setShowPanel(true);
+    },
     [push]
   );
 
-  // Global hata yakala (1 kez)
+  // Global hata yakala
   useEffect(() => {
     const onError = (event: ErrorEvent) => {
       const where = event.filename ? ` @ ${event.filename}:${event.lineno}:${event.colno}` : "";
@@ -247,7 +323,7 @@ export default function EslemeGame() {
     };
   }, [report]);
 
-  // ✅ INIT BLOĞU: SADECE 1 KEZ ÇALIŞSIN
+  // INIT: sadece 1 kere
   const initOnceRef = useRef(false);
   useEffect(() => {
     if (initOnceRef.current) return;
@@ -255,43 +331,63 @@ export default function EslemeGame() {
 
     const origin = window.location.origin;
     const base = new URL("/assets/public/", origin).toString();
-    const glb = new URL("models/balik.glb", base).toString();
+
+    const fish = new URL("models/balik.glb", base).toString();
+    const sea = new URL("models/deniz.glb", base).toString();
     const draco = new URL("draco/", base).toString();
 
-    setModelUrl(glb);
+    setFishUrl(fish);
+    setSeaUrl(sea);
     setDracoBase(draco);
 
-    report(`origin: ${origin}`, "info");
-    report(`BASE: ${base}`, "info");
-    report(`GLB URL: ${glb}`, "info");
-    report(`DRACO BASE: ${draco}`, "info");
+    // info logları sadece panel açıksa gösterelim (normalde sessiz)
+    // ama ilk kurulumda yine de 2-3 satır yazalım (çok kısa)
+    push(`origin: ${origin}`, "info");
+    push(`BASE: ${base}`, "info");
 
     const testFetch = async (path: string, label: string) => {
       try {
         const res = await fetch(path, { cache: "no-store" });
-        if (res.ok) report(`${label} OK (HTTP ${res.status})`, "info");
-        else report(`${label} HATA (HTTP ${res.status})`, "error");
+        if (res.ok) push(`${label} OK (HTTP ${res.status})`, "info");
+        else {
+          push(`${label} HATA (HTTP ${res.status})`, "error");
+          setShowPanel(true);
+        }
       } catch (e: any) {
-        report(`${label} FAILED: ${e?.message || String(e)}`, "error");
+        push(`${label} FAILED: ${e?.message || String(e)}`, "error");
+        setShowPanel(true);
       }
     };
 
-    // sadece temel testler
-    testFetch(glb, "GLB fetch");
-    testFetch(new URL("draco_decoder.wasm", draco).toString(), "DRACO wasm");
-  }, [report]);
+    testFetch(fish, "balik.glb");
+    testFetch(sea, "deniz.glb");
+    testFetch(new URL("draco_decoder.wasm", draco).toString(), "draco_decoder.wasm");
+  }, [push]);
 
   return (
     <div style={{ width: "100vw", height: "100vh", background: "#000" }}>
-      <LogOverlay title="NATIVE / 3D RAPOR (Console Yok)" logs={logs} onClear={clear} />
+      {/* Panel normalde kapalı; hata olunca açılır; istersen manuel aç */}
+      {!showPanel ? (
+        <MiniButton
+          onClick={() => setShowPanel(true)}
+          label="Rapor"
+        />
+      ) : (
+        <LogOverlay
+          title="NATIVE / 3D RAPOR (Console Yok)"
+          logs={logs}
+          onClear={clear}
+          onClose={() => setShowPanel(false)}
+        />
+      )}
 
       <Canvas
         camera={{ position: [0, 0, 6], fov: 45 }}
         onCreated={({ gl }) => {
           setGlReady(true);
-          report("WebGL hazır (onCreated).", "info");
-
+          // hata olursa panel açılacak zaten; burayı info olarak basmayalım
           const canvas = gl.domElement;
+
           const onLost = (e: Event) => {
             e.preventDefault();
             report("WEBGL CONTEXT LOST (siyah ekran sebebi olabilir).", "error");
@@ -328,8 +424,13 @@ export default function EslemeGame() {
           }
         >
           <Suspense fallback={<Loader3D />}>
-            {modelUrl && dracoBase ? (
-              <Model3D url={modelUrl} dracoBase={dracoBase} report={report} />
+            {fishUrl && seaUrl && dracoBase ? (
+              <SceneMultiGLB
+                fishUrl={fishUrl}
+                seaUrl={seaUrl}
+                dracoBase={dracoBase}
+                report={report}
+              />
             ) : (
               <Html center>
                 <div style={{ color: "white", fontFamily: "monospace" }}>
@@ -364,4 +465,4 @@ export default function EslemeGame() {
       )}
     </div>
   );
-}
+              }
