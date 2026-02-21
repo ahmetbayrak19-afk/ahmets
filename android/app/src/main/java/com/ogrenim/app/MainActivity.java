@@ -139,7 +139,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // 5. WebViewClient (3D Model Yakalayıcı - FIX EKLENDİ)
+        // 5. WebViewClient (3D Model Yakalayıcı)
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
@@ -148,8 +148,7 @@ public class MainActivity extends AppCompatActivity {
                 // URL'nin sonu /human.glb ise yakala
                 if (url.endsWith("/human.glb")) {
                     try {
-                        // Assets klasöründen dosyayı aç
-                        // Eğer dosyayı public altına koyduysan: getAssets().open("public/human.glb") veya "public/models/human.glb"
+                        // Eğer human.glb'yi root asset'e koyduysan bu doğru:
                         InputStream is = getAssets().open("human.glb");
 
                         Map<String, String> headers = new HashMap<>();
@@ -168,7 +167,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // ✅ Uygulamayı Başlat (Cap sync web dosyalarını android_asset/public içine koyar)
+        // ✅ KRİTİK: cap sync web'i android_asset/public içine koyar
         webView.loadUrl("file:///android_asset/public/index.html");
     }
 
@@ -211,7 +210,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onNewIntent(Intent intent) {
+    protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(intent.getAction()) ||
                 NfcAdapter.ACTION_TECH_DISCOVERED.equals(intent.getAction()) ||
@@ -235,4 +234,4 @@ public class MainActivity extends AppCompatActivity {
         if (tts != null) { tts.stop(); tts.shutdown(); }
         super.onDestroy();
     }
-            }
+                     }
