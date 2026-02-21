@@ -1,32 +1,22 @@
-import React, {
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, useAnimations, useGLTF, useProgress } from "@react-three/drei";
 import * as THREE from "three";
 
-/** =========================
- *  Ayarlanabilir Sabitler
- *  ========================= */
-const SEA_ANIM_NAME = "yeme"; // ot sallanması animasyonu (yanlışlıkla yeme dediğini söyledin)
+const SEA_ANIM_NAME = "yeme";
 const SEA_ANIM_SPEED = 0.2;
 
-const FISH_SWIM_ANIM_NAME = "yuzme"; // balık yüzme animasyonu
-const MAX_SPEED = 1.6; // balık hızı (düşür: 1.0-2.0 arası)
-const CAMERA_Z = 9; // kamera uzaklık
-const CAMERA_LOOKAHEAD = 1.8; // nereye gidiyorum hissi için ileri bakış
-const FOG_DENSITY = 0.07;
+const FISH_SWIM_ANIM_NAME = "yuzme";
+const MAX_SPEED = 1.6;
+
+const CAMERA_Z = 10;
+const CAMERA_LOOKAHEAD = 2.0;
+
+// Fog fazla olursa denizi “yutar” → daha düşük
+const FOG_DENSITY = 0.03;
 
 type LogItem = { t: number; msg: string; level: "info" | "warn" | "error" };
 
-/** =========================
- *  Debug Logger (panel normalde kapalı)
- *  ========================= */
 function useScreenLogger() {
   const [logs, setLogs] = useState<LogItem[]>([]);
   const lastMsgRef = useRef<string>("");
@@ -204,9 +194,6 @@ class ScreenErrorBoundary extends React.Component<
   }
 }
 
-/** =========================
- *  World: Deniz + Balık + Kontrol + Kamera
- *  ========================= */
 function World({
   fishUrl,
   seaUrl,
@@ -218,7 +205,6 @@ function World({
   dracoBase: string;
   report: (msg: string, level?: "info" | "warn" | "error") => void;
 }) {
-  // Draco
   useMemo(() => {
     useGLTF.setDecoderPath(dracoBase.endsWith("/") ? dracoBase : `${dracoBase}/`);
   }, [dracoBase]);
@@ -226,21 +212,18 @@ function World({
   const sea = useGLTF(seaUrl);
   const fish = useGLTF(fishUrl);
 
-  // refs
   const seaGroupRef = useRef<THREE.Group | null>(null);
   const fishGroupRef = useRef<THREE.Group | null>(null);
 
-  // animasyonlar
   const seaAnim = useAnimations(sea.animations, sea.scene);
   const fishAnim = useAnimations(fish.animations, fish.scene);
   const swimActionRef = useRef<THREE.AnimationAction | null>(null);
 
-  // Deniz animasyonu 0.2 hız
+  // Deniz animasyonu
   useEffect(() => {
     const actions = seaAnim.actions;
     const names = seaAnim.names;
     const target = actions?.[SEA_ANIM_NAME] ? SEA_ANIM_NAME : names?.[0];
-
     if (target && actions[target]) {
       const a = actions[target]!;
       a.reset().fadeIn(0.15).play();
@@ -251,12 +234,11 @@ function World({
     }
   }, [seaAnim.actions, seaAnim.names, report]);
 
-  // Balık yuzme animasyonu: sadece hareket edince
+  // Balık yüzme animasyonu
   useEffect(() => {
     const actions = fishAnim.actions;
     const names = fishAnim.names;
     const target = actions?.[FISH_SWIM_ANIM_NAME] ? FISH_SWIM_ANIM_NAME : names?.[0];
-
     if (target && actions[target]) {
       const a = actions[target]!;
       a.reset();
@@ -269,82 +251,93 @@ function World({
     }
   }, [fishAnim.actions, fishAnim.names, report]);
 
-  // Deniz yönünü otomatik tahmin et (uzun eksen Z ise Y ekseninde 90° çevir)
-  const seaAutoRotYRef = useRef(0);
-  useEffect(() => {
-    // ham sahnenin box'ı
-    const box = new THREE.Box3().setFromObject(sea.scene);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-
-    // Eğer model “derinlikte” uzunsa (z > x), side-scroller için döndür
-    const rotY = size.z > size.x ? Math.PI / 2 : 0;
-    seaAutoRotYRef.current = rotY;
-
-    report(
-      `Deniz auto-rot: size(x=${size.x.toFixed(2)}, y=${size.y.toFixed(2)}, z=${size.z.toFixed(
-        2
-      )}) => rotY=${rotY ? "90deg" : "0deg"}`,
-      "info"
-    );
-
-    if (seaGroupRef.current) {
-      seaGroupRef.current.rotation.set(0, rotY, 0);
-    }
-  }, [sea.scene, report]);
-
-  // Bounds (deniz group üzerinden) + balık başlangıç
+  // ✅ DENİZİ OTOMATİK “GÖRÜNÜR” HALE GETİR:
+  // - center
+  // - scale (fit)
+  // - materyal doubleSide (bazı glb’lerde içten bakınca görünmez)
+  // - box helper (deniz nerde göreyim diye)
   const boundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number; fixedY: number } | null>(null);
+  const seaBoxHelperRef = useRef<THREE.Box3Helper | null>(null);
 
   useEffect(() => {
     if (!seaGroupRef.current) return;
 
-    const box = new THREE.Box3().setFromObject(seaGroupRef.current);
-    const size = new THREE.Vector3();
-    box.getSize(size);
+    // materyal düzelt (içeriden bakınca görünmeme ihtimali)
+    sea.scene.traverse((obj: any) => {
+      if (obj?.isMesh && obj.material) {
+        obj.material.side = THREE.DoubleSide;
+        obj.material.needsUpdate = true;
+      }
+    });
 
-    const padX = Math.max(0.8, size.x * 0.03);
-    const padY = Math.max(0.8, size.y * 0.08);
+    // önce deniz sahnesinin box'ını çıkar
+    const rawBox = new THREE.Box3().setFromObject(sea.scene);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    rawBox.getSize(size);
+    rawBox.getCenter(center);
+
+    // denizi kendi merkezine çek
+    sea.scene.position.sub(center);
+
+    // denizi “fit” ölçeğe getir (çok büyük/çok küçük olmasın)
+    const longest = Math.max(size.x, size.y, size.z);
+    const targetLongest = 60; // sahnede görmek için iyi bir ölçü
+    const scale = longest > 0 ? targetLongest / longest : 1;
+    sea.scene.scale.setScalar(scale);
+
+    // group pozisyonu: z biraz geride
+    seaGroupRef.current.position.set(0, 0, -8);
+
+    // yeni box (ölçek+merkez sonrası)
+    const box = new THREE.Box3().setFromObject(seaGroupRef.current);
+    const newSize = new THREE.Vector3();
+    box.getSize(newSize);
+
+    // bounds
+    const padX = Math.max(1.0, newSize.x * 0.04);
+    const padY = Math.max(1.0, newSize.y * 0.10);
 
     const minX = box.min.x + padX;
     const maxX = box.max.x - padX;
     const minY = box.min.y + padY;
     const maxY = box.max.y - padY;
-
-    // Kamera Y sabit: kaybolmayı azaltır
-    const fixedY = minY + (maxY - minY) * 0.60;
+    const fixedY = minY + (maxY - minY) * 0.55;
 
     boundsRef.current = { minX, maxX, minY, maxY, fixedY };
 
     report(
-      `Bounds: X[${minX.toFixed(2)}, ${maxX.toFixed(2)}] Y[${minY.toFixed(2)}, ${maxY.toFixed(
-        2
-      )}] fixedY=${fixedY.toFixed(2)}`,
+      `Deniz fit: scale=${scale.toFixed(3)} size=(${newSize.x.toFixed(1)},${newSize.y.toFixed(
+        1
+      )},${newSize.z.toFixed(1)})`,
       "info"
     );
-  }, [seaGroupRef.current, report]);
 
-  // Fish state
+    // Box helper (deniz nerede gör diye)
+    if (seaBoxHelperRef.current) {
+      seaGroupRef.current.remove(seaBoxHelperRef.current);
+      seaBoxHelperRef.current = null;
+    }
+    const helper = new THREE.Box3Helper(box, new THREE.Color("#00ff88"));
+    seaBoxHelperRef.current = helper;
+    seaGroupRef.current.add(helper);
+  }, [sea.scene, report]);
+
+  // fish state + drag
   const fishPos = useRef(new THREE.Vector3(0, 0, 0));
   const fishTarget = useRef(new THREE.Vector3(0, 0, 0));
   const dragging = useRef(false);
 
-  // İlk yerleştirme: bounds hazır olunca
   useEffect(() => {
     const b = boundsRef.current;
-    if (!b) return;
-
+    if (!b || !fishGroupRef.current) return;
     fishPos.current.set((b.minX + b.maxX) * 0.5, b.fixedY, 0);
     fishTarget.current.copy(fishPos.current);
-
-    if (fishGroupRef.current) {
-      fishGroupRef.current.position.copy(fishPos.current);
-      // Balığı yan çevir (default sağa bakar gibi)
-      fishGroupRef.current.rotation.y = Math.PI / 2;
-    }
+    fishGroupRef.current.position.copy(fishPos.current);
+    fishGroupRef.current.rotation.y = Math.PI / 2; // yan duruş
   }, [fish.scene]);
 
-  // Pointer -> world (z=0 plane)
+  // pointer->world
   const { camera, size: viewportSize } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), []);
@@ -364,39 +357,32 @@ function World({
   const onPointerDown = useCallback(
     (e: any) => {
       dragging.current = true;
-      const hit = pointerToWorld(e.clientX, e.clientY);
-      fishTarget.current.copy(hit);
+      fishTarget.current.copy(pointerToWorld(e.clientX, e.clientY));
     },
     [pointerToWorld]
   );
-
   const onPointerMove = useCallback(
     (e: any) => {
       if (!dragging.current) return;
-      const hit = pointerToWorld(e.clientX, e.clientY);
-      fishTarget.current.copy(hit);
+      fishTarget.current.copy(pointerToWorld(e.clientX, e.clientY));
     },
     [pointerToWorld]
   );
-
   const onPointerUp = useCallback(() => {
     dragging.current = false;
   }, []);
 
-  // Frame loop
   useFrame((state, dt) => {
     const b = boundsRef.current;
     if (!b || !fishGroupRef.current) return;
 
-    // hedef clamp
+    // clamp target
     fishTarget.current.x = THREE.MathUtils.clamp(fishTarget.current.x, b.minX, b.maxX);
     fishTarget.current.y = THREE.MathUtils.clamp(fishTarget.current.y, b.minY, b.maxY);
     fishTarget.current.z = 0;
 
-    // hareket: maxSpeed ile (çok hızlı gitmesin)
     const toTarget = fishTarget.current.clone().sub(fishPos.current);
     const dist = toTarget.length();
-
     const moving = dragging.current && dist > 0.01;
 
     if (moving) {
@@ -405,52 +391,46 @@ function World({
       fishPos.current.add(toTarget);
     }
 
-    // clamp tekrar
     fishPos.current.x = THREE.MathUtils.clamp(fishPos.current.x, b.minX, b.maxX);
     fishPos.current.y = THREE.MathUtils.clamp(fishPos.current.y, b.minY, b.maxY);
     fishPos.current.z = 0;
 
     fishGroupRef.current.position.copy(fishPos.current);
 
-    // Balık yönü: yan duruş + sağ/sol
+    // yön
     const dx = fishTarget.current.x - fishPos.current.x;
     if (Math.abs(dx) > 0.005) {
       fishGroupRef.current.rotation.y = dx >= 0 ? Math.PI / 2 : -Math.PI / 2;
     }
 
-    // Swim animasyonu
+    // swim anim
     const swim = swimActionRef.current;
     if (swim) {
-      if (moving) {
-        swim.paused = false;
-        swim.timeScale = 1.0;
-      } else {
-        swim.paused = true;
-      }
+      swim.paused = !moving;
+      if (moving) swim.timeScale = 1.0;
     }
 
-    // Kamera: balığı X takip, Y sabit (kaybolma azalır)
+    // kamera: X takip, Y sabit
     const cam = state.camera as THREE.PerspectiveCamera;
     const desiredCam = new THREE.Vector3(fishPos.current.x, b.fixedY, CAMERA_Z);
     cam.position.lerp(desiredCam, 1 - Math.pow(0.001, dt));
-
-    // İleri bakış: nereye gidiyorum hissi
-    cam.lookAt(new THREE.Vector3(fishPos.current.x + (dx >= 0 ? CAMERA_LOOKAHEAD : -CAMERA_LOOKAHEAD), b.fixedY, 0));
+    cam.lookAt(
+      new THREE.Vector3(
+        fishPos.current.x + (dx >= 0 ? CAMERA_LOOKAHEAD : -CAMERA_LOOKAHEAD),
+        b.fixedY,
+        0
+      )
+    );
   });
 
   return (
     <>
-      {/* Deniz */}
-      <group ref={seaGroupRef} position={[0, 0, -2]}>
-        <primitive object={sea.scene} />
-      </group>
-
-      {/* Balık (yan duruş) */}
+      {/* Balık */}
       <group ref={fishGroupRef}>
         <primitive object={fish.scene} />
       </group>
 
-      {/* Tüm ekran drag */}
+      {/* Fullscreen drag plane */}
       <mesh
         position={[0, 0, 0]}
         onPointerDown={onPointerDown}
@@ -465,13 +445,10 @@ function World({
   );
 }
 
-/** =========================
- *  Screen
- *  ========================= */
 export default function EslemeGame() {
   const { logs, push, clear } = useScreenLogger();
-
   const [showPanel, setShowPanel] = useState(false);
+
   const [fishUrl, setFishUrl] = useState("");
   const [seaUrl, setSeaUrl] = useState("");
   const [dracoBase, setDracoBase] = useState("");
@@ -485,7 +462,7 @@ export default function EslemeGame() {
     [push]
   );
 
-  // INIT (1 kez)
+  // init
   const initOnceRef = useRef(false);
   useEffect(() => {
     if (initOnceRef.current) return;
@@ -498,16 +475,13 @@ export default function EslemeGame() {
     setSeaUrl(new URL("models/deniz.glb", base).toString());
     setDracoBase(new URL("draco/", base).toString());
 
-    // çok kısa bilgi (panel açarsan görürsün)
     push(`origin: ${origin}`, "info");
     push(`BASE: ${base}`, "info");
   }, [push]);
 
-  // Fog + background
   const onCreated = useCallback(
     ({ gl, scene }: any) => {
       setGlReady(true);
-
       scene.background = new THREE.Color("#001623");
       scene.fog = new THREE.FogExp2("#001623", FOG_DENSITY);
 
@@ -534,10 +508,11 @@ export default function EslemeGame() {
         />
       )}
 
-      <Canvas camera={{ position: [0, 1, CAMERA_Z], fov: 45 }} onCreated={onCreated}>
-        <ambientLight intensity={0.7} />
-        <directionalLight position={[5, 5, 5]} intensity={1.0} />
-        <directionalLight position={[-5, -3, 2]} intensity={0.35} />
+      <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45, near: 0.1, far: 5000 }} onCreated={onCreated}>
+        {/* Işık biraz güçlü: deniz görünür olsun */}
+        <ambientLight intensity={1.0} />
+        <directionalLight position={[8, 10, 8]} intensity={1.4} />
+        <directionalLight position={[-8, -3, 2]} intensity={0.55} />
 
         <ScreenErrorBoundary
           onError={(m) => report(m, "error")}
@@ -572,9 +547,6 @@ export default function EslemeGame() {
             )}
           </Suspense>
         </ScreenErrorBoundary>
-
-        {/* Hungry Shark hissi için kapalı */}
-        {/* <OrbitControls enabled={false} /> */}
       </Canvas>
 
       {!glReady && (
@@ -598,4 +570,4 @@ export default function EslemeGame() {
       )}
     </div>
   );
-}
+      }
