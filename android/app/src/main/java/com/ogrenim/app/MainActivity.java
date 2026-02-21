@@ -20,10 +20,11 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
+
+import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.activity.OnBackPressedCallback;
 
 import org.json.JSONObject;
 
@@ -63,7 +64,7 @@ public class MainActivity extends AppCompatActivity {
                 new IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED)
         };
 
-        // 2. TTS (Sesli Okuma) Ayarları
+        // 2. TTS (Sesli Okuma)
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
                 tts.setLanguage(new Locale("tr", "TR"));
@@ -71,17 +72,16 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // 3. WebView Kurulumu
+        // 3. WebView
         webView = new WebView(this);
         setContentView(webView);
 
-        // Geri Tuşu Yönetimi
+        // Geri tuşu
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                if (webView.canGoBack()) {
-                    webView.goBack();
-                } else {
+                if (webView.canGoBack()) webView.goBack();
+                else {
                     setEnabled(false);
                     getOnBackPressedDispatcher().onBackPressed();
                 }
@@ -91,13 +91,16 @@ public class MainActivity extends AppCompatActivity {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
+
+        // File erişimleri
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
         settings.setAllowFileAccessFromFileURLs(true);
         settings.setAllowUniversalAccessFromFileURLs(true);
+
         settings.setMediaPlaybackRequiresUserGesture(false);
 
-        // JS Arayüzü (TTS için)
+        // JS Arayüzü (TTS)
         webView.addJavascriptInterface(new Object() {
             @JavascriptInterface
             public void speak(String text) {
@@ -108,7 +111,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }, "AndroidTTS");
 
-        // 4. WebChromeClient (Kamera/Mikrofon İzinleri ve Dosya Seçici)
+        // Kamera/Mikrofon izinleri + file chooser
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
@@ -119,11 +122,8 @@ public class MainActivity extends AppCompatActivity {
                         grants.add(resource);
                     }
                 }
-                if (!grants.isEmpty()) {
-                    request.grant(grants.toArray(new String[0]));
-                } else {
-                    request.deny();
-                }
+                if (!grants.isEmpty()) request.grant(grants.toArray(new String[0]));
+                else request.deny();
             }
 
             @Override
@@ -139,39 +139,72 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // 5. WebViewClient (3D Model Yakalayıcı)
+        // ✅ EN KRİTİK: GLB + DRACO isteklerini asset'ten servis et
         webView.setWebViewClient(new WebViewClient() {
+
+            private WebResourceResponse serveAsset(String assetPath, String mimeType) {
+                try {
+                    InputStream is = getAssets().open(assetPath);
+
+                    Map<String, String> headers = new HashMap<>();
+                    headers.put("Access-Control-Allow-Origin", "*");
+                    headers.put("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+                    headers.put("Access-Control-Allow-Headers", "*");
+                    headers.put("Cache-Control", "no-store");
+                    headers.put("Content-Type", mimeType);
+
+                    // binary dosyalarda encoding null/empty daha sağlıklı
+                    return new WebResourceResponse(mimeType, null, 200, "OK", headers, is);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return null;
+                }
+            }
+
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                String url = request.getUrl().toString();
+                Uri uri = request.getUrl();
+                String url = uri.toString();
+                String path = uri.getPath(); // ör: /public/models/balik.glb veya /public/draco/draco_decoder.wasm
 
-                // URL'nin sonu /human.glb ise yakala
-                if (url.endsWith("/human.glb")) {
-                    try {
-                        // Eğer human.glb'yi root asset'e koyduysan bu doğru:
-                        InputStream is = getAssets().open("human.glb");
+                if (path == null) return super.shouldInterceptRequest(view, request);
 
-                        Map<String, String> headers = new HashMap<>();
-                        headers.put("Access-Control-Allow-Origin", "*");
-                        headers.put("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-                        headers.put("Access-Control-Allow-Headers", "*");
-                        headers.put("Content-Type", "model/gltf-binary");
-
-                        return new WebResourceResponse("model/gltf-binary", "UTF-8", 200, "OK", headers, is);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        return null;
-                    }
+                // 1) GLB: /public/models/*.glb
+                if (path.startsWith("/public/models/") && path.endsWith(".glb")) {
+                    // asset yolu: public/models/balik.glb
+                    String assetPath = "public/models/" + path.substring("/public/models/".length());
+                    return serveAsset(assetPath, "model/gltf-binary");
                 }
+
+                // 2) DRACO: /public/draco/*
+                if (path.startsWith("/public/draco/")) {
+                    String file = path.substring("/public/draco/".length());
+                    String assetPath = "public/draco/" + file;
+
+                    if (file.endsWith(".wasm")) {
+                        return serveAsset(assetPath, "application/wasm");
+                    }
+                    if (file.endsWith(".js")) {
+                        return serveAsset(assetPath, "application/javascript");
+                    }
+                    // diğer dosyalar (README vs) istenirse:
+                    return serveAsset(assetPath, "application/octet-stream");
+                }
+
+                // 3) Senin eski kuralın: /human.glb yakala (korudum)
+                if (url.endsWith("/human.glb")) {
+                    // Eğer human.glb'yi artık public altına koyduysan bunu "public/models/human.glb" yap
+                    return serveAsset("human.glb", "model/gltf-binary");
+                }
+
                 return super.shouldInterceptRequest(view, request);
             }
         });
 
-        // ✅ KRİTİK: cap sync web'i android_asset/public içine koyar
+        // ✅ Açılış: cap sync -> android_asset/public
         webView.loadUrl("file:///android_asset/public/index.html");
     }
 
-    // İzin İsteme Fonksiyonu
     private void checkAndRequestPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             String[] permissions = {Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO, Manifest.permission.NFC};
@@ -183,7 +216,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // Dosya Seçici Sonucu
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == FILECHOOSER_RESULTCODE) {
@@ -196,7 +228,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // NFC Yaşam Döngüsü
     @Override
     protected void onResume() {
         super.onResume();
@@ -234,4 +265,4 @@ public class MainActivity extends AppCompatActivity {
         if (tts != null) { tts.stop(); tts.shutdown(); }
         super.onDestroy();
     }
-                     }
+    }
