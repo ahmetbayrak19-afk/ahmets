@@ -1,15 +1,6 @@
-import React, { Suspense, useEffect, useMemo, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Html, OrbitControls, useGLTF, useProgress } from "@react-three/drei";
-
-/**
- * Amaç:
- * - Console yokken bile hatayı ekrana basmak
- * - Draco decoder'ı APK içinden yüklemek (WebViewAssetLoader ile):
- *   https://appassets.androidplatform.net/assets/public/draco/*
- * - GLB'yi APK içinden yüklemek:
- *   https://appassets.androidplatform.net/assets/public/models/balik.glb
- */
 
 type LogItem = { t: number; msg: string; level: "info" | "warn" | "error" };
 
@@ -96,7 +87,6 @@ function LogOverlay({
   );
 }
 
-/** Drei Loader */
 function Loader3D() {
   const { progress } = useProgress();
   return (
@@ -117,11 +107,6 @@ function Loader3D() {
   );
 }
 
-/**
- * Drei ErrorBoundary yoksa:
- * - React class ErrorBoundary kullanıyoruz
- * - Hata mesajını ekrana basıyoruz
- */
 class ScreenErrorBoundary extends React.Component<
   { onError: (msg: string) => void; fallback?: React.ReactNode; children: React.ReactNode },
   { hasError: boolean }
@@ -176,15 +161,18 @@ function Model3D({
   dracoBase: string;
   report: (msg: string, level?: "info" | "warn" | "error") => void;
 }) {
-  // Draco dosyaları: /assets/public/draco/*
+  // Decoder path'i sadece değiştiğinde set et
   useMemo(() => {
-    // üç.js DRACOLoader içinden relative fetch yapar, bu yüzden trailing slash şart
     useGLTF.setDecoderPath(dracoBase.endsWith("/") ? dracoBase : `${dracoBase}/`);
   }, [dracoBase]);
 
   const { scene } = useGLTF(url);
 
+  // ✅ spam'i kes: sadece ilk başarılı yüklemede log bas
+  const loggedRef = useRef(false);
   useEffect(() => {
+    if (loggedRef.current) return;
+    loggedRef.current = true;
     report("BAŞARILI: GLB yüklendi ve sahneye eklendi.", "info");
   }, [report]);
 
@@ -197,9 +185,12 @@ export default function EslemeGame() {
   const [dracoBase, setDracoBase] = useState<string>("");
   const [glReady, setGlReady] = useState<boolean>(false);
 
-  const report = (msg: string, level: "info" | "warn" | "error" = "info") => push(msg, level);
+  // ✅ report referansı sabit
+  const report = useCallback(
+    (msg: string, level: "info" | "warn" | "error" = "info") => push(msg, level),
+    [push]
+  );
 
-  // Console olmadan global hata yakala
   useEffect(() => {
     const onError = (event: ErrorEvent) => {
       const where = event.filename ? ` @ ${event.filename}:${event.lineno}:${event.colno}` : "";
@@ -221,17 +212,15 @@ export default function EslemeGame() {
       window.removeEventListener("error", onError);
       window.removeEventListener("unhandledrejection", onRejection);
     };
-  }, []);
+  }, [report]);
 
   useEffect(() => {
     report(`href: ${window.location.href}`, "info");
     report(`origin: ${window.location.origin}`, "info");
 
-    // ✅ WebViewAssetLoader kullanıyorsun: sayfa /assets/public/... altında.
-    // Bu yüzden kaynakları da buradan absolute veriyoruz.
-    const base = new URL("/assets/public/", window.location.origin).toString(); // https://appassets.../assets/public/
-    const glb = new URL("models/balik.glb", base).toString(); // .../assets/public/models/balik.glb
-    const draco = new URL("draco/", base).toString(); // .../assets/public/draco/
+    const base = new URL("/assets/public/", window.location.origin).toString();
+    const glb = new URL("models/balik.glb", base).toString();
+    const draco = new URL("draco/", base).toString();
 
     setModelUrl(glb);
     setDracoBase(draco);
@@ -239,6 +228,13 @@ export default function EslemeGame() {
     report(`BASE: ${base}`, "info");
     report(`GLB URL: ${glb}`, "info");
     report(`DRACO BASE: ${draco}`, "info");
+
+    // preload (doğru path)
+    try {
+      useGLTF.preload(glb);
+    } catch {
+      // preload bazı ortamlarda erken çağrılınca patlayabilir, umursama
+    }
 
     const testFetch = async (path: string, label: string) => {
       try {
@@ -250,13 +246,11 @@ export default function EslemeGame() {
       }
     };
 
-    // GLB erişim
     testFetch(glb, "GLB fetch");
-    // Draco erişim (✅ doğru path)
     testFetch(new URL("draco_wasm_wrapper.js", draco).toString(), "DRACO wrapper");
     testFetch(new URL("draco_decoder.wasm", draco).toString(), "DRACO wasm");
     testFetch(new URL("draco_decoder.js", draco).toString(), "DRACO decoder.js");
-  }, []);
+  }, [report]);
 
   return (
     <div style={{ width: "100vw", height: "100vh", background: "#000" }}>
@@ -343,7 +337,4 @@ export default function EslemeGame() {
       )}
     </div>
   );
-}
-
-// Optional preload (✅ doğru path)
-useGLTF.preload("https://appassets.androidplatform.net/assets/public/models/balik.glb");
+     }
