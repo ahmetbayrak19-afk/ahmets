@@ -36,7 +36,8 @@ const FISH_SCALE = 3.0;
 // Dönüş Hassasiyetleri
 const TURN_SMOOTH_YAW = 8.0;   
 const TURN_SMOOTH_PITCH = 8.0; 
-const MAX_PITCH_ANGLE = Math.PI / 3; 
+// Burnunu en fazla 45 derece kaldırsın (Estetik açıdan en iyisi)
+const MAX_PITCH_ANGLE = Math.PI / 4; 
 
 const BOUNCE = 0.6;
 const FRICTION = 0.92;
@@ -82,6 +83,7 @@ class ScreenErrorBoundary extends React.Component<{ onError: (msg: string) => vo
   render() { if (this.state.hasError) return null; return this.props.children as any; }
 }
 
+// ✅ EKRAN ESNEMESİNİ ÖNLEYEN DOKUNMATİK ALAN
 function CanvasEvents({ onDown, onUp }: { onDown: () => void; onUp: () => void; }) {
   return ( 
     <mesh 
@@ -148,7 +150,8 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
   const fishTarget = useRef(new THREE.Vector3(0, 0, Z_PLANE));
   const dragging = useRef(false);
 
-  const currentYaw = useRef(-Math.PI / 2); 
+  // Başlangıç Yönü: Sağa bakarak başlasın (Math.PI)
+  const currentYaw = useRef(Math.PI); 
   const currentPitch = useRef(0);
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
@@ -159,7 +162,7 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
   useFrame((state, dt) => {
     if (!fishGroup.current) return;
 
-    // 🔥 HUNGRY SHARK MANTIĞI: Parmak basılıysa hedefi KESİNTİSİZ canlı güncelle!
+    // 🔥 CANLI HEDEF TAKİBİ: Parmak ekranda olduğu sürece hedefi kameraya göre güncelle
     if (dragging.current) {
       raycaster.setFromCamera(state.pointer, state.camera);
       raycaster.ray.intersectPlane(plane, fishTarget.current);
@@ -173,7 +176,7 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
     const dy = fishTarget.current.y - fishPos.current.y;
     const dist = Math.hypot(dx, dy);
     
-    // 🔥 ÖLÜ BÖLGE (DEADZONE): Hedefe çok yakınsa titremeyi kes!
+    // Titremeyi kesen deadzone
     const moving = dragging.current && dist > 0.2;
 
     if (moving) {
@@ -184,12 +187,13 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
       fishVel.current.x = THREE.MathUtils.lerp(fishVel.current.x, targetVx, a);
       fishVel.current.y = THREE.MathUtils.lerp(fishVel.current.y, targetVy, a);
 
+      // ✅ SAĞA VE SOLA NET KİLİTLENME
       let targetYaw = currentYaw.current; 
-      if (nx > 0.1) targetYaw = -Math.PI / 2;       
-      else if (nx < -0.1) targetYaw = Math.PI / 2;  
+      if (nx > 0.05) targetYaw = Math.PI;       // Sağa tam dön
+      else if (nx < -0.05) targetYaw = 0;       // Sola tam dön
 
-      const pitchDirection = (targetYaw < 0) ? 1 : -1;
-      let targetPitch = ny * MAX_PITCH_ANGLE * pitchDirection;
+      // ✅ BURNU YUKARI/AŞAĞI KALDIRMA (Göbek / Sırt)
+      let targetPitch = ny * MAX_PITCH_ANGLE;
 
       const tYaw = 1 - Math.pow(0.001, dt * TURN_SMOOTH_YAW);
       const tPitch = 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH);
@@ -198,7 +202,7 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
       currentPitch.current = lerp(currentPitch.current, targetPitch, tPitch);
 
     } else {
-      // Motorları durdur, süzül.
+      // Motorları durdur, süzülerek yatay konuma geç
       fishVel.current.multiplyScalar(DRAG_STOP);
       const tPitch = 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH);
       currentPitch.current = lerp(currentPitch.current, 0, tPitch);
@@ -216,9 +220,10 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
 
     fishGroup.current.position.copy(fishPos.current);
 
-    // Roll sıfır, Yaw sağ/sol, Pitch burun havaya.
+    // 🔥 FOTOĞRAFTAN ÇIKAN MUHTEŞEM DÜZELTME
+    // Yan devrilmeyi (Roll) bitirip burnu kaldırmayı (Pitch) doğru eksene (Z) atadık
     fishGroup.current.rotation.set(0, currentYaw.current, 0, 'YXZ');
-    fishGroup.current.rotateZ(currentPitch.current);
+    fishGroup.current.rotateZ(-currentPitch.current);
 
     const swim = swimActionRef.current;
     if (swim) swim.paused = !moving;
@@ -264,8 +269,9 @@ export default function EslemeGame() {
   }, []);
 
   return (
-    <div style={{ width: "100vw", height: "100vh", background: BG_COLOR }}>
-      <Overlay title="HUNGRY SHARK TAKİP MANTIĞI AKTİF" lines={lines} onClear={clear} />
+    // 🔥 EKRAN ESNEMESİNİ KİLİTLEYEN CSS: touchAction: "none" EKLENDİ
+    <div style={{ width: "100vw", height: "100vh", background: BG_COLOR, touchAction: "none" }}>
+      <Overlay title="ARCADE KONTROL & SIFIR ESNEME" lines={lines} onClear={clear} />
       <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45, near: 0.1, far: 5000 }} onCreated={({ scene }) => { scene.background = new THREE.Color(BG_COLOR); }}>
         <ambientLight intensity={1.0} />
         <directionalLight position={[10, 12, 10]} intensity={2.1} />
@@ -279,4 +285,5 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-}
+                                                 }
+    
