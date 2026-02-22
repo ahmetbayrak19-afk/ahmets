@@ -4,12 +4,9 @@ import { Html, useAnimations, useGLTF, useProgress } from "@react-three/drei";
 import * as THREE from "three";
 
 /** ---- Utils ---- */
-// Basit ve yumuşak geçiş fonksiyonu
 function lerp(start: number, end: number, t: number) {
   return start * (1 - t) + end * t;
 }
-
-// Açıları en kısa yoldan yumuşatmak için (U dönüşleri için kritik)
 function lerpAngle(a: number, b: number, t: number) {
   const TWO_PI = Math.PI * 2;
   let diff = (b - a) % TWO_PI;
@@ -20,7 +17,6 @@ function lerpAngle(a: number, b: number, t: number) {
 /** ==== AYARLAR ==== */
 const SEA_ANIM_NAME = "yeme";
 const SEA_ANIM_SPEED = 0.2;
-
 const FISH_SWIM_ANIM_NAME = "yuzme";
 
 // Hız ayarları
@@ -38,9 +34,9 @@ const SEA_SCALE_MULT = 2.0;
 const FISH_SCALE = 3.0;
 
 // Dönüş Hassasiyetleri
-const TURN_SMOOTH_YAW = 6.0;   // Sağa/Sola U dönüşü hızı
+const TURN_SMOOTH_YAW = 8.0;   // Sağa/Sola U dönüşü hızı
 const TURN_SMOOTH_PITCH = 8.0; // Yukarı/Aşağı burun kaldırma hızı
-const MAX_PITCH_ANGLE = Math.PI / 4; // Burnunu en fazla 45 derece kaldırıp/indirsin (Göbek/Sırt açısı)
+const MAX_PITCH_ANGLE = Math.PI / 3; // Burnunu kaldırma sınırı (Maksimum göbek/sırt açısı)
 
 const BOUNCE = 0.6;
 const FRICTION = 0.92;
@@ -141,10 +137,8 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
   const fishTarget = useRef(new THREE.Vector3(0, 0, Z_PLANE));
   const dragging = useRef(false);
 
-  // ✅ YENİ MANTIK DEĞİŞKENLERİ
-  // Yaw = Sağa/Sola Dönüş (U Dönüşü)
-  // Pitch = Yukarı/Aşağı Burnunu Kaldırma (Göbek/Sırt)
-  const currentYaw = useRef(Math.PI / 2); // Başlangıçta sağa bakıyor
+  // Başlangıçta sağa dönük başlasın
+  const currentYaw = useRef(-Math.PI / 2); 
   const currentPitch = useRef(0);
 
   useEffect(() => { if (!fishGroup.current) return; fishGroup.current.scale.setScalar(FISH_SCALE); }, [fish.scene]);
@@ -160,7 +154,7 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
     const dy = fishTarget.current.y - fishPos.current.y;
     const dist = Math.hypot(dx, dy);
     
-    // Titremeyi önlemek için ölü bölge
+    // Parmağa ulaştığında durması için hassas eşik
     const moving = dragging.current && dist > 0.15;
 
     if (moving) {
@@ -170,25 +164,18 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
       fishVel.current.x = THREE.MathUtils.lerp(fishVel.current.x, targetVx, a);
       fishVel.current.y = THREE.MathUtils.lerp(fishVel.current.y, targetVy, a);
 
-      // ==========================================
-      // ✅ SENİN İSTEDİĞİN GÖBEK/SIRT/YAN PROFİL MATEMATİĞİ
-      // ==========================================
+      // ✅ 1. SAĞA MI SOLA MI GİDİYORUZ? (TAM TERSİNE ÇEVRİLDİ)
+      // Artık sağa çektiğinde kuyruktan sürüklenmeyecek, burnu önde gidecek.
+      let targetYaw = currentYaw.current; 
+      if (nx > 0.1) targetYaw = -Math.PI / 2;       // Sağa giderken burnunu sağa dönecek
+      else if (nx < -0.1) targetYaw = Math.PI / 2;  // Sola giderken burnunu sola dönecek
 
-      // 1. SAĞA MI SOLA MI GİDİYORUZ? (YAW HESABI)
-      // Parmağın sağdaysa Yaw = 90 derece (Math.PI/2)
-      // Parmağın soldaysa Yaw = -90 derece (-Math.PI/2)
-      let targetYaw = currentYaw.current; // Varsayılan: Yönünü koru
-      if (nx > 0.1) targetYaw = Math.PI / 2;       // Net sağ
-      else if (nx < -0.1) targetYaw = -Math.PI / 2; // Net sol
-
-      // 2. YUKARI MI AŞAĞI MI GİDİYORUZ? (PITCH HESABI)
-      // Parmağın Y eksenindeki yüksekliğine (ny) göre burnunu kaldır/indir.
-      // Eğim (ny), -1 ile +1 arasındadır. Bunu MAX_PITCH_ANGLE (45 derece) ile çarpıyoruz.
-      // Sola giderken eğimin (ny) ters çevrilmesi gerekir ki göbeği hep aşağıda/yukarıda doğru görünsün.
-      const pitchDirection = (targetYaw > 0) ? 1 : -1; 
+      // ✅ 2. YUKARI MI AŞAĞI MI GİDİYORUZ? (GÖBEK VE SIRT)
+      // Balık sola bakarken pitch ekseni tersine döner, bunu pitchDirection ile çözeriz.
+      const pitchDirection = (targetYaw < 0) ? 1 : -1;
       let targetPitch = ny * MAX_PITCH_ANGLE * pitchDirection;
 
-      // 3. YUMUŞAK GEÇİŞLER (U Dönüşü ve Burnunu Yumuşakça Kaldırma)
+      // 3. YUMUŞATICI
       const tYaw = 1 - Math.pow(0.001, dt * TURN_SMOOTH_YAW);
       const tPitch = 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH);
       
@@ -197,8 +184,7 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
 
     } else {
       fishVel.current.multiplyScalar(DRAG_STOP);
-      
-      // Durduğunda burnunu düzelt, ama sağa/sola bakışını (Yaw) koru.
+      // Durunca göbeği düzeltip yola paralel hale gelir
       const tPitch = 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH);
       currentPitch.current = lerp(currentPitch.current, 0, tPitch);
     }
@@ -215,27 +201,15 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
 
     fishGroup.current.position.copy(fishPos.current);
 
-    // ==========================================
-    // ✅ BALIĞA ROTASYONU UYGULAMA
-    // Roll (Z) = Her zaman 0 (Asla yan yatmaz, ölü balık olmaz)
-    // Yaw (Y) = Sağa/Sola bakış (U Dönüşü yapar)
-    // Pitch (X) = Yukarı/Aşağı burun kaldırma (Göbek ve sırtı gösterir)
-    //
-    // NOT: Balığın orjinal burnu -X ekseninde olduğu için, sistemin X ekseni 
-    // balığın Pitch ekseni gibi davranır. Y ekseni ise Yaw eksenidir.
-    // ==========================================
-    
-    // Euler rotasyonu sırası 'YXZ' olarak ayarlanmalıdır ki dönüşler birbirini bozmasın.
+    // ✅ 4. EKSEN UYGULAMA (SIFIR HATA)
+    // Önce sağa/sola döndür, sonra burnunu kaldır. Asla yan yatma!
     fishGroup.current.rotation.set(0, currentYaw.current, 0, 'YXZ');
-    
-    // Pitch (Burnu kaldırma/indirme) işlemini sadece Z ekseninde (ekran düzleminde) yapıyoruz.
-    // Çünkü balık Y ekseninde sağa veya sola döndü. Artık burnunu kaldırmak için 
-    // Global Z ekseninde (veya balığın yerel Z/X ekseninde) dönmesi gerekiyor.
     fishGroup.current.rotateZ(currentPitch.current);
 
     const swim = swimActionRef.current;
     if (swim) swim.paused = !moving;
 
+    // Kamera dümdüz bakar, sarsılmaz.
     const cam = state.camera as THREE.PerspectiveCamera;
     const desiredCam = new THREE.Vector3(fishPos.current.x, fishPos.current.y, CAMERA_Z);
     const tCam = 1 - Math.pow(0.001, dt * CAMERA_SMOOTH);
@@ -289,4 +263,5 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-  }
+    }
+      
