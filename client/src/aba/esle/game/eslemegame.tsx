@@ -531,4 +531,4 @@ export default function EslemeGame() {
       )}
     </div>
   );
-                   }
+}
