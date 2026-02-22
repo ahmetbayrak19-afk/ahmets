@@ -12,18 +12,18 @@ function lerpAngle(a: number, b: number, t: number) {
 }
 
 /** ==== AYARLAR ==== */
-const SEA_ANIM_NAME = "yeme"; //
+const SEA_ANIM_NAME = "yeme";
 const SEA_ANIM_SPEED = 0.2;
 
 const FISH_SWIM_ANIM_NAME = "yuzme";
 
 // Hareket
-const MAX_SPEED = 7.2;     
-const ACCEL = 10.0;        
-const DRAG_STOP = 0.90;    
+const MAX_SPEED = 7.2;
+const ACCEL = 10.0;
+const DRAG_STOP = 0.90;
 const Z_PLANE = 0; // Balık hep bu düzlemde kalacak (yan profil için)
 
-// Kamera (balığı XY takip)
+// Kamera
 const CAMERA_Z = 10;
 const CAMERA_SMOOTH = 7.0;
 const LOOK_SMOOTH = 9.0;
@@ -36,12 +36,11 @@ const SEA_SCALE_MULT = 2.0;
 // Balık
 const FISH_SCALE = 3.0;
 
-// ✅ Pivot burnunda olduğu için NOSE_OFFSET düzeltildi. 
-// Eğer balık ters dönerse burayı 0 veya Math.PI olarak değiştir.
+// Pivot burnunda olduğu için NOSE_OFFSET
 const NOSE_OFFSET_RAD = Math.PI;
 
 // Dönüş yumuşaklığı
-const TURN_SMOOTH = 8.0;
+const TURN_SMOOTH = 10.0;
 
 // Çarpma
 const BOUNCE = 0.6;
@@ -51,11 +50,11 @@ const FRICTION = 0.92;
 const BG_COLOR = "#0b2a46";
 
 // Sonsuz su
-const WATER_Y_OFFSET = -1.8;      
+const WATER_Y_OFFSET = -1.8;
 const WATER_THICKNESS = 2.8;
 const WATER_WAVE_STRENGTH = 0.35;
 const WATER_SCROLL_SPEED = 0.08;
-const WATER_TILES = 5;            
+const WATER_TILES = 5;
 
 type LogItem = { msg: string; level: "info" | "warn" | "error" };
 
@@ -82,15 +81,39 @@ function useOverlayLog() {
 }
 
 function Overlay({ title, lines, onClear }: { title: string; lines: LogItem[]; onClear: () => void }) {
-  // ... (Overlay kodu aynı kalabilir, yer kaplamasın diye kısalttım, sen kendi orijinalini kullan)
-  return null; 
+  return (
+    <div
+      style={{
+        position: "fixed", top: 10, left: 10, right: 10, maxWidth: 820, zIndex: 999999,
+        background: "rgba(0,0,0,0.88)", border: "1px solid rgba(255,255,255,0.15)",
+        borderRadius: 12, padding: 12, fontFamily: "monospace", fontSize: 12, color: "#e5e7eb", pointerEvents: "auto",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ fontWeight: 800, color: "#ffcc00" }}>{title}</div>
+        <button
+          onClick={onClear}
+          style={{ marginLeft: "auto", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", padding: "6px 10px", borderRadius: 10, cursor: "pointer", }}
+        >
+          Temizle
+        </button>
+      </div>
+      <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
+        {lines.map((l, i) => (
+          <div key={i} style={{ color: l.level === "error" ? "#ff4d4d" : l.level === "warn" ? "#fbbf24" : "#a7f3d0", whiteSpace: "pre-wrap", wordBreak: "break-word", }}>
+            {"> "} {l.msg}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function Loader3D() {
   const { progress } = useProgress();
   return (
     <Html center>
-      <div style={{ color: "white", background: "rgba(0,0,0,0.75)", padding: "10px 12px", borderRadius: 10, fontFamily: "monospace" }}>
+      <div style={{ color: "white", background: "rgba(0,0,0,0.75)", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.2)", fontFamily: "monospace", }}>
         Yükleniyor: %{progress.toFixed(0)}
       </div>
     </Html>
@@ -113,8 +136,7 @@ function CanvasEvents({ onDown, onMove, onUp }: { onDown: (e: any) => void; onMo
   );
 }
 
-/** ---- ✅ RESİMSİZ (PROSEDÜREL) WATER SHADER ---- */
-// waternormals.jpg GİTTİ! Tamamen matematiksel, bizim eski pürüzsüz denizimiz.
+/** ---- ✅ YENİ: OFFLINE WATER SHADER (JPG İNDİRMEK YOK) ---- */
 function useWaterRibbonMaterial() {
   return useMemo(() => {
     return new THREE.ShaderMaterial({
@@ -130,17 +152,14 @@ function useWaterRibbonMaterial() {
       },
       vertexShader: `
         varying vec2 vUv;
-        varying vec3 vPos;
         void main() {
           vUv = uv;
-          vPos = position;
           vec4 wp = modelMatrix * vec4(position, 1.0);
           gl_Position = projectionMatrix * viewMatrix * wp;
         }
       `,
       fragmentShader: `
         varying vec2 vUv;
-        varying vec3 vPos;
         uniform float uTime;
         uniform float uOpacity;
         uniform float uWave;
@@ -148,7 +167,7 @@ function useWaterRibbonMaterial() {
         uniform vec3 uColorDeep;
         uniform vec3 uColorLight;
 
-        // Basit bir gürültü/dalga fonksiyonu (JPG yerine bunu kullanıyoruz)
+        // Kendi dalgamızı matematiksel yaratıyoruz
         float wave(vec2 p) {
             float w = sin(p.x * 5.0 + uTime * uScroll * 10.0) * 0.5 + 0.5;
             w += cos(p.y * 3.0 - uTime * uScroll * 5.0) * 0.5 + 0.5;
@@ -158,17 +177,14 @@ function useWaterRibbonMaterial() {
         void main() {
           vec2 uv = vUv;
           
-          // Matematiksel dalga üretimi
           float w1 = wave(uv * vec2(4.0, 1.0));
           float w2 = wave(uv * vec2(8.0, 2.0) + vec2(1.2, 0.5));
           float combinedWave = (w1 + w2) * uWave;
 
           float edge = smoothstep(0.0, 0.35, vUv.y) * smoothstep(1.0, 0.75, vUv.y);
-          
           float t = clamp(vUv.y + combinedWave * 0.45, 0.0, 1.0);
           vec3 col = mix(uColorDeep, uColorLight, t);
 
-          // Pırıltı efekti (matematiksel)
           float sparkle = pow(clamp(combinedWave, 0.0, 1.0), 6.0) * 0.35;
           col += sparkle;
 
@@ -181,7 +197,7 @@ function useWaterRibbonMaterial() {
 }
 
 function InfiniteWaterRibbon({ width, y, z }: { width: number; y: number; z: number; }) {
-  const mat = useWaterRibbonMaterial();
+  const mat = useWaterRibbonMaterial(); // Artık baseUrl beklemiyor
   const geom = useMemo(() => new THREE.PlaneGeometry(width, WATER_THICKNESS, 64, 4), [width]);
   const groupRef = useRef<THREE.Group | null>(null);
   const { camera } = useThree();
@@ -208,7 +224,19 @@ function InfiniteWaterRibbon({ width, y, z }: { width: number; y: number; z: num
   );
 }
 
-function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: string; dracoBase: string; log: (m: string, lvl?: "info" | "warn" | "error") => void; }) {
+function World({
+  fishUrl,
+  seaUrl,
+  dracoBase,
+  baseUrl,
+  log,
+}: {
+  fishUrl: string;
+  seaUrl: string;
+  dracoBase: string;
+  baseUrl: string;
+  log: (m: string, lvl?: "info" | "warn" | "error") => void;
+}) {
   useMemo(() => {
     useGLTF.setDecoderPath(dracoBase.endsWith("/") ? dracoBase : `${dracoBase}/`);
   }, [dracoBase]);
@@ -238,11 +266,19 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
 
   useEffect(() => {
     if (!seaGroup.current) return;
-    sea.scene.traverse((o: any) => { if (o?.isMesh && o.material) { o.material.side = THREE.DoubleSide; o.material.needsUpdate = true; } });
+
+    sea.scene.traverse((o: any) => {
+      if (o?.isMesh && o.material) {
+        o.material.side = THREE.DoubleSide;
+        o.material.needsUpdate = true;
+      }
+    });
 
     const rawBox = new THREE.Box3().setFromObject(sea.scene);
-    const size = new THREE.Vector3(); const center = new THREE.Vector3();
-    rawBox.getSize(size); rawBox.getCenter(center);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    rawBox.getSize(size);
+    rawBox.getCenter(center);
     sea.scene.position.sub(center);
 
     const longest = Math.max(size.x, size.y, size.z);
@@ -253,17 +289,28 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
     seaGroup.current.rotation.set(0, SEA_ROT_Y, 0);
 
     const box = new THREE.Box3().setFromObject(seaGroup.current);
-    const newSize = new THREE.Vector3(); const newCenter = new THREE.Vector3();
-    box.getSize(newSize); box.getCenter(newCenter);
+    const newSize = new THREE.Vector3();
+    const newCenter = new THREE.Vector3();
+    box.getSize(newSize);
+    box.getCenter(newCenter);
 
     const padX = Math.max(2.0, newSize.x * 0.04);
     const padY = Math.max(2.0, newSize.y * 0.10);
 
-    boundsRef.current = { minX: box.min.x + padX, maxX: box.max.x - padX, minY: box.min.y + padY, maxY: box.max.y - padY };
-    surfaceRef.current = { w: newSize.x * 1.2, y: box.max.y - newSize.y * 0.02, z: newCenter.z };
+    boundsRef.current = {
+      minX: box.min.x + padX,
+      maxX: box.max.x - padX,
+      minY: box.min.y + padY,
+      maxY: box.max.y - padY,
+    };
+
+    surfaceRef.current = {
+      w: newSize.x * 1.2,
+      y: box.max.y - newSize.y * 0.02,
+      z: newCenter.z,
+    };
   }, [sea.scene]);
 
-  // ✅ YEM TAKİBİ VE DÜZ DURUŞ
   const fishPos = useRef(new THREE.Vector3(0, 0, Z_PLANE));
   const fishVel = useRef(new THREE.Vector2(0, 0));
   const fishTarget = useRef(new THREE.Vector3(0, 0, Z_PLANE));
@@ -281,17 +328,19 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -Z_PLANE), []);
 
-  const ndcToWorld = useCallback((xNdc: number, yNdc: number) => {
-    raycaster.setFromCamera({ x: xNdc, y: yNdc }, camera);
-    const hit = new THREE.Vector3();
-    raycaster.ray.intersectPlane(plane, hit);
-    return hit;
-  }, [camera, plane, raycaster]);
+  const ndcToWorld = useCallback(
+    (xNdc: number, yNdc: number) => {
+      raycaster.setFromCamera({ x: xNdc, y: yNdc }, camera);
+      const hit = new THREE.Vector3();
+      raycaster.ray.intersectPlane(plane, hit);
+      return hit;
+    },
+    [camera, plane, raycaster]
+  );
 
   const updateTarget = (e: any) => {
     dragging.current = true;
-    const hit = ndcToWorld(e.pointer.x, e.pointer.y);
-    fishTarget.current.copy(hit);
+    fishTarget.current.copy(ndcToWorld(e.pointer.x, e.pointer.y));
   };
 
   useFrame((state, dt) => {
@@ -304,12 +353,11 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
     }
     fishTarget.current.z = Z_PLANE;
 
-    // ✅ Balığın burnu hedefe (parmağına) bakacak şekilde yönelmesi
     const dx = fishTarget.current.x - fishPos.current.x;
     const dy = fishTarget.current.y - fishPos.current.y;
     const dist = Math.hypot(dx, dy);
 
-    const moving = dragging.current && dist > 0.05;
+    const moving = dragging.current && dist > 0.02;
 
     if (moving) {
       const nx = dx / dist;
@@ -322,31 +370,10 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
       fishVel.current.x = THREE.MathUtils.lerp(fishVel.current.x, targetVx, a);
       fishVel.current.y = THREE.MathUtils.lerp(fishVel.current.y, targetVy, a);
 
-      // ✅ BURNUNUN UCU PİVOT OLDUĞU İÇİN ROTASYON HESABI
-      // Sadece Z ekseninde (2D düzlemde) dönecek, böylece arkasını dönmeyecek (hep yan profil)
-      let desiredRotZ = Math.atan2(ny, nx);
-      
-      // Eğer balık ters gidiyorsa, balığın orijinal yönelimine göre offset ekliyoruz.
-      // Blender'daki export duruma göre bu Math.PI (180 derece) veya 0 olmalı.
-      desiredRotZ += NOSE_OFFSET_RAD; 
-
+      // ✅ BALIK YEM TAKİBİ - SADECE Z EKSENİNDE DÖNÜŞ
+      const desiredRotZ = Math.atan2(ny, nx) + NOSE_OFFSET_RAD;
       const tTurn = 1 - Math.pow(0.001, dt * TURN_SMOOTH);
       rotZRef.current = lerpAngle(rotZRef.current, desiredRotZ, tTurn);
-      
-      // Balık sola dönerken başaşağı olmasını engellemek için Y ekseni taklası:
-      // Yön vektörü (nx) negatifse (sola gidiyorsa), balığın arkasını dönmesini istemiyoruz, 
-      // bu yüzden sadece Z ekseninde dönmesini (yukarı/aşağı bakmasını) ve gerekirse 
-      // modelin içinde bir flip yapmasını sağlayabiliriz. Ancak 2D oyun hissiyatı için 
-      // Z rotasyonu genellikle yeterlidir. Eğer balık sola giderken sırtüstü dönüyorsa,
-      // aşağıdaki Math.abs kodunu açmalısın.
-      /*
-      if (nx < 0) {
-          fishGroup.current.rotation.x = Math.PI; // Sola giderken takla atmasın
-      } else {
-          fishGroup.current.rotation.x = 0;
-      }
-      */
-
     } else {
       fishVel.current.multiplyScalar(DRAG_STOP);
     }
@@ -355,15 +382,30 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
     fishPos.current.y += fishVel.current.y * dt;
 
     if (b) {
-      if (fishPos.current.x <= b.minX) { fishPos.current.x = b.minX; fishVel.current.x *= -BOUNCE; }
-      if (fishPos.current.x >= b.maxX) { fishPos.current.x = b.maxX; fishVel.current.x *= -BOUNCE; }
-      if (fishPos.current.y <= b.minY) { fishPos.current.y = b.minY; fishVel.current.y *= -BOUNCE; }
-      if (fishPos.current.y >= b.maxY) { fishPos.current.y = b.maxY; fishVel.current.y *= -BOUNCE; }
+      if (fishPos.current.x <= b.minX) {
+        fishPos.current.x = b.minX;
+        fishVel.current.x = Math.abs(fishVel.current.x) * BOUNCE;
+        fishVel.current.multiplyScalar(FRICTION);
+      } else if (fishPos.current.x >= b.maxX) {
+        fishPos.current.x = b.maxX;
+        fishVel.current.x = -Math.abs(fishVel.current.x) * BOUNCE;
+        fishVel.current.multiplyScalar(FRICTION);
+      }
+
+      if (fishPos.current.y <= b.minY) {
+        fishPos.current.y = b.minY;
+        fishVel.current.y = Math.abs(fishVel.current.y) * BOUNCE;
+        fishVel.current.multiplyScalar(FRICTION);
+      } else if (fishPos.current.y >= b.maxY) {
+        fishPos.current.y = b.maxY;
+        fishVel.current.y = -Math.abs(fishVel.current.y) * BOUNCE;
+        fishVel.current.multiplyScalar(FRICTION);
+      }
     }
 
     fishGroup.current.position.copy(fishPos.current);
-    
-    // ✅ Sadece Z etrafında dön, X ve Y rotasyonları sıfır kalsın. (Yan profil garantisi)
+
+    // ✅ Balığın yan profilini koruması için sadece Z ekseninde rotasyon atıyoruz
     fishGroup.current.rotation.set(0, 0, rotZRef.current);
 
     const swim = swimActionRef.current;
@@ -391,31 +433,68 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
 
   return (
     <>
-      <group ref={seaGroup}><primitive object={sea.scene} /></group>
-      {surface && <InfiniteWaterRibbon width={surface.w} y={surface.y} z={surface.z} />}
-      <group ref={fishGroup}><primitive object={fish.scene} /></group>
+      <group ref={seaGroup}>
+        <primitive object={sea.scene} />
+      </group>
+
+      {surface && (
+        <InfiniteWaterRibbon width={surface.w} y={surface.y} z={surface.z} />
+      )}
+
+      <group ref={fishGroup}>
+        <primitive object={fish.scene} />
+      </group>
+
       <CanvasEvents onDown={updateTarget} onMove={updateTarget} onUp={() => dragging.current = false} />
     </>
   );
 }
 
 export default function EslemeGame() {
-  const { log } = useOverlayLog();
+  const { lines, log, clear } = useOverlayLog();
+
   const [fishUrl, setFishUrl] = useState("");
   const [seaUrl, setSeaUrl] = useState("");
   const [dracoBase, setDracoBase] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
 
   useEffect(() => {
+    const onErr = (e: ErrorEvent) => log(`window.onerror: ${e.message}`, "error");
+    const onRej = (e: PromiseRejectionEvent) => {
+      const msg = (e.reason && (e.reason.message || String(e.reason))) || "unhandledrejection";
+      log(`unhandledrejection: ${msg}`, "error");
+    };
+    window.addEventListener("error", onErr);
+    window.addEventListener("unhandledrejection", onRej);
+    return () => {
+      window.removeEventListener("error", onErr);
+      window.removeEventListener("unhandledrejection", onRej);
+    };
+  }, [log]);
+
+  // ✅ Senin URL ve Base mantığını tamamen koruduk
+  useEffect(() => {
     const origin = window.location.origin;
-    // URL yollarını senin çalıştığını bildiğimiz lokal yollarla değiştirdik
-    setFishUrl(origin + "/models/balik.glb");
-    setSeaUrl(origin + "/models/deniz.glb");
-    setDracoBase("https://www.gstatic.com/draco/versioned/decoders/1.5.7/");
-  }, []);
+    const base = new URL("/assets/public/", origin).toString();
+    setBaseUrl(base);
+
+    setFishUrl(new URL("models/balik.glb", base).toString());
+    setSeaUrl(new URL("models/deniz.glb", base).toString());
+    setDracoBase(new URL("draco/", base).toString());
+
+    log(`base: ${base}`, "info");
+  }, [log]);
 
   return (
     <div style={{ width: "100vw", height: "100vh", background: BG_COLOR }}>
-      <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45, near: 0.1, far: 5000 }} onCreated={({ scene }) => { scene.background = new THREE.Color(BG_COLOR); }}>
+      <Overlay title="NATIVE / 3D DURUM" lines={lines} onClear={clear} />
+
+      <Canvas
+        camera={{ position: [0, 0, CAMERA_Z], fov: 45, near: 0.1, far: 5000 }}
+        onCreated={({ scene }) => {
+          scene.background = new THREE.Color(BG_COLOR);
+        }}
+      >
         <ambientLight intensity={1.0} />
         <directionalLight position={[10, 12, 10]} intensity={2.1} />
         <directionalLight position={[-10, -4, 2]} intensity={0.9} />
@@ -423,8 +502,8 @@ export default function EslemeGame() {
 
         <ScreenErrorBoundary onError={(m) => log(`Boundary: ${m}`, "error")}>
           <Suspense fallback={<Loader3D />}>
-            {fishUrl && seaUrl && dracoBase ? (
-              <World fishUrl={fishUrl} seaUrl={seaUrl} dracoBase={dracoBase} log={log} />
+            {fishUrl && seaUrl && dracoBase && baseUrl ? (
+              <World fishUrl={fishUrl} seaUrl={seaUrl} dracoBase={dracoBase} baseUrl={baseUrl} log={log} />
             ) : null}
           </Suspense>
         </ScreenErrorBoundary>
@@ -432,4 +511,4 @@ export default function EslemeGame() {
     </div>
   );
     }
-    
+      
