@@ -3,55 +3,52 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, useAnimations, useGLTF, useProgress } from "@react-three/drei";
 import * as THREE from "three";
 
-/** ---- Utils ---- */
-function lerp(start: number, end: number, t: number) {
-  return start * (1 - t) + end * t;
-}
-function lerpAngle(a: number, b: number, t: number) {
-  const TWO_PI = Math.PI * 2;
-  let diff = (b - a) % TWO_PI;
-  diff = (2 * diff) % TWO_PI - diff;
-  return a + diff * t;
-}
+/** =========================
+ *  STANDARD FISH STEERING
+ *  Seek + Arrival + Velocity Heading
+ *  ========================= */
 
-/** ==== AYARLAR ==== */
+// Deniz / Balık anim
 const SEA_ANIM_NAME = "yeme";
 const SEA_ANIM_SPEED = 0.2;
 const FISH_SWIM_ANIM_NAME = "yuzme";
 
-// Hız / sürüş
-const MAX_SPEED = 7.2;        // istersen artır
-const ACCEL = 8.0;            // hedef hıza yaklaşma
-const DRAG_STOP = 0.90;       // el çekince süzülme
-const STOP_DIST = 0.25;       // hedefe yaklaşınca dur (titreme önler)
-
 // Dünya düzlemi
 const Z_PLANE = 0;
 
-// Kamera
-const CAMERA_Z = 10;
-const CAMERA_SMOOTH = 5.0;
+// Balık boyutu
+const FISH_SCALE = 3.0;
 
 // Deniz
 const SEA_ROT_Y = Math.PI / 2;
 const SEA_SCALE_MULT = 2.0;
 
-// Balık
-const FISH_SCALE = 3.0;
-
-// Dönüş (yaw + pitch)
-const YAW_TURN_SMOOTH = 10.0;      // sağ/sol yumuşak
-const PITCH_TURN_SMOOTH = 10.0;    // yukarı/aşağı burun yumuşak
-const MAX_PITCH_ANGLE = Math.PI / 3; // max burun kaldırma
-const MIN_VX_FOR_YAW = 0.08;       // vx küçükken yaw değiştirme (kararsızlık biter)
-const PITCH_WHEN_GLIDING = 0.0;    // el çekince pitch yavaşça düzleşsin (0)
-
-// Çarpma
-const BOUNCE = 0.6;
-const FRICTION = 0.92;
+// Kamera
+const CAMERA_Z = 10;
+const CAMERA_SMOOTH = 6.0;
 
 // Arkaplan
 const BG_COLOR = "#0b2a46";
+
+// ===== Hareket parametreleri (standard) =====
+const MAX_SPEED = 7.5;          // max yüzüş hızı
+const STEER_ACCEL = 10.0;       // steering kuvveti (yüksek => daha atik)
+const ARRIVE_RADIUS = 1.4;      // hedefe yaklaşınca yavaşlama yarıçapı
+const STOP_RADIUS = 0.20;       // bu kadar yakında "vardı" say
+const GLIDE_DAMPING = 0.92;     // parmağı bırakınca süzülme
+const MIN_SPEED_HEADING = 0.12; // bu hızın altında yön kilitlenir
+
+// ===== Görsel yönelim =====
+// Blender görüntüne göre burun -X bakıyor demiştin.
+// 2D yönelim: XY düzleminde heading'i Z etrafında döndürürüz.
+// Burun -X ise heading’e +PI ekliyoruz.
+const NOSE_OFFSET_Z = Math.PI;
+
+// Yukarı giderken alt, aşağı giderken sırt görünsün diye "roll" (local forward ekseni etrafında)
+// Bu 3D etki: heading ayrı, roll ayrı.
+// Max roll açısı:
+const MAX_ROLL = Math.PI / 6; // 30° iyi
+const ROLL_SMOOTH = 10.0;
 
 // Sonsuz su
 const WATER_Y_OFFSET = -1.8;
@@ -60,49 +57,18 @@ const WATER_WAVE_STRENGTH = 0.35;
 const WATER_SCROLL_SPEED = 0.08;
 const WATER_TILES = 5;
 
-type LogItem = { msg: string; level: "info" | "warn" | "error" };
-
-/** Basit overlay (sadece başlık) */
-function Overlay({ title }: { title: string }) {
-  return (
-    <div
-      style={{
-        position: "fixed",
-        top: 10,
-        left: 10,
-        right: 10,
-        maxWidth: 820,
-        zIndex: 999999,
-        background: "rgba(0,0,0,0.55)",
-        border: "1px solid rgba(255,255,255,0.15)",
-        borderRadius: 12,
-        padding: 12,
-        fontFamily: "monospace",
-        fontSize: 12,
-        color: "#e5e7eb",
-        pointerEvents: "none",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ fontWeight: 800, color: "#ffcc00" }}>{title}</div>
-      </div>
-    </div>
-  );
+function lerpAngle(a: number, b: number, t: number) {
+  const TWO_PI = Math.PI * 2;
+  let diff = (b - a) % TWO_PI;
+  diff = (2 * diff) % TWO_PI - diff;
+  return a + diff * t;
 }
 
 function Loader3D() {
   const { progress } = useProgress();
   return (
     <Html center>
-      <div
-        style={{
-          color: "white",
-          background: "rgba(0,0,0,0.75)",
-          padding: "10px 12px",
-          borderRadius: 10,
-          fontFamily: "monospace",
-        }}
-      >
+      <div style={{ color: "white", background: "rgba(0,0,0,0.75)", padding: "10px 12px", borderRadius: 10, fontFamily: "monospace" }}>
         Yükleniyor: %{progress.toFixed(0)}
       </div>
     </Html>
@@ -110,23 +76,12 @@ function Loader3D() {
 }
 
 class ScreenErrorBoundary extends React.Component<
-  { onError: (msg: string) => void; children: React.ReactNode },
+  { children: React.ReactNode },
   { hasError: boolean }
 > {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false };
-  }
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  componentDidCatch(error: any) {
-    this.props.onError(error?.message || String(error));
-  }
-  render() {
-    if (this.state.hasError) return null;
-    return this.props.children as any;
-  }
+  constructor(props: any) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() { if (this.state.hasError) return null; return this.props.children as any; }
 }
 
 /** Fullscreen input plane */
@@ -153,7 +108,7 @@ function CanvasEvents({
   );
 }
 
-/** Water shader material (normal map yok, sin/cos dalga) */
+/** Water shader material (sin/cos dalga) */
 function useWaterRibbonMaterial() {
   return useMemo(() => {
     return new THREE.ShaderMaterial({
@@ -212,7 +167,6 @@ function useWaterRibbonMaterial() {
   }, []);
 }
 
-/** Infinite water ribbon tiles */
 function InfiniteWaterRibbon({ width, y, z }: { width: number; y: number; z: number }) {
   const mat = useWaterRibbonMaterial();
   const geom = useMemo(() => new THREE.PlaneGeometry(width, WATER_THICKNESS, 64, 4), [width]);
@@ -243,12 +197,10 @@ function World({
   fishUrl,
   seaUrl,
   dracoBase,
-  onError,
 }: {
   fishUrl: string;
   seaUrl: string;
   dracoBase: string;
-  onError: (m: string) => void;
 }) {
   useMemo(() => {
     useGLTF.setDecoderPath(dracoBase.endsWith("/") ? dracoBase : `${dracoBase}/`);
@@ -286,7 +238,7 @@ function World({
     }
   }, [fishAnim.actions, fishAnim.names]);
 
-  // Bounds + surface
+  // Deniz bounds + surface
   const boundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number } | null>(null);
   const surfaceRef = useRef<{ w: number; y: number; z: number } | null>(null);
 
@@ -300,6 +252,7 @@ function World({
       }
     });
 
+    // center + scale
     const rawBox = new THREE.Box3().setFromObject(sea.scene);
     const size = new THREE.Vector3();
     const center = new THREE.Vector3();
@@ -314,6 +267,7 @@ function World({
     seaGroup.current.position.set(0, 0, -20);
     seaGroup.current.rotation.set(0, SEA_ROT_Y, 0);
 
+    // final bbox
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     const newSize = new THREE.Vector3();
     const newCenter = new THREE.Vector3();
@@ -337,36 +291,34 @@ function World({
     };
   }, [sea.scene]);
 
-  // Fish state
+  // ===== Fish steering state =====
   const fishPos = useRef(new THREE.Vector3(0, 0, Z_PLANE));
-  const fishVel = useRef(new THREE.Vector2(0, 0));
+  const fishVel = useRef(new THREE.Vector3(0, 0, 0));
   const fishTarget = useRef(new THREE.Vector3(0, 0, Z_PLANE));
-  const dragging = useRef(false);
+  const pressed = useRef(false); // parmak basılı mı?
 
-  // Start: sağa yatay
-  const currentYaw = useRef(-Math.PI / 2); // sağ
-  const currentPitch = useRef(0);
+  // heading + roll kilitleri
+  const headingZ = useRef(0); // Z etrafında yön
+  const rollX = useRef(0);    // local forward ekseni etrafında (belly/back)
+  const lastHeadingZ = useRef(0);
 
   useEffect(() => {
     if (!fishGroup.current) return;
     fishGroup.current.scale.setScalar(FISH_SCALE);
   }, [fish.scene]);
 
-  // NDC -> world plane
-  const { camera } = useThree();
-  const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -Z_PLANE), []);
+  // Pointer updates (parmak sabit kalsa bile target sabit; pressed true kaldığı sürece takip sürer)
+  const setTargetFromEvent = useCallback((e: any) => {
+    pressed.current = true;
+    if (e.point) {
+      fishTarget.current.copy(e.point);
+      fishTarget.current.z = Z_PLANE;
+    }
+  }, []);
 
-  const updateTarget = useCallback(
-    (e: any) => {
-      dragging.current = true;
-      if (e.point) {
-        fishTarget.current.copy(e.point);
-        fishTarget.current.z = Z_PLANE;
-      }
-    },
-    []
-  );
+  const release = useCallback(() => {
+    pressed.current = false;
+  }, []);
 
   useFrame((state, dt) => {
     if (!fishGroup.current) return;
@@ -377,55 +329,38 @@ function World({
       fishTarget.current.y = THREE.MathUtils.clamp(fishTarget.current.y, b.minY, b.maxY);
     }
 
-    const dx = fishTarget.current.x - fishPos.current.x;
-    const dy = fishTarget.current.y - fishPos.current.y;
-    const dist = Math.hypot(dx, dy);
+    // SEEK + ARRIVAL
+    const toTarget = new THREE.Vector3().subVectors(fishTarget.current, fishPos.current);
+    const dist = Math.hypot(toTarget.x, toTarget.y);
 
-    // hedefe yaklaşınca dur: kararsız flip biter
-    const moving = dragging.current && dist > STOP_DIST;
+    let desiredVel = new THREE.Vector3(0, 0, 0);
 
-    if (moving) {
-      const nx = dx / dist;
-      const ny = dy / dist;
+    const seeking = pressed.current && dist > STOP_RADIUS;
 
-      const targetVx = nx * MAX_SPEED;
-      const targetVy = ny * MAX_SPEED;
-
-      const a = 1 - Math.pow(0.001, dt * ACCEL);
-      fishVel.current.x = THREE.MathUtils.lerp(fishVel.current.x, targetVx, a);
-      fishVel.current.y = THREE.MathUtils.lerp(fishVel.current.y, targetVy, a);
-
-      // ✅ YAW: sadece X hızına göre sağ/sol seç, vx küçükse kilitli kalsın
-      if (fishVel.current.x > MIN_VX_FOR_YAW) {
-        const tYaw = 1 - Math.pow(0.001, dt * YAW_TURN_SMOOTH);
-        currentYaw.current = lerpAngle(currentYaw.current, -Math.PI / 2, tYaw);
-      } else if (fishVel.current.x < -MIN_VX_FOR_YAW) {
-        const tYaw = 1 - Math.pow(0.001, dt * YAW_TURN_SMOOTH);
-        currentYaw.current = lerpAngle(currentYaw.current, Math.PI / 2, tYaw);
+    if (seeking) {
+      // normalize direction
+      if (dist > 1e-6) {
+        desiredVel.set(toTarget.x / dist, toTarget.y / dist, 0);
       }
+      // arrival scaling
+      const speedScale = Math.min(1, dist / ARRIVE_RADIUS);
+      desiredVel.multiplyScalar(MAX_SPEED * speedScale);
 
-      // ✅ PITCH: sadece Y hızına göre burun yukarı/aşağı
-      const vyNorm = THREE.MathUtils.clamp(fishVel.current.y / MAX_SPEED, -1, 1);
-      const targetPitch = vyNorm * MAX_PITCH_ANGLE;
-
-      const tPitch = 1 - Math.pow(0.001, dt * PITCH_TURN_SMOOTH);
-      currentPitch.current = lerp(currentPitch.current, targetPitch, tPitch);
+      // steering = desiredVel - currentVel
+      const steering = desiredVel.clone().sub(fishVel.current);
+      const steerFactor = 1 - Math.pow(0.001, dt * STEER_ACCEL);
+      fishVel.current.add(steering.multiplyScalar(steerFactor));
     } else {
-      // el çekince süzül ve dur
-      fishVel.current.multiplyScalar(DRAG_STOP);
-
-      // yaw sabit: ekrana dönme yok
-
-      // pitch yumuşakça düzleşsin
-      const tPitch = 1 - Math.pow(0.001, dt * PITCH_TURN_SMOOTH);
-      currentPitch.current = lerp(currentPitch.current, PITCH_WHEN_GLIDING, tPitch);
+      // glide
+      fishVel.current.multiplyScalar(GLIDE_DAMPING);
     }
 
-    // Position integrate
+    // integrate position
     fishPos.current.x += fishVel.current.x * dt;
     fishPos.current.y += fishVel.current.y * dt;
+    fishPos.current.z = Z_PLANE;
 
-    // Bounce bounds
+    // bounce
     if (b) {
       if (fishPos.current.x <= b.minX) {
         fishPos.current.x = b.minX;
@@ -448,24 +383,53 @@ function World({
       }
     }
 
-    fishPos.current.z = Z_PLANE;
     fishGroup.current.position.copy(fishPos.current);
 
-    // ✅ Rotation apply: yaw + pitch (X)
-    fishGroup.current.rotation.set(0, currentYaw.current, 0);
-    fishGroup.current.rotateX(-currentPitch.current); // ters olursa işareti değiştir
+    // ===== Orientation from VELOCITY (no jitter) =====
+    const speed = Math.hypot(fishVel.current.x, fishVel.current.y);
 
-    // Swim anim
+    if (speed > MIN_SPEED_HEADING) {
+      // heading in XY plane (rotate around Z)
+      const dirX = fishVel.current.x / speed;
+      const dirY = fishVel.current.y / speed;
+
+      // model nose is -X => add PI
+      const desiredHeading = Math.atan2(dirY, dirX) + NOSE_OFFSET_Z;
+
+      const tH = 1 - Math.pow(0.001, dt * 10.0);
+      headingZ.current = lerpAngle(headingZ.current, desiredHeading, tH);
+      lastHeadingZ.current = headingZ.current;
+
+      // belly/back roll: up => belly (roll +), down => back (roll -)
+      // scale by vertical component
+      const vyNorm = THREE.MathUtils.clamp(dirY, -1, 1);
+      const desiredRoll = THREE.MathUtils.clamp(vyNorm * MAX_ROLL, -MAX_ROLL, MAX_ROLL);
+
+      const tR = 1 - Math.pow(0.001, dt * ROLL_SMOOTH);
+      rollX.current = lerpAngle(rollX.current, desiredRoll, tR);
+    } else {
+      // speed small: keep last heading (do NOT turn to camera)
+      headingZ.current = lastHeadingZ.current;
+      // roll relax slowly
+      const tR = 1 - Math.pow(0.001, dt * ROLL_SMOOTH);
+      rollX.current = lerpAngle(rollX.current, 0, tR);
+    }
+
+    // Apply rotations:
+    // 1) heading around Z (2D direction)
+    fishGroup.current.rotation.set(0, 0, headingZ.current);
+    // 2) roll around local forward axis (approx: local X after heading)
+    fishGroup.current.rotateX(rollX.current);
+
+    // swim anim only when actually moving
     const swim = swimActionRef.current;
-    if (swim) swim.paused = !moving;
+    if (swim) swim.paused = !(speed > MIN_SPEED_HEADING);
 
-    // Camera follow XY (smooth)
+    // Camera follow XY
     const cam = state.camera as THREE.PerspectiveCamera;
     const desiredCam = new THREE.Vector3(fishPos.current.x, fishPos.current.y, CAMERA_Z);
     const tCam = 1 - Math.pow(0.001, dt * CAMERA_SMOOTH);
     cam.position.lerp(desiredCam, tCam);
-
-    // Kamera balığa baksın
     cam.lookAt(fishPos.current.x, fishPos.current.y, 0);
   });
 
@@ -483,13 +447,13 @@ function World({
         <primitive object={fish.scene} />
       </group>
 
-      <CanvasEvents onDown={updateTarget} onMove={updateTarget} onUp={() => (dragging.current = false)} />
+      <CanvasEvents onDown={setTargetFromEvent} onMove={setTargetFromEvent} onUp={release} />
     </>
   );
 }
 
 export default function EslemeGame() {
-  // Yatay uyarısı (manifest yok)
+  // Portrait’te sadece uyarı
   const [isPortrait, setIsPortrait] = useState(false);
 
   useEffect(() => {
@@ -517,7 +481,9 @@ export default function EslemeGame() {
 
   return (
     <div style={{ width: "100vw", height: "100vh", background: BG_COLOR }}>
-      <Overlay title="YATAY MOD / ARCADE KONTROL" />
+      <div style={{ position: "fixed", top: 10, left: 10, zIndex: 999999, color: "#fff", fontFamily: "monospace", opacity: 0.8 }}>
+        YATAY MOD
+      </div>
 
       {isPortrait && (
         <div
@@ -548,16 +514,16 @@ export default function EslemeGame() {
             scene.background = new THREE.Color(BG_COLOR);
           }}
         >
-          {/* Balık kaybolmasın diye ışıklar */}
+          {/* Balık kaybolmasın */}
           <ambientLight intensity={1.0} />
           <directionalLight position={[10, 12, 10]} intensity={2.1} />
           <directionalLight position={[-10, -4, 2]} intensity={0.9} />
           <pointLight position={[0, 3, 8]} intensity={1.8} />
 
-          <ScreenErrorBoundary onError={() => {}}>
+          <ScreenErrorBoundary>
             <Suspense fallback={<Loader3D />}>
               {fishUrl && seaUrl && dracoBase ? (
-                <World fishUrl={fishUrl} seaUrl={seaUrl} dracoBase={dracoBase} onError={() => {}} />
+                <World fishUrl={fishUrl} seaUrl={seaUrl} dracoBase={dracoBase} />
               ) : null}
             </Suspense>
           </ScreenErrorBoundary>
@@ -565,4 +531,4 @@ export default function EslemeGame() {
       )}
     </div>
   );
-}
+                   }
