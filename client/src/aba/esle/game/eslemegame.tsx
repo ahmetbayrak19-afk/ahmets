@@ -9,44 +9,60 @@ const SEA_ANIM_SPEED = 0.2;
 
 const FISH_SWIM_ANIM_NAME = "yuzme";
 
-const MAX_SPEED = 1.4;
+// hareket
+const MAX_SPEED = 1.6;        // balık hızı
+const Z_PLANE = 0;            // drag düzlemi z
+const CAMERA_Z = 10;          // kamera uzaklık
+const CAMERA_SMOOTH = 6.0;    // kamera takip yumuşaklığı
+const LOOK_SMOOTH = 8.0;      // lookAt yumuşaklığı
 
-const CAMERA_Z = 10;
-const CAMERA_LOOKAHEAD = 1.6;
-
+// ortam
 const FOG_DENSITY = 0.02;
 
-// ✅ Deniz: sola doğru 90 derece
-const SEA_ROT_Y = -Math.PI / 2;
-
-// ✅ Deniz 2x büyüsün
+// deniz
+const SEA_ROT_Y = -Math.PI / 2; // sola 90
 const SEA_SCALE_MULT = 2.0;
 
-// ✅ Balık 3x büyüsün
+// balık
 const FISH_SCALE = 3.0;
-
-// ✅ Dönüş yumuşaklığı
-const TURN_SMOOTH = 10.0; // büyüt => daha hızlı döner, küçült => daha yavaş
-const BANK_AMOUNT = 0.35; // 0.2-0.5
+const TURN_SMOOTH = 10.0;
+const BANK_AMOUNT = 0.35;
 
 function Loader3D() {
   const { progress } = useProgress();
   return (
     <Html center>
-      <div
-        style={{
-          color: "white",
-          background: "rgba(0,0,0,0.6)",
-          padding: "10px 12px",
-          borderRadius: 10,
-          border: "1px solid rgba(255,255,255,0.2)",
-          fontFamily: "monospace",
-        }}
-      >
+      <div style={{
+        color: "white",
+        background: "rgba(0,0,0,0.6)",
+        padding: "10px 12px",
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,0.2)",
+        fontFamily: "monospace",
+      }}>
         Yükleniyor: %{progress.toFixed(0)}
       </div>
     </Html>
   );
+}
+
+type LogItem = { t: number; msg: string; level: "info" | "warn" | "error" };
+
+function useScreenLogger() {
+  const [logs, setLogs] = useState<LogItem[]>([]);
+  const lastMsgRef = useRef<string>("");
+
+  const push = useCallback((msg: string, level: LogItem["level"] = "info") => {
+    const key = `${level}:${msg}`;
+    if (lastMsgRef.current === key) return;
+    lastMsgRef.current = key;
+    setLogs((prev) => {
+      const next = [...prev, { t: Date.now(), msg, level }];
+      return next.length > 14 ? next.slice(-14) : next;
+    });
+  }, []);
+
+  return { logs, push };
 }
 
 function MiniButton({ onClick, label }: { onClick: () => void; label: string }) {
@@ -71,25 +87,6 @@ function MiniButton({ onClick, label }: { onClick: () => void; label: string }) 
       {label}
     </button>
   );
-}
-
-type LogItem = { t: number; msg: string; level: "info" | "warn" | "error" };
-
-function useScreenLogger() {
-  const [logs, setLogs] = useState<LogItem[]>([]);
-  const lastMsgRef = useRef<string>("");
-
-  const push = useCallback((msg: string, level: LogItem["level"] = "info") => {
-    const key = `${level}:${msg}`;
-    if (lastMsgRef.current === key) return;
-    lastMsgRef.current = key;
-    setLogs((prev) => {
-      const next = [...prev, { t: Date.now(), msg, level }];
-      return next.length > 18 ? next.slice(-18) : next;
-    });
-  }, []);
-
-  return { logs, push };
 }
 
 function LogOverlay({ logs, onClose }: { logs: LogItem[]; onClose: () => void }) {
@@ -155,28 +152,22 @@ class ScreenErrorBoundary extends React.Component<
     super(props);
     this.state = { hasError: false };
   }
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  componentDidCatch(error: any) {
-    this.props.onError(error?.message || String(error));
-  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: any) { this.props.onError(error?.message || String(error)); }
   render() {
     if (this.state.hasError) {
       return (
         <Html center>
-          <div
-            style={{
-              color: "#ff4d4d",
-              background: "rgba(0,0,0,0.75)",
-              padding: 12,
-              borderRadius: 10,
-              border: "1px solid rgba(255,255,255,0.2)",
-              fontFamily: "monospace",
-              maxWidth: 340,
-              textAlign: "center",
-            }}
-          >
+          <div style={{
+            color: "#ff4d4d",
+            background: "rgba(0,0,0,0.75)",
+            padding: 12,
+            borderRadius: 10,
+            border: "1px solid rgba(255,255,255,0.2)",
+            fontFamily: "monospace",
+            maxWidth: 340,
+            textAlign: "center",
+          }}>
             HATA: 3D sahne çöktü
           </div>
         </Html>
@@ -186,11 +177,9 @@ class ScreenErrorBoundary extends React.Component<
   }
 }
 
-/** ✅ Tek CanvasEvents: sadece burada var */
+/** Tek event yakalayıcı plane */
 function CanvasEvents({
-  onDown,
-  onMove,
-  onUp,
+  onDown, onMove, onUp,
 }: {
   onDown: (e: any) => void;
   onMove: (e: any) => void;
@@ -198,7 +187,7 @@ function CanvasEvents({
 }) {
   return (
     <mesh
-      position={[0, 0, 0]}
+      position={[0, 0, Z_PLANE]}
       onPointerDown={onDown}
       onPointerMove={onMove}
       onPointerUp={onUp}
@@ -243,11 +232,8 @@ function World({
       const a = actions[target]!;
       a.reset().fadeIn(0.15).play();
       a.timeScale = SEA_ANIM_SPEED;
-      report(`Deniz anim: ${target} speed=${SEA_ANIM_SPEED}`, "info");
-    } else {
-      report("Deniz animasyonu yok", "warn");
     }
-  }, [seaAnim.actions, seaAnim.names, report]);
+  }, [seaAnim.actions, seaAnim.names]);
 
   useEffect(() => {
     const actions = fishAnim.actions;
@@ -259,13 +245,10 @@ function World({
       a.paused = true;
       a.play();
       swimActionRef.current = a;
-      report(`Balık anim hazır: ${target}`, "info");
-    } else {
-      report("Balık yuzme animasyonu yok", "warn");
     }
-  }, [fishAnim.actions, fishAnim.names, report]);
+  }, [fishAnim.actions, fishAnim.names]);
 
-  const boundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number; fixedY: number } | null>(null);
+  const boundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number } | null>(null);
 
   useEffect(() => {
     if (!seaGroup.current) return;
@@ -300,40 +283,35 @@ function World({
 
     const padX = Math.max(1.5, newSize.x * 0.04);
     const padY = Math.max(1.5, newSize.y * 0.10);
-    const minX = box.min.x + padX;
-    const maxX = box.max.x - padX;
-    const minY = box.min.y + padY;
-    const maxY = box.max.y - padY;
-    const fixedY = minY + (maxY - minY) * 0.55;
 
-    boundsRef.current = { minX, maxX, minY, maxY, fixedY };
-    report(`Deniz scale=${s.toFixed(3)} rotY=${(SEA_ROT_Y * 57.2958).toFixed(0)}deg`, "info");
-  }, [sea.scene, report]);
+    boundsRef.current = {
+      minX: box.min.x + padX,
+      maxX: box.max.x - padX,
+      minY: box.min.y + padY,
+      maxY: box.max.y - padY,
+    };
 
-  const fishPos = useRef(new THREE.Vector3(0, 0, 0));
-  const fishTarget = useRef(new THREE.Vector3(0, 0, 0));
+    report?.(`Bounds OK`, "info");
+  }, [sea.scene]);
+
+  // fish state
+  const fishPos = useRef(new THREE.Vector3(0, 0, Z_PLANE));
+  const fishTarget = useRef(new THREE.Vector3(0, 0, Z_PLANE));
   const dragging = useRef(false);
 
   const yawRef = useRef(Math.PI / 2);
+  const lookRef = useRef(new THREE.Vector3(0, 0, Z_PLANE)); // camera look target smooth
 
   useEffect(() => {
-    const b = boundsRef.current;
-    if (!b || !fishGroup.current) return;
-
-    fishPos.current.set((b.minX + b.maxX) * 0.5, b.fixedY, 0);
-    fishTarget.current.copy(fishPos.current);
-
-    fishGroup.current.position.copy(fishPos.current);
+    if (!fishGroup.current) return;
     fishGroup.current.scale.setScalar(FISH_SCALE);
-
-    yawRef.current = Math.PI / 2;
-    fishGroup.current.rotation.set(0, yawRef.current, 0);
+    fishGroup.current.rotation.set(0, Math.PI / 2, 0);
   }, [fish.scene]);
 
-  // pointer->world NDC
+  // NDC -> world
   const { camera } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), []);
+  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -Z_PLANE), []);
 
   const ndcToWorld = useCallback((xNdc: number, yNdc: number) => {
     raycaster.setFromCamera({ x: xNdc, y: yNdc }, camera);
@@ -352,15 +330,18 @@ function World({
     fishTarget.current.copy(ndcToWorld(e.pointer.x, e.pointer.y));
   }, [ndcToWorld]);
 
-  const onUp = useCallback(() => { dragging.current = false; }, []);
+  const onUp = useCallback(() => {
+    dragging.current = false;
+  }, []);
 
   useFrame((state, dt) => {
     const b = boundsRef.current;
-    if (!b || !fishGroup.current) return;
+    if (!fishGroup.current || !b) return;
 
+    // clamp target
     fishTarget.current.x = THREE.MathUtils.clamp(fishTarget.current.x, b.minX, b.maxX);
     fishTarget.current.y = THREE.MathUtils.clamp(fishTarget.current.y, b.minY, b.maxY);
-    fishTarget.current.z = 0;
+    fishTarget.current.z = Z_PLANE;
 
     const toTarget = fishTarget.current.clone().sub(fishPos.current);
     const dist = toTarget.length();
@@ -374,31 +355,38 @@ function World({
 
     fishPos.current.x = THREE.MathUtils.clamp(fishPos.current.x, b.minX, b.maxX);
     fishPos.current.y = THREE.MathUtils.clamp(fishPos.current.y, b.minY, b.maxY);
-    fishPos.current.z = 0;
+    fishPos.current.z = Z_PLANE;
 
     fishGroup.current.position.copy(fishPos.current);
 
+    // smooth yaw + bank
     const dx = fishTarget.current.x - fishPos.current.x;
     const desiredYaw = dx >= 0 ? Math.PI / 2 : -Math.PI / 2;
-
-    const t = 1 - Math.pow(0.001, dt * TURN_SMOOTH);
-    yawRef.current = THREE.MathUtils.lerpAngle(yawRef.current, desiredYaw, t);
+    const tTurn = 1 - Math.pow(0.001, dt * TURN_SMOOTH);
+    yawRef.current = THREE.MathUtils.lerpAngle(yawRef.current, desiredYaw, tTurn);
 
     const bank = THREE.MathUtils.clamp(dx * 0.15, -1, 1) * BANK_AMOUNT;
-
     fishGroup.current.rotation.set(0, yawRef.current, bank);
 
+    // swim anim
     const swim = swimActionRef.current;
     if (swim) swim.paused = !moving;
 
+    // ✅ Kamera: balığı X+Y paralel takip etsin (Y sabit değil)
     const cam = state.camera as THREE.PerspectiveCamera;
-    const desiredCam = new THREE.Vector3(fishPos.current.x, b.fixedY, CAMERA_Z);
-    cam.position.lerp(desiredCam, 1 - Math.pow(0.001, dt));
-    cam.lookAt(new THREE.Vector3(
+    const desiredCam = new THREE.Vector3(fishPos.current.x, fishPos.current.y, CAMERA_Z);
+    const tCam = 1 - Math.pow(0.001, dt * CAMERA_SMOOTH);
+    cam.position.lerp(desiredCam, tCam);
+
+    // lookAt da smooth: balığın biraz önüne
+    const desiredLook = new THREE.Vector3(
       fishPos.current.x + (dx >= 0 ? CAMERA_LOOKAHEAD : -CAMERA_LOOKAHEAD),
-      b.fixedY,
-      0
-    ));
+      fishPos.current.y,
+      Z_PLANE
+    );
+    const tLook = 1 - Math.pow(0.001, dt * LOOK_SMOOTH);
+    lookRef.current.lerp(desiredLook, tLook);
+    cam.lookAt(lookRef.current);
   });
 
   return (
@@ -475,4 +463,4 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-                              }
+          }
