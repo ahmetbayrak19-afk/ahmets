@@ -2,8 +2,9 @@ import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } fr
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, useAnimations, useGLTF, useProgress } from "@react-three/drei";
 import * as THREE from "three";
+import { Water } from "three/examples/jsm/objects/Water.js";
 
-/** ✅ Her ortamda çalışan angle lerp (THREE.MathUtils.lerpAngle yerine) */
+/** ✅ Her ortamda çalışan angle lerp */
 function lerpAngle(a: number, b: number, t: number) {
   const TWO_PI = Math.PI * 2;
   let diff = (b - a) % TWO_PI;
@@ -17,23 +18,32 @@ const SEA_ANIM_SPEED = 0.2;
 
 const FISH_SWIM_ANIM_NAME = "yuzme";
 
-const MAX_SPEED = 1.6;
+// hız
+const MAX_SPEED = 4.8;
 const Z_PLANE = 0;
 
-// Kamera
+// kamera
 const CAMERA_Z = 10;
 const CAMERA_SMOOTH = 6.0;
 const LOOK_SMOOTH = 8.0;
 const CAMERA_LOOKAHEAD = 1.6;
 
-// Deniz
-const SEA_ROT_Y = -Math.PI / 2; // sola 90
+// deniz
+const SEA_ROT_Y = Math.PI / 2; // senin son isteğin sonrası (tersi düzeltmek için)
 const SEA_SCALE_MULT = 2.0;
 
-// Balık
+// balık
 const FISH_SCALE = 3.0;
-const TURN_SMOOTH = 10.0;
-const BANK_AMOUNT = 0.35;
+
+// dönüş yumuşak
+const TURN_SMOOTH = 4.0;     // küçük => daha yumuşak
+const BANK_AMOUNT = 0.25;
+const TURN_DEADZONE = 0.08;
+
+// water
+const WATER_BAND_HEIGHT = 3.5;   // yüzey şeridi kalınlığı (side view için)
+const WATER_OPACITY = 0.85;      // su opaklığı
+const WATER_DISTORTION = 3.2;    // dalga şiddeti
 
 type LogItem = { msg: string; level: "info" | "warn" | "error" };
 
@@ -191,15 +201,74 @@ function CanvasEvents({
   );
 }
 
+/** ✅ Dalgalı/yansımalı su yüzeyi (Water shader) */
+function WaterSurface({
+  width,
+  y,
+  z,
+  baseUrl,
+}: {
+  width: number;
+  y: number;
+  z: number;
+  baseUrl: string; // .../assets/public/
+}) {
+  const waterRef = useRef<Water | null>(null);
+
+  const waterObj = useMemo(() => {
+    const geom = new THREE.PlaneGeometry(width, WATER_BAND_HEIGHT);
+
+    // local normal map (APK içinden)
+    const normalsUrl = new URL("textures/waternormals.jpg", baseUrl).toString();
+    const normals = new THREE.TextureLoader().load(normalsUrl);
+    normals.wrapS = normals.wrapT = THREE.RepeatWrapping;
+    normals.repeat.set(4, 1);
+
+    const w = new Water(geom, {
+      textureWidth: 512,
+      textureHeight: 512,
+      waterNormals: normals,
+      sunDirection: new THREE.Vector3(0.2, 1.0, 0.2),
+      sunColor: 0xffffff,
+      waterColor: 0x0a4b6a,
+      distortionScale: WATER_DISTORTION,
+      fog: false,
+      alpha: 1.0,
+    });
+
+    // Side-view için su şeridi kameraya baksın (XY düzlemi)
+    w.position.set(0, y, z + 0.1); // denizin üstüne “kapak” gibi
+    // varsayılan plane normal +Z (kameraya doğru) => görünür olur
+
+    // opaklık/şeffaflık
+    (w.material as any).transparent = true;
+    (w.material as any).opacity = WATER_OPACITY;
+    (w.material as any).depthWrite = false;
+
+    waterRef.current = w;
+    return w;
+  }, [baseUrl, width, y, z]);
+
+  useFrame((_, dt) => {
+    if (!waterRef.current) return;
+    const mat: any = waterRef.current.material;
+    if (mat?.uniforms?.time) mat.uniforms.time.value += dt;
+  });
+
+  return <primitive object={waterObj} />;
+}
+
 function World({
   fishUrl,
   seaUrl,
   dracoBase,
+  baseUrl,
   log,
 }: {
   fishUrl: string;
   seaUrl: string;
   dracoBase: string;
+  baseUrl: string;
   log: (m: string, lvl?: "info" | "warn" | "error") => void;
 }) {
   useMemo(() => {
@@ -216,7 +285,6 @@ function World({
   const fishAnim = useAnimations(fish.animations, fish.scene);
   const swimActionRef = useRef<THREE.AnimationAction | null>(null);
 
-  // Deniz anim
   useEffect(() => {
     const a =
       seaAnim.actions?.[SEA_ANIM_NAME] ??
@@ -225,13 +293,11 @@ function World({
     if (a) {
       a.reset().fadeIn(0.15).play();
       a.timeScale = SEA_ANIM_SPEED;
-      log(`Deniz anim: ${SEA_ANIM_NAME} speed=${SEA_ANIM_SPEED}`, "info");
     } else {
       log("Deniz animasyonu bulunamadı.", "warn");
     }
   }, [seaAnim.actions, seaAnim.names, log]);
 
-  // Balık anim
   useEffect(() => {
     const a =
       fishAnim.actions?.[FISH_SWIM_ANIM_NAME] ??
@@ -242,14 +308,14 @@ function World({
       a.paused = true;
       a.play();
       swimActionRef.current = a;
-      log(`Balık anim hazır: ${FISH_SWIM_ANIM_NAME}`, "info");
     } else {
       log("Balık yuzme animasyonu bulunamadı.", "warn");
     }
   }, [fishAnim.actions, fishAnim.names, log]);
 
-  // Deniz center+scale+rotate + bounds
+  // Bounds + surface placement
   const boundsRef = useRef<{ minX: number; maxX: number; minY: number; maxY: number } | null>(null);
+  const surfaceRef = useRef<{ w: number; y: number; z: number } | null>(null);
 
   useEffect(() => {
     if (!seaGroup.current) return;
@@ -277,7 +343,9 @@ function World({
 
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     const newSize = new THREE.Vector3();
+    const newCenter = new THREE.Vector3();
     box.getSize(newSize);
+    box.getCenter(newCenter);
 
     const padX = Math.max(2.0, newSize.x * 0.04);
     const padY = Math.max(2.0, newSize.y * 0.10);
@@ -289,7 +357,14 @@ function World({
       maxY: box.max.y - padY,
     };
 
-    log("Deniz sahneye oturdu (center+scale+rotate).", "info");
+    // su yüzeyi: denizin üst bandına otur
+    surfaceRef.current = {
+      w: newSize.x * 1.05,
+      y: box.max.y - newSize.y * 0.02,
+      z: newCenter.z,
+    };
+
+    log("Deniz oturdu + su yüzeyi konumlandı.", "info");
   }, [sea.scene, log]);
 
   // Fish state
@@ -297,7 +372,8 @@ function World({
   const fishTarget = useRef(new THREE.Vector3(0, 0, Z_PLANE));
   const dragging = useRef(false);
 
-  const yawRef = useRef(Math.PI / 2);
+  const desiredYawRef = useRef<number>(Math.PI / 2);
+  const yawRef = useRef<number>(Math.PI / 2);
   const lookRef = useRef(new THREE.Vector3(0, 0, Z_PLANE));
 
   useEffect(() => {
@@ -370,26 +446,29 @@ function World({
 
     fishGroup.current.position.copy(fishPos.current);
 
-    // ✅ smooth turn (lerpAngle yerine kendi fonksiyon)
     const dx = fishTarget.current.x - fishPos.current.x;
-    const desiredYaw = dx >= 0 ? Math.PI / 2 : -Math.PI / 2;
-    const tTurn = 1 - Math.pow(0.001, dt * TURN_SMOOTH);
-    yawRef.current = lerpAngle(yawRef.current, desiredYaw, tTurn);
 
-    const bank = THREE.MathUtils.clamp(dx * 0.15, -1, 1) * BANK_AMOUNT;
+    if (Math.abs(dx) > TURN_DEADZONE) {
+      desiredYawRef.current = dx >= 0 ? Math.PI / 2 : -Math.PI / 2;
+    }
+
+    const tTurn = 1 - Math.pow(0.001, dt * TURN_SMOOTH);
+    yawRef.current = lerpAngle(yawRef.current, desiredYawRef.current, tTurn);
+
+    const bank = THREE.MathUtils.clamp(dx * 0.08, -1, 1) * BANK_AMOUNT;
     fishGroup.current.rotation.set(0, yawRef.current, bank);
 
     const swim = swimActionRef.current;
     if (swim) swim.paused = !moving;
 
-    // Kamera X+Y takip
+    // camera XY follow
     const cam = state.camera as THREE.PerspectiveCamera;
     const desiredCam = new THREE.Vector3(fishPos.current.x, fishPos.current.y, CAMERA_Z);
     const tCam = 1 - Math.pow(0.001, dt * CAMERA_SMOOTH);
     cam.position.lerp(desiredCam, tCam);
 
     const desiredLook = new THREE.Vector3(
-      fishPos.current.x + (dx >= 0 ? CAMERA_LOOKAHEAD : -CAMERA_LOOKAHEAD),
+      fishPos.current.x + (desiredYawRef.current > 0 ? CAMERA_LOOKAHEAD : -CAMERA_LOOKAHEAD),
       fishPos.current.y,
       Z_PLANE
     );
@@ -398,11 +477,18 @@ function World({
     cam.lookAt(lookRef.current);
   });
 
+  const surface = surfaceRef.current;
+
   return (
     <>
       <group ref={seaGroup}>
         <primitive object={sea.scene} />
       </group>
+
+      {/* ✅ Google-style Water */}
+      {surface && (
+        <WaterSurface width={surface.w} y={surface.y} z={surface.z} baseUrl={baseUrl} />
+      )}
 
       <group ref={fishGroup}>
         <primitive object={fish.scene} />
@@ -419,8 +505,8 @@ export default function EslemeGame() {
   const [fishUrl, setFishUrl] = useState("");
   const [seaUrl, setSeaUrl] = useState("");
   const [dracoBase, setDracoBase] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
 
-  // Global hata yakala (console yok)
   useEffect(() => {
     const onErr = (e: ErrorEvent) => log(`window.onerror: ${e.message}`, "error");
     const onRej = (e: PromiseRejectionEvent) => {
@@ -435,14 +521,17 @@ export default function EslemeGame() {
     };
   }, [log]);
 
-  // init urls
   useEffect(() => {
     const origin = window.location.origin;
     const base = new URL("/assets/public/", origin).toString();
+    setBaseUrl(base);
+
     setFishUrl(new URL("models/balik.glb", base).toString());
     setSeaUrl(new URL("models/deniz.glb", base).toString());
     setDracoBase(new URL("draco/", base).toString());
-    log(`init base: ${base}`, "info");
+
+    log(`base: ${base}`, "info");
+    log(`waternormals: ${new URL("textures/waternormals.jpg", base).toString()}`, "info");
   }, [log]);
 
   return (
@@ -450,15 +539,21 @@ export default function EslemeGame() {
       <Overlay title="NATIVE / 3D DURUM" lines={lines} onClear={clear} />
 
       <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45, near: 0.1, far: 5000 }}>
-        {/* Fog yok, background yok */}
+        {/* fog/background yok */}
         <ambientLight intensity={1.2} />
         <directionalLight position={[10, 12, 10]} intensity={2.0} />
         <directionalLight position={[-10, -4, 2]} intensity={0.8} />
 
         <ScreenErrorBoundary onError={(m) => log(`Boundary: ${m}`, "error")}>
           <Suspense fallback={<Loader3D />}>
-            {fishUrl && seaUrl && dracoBase ? (
-              <World fishUrl={fishUrl} seaUrl={seaUrl} dracoBase={dracoBase} log={log} />
+            {fishUrl && seaUrl && dracoBase && baseUrl ? (
+              <World
+                fishUrl={fishUrl}
+                seaUrl={seaUrl}
+                dracoBase={dracoBase}
+                baseUrl={baseUrl}
+                log={log}
+              />
             ) : null}
           </Suspense>
         </ScreenErrorBoundary>
