@@ -36,8 +36,7 @@ const FISH_SCALE = 3.0;
 // Dönüş Hassasiyetleri
 const TURN_SMOOTH_YAW = 8.0;   
 const TURN_SMOOTH_PITCH = 8.0; 
-// Burnunu en fazla 45 derece kaldırsın (Estetik açıdan en iyisi)
-const MAX_PITCH_ANGLE = Math.PI / 4; 
+const MAX_PITCH_ANGLE = Math.PI / 3; // Burnunu kaldırma sınırı (60 derece)
 
 const BOUNCE = 0.6;
 const FRICTION = 0.92;
@@ -83,7 +82,6 @@ class ScreenErrorBoundary extends React.Component<{ onError: (msg: string) => vo
   render() { if (this.state.hasError) return null; return this.props.children as any; }
 }
 
-// ✅ EKRAN ESNEMESİNİ ÖNLEYEN DOKUNMATİK ALAN
 function CanvasEvents({ onDown, onUp }: { onDown: () => void; onUp: () => void; }) {
   return ( 
     <mesh 
@@ -150,8 +148,8 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
   const fishTarget = useRef(new THREE.Vector3(0, 0, Z_PLANE));
   const dragging = useRef(false);
 
-  // Başlangıç Yönü: Sağa bakarak başlasın (Math.PI)
-  const currentYaw = useRef(Math.PI); 
+  // BAŞLANGIÇ YÖNÜ: 0 derece (Sola bakan orijinal profil)
+  const currentYaw = useRef(0); 
   const currentPitch = useRef(0);
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
@@ -162,7 +160,6 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
   useFrame((state, dt) => {
     if (!fishGroup.current) return;
 
-    // 🔥 CANLI HEDEF TAKİBİ: Parmak ekranda olduğu sürece hedefi kameraya göre güncelle
     if (dragging.current) {
       raycaster.setFromCamera(state.pointer, state.camera);
       raycaster.ray.intersectPlane(plane, fishTarget.current);
@@ -176,7 +173,6 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
     const dy = fishTarget.current.y - fishPos.current.y;
     const dist = Math.hypot(dx, dy);
     
-    // Titremeyi kesen deadzone
     const moving = dragging.current && dist > 0.2;
 
     if (moving) {
@@ -187,13 +183,21 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
       fishVel.current.x = THREE.MathUtils.lerp(fishVel.current.x, targetVx, a);
       fishVel.current.y = THREE.MathUtils.lerp(fishVel.current.y, targetVy, a);
 
-      // ✅ SAĞA VE SOLA NET KİLİTLENME
+      // ==========================================
+      // ✅ 2.5D ARCADE KİLİDİ (RESİMLERE GÖRE DÜZELTİLDİ)
+      // Balık sadece sağa (180 derece) veya sola (0 derece) kilitlenir. Asla sana dönmez.
+      // ==========================================
       let targetYaw = currentYaw.current; 
-      if (nx > 0.05) targetYaw = Math.PI;       // Sağa tam dön
-      else if (nx < -0.05) targetYaw = 0;       // Sola tam dön
+      if (nx > 0.05) targetYaw = Math.PI; // Sağa gitmek için tam ters dön
+      else if (nx < -0.05) targetYaw = 0; // Sola gitmek için hiç dönme (orijinal duruş)
 
-      // ✅ BURNU YUKARI/AŞAĞI KALDIRMA (Göbek / Sırt)
-      let targetPitch = ny * MAX_PITCH_ANGLE;
+      // ==========================================
+      // ✅ BURNU YUKARI/AŞAĞI KALDIRMA MANTIĞI
+      // Sola giderken eğim yönü ile sağa giderkenki eğim yönü 
+      // iskelet yapısı nedeniyle birbirinin tersidir.
+      // ==========================================
+      const pitchDirection = (targetYaw > 1.5) ? 1 : -1;
+      let targetPitch = ny * MAX_PITCH_ANGLE * pitchDirection;
 
       const tYaw = 1 - Math.pow(0.001, dt * TURN_SMOOTH_YAW);
       const tPitch = 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH);
@@ -202,7 +206,6 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
       currentPitch.current = lerp(currentPitch.current, targetPitch, tPitch);
 
     } else {
-      // Motorları durdur, süzülerek yatay konuma geç
       fishVel.current.multiplyScalar(DRAG_STOP);
       const tPitch = 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH);
       currentPitch.current = lerp(currentPitch.current, 0, tPitch);
@@ -220,10 +223,10 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
 
     fishGroup.current.position.copy(fishPos.current);
 
-    // 🔥 FOTOĞRAFTAN ÇIKAN MUHTEŞEM DÜZELTME
-    // Yan devrilmeyi (Roll) bitirip burnu kaldırmayı (Pitch) doğru eksene (Z) atadık
+    // ✅ SON VURUŞ: Rotasyonu yerel Z ekseninden uyguluyoruz. 
+    // Balık asla fıçı tonosu (Roll) atmaz, sadece uçağın burnunu kaldırması gibi eğilir.
     fishGroup.current.rotation.set(0, currentYaw.current, 0, 'YXZ');
-    fishGroup.current.rotateZ(-currentPitch.current);
+    fishGroup.current.rotateZ(currentPitch.current);
 
     const swim = swimActionRef.current;
     if (swim) swim.paused = !moving;
@@ -269,9 +272,8 @@ export default function EslemeGame() {
   }, []);
 
   return (
-    // 🔥 EKRAN ESNEMESİNİ KİLİTLEYEN CSS: touchAction: "none" EKLENDİ
     <div style={{ width: "100vw", height: "100vh", background: BG_COLOR, touchAction: "none" }}>
-      <Overlay title="ARCADE KONTROL & SIFIR ESNEME" lines={lines} onClear={clear} />
+      <Overlay title="2.5D YAN PROFİL KİLİDİ AKTİF" lines={lines} onClear={clear} />
       <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45, near: 0.1, far: 5000 }} onCreated={({ scene }) => { scene.background = new THREE.Color(BG_COLOR); }}>
         <ambientLight intensity={1.0} />
         <directionalLight position={[10, 12, 10]} intensity={2.1} />
@@ -285,5 +287,5 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-                                                 }
+    }
     
