@@ -27,20 +27,22 @@ const FISH_SCALE = 3.0;
 
 // ✅ Dönüş yumuşaklığı
 const TURN_SMOOTH = 10.0; // büyüt => daha hızlı döner, küçült => daha yavaş
-const BANK_AMOUNT = 0.35; // yüzünü gösterme/bank (radyan) 0.2-0.5
+const BANK_AMOUNT = 0.35; // 0.2-0.5
 
 function Loader3D() {
   const { progress } = useProgress();
   return (
     <Html center>
-      <div style={{
-        color: "white",
-        background: "rgba(0,0,0,0.6)",
-        padding: "10px 12px",
-        borderRadius: 10,
-        border: "1px solid rgba(255,255,255,0.2)",
-        fontFamily: "monospace",
-      }}>
+      <div
+        style={{
+          color: "white",
+          background: "rgba(0,0,0,0.6)",
+          padding: "10px 12px",
+          borderRadius: 10,
+          border: "1px solid rgba(255,255,255,0.2)",
+          fontFamily: "monospace",
+        }}
+      >
         Yükleniyor: %{progress.toFixed(0)}
       </div>
     </Html>
@@ -92,21 +94,23 @@ function useScreenLogger() {
 
 function LogOverlay({ logs, onClose }: { logs: LogItem[]; onClose: () => void }) {
   return (
-    <div style={{
-      position: "fixed",
-      top: 10,
-      left: 10,
-      right: 10,
-      maxWidth: 760,
-      zIndex: 999999,
-      background: "rgba(0,0,0,0.88)",
-      border: "1px solid rgba(255,255,255,0.15)",
-      borderRadius: 12,
-      padding: 12,
-      fontFamily: "monospace",
-      fontSize: 12,
-      color: "#e5e7eb",
-    }}>
+    <div
+      style={{
+        position: "fixed",
+        top: 10,
+        left: 10,
+        right: 10,
+        maxWidth: 760,
+        zIndex: 999999,
+        background: "rgba(0,0,0,0.88)",
+        border: "1px solid rgba(255,255,255,0.15)",
+        borderRadius: 12,
+        padding: 12,
+        fontFamily: "monospace",
+        fontSize: 12,
+        color: "#e5e7eb",
+      }}
+    >
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
         <div style={{ fontWeight: 800, color: "#ffcc00" }}>RAPOR</div>
         <button
@@ -126,12 +130,16 @@ function LogOverlay({ logs, onClose }: { logs: LogItem[]; onClose: () => void })
       </div>
       <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
         {logs.map((l, i) => (
-          <div key={i} style={{
-            color: l.level === "error" ? "#ff4d4d" : l.level === "warn" ? "#fbbf24" : "#a7f3d0",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-          }}>
-            {"> "}{l.msg}
+          <div
+            key={i}
+            style={{
+              color: l.level === "error" ? "#ff4d4d" : l.level === "warn" ? "#fbbf24" : "#a7f3d0",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {"> "}
+            {l.msg}
           </div>
         ))}
       </div>
@@ -147,22 +155,28 @@ class ScreenErrorBoundary extends React.Component<
     super(props);
     this.state = { hasError: false };
   }
-  static getDerivedStateFromError() { return { hasError: true }; }
-  componentDidCatch(error: any) { this.props.onError(error?.message || String(error)); }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: any) {
+    this.props.onError(error?.message || String(error));
+  }
   render() {
     if (this.state.hasError) {
       return (
         <Html center>
-          <div style={{
-            color: "#ff4d4d",
-            background: "rgba(0,0,0,0.75)",
-            padding: 12,
-            borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.2)",
-            fontFamily: "monospace",
-            maxWidth: 340,
-            textAlign: "center",
-          }}>
+          <div
+            style={{
+              color: "#ff4d4d",
+              background: "rgba(0,0,0,0.75)",
+              padding: 12,
+              borderRadius: 10,
+              border: "1px solid rgba(255,255,255,0.2)",
+              fontFamily: "monospace",
+              maxWidth: 340,
+              textAlign: "center",
+            }}
+          >
             HATA: 3D sahne çöktü
           </div>
         </Html>
@@ -172,8 +186,11 @@ class ScreenErrorBoundary extends React.Component<
   }
 }
 
+/** ✅ Tek CanvasEvents: sadece burada var */
 function CanvasEvents({
-  onDown, onMove, onUp,
+  onDown,
+  onMove,
+  onUp,
 }: {
   onDown: (e: any) => void;
   onMove: (e: any) => void;
@@ -260,24 +277,20 @@ function World({
       }
     });
 
-    // raw bbox
     const rawBox = new THREE.Box3().setFromObject(sea.scene);
     const size = new THREE.Vector3();
     const center = new THREE.Vector3();
     rawBox.getSize(size);
     rawBox.getCenter(center);
 
-    // center
     sea.scene.position.sub(center);
 
-    // scale to longest=80 then *2
     const longest = Math.max(size.x, size.y, size.z);
     const targetLongest = 80;
     const s0 = longest > 0 ? targetLongest / longest : 1;
     const s = s0 * SEA_SCALE_MULT;
     sea.scene.scale.setScalar(s);
 
-    // place
     seaGroup.current.position.set(0, 0, -25);
     seaGroup.current.rotation.set(0, SEA_ROT_Y, 0);
 
@@ -297,12 +310,10 @@ function World({
     report(`Deniz scale=${s.toFixed(3)} rotY=${(SEA_ROT_Y * 57.2958).toFixed(0)}deg`, "info");
   }, [sea.scene, report]);
 
-  // fish state
   const fishPos = useRef(new THREE.Vector3(0, 0, 0));
   const fishTarget = useRef(new THREE.Vector3(0, 0, 0));
   const dragging = useRef(false);
 
-  // smooth rotation state
   const yawRef = useRef(Math.PI / 2);
 
   useEffect(() => {
@@ -314,11 +325,12 @@ function World({
 
     fishGroup.current.position.copy(fishPos.current);
     fishGroup.current.scale.setScalar(FISH_SCALE);
+
     yawRef.current = Math.PI / 2;
     fishGroup.current.rotation.set(0, yawRef.current, 0);
   }, [fish.scene]);
 
-  // pointer->world via NDC
+  // pointer->world NDC
   const { camera } = useThree();
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), []);
@@ -346,7 +358,6 @@ function World({
     const b = boundsRef.current;
     if (!b || !fishGroup.current) return;
 
-    // clamp target
     fishTarget.current.x = THREE.MathUtils.clamp(fishTarget.current.x, b.minX, b.maxX);
     fishTarget.current.y = THREE.MathUtils.clamp(fishTarget.current.y, b.minY, b.maxY);
     fishTarget.current.z = 0;
@@ -367,24 +378,19 @@ function World({
 
     fishGroup.current.position.copy(fishPos.current);
 
-    // ✅ YUMUŞAK DÖNÜŞ + küçük bank (yüzü görünsün)
     const dx = fishTarget.current.x - fishPos.current.x;
     const desiredYaw = dx >= 0 ? Math.PI / 2 : -Math.PI / 2;
 
-    // lerpAngle
     const t = 1 - Math.pow(0.001, dt * TURN_SMOOTH);
     yawRef.current = THREE.MathUtils.lerpAngle(yawRef.current, desiredYaw, t);
 
-    // bank (z rotation): dönüş yönüne göre küçük eğim
     const bank = THREE.MathUtils.clamp(dx * 0.15, -1, 1) * BANK_AMOUNT;
 
     fishGroup.current.rotation.set(0, yawRef.current, bank);
 
-    // anim
     const swim = swimActionRef.current;
     if (swim) swim.paused = !moving;
 
-    // kamera
     const cam = state.camera as THREE.PerspectiveCamera;
     const desiredCam = new THREE.Vector3(fishPos.current.x, b.fixedY, CAMERA_Z);
     cam.position.lerp(desiredCam, 1 - Math.pow(0.001, dt));
@@ -410,27 +416,6 @@ function World({
   );
 }
 
-function CanvasEvents({
-  onDown, onMove, onUp,
-}: {
-  onDown: (e: any) => void;
-  onMove: (e: any) => void;
-  onUp: () => void;
-}) {
-  return (
-    <mesh
-      position={[0, 0, 0]}
-      onPointerDown={onDown}
-      onPointerMove={onMove}
-      onPointerUp={onUp}
-      onPointerCancel={onUp}
-    >
-      <planeGeometry args={[5000, 5000]} />
-      <meshBasicMaterial transparent opacity={0.01} depthWrite={false} />
-    </mesh>
-  );
-}
-
 export default function EslemeGame() {
   const { logs, push } = useScreenLogger();
   const [showPanel, setShowPanel] = useState(false);
@@ -451,6 +436,7 @@ export default function EslemeGame() {
 
     const origin = window.location.origin;
     const base = new URL("/assets/public/", origin).toString();
+
     setFishUrl(new URL("models/balik.glb", base).toString());
     setSeaUrl(new URL("models/deniz.glb", base).toString());
     setDracoBase(new URL("draco/", base).toString());
@@ -489,4 +475,4 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-}
+                              }
