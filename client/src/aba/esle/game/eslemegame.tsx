@@ -16,37 +16,29 @@ function lerpAngle(a: number, b: number, t: number) {
 
 /** ==== AYARLAR ==== */
 const SEA_ANIM_NAME = "yeme";
-const SEA_ANIM_SPEED = 0.2;
 const FISH_SWIM_ANIM_NAME = "yuzme";
-
-const MAX_SPEED = 7.2;
+const MAX_SPEED = 7.5;
 const ACCEL = 8.0; 
-const DRAG_STOP = 0.90;
+const DRAG_STOP = 0.92;
 const Z_PLANE = 0; 
-
-const CAMERA_Z = 10;
+const CAMERA_Z = 12;
 const CAMERA_SMOOTH = 5.0;
-
 const SEA_ROT_Y = Math.PI / 2;
 const SEA_SCALE_MULT = 2.0;
-const FISH_SCALE = 3.0;
+const FISH_SCALE = 3.2;
 
+// Dönüş Hassasiyetleri
 const TURN_SMOOTH_YAW = 8.0;   
 const TURN_SMOOTH_PITCH = 8.0; 
-const MAX_PITCH_ANGLE = Math.PI / 4; 
+const MAX_PITCH_ANGLE = Math.PI / 4; // 45 derece burun kaldırma
+const BELLY_ROLL_ANGLE = Math.PI / 6; // Yukarı çıkarken karın gösterme açısı (30 derece)
 
 const BOUNCE = 0.6;
 const BG_COLOR = "#0b2a46";
 
-const WATER_Y_OFFSET = -1.8;
-const WATER_THICKNESS = 2.8;
-const WATER_WAVE_STRENGTH = 0.35;
-const WATER_SCROLL_SPEED = 0.08;
-const WATER_TILES = 5;
-
 function Loader3D() {
   const { progress } = useProgress();
-  return ( <Html center> <div style={{ color: "white", background: "rgba(0,0,0,0.75)", padding: "10px 12px", borderRadius: 10, fontFamily: "monospace" }}> Yükleniyor: %{progress.toFixed(0)} </div> </Html> );
+  return ( <Html center> <div style={{ color: "white", background: "rgba(0,0,0,0.75)", padding: "10px 12px", borderRadius: 10, fontFamily: "monospace" }}> %{progress.toFixed(0)} </div> </Html> );
 }
 
 function CanvasEvents({ onDown, onUp }: { onDown: () => void; onUp: () => void; }) {
@@ -62,8 +54,8 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   useMemo(() => { useGLTF.setDecoderPath(dracoBase.endsWith("/") ? dracoBase : `${dracoBase}/`); }, [dracoBase]);
   const sea = useGLTF(seaUrl); const fish = useGLTF(fishUrl);
   const seaGroup = useRef<THREE.Group>(null); 
-  const fishGroup = useRef<THREE.Group>(null); // Dış Kutu (Pozisyon ve Sağa/Sola Dönüş)
-  const fishInner = useRef<THREE.Group>(null); // İç Kutu (Sadece Burnu Aşağı/Yukarı Kaldırma)
+  const fishGroup = useRef<THREE.Group>(null); // Pozisyon ve Sağ-Sol (Yaw)
+  const fishInner = useRef<THREE.Group>(null); // Burun Kaldırma (Pitch) ve Göbek Gösterme (Roll)
   
   const seaAnim = useAnimations(sea.animations, sea.scene); 
   const fishAnim = useAnimations(fish.animations, fish.scene);
@@ -71,7 +63,7 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
   useEffect(() => { 
     const a = seaAnim.actions?.[SEA_ANIM_NAME] || (seaAnim.names?.[0] ? seaAnim.actions?.[seaAnim.names[0]] : null); 
-    if (a) { a.reset().fadeIn(0.15).play(); a.timeScale = SEA_ANIM_SPEED; } 
+    if (a) { a.reset().fadeIn(0.2).play(); a.timeScale = 0.2; } 
   }, [seaAnim]);
   
   useEffect(() => { 
@@ -80,20 +72,17 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   }, [fishAnim]);
 
   const boundsRef = useRef({ minX: -50, maxX: 50, minY: -30, maxY: 30 });
-  const surfaceRef = useRef({ w: 100, y: 10, z: -20 });
 
   useEffect(() => {
     if (!seaGroup.current) return;
-    sea.scene.traverse((o: any) => { if (o?.isMesh && o.material) o.material.side = THREE.DoubleSide; });
+    sea.scene.traverse((o: any) => { if (o?.isMesh) o.material.side = THREE.DoubleSide; });
     const rawBox = new THREE.Box3().setFromObject(sea.scene);
-    const size = new THREE.Vector3();
-    rawBox.getSize(size);
-    sea.scene.scale.setScalar((Math.max(size.x, size.y, size.z) > 0 ? 90 / Math.max(size.x, size.y, size.z) : 1) * SEA_SCALE_MULT);
+    const size = new THREE.Vector3(); rawBox.getSize(size);
+    sea.scene.scale.setScalar((size.x > 0 ? 90 / size.x : 1) * SEA_SCALE_MULT);
     seaGroup.current.position.set(0, 0, -20);
     seaGroup.current.rotation.set(0, SEA_ROT_Y, 0);
     const box = new THREE.Box3().setFromObject(seaGroup.current);
-    boundsRef.current = { minX: box.min.x + 2, maxX: box.max.x - 2, minY: box.min.y + 2, maxY: box.max.y - 2 };
-    surfaceRef.current = { w: (box.max.x - box.min.x) * 1.2, y: box.max.y - 1, z: box.min.z };
+    boundsRef.current = { minX: box.min.x + 3, maxX: box.max.x - 3, minY: box.min.y + 3, maxY: box.max.y - 3 };
   }, [sea.scene]);
 
   const fishPos = useRef(new THREE.Vector3(0, 0, Z_PLANE));
@@ -101,9 +90,10 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   const fishTarget = useRef(new THREE.Vector3(0, 0, Z_PLANE));
   const dragging = useRef(false);
 
-  // ✅ BAŞLANGIÇ: Yan Profil Kilidi (Modelin burnuna göre ayarlandı)
-  const currentYaw = useRef(Math.PI / 2); 
+  // Başlangıç: Modelin sola bakması (0 derece)
+  const currentYaw = useRef(0); 
   const currentPitch = useRef(0);
+  const currentRoll = useRef(0);
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -Z_PLANE), []);
@@ -127,22 +117,27 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
     if (moving) {
       const nx = dx / dist; const ny = dy / dist;
-      const a = 1 - Math.pow(0.001, dt * ACCEL);
-      fishVel.current.x = lerp(fishVel.current.x, nx * MAX_SPEED, a);
-      fishVel.current.y = lerp(fishVel.current.y, ny * MAX_SPEED, a);
+      const lerpVal = 1 - Math.pow(0.001, dt * ACCEL);
+      fishVel.current.x = lerp(fishVel.current.x, nx * MAX_SPEED, lerpVal);
+      fishVel.current.y = lerp(fishVel.current.y, ny * MAX_SPEED, lerpVal);
 
-      // ✅ 90 DERECE ŞAŞILIK GİDERİLDİ: Sola PI/2, Sağa -PI/2
-      let targetYaw = (nx > 0.05) ? -Math.PI / 2 : Math.PI / 2; 
+      // ✅ YAW: Sola (0), Sağa (Math.PI)
+      let targetYaw = (nx > 0.05) ? Math.PI : 0; 
       
-      // ✅ PITCH (BURUN KALDIRMA) DÜZELTİLDİ
-      const pitchDirection = (targetYaw < 0) ? 1 : -1;
-      let targetPitch = ny * MAX_PITCH_ANGLE * pitchDirection;
+      // ✅ PITCH (BURUN): Sola giderken ny, sağa giderken -ny (Kuyruk dikmeyi engeller)
+      const pitchFix = (targetYaw > 1) ? -1 : 1;
+      let targetPitch = ny * MAX_PITCH_ANGLE * pitchFix;
+
+      // ✅ ROLL (GÖBEK): Yukarı çıkarken bize doğru (turuncu karın), aşağı inerken arkaya doğru
+      let targetRoll = ny * BELLY_ROLL_ANGLE * pitchFix;
 
       currentYaw.current = lerpAngle(currentYaw.current, targetYaw, 1 - Math.pow(0.001, dt * TURN_SMOOTH_YAW));
       currentPitch.current = lerp(currentPitch.current, targetPitch, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
+      currentRoll.current = lerp(currentRoll.current, targetRoll, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
     } else {
       fishVel.current.multiplyScalar(DRAG_STOP);
       currentPitch.current = lerp(currentPitch.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
+      currentRoll.current = lerp(currentRoll.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
     }
 
     fishPos.current.x += fishVel.current.x * dt;
@@ -153,11 +148,15 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
     fishGroup.current.position.copy(fishPos.current);
     
-    // ✅ DIŞ KUTU: Sola/Sağa Döner (Yaw)
+    // ✅ DIŞ KUTU: Sadece Yaw (Sağ-Sol)
     fishGroup.current.rotation.y = currentYaw.current;
     
-    // ✅ İÇ KUTU: Yukarı/Aşağı Eğilir (Pitch) - Asla karnını göstermez!
-    fishInner.current.rotation.x = currentPitch.current;
+    // ✅ İÇ KUTU: Burun Kaldırma (Pitch) + Karın Gösterme (Roll)
+    // Local Z ekseninde büküyoruz, böylece modelin burnu hep parmağı takip eder
+    fishInner.current.rotation.z = currentPitch.current;
+    
+    // Local X ekseninde hafif yatırıyoruz, böylece yukarı çıkarken göbek görünür
+    fishInner.current.rotation.x = currentRoll.current;
 
     if (swimActionRef.current) swimActionRef.current.paused = !moving;
 
@@ -169,7 +168,6 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     <>
       <group ref={seaGroup}> <primitive object={sea.scene} /> </group>
       <group ref={fishGroup} scale={FISH_SCALE}> 
-         {/* İç Kutu: Pitch işlemini burası yapar, fıçı tonosu atmasını engeller */}
          <group ref={fishInner}>
             <primitive object={fish.scene} /> 
          </group>
@@ -181,14 +179,9 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
 export default function EslemeGame() {
   const [urls, setUrls] = useState({ fish: "", sea: "", draco: "" });
-
   useEffect(() => {
     const base = new URL("/assets/public/", window.location.origin).toString();
-    setUrls({
-      fish: new URL("models/balik.glb", base).toString(),
-      sea: new URL("models/deniz.glb", base).toString(),
-      draco: new URL("draco/", base).toString()
-    });
+    setUrls({ fish: new URL("models/balik.glb", base).toString(), sea: new URL("models/deniz.glb", base).toString(), draco: new URL("draco/", base).toString() });
   }, []);
 
   return (
