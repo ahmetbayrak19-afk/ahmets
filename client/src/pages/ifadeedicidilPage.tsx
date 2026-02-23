@@ -10,6 +10,7 @@ import Talk from './talk';
 
 // --- OYUN IMPORT ---
 import IfadeEdiciGame15 from '@/aba/ifade/ifadeEdiciGame15';
+import IfadeEdiciGame14 from '@/aba/ifade/ifadeEdiciGame14'; // ✅ 1. OYUN EKLENDİ
 import IfadeEdiciGame13 from '@/aba/ifade/ifadeEdiciGame13';
 
 interface IfadeEdiciDilPageProps {
@@ -111,12 +112,23 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
     );
   }
 
-  // 2. OYUN MODU KONTROLÜ (İEDB 3.5 / 3.7)
+  // 2. OYUN MODU KONTROLÜ (İEDB 3.5 / 3.6 / 3.7)
   if (activeGameMode && activeGameItem) {
     if (activeGameItem.startsWith("İEDB 3.5")) {
       return (
         <IfadeEdiciGame13
-          // ✅ KRİTİK: studentId’yi mutlaka geçir!
+          studentId={studentId}
+          mode={activeGameMode}
+          onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }}
+          onComplete={handleGameComplete}
+        />
+      );
+    }
+
+    // ✅ 2. YENİ OYUNUN YÖNLENDİRMESİ EKLENDİ (Kodu kendi listene göre düzenle)
+    if (activeGameItem.startsWith("İEDB 3.6")) { 
+      return (
+        <IfadeEdiciGame14
           studentId={studentId}
           mode={activeGameMode}
           onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }}
@@ -128,7 +140,6 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
     if (activeGameItem.startsWith("İEDB 3.7")) {
       return (
         <IfadeEdiciGame15
-          // ✅ Aynı şekilde
           studentId={studentId}
           mode={activeGameMode}
           onClose={() => { setActiveGameMode(null); setActiveGameItem(null); }}
@@ -172,7 +183,9 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
           const isCompleted = status === true;
 
           const isTolkidoItem = item.includes("TOLKİDO");
-          const hasGame = item.startsWith("İEDB 3.5") || item.startsWith("İEDB 3.7");
+          
+          // ✅ 3. BUTONLARIN GÖRÜNMESİ İÇİN 3.6 BURAYA DA EKLENDİ
+          const hasGame = item.startsWith("İEDB 3.5") || item.startsWith("İEDB 3.6") || item.startsWith("İEDB 3.7");
 
           return (
             <div
@@ -264,4 +277,4 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
       </div>
     </div>
   );
-        }
+}
