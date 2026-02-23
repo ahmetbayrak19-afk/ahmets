@@ -19,13 +19,11 @@ const SEA_ANIM_NAME = "yeme";
 const SEA_ANIM_SPEED = 0.2;
 const FISH_SWIM_ANIM_NAME = "yuzme";
 
-// Hız ayarları
 const MAX_SPEED = 7.2;
 const ACCEL = 8.0; 
 const DRAG_STOP = 0.90;
 const Z_PLANE = 0; 
 
-// Kamera
 const CAMERA_Z = 10;
 const CAMERA_SMOOTH = 5.0;
 
@@ -33,16 +31,14 @@ const SEA_ROT_Y = Math.PI / 2;
 const SEA_SCALE_MULT = 2.0;
 const FISH_SCALE = 3.0;
 
-// Dönüş Hassasiyetleri
 const TURN_SMOOTH_YAW = 8.0;   
 const TURN_SMOOTH_PITCH = 8.0; 
-const MAX_PITCH_ANGLE = Math.PI / 3; // Burnunu kaldırma sınırı (60 derece)
+const MAX_PITCH_ANGLE = Math.PI / 3; 
 
 const BOUNCE = 0.6;
 const FRICTION = 0.92;
 const BG_COLOR = "#0b2a46";
 
-// Sonsuz su
 const WATER_Y_OFFSET = -1.8;
 const WATER_THICKNESS = 2.8;
 const WATER_WAVE_STRENGTH = 0.35;
@@ -148,8 +144,8 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
   const fishTarget = useRef(new THREE.Vector3(0, 0, Z_PLANE));
   const dragging = useRef(false);
 
-  // BAŞLANGIÇ YÖNÜ: 0 derece (Sola bakan orijinal profil)
-  const currentYaw = useRef(0); 
+  // ✅ BAŞLANGIÇ YÖNÜ: 90 Derece (Sola bakan profil)
+  const currentYaw = useRef(Math.PI / 2); 
   const currentPitch = useRef(0);
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
@@ -184,19 +180,15 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
       fishVel.current.y = THREE.MathUtils.lerp(fishVel.current.y, targetVy, a);
 
       // ==========================================
-      // ✅ 2.5D ARCADE KİLİDİ (RESİMLERE GÖRE DÜZELTİLDİ)
-      // Balık sadece sağa (180 derece) veya sola (0 derece) kilitlenir. Asla sana dönmez.
+      // ✅ YÖN DÜZELTME (90 DERECE ŞAŞILIK GİDERİLDİ)
+      // Balık artık sola PI/2 (90), sağa -PI/2 (-90) kilitlenir.
       // ==========================================
       let targetYaw = currentYaw.current; 
-      if (nx > 0.05) targetYaw = Math.PI; // Sağa gitmek için tam ters dön
-      else if (nx < -0.05) targetYaw = 0; // Sola gitmek için hiç dönme (orijinal duruş)
+      if (nx > 0.05) targetYaw = -Math.PI / 2; // Sağa bak
+      else if (nx < -0.05) targetYaw = Math.PI / 2; // Sola bak
 
-      // ==========================================
-      // ✅ BURNU YUKARI/AŞAĞI KALDIRMA MANTIĞI
-      // Sola giderken eğim yönü ile sağa giderkenki eğim yönü 
-      // iskelet yapısı nedeniyle birbirinin tersidir.
-      // ==========================================
-      const pitchDirection = (targetYaw > 1.5) ? 1 : -1;
+      // Yeni Yaw değerine göre Pitch yönünü ayarla
+      const pitchDirection = (targetYaw < 0) ? 1 : -1;
       let targetPitch = ny * MAX_PITCH_ANGLE * pitchDirection;
 
       const tYaw = 1 - Math.pow(0.001, dt * TURN_SMOOTH_YAW);
@@ -223,8 +215,7 @@ function World({ fishUrl, seaUrl, dracoBase, log }: { fishUrl: string; seaUrl: s
 
     fishGroup.current.position.copy(fishPos.current);
 
-    // ✅ SON VURUŞ: Rotasyonu yerel Z ekseninden uyguluyoruz. 
-    // Balık asla fıçı tonosu (Roll) atmaz, sadece uçağın burnunu kaldırması gibi eğilir.
+    // Rotasyonu yerel Z ekseninden uyguluyoruz.
     fishGroup.current.rotation.set(0, currentYaw.current, 0, 'YXZ');
     fishGroup.current.rotateZ(currentPitch.current);
 
@@ -273,7 +264,7 @@ export default function EslemeGame() {
 
   return (
     <div style={{ width: "100vw", height: "100vh", background: BG_COLOR, touchAction: "none" }}>
-      <Overlay title="2.5D YAN PROFİL KİLİDİ AKTİF" lines={lines} onClear={clear} />
+      <Overlay title="BALIK YAN PROFİL KİLİDİ AKTİF" lines={lines} onClear={clear} />
       <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45, near: 0.1, far: 5000 }} onCreated={({ scene }) => { scene.background = new THREE.Color(BG_COLOR); }}>
         <ambientLight intensity={1.0} />
         <directionalLight position={[10, 12, 10]} intensity={2.1} />
@@ -287,5 +278,4 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-    }
-    
+}
