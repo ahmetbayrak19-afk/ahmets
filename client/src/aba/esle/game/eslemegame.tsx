@@ -19,7 +19,6 @@ const SEA_ANIM_NAME = "yeme";
 const SEA_ANIM_SPEED = 0.2;
 const FISH_SWIM_ANIM_NAME = "yuzme";
 
-// Hız ve Takip Ayarları
 const MAX_SPEED = 7.2;
 const ACCEL = 8.0; 
 const DRAG_STOP = 0.90;
@@ -32,11 +31,12 @@ const SEA_ROT_Y = Math.PI / 2;
 const SEA_SCALE_MULT = 2.0;
 const FISH_SCALE = 3.0;
 
-// Dönüş Hassasiyetleri
 const TURN_SMOOTH_YAW = 8.0;   
 const TURN_SMOOTH_PITCH = 8.0; 
-const MAX_PITCH_ANGLE = Math.PI / 3; // 60 derece burun kalkar
-const BELLY_ROLL_ANGLE = Math.PI / 5; // 36 derece göbek kameraya döner
+
+// 🔥 İSTEDİĞİN GİBİ TAM 90 DERECE: Burun havaya 90 derece dikilir, göbek bize 90 derece döner.
+const MAX_PITCH_ANGLE = Math.PI / 2; 
+const BELLY_ROLL_ANGLE = Math.PI / 2; 
 
 const BOUNCE = 0.6;
 const BG_COLOR = "#0b2a46";
@@ -59,9 +59,8 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   useMemo(() => { useGLTF.setDecoderPath(dracoBase.endsWith("/") ? dracoBase : `${dracoBase}/`); }, [dracoBase]);
   const sea = useGLTF(seaUrl); const fish = useGLTF(fishUrl);
   const seaGroup = useRef<THREE.Group>(null); 
-  
   const fishGroup = useRef<THREE.Group>(null); // Sadece Yaw (Sağ-Sol)
-  const fishInner = useRef<THREE.Group>(null); // Sadece Pitch (Burun) ve Roll (Göbek)
+  const fishInner = useRef<THREE.Group>(null); // Pitch (Yukarı) ve Roll (Göbek)
   
   const seaAnim = useAnimations(sea.animations, sea.scene); 
   const fishAnim = useAnimations(fish.animations, fish.scene);
@@ -81,7 +80,6 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
   useEffect(() => {
     if (!seaGroup.current) return;
-    sea.scene.traverse((o: any) => { if (o?.isMesh && o.material) o.material.side = THREE.DoubleSide; });
     const rawBox = new THREE.Box3().setFromObject(sea.scene);
     const size = new THREE.Vector3(); rawBox.getSize(size);
     sea.scene.scale.setScalar((Math.max(size.x, size.y, size.z) > 0 ? 90 / Math.max(size.x, size.y, size.z) : 1) * SEA_SCALE_MULT);
@@ -96,10 +94,9 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   const fishTarget = useRef(new THREE.Vector3(0, 0, Z_PLANE));
   const dragging = useRef(false);
 
-  // BAŞLANGIÇ: Senin o kusursuz çalışan ilk halindeki gibi!
-  const currentYaw = useRef(0); 
+  const currentYaw = useRef(Math.PI / 2); 
   const currentPitch = useRef(0);
-  const currentRoll = useRef(0); 
+  const currentRoll = useRef(0); // 🔥 Göbek için eklendi
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -Z_PLANE), []);
@@ -128,20 +125,24 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
       fishVel.current.y = lerp(fishVel.current.y, ny * MAX_SPEED, a);
 
       // ==========================================
-      // ✅ 1. KUSURSUZ SAĞ-SOL (Asla bozulmayacak)
+      // ✅ 1. SENİN DOĞRU KODUN (Sağ-Sol Kilidi)
+      // Sadece dümdüz yukarı çıkarken aniden sola dönmesin diye mevcut yönü koruma ekledim.
       // ==========================================
-      let targetYaw = (nx > 0.05) ? Math.PI : 0; 
+      let targetYaw = currentYaw.current;
+      if (nx > 0.05) targetYaw = -Math.PI / 2; 
+      else if (nx < -0.05) targetYaw = Math.PI / 2; 
       
       // ==========================================
-      // ✅ 2. BURUN DİKME (Artık kıçını dikmeyecek)
+      // ✅ 2. YUKARI 90 DERECE (Kıç dikme yok, burun havaya)
       // ==========================================
-      let targetPitch = -ny * MAX_PITCH_ANGLE; 
+      let targetPitch = ny * MAX_PITCH_ANGLE; 
 
       // ==========================================
-      // ✅ 3. GÖBEK ŞOV (Turuncu karın kameraya)
+      // ✅ 3. GÖBEĞİ SANA ÇEVİRME (Karnı 90 derece kameraya açma)
+      // Sağa veya sola dönük olmasına göre göbeği doğru yöne deviriyoruz.
       // ==========================================
-      const direction = (targetYaw > 1) ? 1 : -1;
-      let targetRoll = ny * BELLY_ROLL_ANGLE * direction;
+      const rollDirection = (targetYaw < 0) ? 1 : -1;
+      let targetRoll = ny * BELLY_ROLL_ANGLE * rollDirection;
 
       currentYaw.current = lerpAngle(currentYaw.current, targetYaw, 1 - Math.pow(0.001, dt * TURN_SMOOTH_YAW));
       currentPitch.current = lerp(currentPitch.current, targetPitch, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
@@ -158,12 +159,12 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     if (fishPos.current.x <= b.minX || fishPos.current.x >= b.maxX) fishVel.current.x *= -BOUNCE;
     if (fishPos.current.y <= b.minY || fishPos.current.y >= b.maxY) fishVel.current.y *= -BOUNCE;
 
-    // Yönleri Atama: Dış kutu sadece sağı solu ayarlar
+    // ✅ DIŞ KUTU: Sadece Sağ-Sol Dönüşü
     fishGroup.current.position.copy(fishPos.current);
     fishGroup.current.rotation.y = currentYaw.current;
     
-    // İç kutu: Önce burnu diker (Z), sonra o eksen etrafında göbeği yatırır (X)
-    fishInner.current.rotation.set(currentRoll.current, 0, currentPitch.current, 'ZXY');
+    // ✅ İÇ KUTU: Burun 90 derece kalkar (Pitch/X) ve Göbek 90 derece sana döner (Roll/Z)
+    fishInner.current.rotation.set(currentPitch.current, 0, currentRoll.current, 'XYZ');
 
     if (swimActionRef.current) swimActionRef.current.paused = !moving;
 
@@ -202,4 +203,5 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-}
+    }
+                               
