@@ -44,10 +44,16 @@ const BELLY_ROLL_ANGLE = Math.PI / 2;
 
 const BOUNCE = 0.6;
 
-// 🔥 YENİ: DAHA AÇIK (GÜNDÜZ) OKYANUS RENKLERİ
-const GRADIENT_TOP = "#3498db"; // Pırıl pırıl açık mavi
-const GRADIENT_BOTTOM = "#104068"; // Derinlik mavisi (gece gibi karanlık değil)
+// GÜNDÜZ OKYANUSU RENKLERİ
+const GRADIENT_TOP = "#3498db"; 
+const GRADIENT_BOTTOM = "#104068"; 
 const FOG_COLOR = GRADIENT_BOTTOM; 
+
+// Lazer (Park Sensörü) Mesafesi
+const SENSOR_DISTANCE = 3.5; 
+
+// 🔥 YENİ: Zıplama Limiti (Suyun ne kadar üstüne çıkabilir)
+const JUMP_LIMIT = 2.0;
 
 const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/waternormals.jpg";
 
@@ -83,7 +89,7 @@ function RealisticWater({ y }: { y: number }) {
       waterNormals,
       sunDirection: new THREE.Vector3(0.5, 1, 0.5).normalize(),
       sunColor: 0xffffff,
-      waterColor: 0x0077be, // Suyu da biraz daha aydınlık, okyanus mavisi yaptık
+      waterColor: 0x0077be, 
       distortionScale: 3.7,
       fog: true,
       format: gl.encoding,
@@ -142,8 +148,7 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     boundsRef.current = { minX: box.min.x + 2, maxX: box.max.x - 2, minY: box.min.y + 2, maxY: box.max.y - 2 };
     
-    // 🔥 İSTEK: Su seviyesi eskisine göre 10 birim DAHA AŞAĞI indi. (Önceden -10'du, şimdi -20)
-    setSurfaceY(boundsRef.current.maxY - 20);
+    setSurfaceY(boundsRef.current.maxY - 27);
   }, [sea.scene]);
 
   const fishPos = useRef(new THREE.Vector3(0, 0, Z_PLANE));
@@ -156,12 +161,14 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   const currentRoll = useRef(0); 
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const collisionRaycaster = useMemo(() => new THREE.Raycaster(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -Z_PLANE), []);
 
   useFrame((state, dt) => {
     if (!fishGroup.current || !fishInner.current) return;
 
     const isAboveWater = fishPos.current.y > surfaceY;
+    const maxJumpHeight = surfaceY + JUMP_LIMIT; // 🔥 Suyun 2 birim üstü
 
     if (dragging.current) {
       raycaster.setFromCamera(state.pointer, state.camera);
@@ -169,20 +176,43 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     }
 
     const b = boundsRef.current;
+    
+    // 🔥 YENİ: Parmağını uzaya kadar çeksen bile hedef suyun en fazla 2 birim üstü olabilir
     fishTarget.current.x = THREE.MathUtils.clamp(fishTarget.current.x, b.minX, b.maxX);
-    fishTarget.current.y = Math.max(fishTarget.current.y, b.minY);
+    fishTarget.current.y = THREE.MathUtils.clamp(fishTarget.current.y, b.minY, maxJumpHeight);
 
     const dx = fishTarget.current.x - fishPos.current.x;
     const dy = fishTarget.current.y - fishPos.current.y;
     const dist = Math.hypot(dx, dy);
     const moving = dragging.current && dist > 0.2;
 
+    // LAZER KONTROLÜ (PARK SENSÖRÜ)
+    let hitWall = false;
+    if (moving || fishVel.current.lengthSq() > 0.1) {
+       let dirX = moving ? dx : fishVel.current.x;
+       let dirY = moving ? dy : fishVel.current.y;
+       const moveDir = new THREE.Vector3(dirX, dirY, 0).normalize();
+       
+       collisionRaycaster.set(fishPos.current, moveDir);
+       
+       if (seaGroup.current) {
+           const hits = collisionRaycaster.intersectObject(seaGroup.current, true);
+           if (hits.length > 0 && hits[0].distance < SENSOR_DISTANCE) {
+               hitWall = true; 
+           }
+       }
+    }
+
     if (moving) {
       const nx = dx / dist; const ny = dy / dist;
-      const a = 1 - Math.pow(0.001, dt * ACCEL);
       
-      fishVel.current.x = lerp(fishVel.current.x, nx * MAX_SPEED, a);
-      fishVel.current.y = lerp(fishVel.current.y, ny * MAX_SPEED, a);
+      if (!hitWall) {
+          const a = 1 - Math.pow(0.001, dt * ACCEL);
+          fishVel.current.x = lerp(fishVel.current.x, nx * MAX_SPEED, a);
+          fishVel.current.y = lerp(fishVel.current.y, ny * MAX_SPEED, a);
+      } else {
+          fishVel.current.multiplyScalar(0.7);
+      }
 
       let targetYaw = currentYaw.current;
       if (nx > 0.05) targetYaw = -Math.PI / 2; 
@@ -206,13 +236,34 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
       if (!moving && fishVel.current.y < 0) {
          currentPitch.current = lerp(currentPitch.current, -Math.PI/4, 0.1);
       }
+      
+      if (fishVel.current.y < 0) {
+          collisionRaycaster.set(fishPos.current, new THREE.Vector3(0, -1, 0));
+          if (seaGroup.current) {
+              const hits = collisionRaycaster.intersectObject(seaGroup.current, true);
+              if (hits.length > 0 && hits[0].distance < 2.0) {
+                  fishVel.current.y *= -BOUNCE; 
+              }
+          }
+      }
     }
 
     fishPos.current.x += fishVel.current.x * dt;
     fishPos.current.y += fishVel.current.y * dt;
 
     if (fishPos.current.x <= b.minX || fishPos.current.x >= b.maxX) fishVel.current.x *= -BOUNCE;
-    if (fishPos.current.y <= b.minY) { fishPos.current.y = b.minY; fishVel.current.y *= -BOUNCE; }
+    
+    // 🔥 ZEMİN VE TAVAN KİLİTLERİ
+    if (fishPos.current.y <= b.minY) { 
+        fishPos.current.y = b.minY; 
+        fishVel.current.y *= -BOUNCE; 
+    }
+    // 🔥 YENİ: Havaya zıpladı ve 2 birim sınırına çarptıysa hızı kes, cup diye suya düşsün!
+    else if (fishPos.current.y >= maxJumpHeight) {
+        fishPos.current.y = maxJumpHeight;
+        // Eğer hala yukarı çıkmaya çalışıyorsa hızını sıfırla ki yerçekimi onu hemen aşağı çeksin
+        if (fishVel.current.y > 0) fishVel.current.y = 0;
+    }
 
     fishGroup.current.position.copy(fishPos.current);
     fishGroup.current.rotation.y = currentYaw.current;
