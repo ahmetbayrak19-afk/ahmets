@@ -1,7 +1,12 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Html, useAnimations, useGLTF, useProgress } from "@react-three/drei";
+import { Canvas, useFrame, useThree, extend, useLoader } from "@react-three/fiber";
+import { Html, useAnimations, useGLTF, useProgress, Environment } from "@react-three/drei";
 import * as THREE from "three";
+// Three.js'in standart su efektini projeye dahil ediyoruz
+import { Water } from "three-stdlib";
+
+// Water bileşenini JSX'te kullanabilmek için tanıtıyoruz
+extend({ Water });
 
 /** ---- Utils ---- */
 function lerp(start: number, end: number, t: number) {
@@ -24,7 +29,6 @@ const ACCEL = 8.0;
 const DRAG_STOP = 0.90;
 const Z_PLANE = 0; 
 
-// Havadayken balığı aşağı çeken yerçekimi kuvveti
 const GRAVITY = 35.0; 
 
 const CAMERA_Z = 10;
@@ -47,6 +51,9 @@ const GRADIENT_TOP = "#11426e";
 const GRADIENT_BOTTOM = "#051a2e"; 
 const FOG_COLOR = GRADIENT_BOTTOM; 
 
+// Dalgalar için standart normal map dokusu (İnternetten çekiyoruz)
+const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/waternormals.jpg";
+
 function Loader3D() {
   const { progress } = useProgress();
   return ( <Html center> <div style={{ color: "white", background: "rgba(0,0,0,0.75)", padding: "10px 12px", borderRadius: 10, fontFamily: "monospace" }}> Yükleniyor: %{progress.toFixed(0)} </div> </Html> );
@@ -61,53 +68,48 @@ function CanvasEvents({ onDown, onUp }: { onDown: () => void; onUp: () => void; 
   );
 }
 
-// GTA 5 TARZI DEVASA OKYANUS TAVANI SHADER'I
-function WaterCeiling({ y }: { y: number }) {
-  const mat = useMemo(() => {
-    return new THREE.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-      uniforms: { uTime: { value: 0 } },
-      vertexShader: `
-        varying vec2 vUv;
-        varying vec3 vWorldPos;
-        uniform float uTime;
-        void main() {
-          vUv = uv;
-          vec3 pos = position;
-          pos.z += sin(pos.x * 0.1 + uTime * 0.8) * cos(pos.y * 0.1 + uTime * 0.6) * 3.0;
-          vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
-          vWorldPos = worldPosition.xyz;
-          gl_Position = projectionMatrix * viewMatrix * worldPosition;
-        }
-      `,
-      fragmentShader: `
-        varying vec2 vUv;
-        varying vec3 vWorldPos;
-        uniform float uTime;
-        void main() {
-          vec2 p = vWorldPos.xz * 0.05;
-          float time = uTime * 0.5;
-          float w1 = sin(p.x + time) * cos(p.y + time * 0.8);
-          float w2 = sin(p.x * 2.3 - time * 1.1) * cos(p.y * 2.1 + time * 0.9);
-          float w3 = sin(p.x * 5.1 + time * 1.5) * cos(p.y * 4.8 - time * 1.2);
-          float w = (w1 + w2 * 0.5 + w3 * 0.25);
-          vec3 deepColor = vec3(0.04, 0.18, 0.35);
-          vec3 lightColor = vec3(0.16, 0.71, 0.95);
-          vec3 col = mix(deepColor, lightColor, w * 0.5 + 0.5);
-          float sun = pow(max(0.0, w), 4.0);
-          col += vec3(0.8, 0.9, 1.0) * sun * 0.8;
-          float dist = distance(cameraPosition, vWorldPos);
-          float alpha = 1.0 - smoothstep(40.0, 120.0, dist);
-          gl_FragColor = vec4(col, 0.85 * alpha);
-        }
-      `
-    });
-  }, []);
-  const geom = useMemo(() => new THREE.PlaneGeometry(1000, 1000, 128, 128), []);
-  useFrame((_, dt) => { mat.uniforms.uTime.value += dt; });
-  return ( <mesh geometry={geom} material={mat} rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]} /> );
+// ==========================================
+// 🔥 YENİ: GERÇEKÇİ YANSIMALI SU EFEKTİ
+// ==========================================
+function RealisticWater({ y }: { y: number }) {
+  const ref = useRef<any>();
+  const gl = useThree((state) => state.gl);
+  // Dalga dokusunu yüklüyoruz
+  const waterNormals = useLoader(THREE.TextureLoader, WATER_NORMALS_URL);
+  waterNormals.wrapS = waterNormals.wrapT = THREE.RepeatWrapping;
+
+  const geom = useMemo(() => new THREE.PlaneGeometry(2000, 2000), []);
+  const config = useMemo(
+    () => ({
+      textureWidth: 512,
+      textureHeight: 512,
+      waterNormals,
+      sunDirection: new THREE.Vector3(0.5, 1, 0.5).normalize(), // Güneş ışığının yönü
+      sunColor: 0xffffff, // Güneş rengi (beyaz parlama)
+      waterColor: 0x001e0f, // Suyun kendi rengi (koyu turkuaz)
+      distortionScale: 3.7, // Dalga yoğunluğu (hafif dalgalı)
+      fog: true,
+      format: gl.encoding,
+    }),
+    [waterNormals, gl.encoding]
+  );
+
+  useFrame((state, delta) => {
+    if (ref.current) {
+       // Dalgaları hareket ettir
+      ref.current.material.uniforms.time.value += delta * 0.5;
+    }
+  });
+
+  return (
+    // <water> bileşeni extend ettiğimiz three-stdlib'den geliyor
+    <water
+      ref={ref}
+      args={[geom, config]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[0, y, 0]}
+    />
+  );
 }
 
 function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string; dracoBase: string; }) {
@@ -146,8 +148,7 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     boundsRef.current = { minX: box.min.x + 2, maxX: box.max.x - 2, minY: box.min.y + 2, maxY: box.max.y - 2 };
     
-    // 🔥 İŞTE BURASI: 1 birim değil, tam 8 BİRİM aşağı çektim! 
-    // Suyu çok daha net göreceksin ve zıplamak çok daha kolay olacak.
+    // Suyu yine aşağıda tutuyoruz
     setSurfaceY(boundsRef.current.maxY - 8);
   }, [sea.scene]);
 
@@ -166,7 +167,6 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   useFrame((state, dt) => {
     if (!fishGroup.current || !fishInner.current) return;
 
-    // Balık suyun üstünde mi kontrolü
     const isAboveWater = fishPos.current.y > surfaceY;
 
     if (dragging.current) {
@@ -176,7 +176,6 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
     const b = boundsRef.current;
     fishTarget.current.x = THREE.MathUtils.clamp(fishTarget.current.x, b.minX, b.maxX);
-    // Sadece aşağıya sınır var, yukarıya çıkış serbest!
     fishTarget.current.y = Math.max(fishTarget.current.y, b.minY);
 
     const dx = fishTarget.current.x - fishPos.current.x;
@@ -208,10 +207,8 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
       currentRoll.current = lerp(currentRoll.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
     }
 
-    // 🔥 EĞER SUYUN ÜSTÜNDEYSE YERÇEKİMİ UYGULA
     if (isAboveWater) {
       fishVel.current.y -= GRAVITY * dt;
-      // Havada süzülürken burnunun aşağı dönmesi
       if (!moving && fishVel.current.y < 0) {
          currentPitch.current = lerp(currentPitch.current, -Math.PI/4, 0.1);
       }
@@ -229,7 +226,6 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
     if (swimActionRef.current) swimActionRef.current.paused = !moving;
 
-    // Kamera takibi
     const camSmooth = isAboveWater ? CAMERA_SMOOTH * 0.5 : CAMERA_SMOOTH;
     state.camera.position.lerp(new THREE.Vector3(fishPos.current.x, fishPos.current.y, CAMERA_Z), 1 - Math.pow(0.001, dt * camSmooth));
     state.camera.lookAt(fishPos.current.x, fishPos.current.y, 0); 
@@ -238,7 +234,10 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   return (
     <>
       <group ref={seaGroup}> <primitive object={sea.scene} /> </group>
-      <WaterCeiling y={surfaceY} />
+      
+      {/* 🔥 YENİ GERÇEKÇİ SU EFEKTİ */}
+      <RealisticWater y={surfaceY} />
+
       <group ref={fishGroup} scale={FISH_SCALE}> 
          <group ref={fishInner}>
             <primitive object={fish.scene} /> 
@@ -260,6 +259,10 @@ export default function EslemeGame() {
   return (
     <div style={{ width: "100vw", height: "100vh", background: `linear-gradient(to bottom, ${GRADIENT_TOP} 0%, ${GRADIENT_BOTTOM} 100%)`, touchAction: "none" }}>
       <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45 }}>
+        
+        {/* 🔥 Yansımalar için görünmez bir gökyüzü ortamı ekliyoruz */}
+        <Environment preset="sunset" />
+        
         <fog attach="fog" args={[FOG_COLOR, 30, 80]} />
         <ambientLight intensity={1.5} />
         <directionalLight position={[10, 10, 10]} intensity={2} />
@@ -269,4 +272,5 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-}
+  }
+    
