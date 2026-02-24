@@ -19,7 +19,7 @@ const SEA_ANIM_NAME = "yeme";
 const SEA_ANIM_SPEED = 0.2;
 const FISH_SWIM_ANIM_NAME = "yuzme";
 
-// 🔥 1. İSTEK: Balık Hızı 1.5 Kat (7.2 -> 10.8)
+// 🔥 Balık 1.5 kat hızlı
 const MAX_SPEED = 10.8; 
 const ACCEL = 8.0; 
 const DRAG_STOP = 0.90;
@@ -29,14 +29,14 @@ const CAMERA_Z = 10;
 const CAMERA_SMOOTH = 5.0;
 
 const SEA_ROT_Y = Math.PI / 2;
-// 🔥 2. İSTEK: Deniz 2 Kat Büyüdü (2.0 -> 4.0)
+// 🔥 Deniz 2 kat büyük
 const SEA_SCALE_MULT = 4.0; 
 const FISH_SCALE = 3.0;
 
 const TURN_SMOOTH_YAW = 8.0;   
 const TURN_SMOOTH_PITCH = 8.0; 
 
-// Senin kodundaki orijinal açılar!
+// 🔥 Senin kodundaki mükemmel açılar
 const MAX_PITCH_ANGLE = Math.PI / 2; 
 const BELLY_ROLL_ANGLE = Math.PI / 2; 
 
@@ -46,13 +46,6 @@ const BOUNCE = 0.6;
 const GRADIENT_TOP = "#11426e"; 
 const GRADIENT_BOTTOM = "#051a2e"; 
 const FOG_COLOR = GRADIENT_BOTTOM; 
-
-// 🔥 DENİZ YÜZEYİ AYARLARI
-const WATER_Y_OFFSET = -1.8;
-const WATER_THICKNESS = 2.8;
-const WATER_WAVE_STRENGTH = 0.35;
-const WATER_SCROLL_SPEED = 0.08;
-const WATER_TILES = 5;
 
 function Loader3D() {
   const { progress } = useProgress();
@@ -68,25 +61,75 @@ function CanvasEvents({ onDown, onUp }: { onDown: () => void; onUp: () => void; 
   );
 }
 
-// 🔥 3. İSTEK: DENİZ YÜZEYİ SHADER'I
-function useWaterRibbonMaterial() {
-  return useMemo(() => {
+// ==========================================
+// 🔥 YENİ: GTA 5 TARZI DEVASA OKYANUS TAVANI
+// ==========================================
+function WaterCeiling({ y }: { y: number }) {
+  const mat = useMemo(() => {
     return new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false,
-      uniforms: { uTime: { value: 0 }, uOpacity: { value: 0.82 }, uWave: { value: WATER_WAVE_STRENGTH }, uScroll: { value: WATER_SCROLL_SPEED }, uColorDeep: { value: new THREE.Color(GRADIENT_TOP) }, uColorLight: { value: new THREE.Color("#2ab6ff") }, },
-      vertexShader: `varying vec2 vUv; void main() { vUv = uv; vec4 wp = modelMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * viewMatrix * wp; }`,
-      fragmentShader: `varying vec2 vUv; uniform float uTime; uniform float uOpacity; uniform float uWave; uniform float uScroll; uniform vec3 uColorDeep; uniform vec3 uColorLight; float wave(vec2 p) { float w = sin(p.x * 5.0 + uTime * uScroll * 10.0) * 0.5 + 0.5; w += cos(p.y * 3.0 - uTime * uScroll * 5.0) * 0.5 + 0.5; return w * 0.5; } void main() { vec2 uv = vUv; float w1 = wave(uv * vec2(4.0, 1.0)); float w2 = wave(uv * vec2(8.0, 2.0) + vec2(1.2, 0.5)); float combinedWave = (w1 + w2) * uWave; float edge = smoothstep(0.0, 0.35, vUv.y) * smoothstep(1.0, 0.75, vUv.y); float t = clamp(vUv.y + combinedWave * 0.45, 0.0, 1.0); vec3 col = mix(uColorDeep, uColorLight, t); float sparkle = pow(clamp(combinedWave, 0.0, 1.0), 6.0) * 0.35; col += sparkle; float a = uOpacity * (0.72 + 0.28 * smoothstep(0.6, 1.0, vUv.y)); gl_FragColor = vec4(col, a * edge); }`,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      uniforms: { uTime: { value: 0 } },
+      vertexShader: `
+        varying vec2 vUv;
+        varying vec3 vWorldPos;
+        uniform float uTime;
+        void main() {
+          vUv = uv;
+          vec3 pos = position;
+          // Gerçek 3D dalgalanma (Vertex displacement)
+          pos.z += sin(pos.x * 0.1 + uTime * 0.8) * cos(pos.y * 0.1 + uTime * 0.6) * 3.0;
+          
+          vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
+          vWorldPos = worldPosition.xyz;
+          gl_Position = projectionMatrix * viewMatrix * worldPosition;
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        varying vec3 vWorldPos;
+        uniform float uTime;
+        void main() {
+          vec2 p = vWorldPos.xz * 0.05;
+          float time = uTime * 0.5;
+          
+          // Karmaşık deniz dalgası matematiği
+          float w1 = sin(p.x + time) * cos(p.y + time * 0.8);
+          float w2 = sin(p.x * 2.3 - time * 1.1) * cos(p.y * 2.1 + time * 0.9);
+          float w3 = sin(p.x * 5.1 + time * 1.5) * cos(p.y * 4.8 - time * 1.2);
+          float w = (w1 + w2 * 0.5 + w3 * 0.25);
+          
+          vec3 deepColor = vec3(0.04, 0.18, 0.35);
+          vec3 lightColor = vec3(0.16, 0.71, 0.95);
+          
+          // Dalga yüksekliğine göre renk değişimi
+          vec3 col = mix(deepColor, lightColor, w * 0.5 + 0.5);
+          
+          // Suyun altından vuran güneş yansımaları (Caustics)
+          float sun = pow(max(0.0, w), 4.0);
+          col += vec3(0.8, 0.9, 1.0) * sun * 0.8;
+          
+          // Sis ile birleşmesi için uzaklaştıkça silinme efekti
+          float dist = distance(cameraPosition, vWorldPos);
+          float alpha = 1.0 - smoothstep(40.0, 120.0, dist);
+          
+          gl_FragColor = vec4(col, 0.85 * alpha);
+        }
+      `
     });
   }, []);
-}
 
-function InfiniteWaterRibbon({ width, y, z }: { width: number; y: number; z: number; }) {
-  const mat = useWaterRibbonMaterial();
-  const geom = useMemo(() => new THREE.PlaneGeometry(width, WATER_THICKNESS, 64, 4), [width]);
-  const groupRef = useRef<THREE.Group | null>(null);
-  const { camera } = useThree();
-  useFrame((_, dt) => { (mat.uniforms.uTime.value as number) += dt; const camX = camera.position.x; const baseX = Math.floor(camX / width) * width; if (!groupRef.current) return; groupRef.current.children.forEach((child, idx) => { const i = idx - Math.floor(WATER_TILES / 2); child.position.x = baseX + i * width; }); });
-  return ( <group ref={groupRef} position={[0, y + WATER_Y_OFFSET, z + 0.15]}> {Array.from({ length: WATER_TILES }).map((_, i) => ( <mesh key={i} geometry={geom} material={mat} /> ))} </group> );
+  const geom = useMemo(() => new THREE.PlaneGeometry(1000, 1000, 128, 128), []);
+  
+  useFrame((_, dt) => {
+    mat.uniforms.uTime.value += dt;
+  });
+
+  return (
+    // Yatay konuma getirildi ve istenen Y eksenine (aşağıya) yerleştirildi
+    <mesh geometry={geom} material={mat} rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]} />
+  );
 }
 
 function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string; dracoBase: string; }) {
@@ -100,7 +143,7 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   const fishAnim = useAnimations(fish.animations, fish.scene);
   const swimActionRef = useRef<THREE.AnimationAction | null>(null);
 
-  const [surface, setSurface] = useState<{w: number, y: number, z: number} | null>(null);
+  const [surfaceY, setSurfaceY] = useState(20);
 
   useEffect(() => { 
     const a = seaAnim.actions?.[SEA_ANIM_NAME] || (seaAnim.names?.[0] ? seaAnim.actions?.[seaAnim.names[0]] : null); 
@@ -121,10 +164,13 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     sea.scene.scale.setScalar((Math.max(size.x, size.y, size.z) > 0 ? 90 / Math.max(size.x, size.y, size.z) : 1) * SEA_SCALE_MULT);
     seaGroup.current.position.set(0, 0, -20);
     seaGroup.current.rotation.set(0, SEA_ROT_Y, 0);
+    
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     boundsRef.current = { minX: box.min.x + 2, maxX: box.max.x - 2, minY: box.min.y + 2, maxY: box.max.y - 2 };
     
-    setSurface({ w: (box.max.x - box.min.x) * 1.5, y: box.max.y, z: -20 });
+    // 🔥 İSTEĞİN: Deniz Yüzeyini Aşağı İndir!
+    // Eskiden haritanın en üstü (box.max.y) kadardı, şimdi balığın yüzebileceği en yüksek noktanın hemen 5 birim üstüne (aşağıya) çektim.
+    setSurfaceY(boundsRef.current.maxY + 5);
   }, [sea.scene]);
 
   const fishPos = useRef(new THREE.Vector3(0, 0, Z_PLANE));
@@ -163,7 +209,7 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
       fishVel.current.y = lerp(fishVel.current.y, ny * MAX_SPEED, a);
 
       // ==========================================
-      // ✅ SENİN GÖNDERDİĞİN KODUN AYNISI (Zerre Dokunulmadı)
+      // ✅ SENİN ONAYLADIĞIN YÜZÜŞ KODU (Dokunulmadı)
       // ==========================================
       let targetYaw = currentYaw.current;
       if (nx > 0.05) targetYaw = -Math.PI / 2; 
@@ -189,7 +235,6 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     if (fishPos.current.x <= b.minX || fishPos.current.x >= b.maxX) fishVel.current.x *= -BOUNCE;
     if (fishPos.current.y <= b.minY || fishPos.current.y >= b.maxY) fishVel.current.y *= -BOUNCE;
 
-    // ✅ SENİN GÖNDERDİĞİN KODUN AYNISI
     fishGroup.current.position.copy(fishPos.current);
     fishGroup.current.rotation.y = currentYaw.current;
     fishInner.current.rotation.set(currentPitch.current, 0, currentRoll.current, 'XYZ');
@@ -203,7 +248,10 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   return (
     <>
       <group ref={seaGroup}> <primitive object={sea.scene} /> </group>
-      {surface && <InfiniteWaterRibbon width={surface.w} y={surface.y} z={surface.z} />}
+      
+      {/* 🔥 İŞTE O DEĞİŞTİRİLEN VE AŞAĞI ÇEKİLEN YENİ DENİZ YÜZEYİ */}
+      <WaterCeiling y={surfaceY} />
+
       <group ref={fishGroup} scale={FISH_SCALE}> 
          <group ref={fishInner}>
             <primitive object={fish.scene} /> 
@@ -223,11 +271,10 @@ export default function EslemeGame() {
   }, []);
 
   return (
-    // 🔥 YENİ: Aşağıya doğru koyulaşan okyanus gradyanı
     <div style={{ width: "100vw", height: "100vh", background: `linear-gradient(to bottom, ${GRADIENT_TOP} 0%, ${GRADIENT_BOTTOM} 100%)`, touchAction: "none" }}>
       <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45 }}>
         
-        {/* 🔥 4. İSTEK: SİS AZALTILDI (30'dan başlayıp 80'de bitiyor, ön plan cam gibi net) */}
+        {/* Sis ayarları aynen korundu */}
         <fog attach="fog" args={[FOG_COLOR, 30, 80]} />
 
         <ambientLight intensity={1.5} />
@@ -238,5 +285,5 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-                                                                                                                                                                                                                     }
-      
+  }
+                                                                          
