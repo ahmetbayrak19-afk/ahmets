@@ -2,10 +2,8 @@ import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } fr
 import { Canvas, useFrame, useThree, extend, useLoader } from "@react-three/fiber";
 import { Html, useAnimations, useGLTF, useProgress, Environment } from "@react-three/drei";
 import * as THREE from "three";
-// Three.js'in standart su efektini projeye dahil ediyoruz
 import { Water } from "three-stdlib";
 
-// Water bileşenini JSX'te kullanabilmek için tanıtıyoruz
 extend({ Water });
 
 /** ---- Utils ---- */
@@ -46,12 +44,11 @@ const BELLY_ROLL_ANGLE = Math.PI / 2;
 
 const BOUNCE = 0.6;
 
-// RENKLER VE SİS
-const GRADIENT_TOP = "#11426e"; 
-const GRADIENT_BOTTOM = "#051a2e"; 
+// 🔥 YENİ: DAHA AÇIK (GÜNDÜZ) OKYANUS RENKLERİ
+const GRADIENT_TOP = "#3498db"; // Pırıl pırıl açık mavi
+const GRADIENT_BOTTOM = "#104068"; // Derinlik mavisi (gece gibi karanlık değil)
 const FOG_COLOR = GRADIENT_BOTTOM; 
 
-// Dalgalar için standart normal map dokusu
 const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/waternormals.jpg";
 
 function Loader3D() {
@@ -68,11 +65,8 @@ function CanvasEvents({ onDown, onUp }: { onDown: () => void; onUp: () => void; 
   );
 }
 
-// ==========================================
-// 🔥 YENİ: ÇİFT TARAFLI GERÇEKÇİ SU EFEKTİ
-// ==========================================
+// ÇİFT TARAFLI GERÇEKÇİ SU EFEKTİ
 function RealisticWater({ y }: { y: number }) {
-  // Üst ve alt yüzeyler için ayrı ref'ler
   const refTop = useRef<any>();
   const refBottom = useRef<any>();
   
@@ -82,7 +76,6 @@ function RealisticWater({ y }: { y: number }) {
 
   const geom = useMemo(() => new THREE.PlaneGeometry(2000, 2000), []);
   
-  // Her iki yüzey için de aynı konfigürasyon
   const config = useMemo(
     () => ({
       textureWidth: 512,
@@ -90,7 +83,7 @@ function RealisticWater({ y }: { y: number }) {
       waterNormals,
       sunDirection: new THREE.Vector3(0.5, 1, 0.5).normalize(),
       sunColor: 0xffffff,
-      waterColor: 0x001e0f,
+      waterColor: 0x0077be, // Suyu da biraz daha aydınlık, okyanus mavisi yaptık
       distortionScale: 3.7,
       fog: true,
       format: gl.encoding,
@@ -99,30 +92,16 @@ function RealisticWater({ y }: { y: number }) {
   );
 
   useFrame((state, delta) => {
-    // Her iki yüzeyin de dalgalarını senkronize hareket ettir
     if (refTop.current) refTop.current.material.uniforms.time.value += delta * 0.5;
     if (refBottom.current) refBottom.current.material.uniforms.time.value += delta * 0.5;
   });
 
-  // Pırpırlanmayı önlemek için çok küçük bir boşluk
   const GAP = 0.02;
 
   return (
     <group position={[0, y, 0]}>
-      {/* Üst Yüzey (Yukarı Bakıyor) */}
-      <water
-        ref={refTop}
-        args={[geom, config]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, 0, 0]}
-      />
-      {/* Alt Yüzey (Aşağı Bakıyor - Ters Çevrilmiş) */}
-      <water
-        ref={refBottom}
-        args={[geom, config]}
-        rotation={[Math.PI / 2, 0, 0]} // Tam tersine döndür
-        position={[0, -GAP, 0]} // Çok azıcık aşağıya koy
-      />
+      <water ref={refTop} args={[geom, config]} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} />
+      <water ref={refBottom} args={[geom, config]} rotation={[Math.PI / 2, 0, 0]} position={[0, -GAP, 0]} />
     </group>
   );
 }
@@ -163,8 +142,8 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     boundsRef.current = { minX: box.min.x + 2, maxX: box.max.x - 2, minY: box.min.y + 2, maxY: box.max.y - 2 };
     
-    // 🔥 İSTEK: Su seviyesi 10 BİRİM aşağı indi
-    setSurfaceY(boundsRef.current.maxY - 10);
+    // 🔥 İSTEK: Su seviyesi eskisine göre 10 birim DAHA AŞAĞI indi. (Önceden -10'du, şimdi -20)
+    setSurfaceY(boundsRef.current.maxY - 20);
   }, [sea.scene]);
 
   const fishPos = useRef(new THREE.Vector3(0, 0, Z_PLANE));
@@ -249,10 +228,7 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   return (
     <>
       <group ref={seaGroup}> <primitive object={sea.scene} /> </group>
-      
-      {/* 🔥 YENİ ÇİFT TARAFLI SU EFEKTİ */}
       <RealisticWater y={surfaceY} />
-
       <group ref={fishGroup} scale={FISH_SCALE}> 
          <group ref={fishInner}>
             <primitive object={fish.scene} /> 
@@ -274,10 +250,7 @@ export default function EslemeGame() {
   return (
     <div style={{ width: "100vw", height: "100vh", background: `linear-gradient(to bottom, ${GRADIENT_TOP} 0%, ${GRADIENT_BOTTOM} 100%)`, touchAction: "none" }}>
       <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45 }}>
-        
-        {/* Yansımalar için gökyüzü */}
         <Environment preset="sunset" />
-        
         <fog attach="fog" args={[FOG_COLOR, 30, 80]} />
         <ambientLight intensity={1.5} />
         <directionalLight position={[10, 10, 10]} intensity={2} />
