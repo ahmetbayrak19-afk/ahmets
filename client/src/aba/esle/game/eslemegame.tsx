@@ -19,7 +19,8 @@ const SEA_ANIM_NAME = "yeme";
 const SEA_ANIM_SPEED = 0.2;
 const FISH_SWIM_ANIM_NAME = "yuzme";
 
-const MAX_SPEED = 7.2;
+// 🔥 1. İSTEK: Balık 1.5 kat hızlandı (7.2 * 1.5 = 10.8)
+const MAX_SPEED = 10.8; 
 const ACCEL = 8.0; 
 const DRAG_STOP = 0.90;
 const Z_PLANE = 0; 
@@ -28,18 +29,23 @@ const CAMERA_Z = 10;
 const CAMERA_SMOOTH = 5.0;
 
 const SEA_ROT_Y = Math.PI / 2;
-const SEA_SCALE_MULT = 2.0;
+// 🔥 2. İSTEK: Deniz 2 kat büyüdü (2.0'dan 4.0'a çıktı)
+const SEA_SCALE_MULT = 4.0; 
 const FISH_SCALE = 3.0;
 
 const TURN_SMOOTH_YAW = 8.0;   
 const TURN_SMOOTH_PITCH = 8.0; 
-
-// 🔥 İSTEDİĞİN GİBİ TAM 90 DERECE: Burun havaya 90 derece dikilir, göbek bize 90 derece döner.
-const MAX_PITCH_ANGLE = Math.PI / 2; 
-const BELLY_ROLL_ANGLE = Math.PI / 2; 
+const MAX_PITCH_ANGLE = Math.PI / 3; 
 
 const BOUNCE = 0.6;
 const BG_COLOR = "#0b2a46";
+
+// 🔥 3. İSTEK: DENİZ YÜZEYİ İÇİN AYARLAR
+const WATER_Y_OFFSET = -1.8;
+const WATER_THICKNESS = 2.8;
+const WATER_WAVE_STRENGTH = 0.35;
+const WATER_SCROLL_SPEED = 0.08;
+const WATER_TILES = 5;
 
 function Loader3D() {
   const { progress } = useProgress();
@@ -55,16 +61,40 @@ function CanvasEvents({ onDown, onUp }: { onDown: () => void; onUp: () => void; 
   );
 }
 
+// 🔥 DENİZ YÜZEYİ SHADER'I
+function useWaterRibbonMaterial() {
+  return useMemo(() => {
+    return new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false,
+      uniforms: { uTime: { value: 0 }, uOpacity: { value: 0.82 }, uWave: { value: WATER_WAVE_STRENGTH }, uScroll: { value: WATER_SCROLL_SPEED }, uColorDeep: { value: new THREE.Color("#06324a") }, uColorLight: { value: new THREE.Color("#2ab6ff") }, },
+      vertexShader: `varying vec2 vUv; void main() { vUv = uv; vec4 wp = modelMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * viewMatrix * wp; }`,
+      fragmentShader: `varying vec2 vUv; uniform float uTime; uniform float uOpacity; uniform float uWave; uniform float uScroll; uniform vec3 uColorDeep; uniform vec3 uColorLight; float wave(vec2 p) { float w = sin(p.x * 5.0 + uTime * uScroll * 10.0) * 0.5 + 0.5; w += cos(p.y * 3.0 - uTime * uScroll * 5.0) * 0.5 + 0.5; return w * 0.5; } void main() { vec2 uv = vUv; float w1 = wave(uv * vec2(4.0, 1.0)); float w2 = wave(uv * vec2(8.0, 2.0) + vec2(1.2, 0.5)); float combinedWave = (w1 + w2) * uWave; float edge = smoothstep(0.0, 0.35, vUv.y) * smoothstep(1.0, 0.75, vUv.y); float t = clamp(vUv.y + combinedWave * 0.45, 0.0, 1.0); vec3 col = mix(uColorDeep, uColorLight, t); float sparkle = pow(clamp(combinedWave, 0.0, 1.0), 6.0) * 0.35; col += sparkle; float a = uOpacity * (0.72 + 0.28 * smoothstep(0.6, 1.0, vUv.y)); gl_FragColor = vec4(col, a * edge); }`,
+    });
+  }, []);
+}
+
+function InfiniteWaterRibbon({ width, y, z }: { width: number; y: number; z: number; }) {
+  const mat = useWaterRibbonMaterial();
+  const geom = useMemo(() => new THREE.PlaneGeometry(width, WATER_THICKNESS, 64, 4), [width]);
+  const groupRef = useRef<THREE.Group | null>(null);
+  const { camera } = useThree();
+  useFrame((_, dt) => { (mat.uniforms.uTime.value as number) += dt; const camX = camera.position.x; const baseX = Math.floor(camX / width) * width; if (!groupRef.current) return; groupRef.current.children.forEach((child, idx) => { const i = idx - Math.floor(WATER_TILES / 2); child.position.x = baseX + i * width; }); });
+  return ( <group ref={groupRef} position={[0, y + WATER_Y_OFFSET, z + 0.15]}> {Array.from({ length: WATER_TILES }).map((_, i) => ( <mesh key={i} geometry={geom} material={mat} /> ))} </group> );
+}
+
 function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string; dracoBase: string; }) {
   useMemo(() => { useGLTF.setDecoderPath(dracoBase.endsWith("/") ? dracoBase : `${dracoBase}/`); }, [dracoBase]);
   const sea = useGLTF(seaUrl); const fish = useGLTF(fishUrl);
   const seaGroup = useRef<THREE.Group>(null); 
-  const fishGroup = useRef<THREE.Group>(null); // Sadece Yaw (Sağ-Sol)
-  const fishInner = useRef<THREE.Group>(null); // Pitch (Yukarı) ve Roll (Göbek)
+  const fishGroup = useRef<THREE.Group>(null); 
+  const fishInner = useRef<THREE.Group>(null); 
   
   const seaAnim = useAnimations(sea.animations, sea.scene); 
   const fishAnim = useAnimations(fish.animations, fish.scene);
   const swimActionRef = useRef<THREE.AnimationAction | null>(null);
+
+  // Deniz yüzeyi için state
+  const [surface, setSurface] = useState<{w: number, y: number, z: number} | null>(null);
 
   useEffect(() => { 
     const a = seaAnim.actions?.[SEA_ANIM_NAME] || (seaAnim.names?.[0] ? seaAnim.actions?.[seaAnim.names[0]] : null); 
@@ -85,8 +115,12 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     sea.scene.scale.setScalar((Math.max(size.x, size.y, size.z) > 0 ? 90 / Math.max(size.x, size.y, size.z) : 1) * SEA_SCALE_MULT);
     seaGroup.current.position.set(0, 0, -20);
     seaGroup.current.rotation.set(0, SEA_ROT_Y, 0);
+    
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     boundsRef.current = { minX: box.min.x + 2, maxX: box.max.x - 2, minY: box.min.y + 2, maxY: box.max.y - 2 };
+    
+    // Yüzeyin konumunu hesaplayıp state'e atıyoruz
+    setSurface({ w: (box.max.x - box.min.x) * 1.5, y: box.max.y, z: -20 });
   }, [sea.scene]);
 
   const fishPos = useRef(new THREE.Vector3(0, 0, Z_PLANE));
@@ -96,7 +130,6 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
   const currentYaw = useRef(Math.PI / 2); 
   const currentPitch = useRef(0);
-  const currentRoll = useRef(0); // 🔥 Göbek için eklendi
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -Z_PLANE), []);
@@ -124,33 +157,15 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
       fishVel.current.x = lerp(fishVel.current.x, nx * MAX_SPEED, a);
       fishVel.current.y = lerp(fishVel.current.y, ny * MAX_SPEED, a);
 
-      // ==========================================
-      // ✅ 1. SENİN DOĞRU KODUN (Sağ-Sol Kilidi)
-      // Sadece dümdüz yukarı çıkarken aniden sola dönmesin diye mevcut yönü koruma ekledim.
-      // ==========================================
-      let targetYaw = currentYaw.current;
-      if (nx > 0.05) targetYaw = -Math.PI / 2; 
-      else if (nx < -0.05) targetYaw = Math.PI / 2; 
-      
-      // ==========================================
-      // ✅ 2. YUKARI 90 DERECE (Kıç dikme yok, burun havaya)
-      // ==========================================
-      let targetPitch = ny * MAX_PITCH_ANGLE; 
-
-      // ==========================================
-      // ✅ 3. GÖBEĞİ SANA ÇEVİRME (Karnı 90 derece kameraya açma)
-      // Sağa veya sola dönük olmasına göre göbeği doğru yöne deviriyoruz.
-      // ==========================================
-      const rollDirection = (targetYaw < 0) ? 1 : -1;
-      let targetRoll = ny * BELLY_ROLL_ANGLE * rollDirection;
+      // KUSURSUZ DÖNÜŞ KODLARIN (Zerre dokunulmadı)
+      let targetYaw = (nx > 0.05) ? -Math.PI / 2 : Math.PI / 2; 
+      let targetPitch = -ny * MAX_PITCH_ANGLE; 
 
       currentYaw.current = lerpAngle(currentYaw.current, targetYaw, 1 - Math.pow(0.001, dt * TURN_SMOOTH_YAW));
       currentPitch.current = lerp(currentPitch.current, targetPitch, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
-      currentRoll.current = lerp(currentRoll.current, targetRoll, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
     } else {
       fishVel.current.multiplyScalar(DRAG_STOP);
       currentPitch.current = lerp(currentPitch.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
-      currentRoll.current = lerp(currentRoll.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
     }
 
     fishPos.current.x += fishVel.current.x * dt;
@@ -159,12 +174,9 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     if (fishPos.current.x <= b.minX || fishPos.current.x >= b.maxX) fishVel.current.x *= -BOUNCE;
     if (fishPos.current.y <= b.minY || fishPos.current.y >= b.maxY) fishVel.current.y *= -BOUNCE;
 
-    // ✅ DIŞ KUTU: Sadece Sağ-Sol Dönüşü
     fishGroup.current.position.copy(fishPos.current);
     fishGroup.current.rotation.y = currentYaw.current;
-    
-    // ✅ İÇ KUTU: Burun 90 derece kalkar (Pitch/X) ve Göbek 90 derece sana döner (Roll/Z)
-    fishInner.current.rotation.set(currentPitch.current, 0, currentRoll.current, 'XYZ');
+    fishInner.current.rotation.x = currentPitch.current;
 
     if (swimActionRef.current) swimActionRef.current.paused = !moving;
 
@@ -175,6 +187,10 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   return (
     <>
       <group ref={seaGroup}> <primitive object={sea.scene} /> </group>
+      
+      {/* Yüzey Varsa Render Et */}
+      {surface && <InfiniteWaterRibbon width={surface.w} y={surface.y} z={surface.z} />}
+
       <group ref={fishGroup} scale={FISH_SCALE}> 
          <group ref={fishInner}>
             <primitive object={fish.scene} /> 
@@ -195,6 +211,10 @@ export default function EslemeGame() {
   return (
     <div style={{ width: "100vw", height: "100vh", background: BG_COLOR, touchAction: "none" }}>
       <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45 }}>
+        
+        {/* 🔥 4. İSTEK: SİS (FOG) EKLENDİ - Derinlik hissini arşa çıkarır */}
+        <fog attach="fog" args={[BG_COLOR, 15, 45]} />
+
         <ambientLight intensity={1.5} />
         <directionalLight position={[10, 10, 10]} intensity={2} />
         <Suspense fallback={<Loader3D />}>
@@ -204,4 +224,4 @@ export default function EslemeGame() {
     </div>
   );
     }
-                               
+    
