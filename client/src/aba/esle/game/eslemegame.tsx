@@ -19,7 +19,7 @@ const SEA_ANIM_NAME = "yeme";
 const SEA_ANIM_SPEED = 0.2;
 const FISH_SWIM_ANIM_NAME = "yuzme";
 
-// 🔥 4. İSTEK: Hız 1.5 katına çıktı
+// 🔥 1. İSTEK: Balık Hızı 1.5 Kat (7.2 -> 10.8)
 const MAX_SPEED = 10.8; 
 const ACCEL = 8.0; 
 const DRAG_STOP = 0.90;
@@ -29,23 +29,25 @@ const CAMERA_Z = 10;
 const CAMERA_SMOOTH = 5.0;
 
 const SEA_ROT_Y = Math.PI / 2;
-// 🔥 3. İSTEK: Deniz 2 kat daha büyüdü
+// 🔥 2. İSTEK: Deniz 2 Kat Büyüdü (2.0 -> 4.0)
 const SEA_SCALE_MULT = 4.0; 
 const FISH_SCALE = 3.0;
 
 const TURN_SMOOTH_YAW = 8.0;   
 const TURN_SMOOTH_PITCH = 8.0; 
-const MAX_PITCH_ANGLE = Math.PI / 3; 
-const BELLY_ROLL_ANGLE = Math.PI / 5; 
+
+// Senin kodundaki orijinal açılar!
+const MAX_PITCH_ANGLE = Math.PI / 2; 
+const BELLY_ROLL_ANGLE = Math.PI / 2; 
 
 const BOUNCE = 0.6;
 
 // 🔥 RENKLER VE SİS
-const GRADIENT_TOP = "#11426e"; // Yüzeye yakın daha açık mavi
-const GRADIENT_BOTTOM = "#051a2e"; // Derin okyanus laciverti
-const FOG_COLOR = GRADIENT_BOTTOM; // Sis, okyanusun dibiyle aynı renk olmalı
+const GRADIENT_TOP = "#11426e"; 
+const GRADIENT_BOTTOM = "#051a2e"; 
+const FOG_COLOR = GRADIENT_BOTTOM; 
 
-// DENİZ YÜZEYİ AYARLARI
+// 🔥 DENİZ YÜZEYİ AYARLARI
 const WATER_Y_OFFSET = -1.8;
 const WATER_THICKNESS = 2.8;
 const WATER_WAVE_STRENGTH = 0.35;
@@ -66,7 +68,7 @@ function CanvasEvents({ onDown, onUp }: { onDown: () => void; onUp: () => void; 
   );
 }
 
-// 🔥 2. İSTEK: DENİZ YÜZEYİ (Dalgalı Shader)
+// 🔥 3. İSTEK: DENİZ YÜZEYİ SHADER'I
 function useWaterRibbonMaterial() {
   return useMemo(() => {
     return new THREE.ShaderMaterial({
@@ -114,13 +116,11 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
   useEffect(() => {
     if (!seaGroup.current) return;
-    sea.scene.traverse((o: any) => { if (o?.isMesh && o.material) o.material.side = THREE.DoubleSide; });
     const rawBox = new THREE.Box3().setFromObject(sea.scene);
     const size = new THREE.Vector3(); rawBox.getSize(size);
     sea.scene.scale.setScalar((Math.max(size.x, size.y, size.z) > 0 ? 90 / Math.max(size.x, size.y, size.z) : 1) * SEA_SCALE_MULT);
     seaGroup.current.position.set(0, 0, -20);
     seaGroup.current.rotation.set(0, SEA_ROT_Y, 0);
-    
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     boundsRef.current = { minX: box.min.x + 2, maxX: box.max.x - 2, minY: box.min.y + 2, maxY: box.max.y - 2 };
     
@@ -132,8 +132,7 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   const fishTarget = useRef(new THREE.Vector3(0, 0, Z_PLANE));
   const dragging = useRef(false);
 
-  // BAŞLANGIÇ: Kusursuz orijinal halin
-  const currentYaw = useRef(0); 
+  const currentYaw = useRef(Math.PI / 2); 
   const currentPitch = useRef(0);
   const currentRoll = useRef(0); 
 
@@ -164,13 +163,16 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
       fishVel.current.y = lerp(fishVel.current.y, ny * MAX_SPEED, a);
 
       // ==========================================
-      // ✅ SENİN KUSURSUZ YÜZÜŞ KODUN (Zerre dokunulmadı)
+      // ✅ SENİN GÖNDERDİĞİN KODUN AYNISI (Zerre Dokunulmadı)
       // ==========================================
-      let targetYaw = (nx > 0.05) ? Math.PI : 0; 
-      let targetPitch = -ny * MAX_PITCH_ANGLE; 
+      let targetYaw = currentYaw.current;
+      if (nx > 0.05) targetYaw = -Math.PI / 2; 
+      else if (nx < -0.05) targetYaw = Math.PI / 2; 
+      
+      let targetPitch = ny * MAX_PITCH_ANGLE; 
 
-      const direction = (targetYaw > 1) ? 1 : -1;
-      let targetRoll = ny * BELLY_ROLL_ANGLE * direction;
+      const rollDirection = (targetYaw < 0) ? 1 : -1;
+      let targetRoll = ny * BELLY_ROLL_ANGLE * rollDirection;
 
       currentYaw.current = lerpAngle(currentYaw.current, targetYaw, 1 - Math.pow(0.001, dt * TURN_SMOOTH_YAW));
       currentPitch.current = lerp(currentPitch.current, targetPitch, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
@@ -187,11 +189,10 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     if (fishPos.current.x <= b.minX || fishPos.current.x >= b.maxX) fishVel.current.x *= -BOUNCE;
     if (fishPos.current.y <= b.minY || fishPos.current.y >= b.maxY) fishVel.current.y *= -BOUNCE;
 
+    // ✅ SENİN GÖNDERDİĞİN KODUN AYNISI
     fishGroup.current.position.copy(fishPos.current);
     fishGroup.current.rotation.y = currentYaw.current;
-    
-    // ✅ SENİN ONAYLADIĞIN EKSEN SIRALAMASI: ZXY
-    fishInner.current.rotation.set(currentRoll.current, 0, currentPitch.current, 'ZXY');
+    fishInner.current.rotation.set(currentPitch.current, 0, currentRoll.current, 'XYZ');
 
     if (swimActionRef.current) swimActionRef.current.paused = !moving;
 
@@ -226,7 +227,7 @@ export default function EslemeGame() {
     <div style={{ width: "100vw", height: "100vh", background: `linear-gradient(to bottom, ${GRADIENT_TOP} 0%, ${GRADIENT_BOTTOM} 100%)`, touchAction: "none" }}>
       <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45 }}>
         
-        {/* 🔥 1. İSTEK: SİS AZALTILDI (Eskiden 15-45 arasıydı, şimdi 30'dan başlayıp 80'de bitiyor) */}
+        {/* 🔥 4. İSTEK: SİS AZALTILDI (30'dan başlayıp 80'de bitiyor, ön plan cam gibi net) */}
         <fog attach="fog" args={[FOG_COLOR, 30, 80]} />
 
         <ambientLight intensity={1.5} />
@@ -237,5 +238,5 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-                                      }
-          
+                                                                                                                                                                                                                     }
+      
