@@ -206,5 +206,104 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
       const rollDirection = (targetYaw < 0) ? 1 : -1;
       let targetRoll = ny * BELLY_ROLL_ANGLE * rollDirection;
 
-      currentYaw.current = lerpAngle(currentYaw.current, targetYaw, 1 -
-        
+      currentYaw.current = lerpAngle(currentYaw.current, targetYaw, 1 - Math.pow(0.001, dt * TURN_SMOOTH_YAW));
+      currentPitch.current = lerp(currentPitch.current, targetPitch, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
+      currentRoll.current = lerp(currentRoll.current, targetRoll, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
+    } else {
+      fishVel.current.multiplyScalar(DRAG_STOP);
+      currentPitch.current = lerp(currentPitch.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
+      currentRoll.current = lerp(currentRoll.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
+    }
+
+    // 🔥 SENİN MANTIK: SADECE ÖN VE ALT LAZER KONTROLÜ
+    if (seaGroup.current) {
+        // 1. ÖN TARAF (X Ekseni: Sağa veya Sola)
+        if (Math.abs(fishVel.current.x) > 0.1) {
+            moveDirX.set(Math.sign(fishVel.current.x), 0, 0); // Yönüne göre sağ(1) veya sol(-1)
+            collisionRaycaster.set(fishPos.current, moveDirX);
+            const hits = collisionRaycaster.intersectObject(seaGroup.current, true);
+            if (hits.length > 0 && hits[0].distance < BUMPER_SIZE) {
+                fishVel.current.x = 0; // Duvara tosladı
+            }
+        }
+
+        // 2. ALT TARAF (Y Ekseni Aşağı)
+        if (fishVel.current.y < -0.1) {
+            collisionRaycaster.set(fishPos.current, dirDown);
+            const hits = collisionRaycaster.intersectObject(seaGroup.current, true);
+            if (hits.length > 0 && hits[0].distance < BUMPER_SIZE) {
+                if (isAboveWater) fishVel.current.y *= -BOUNCE; // Sudan düşerken çarparsa seker
+                else fishVel.current.y = 0; // Su altındayken zemine değerse durur
+            }
+        }
+    }
+
+    if (isAboveWater) {
+      fishVel.current.y -= GRAVITY * dt;
+      if (!moving && fishVel.current.y < 0) {
+         currentPitch.current = lerp(currentPitch.current, -Math.PI/4, 0.1);
+      }
+    }
+
+    fishPos.current.x += fishVel.current.x * dt;
+    fishPos.current.y += fishVel.current.y * dt;
+
+    if (fishPos.current.x <= b.minX || fishPos.current.x >= b.maxX) fishVel.current.x *= -BOUNCE;
+    if (fishPos.current.y <= b.minY) { 
+        fishPos.current.y = b.minY; 
+        fishVel.current.y *= -BOUNCE; 
+    }
+    else if (fishPos.current.y >= maxJumpHeight) {
+        fishPos.current.y = maxJumpHeight;
+        if (fishVel.current.y > 0) fishVel.current.y = 0;
+    }
+
+    fishGroup.current.position.copy(fishPos.current);
+    fishGroup.current.rotation.y = currentYaw.current;
+    fishInner.current.rotation.set(currentPitch.current, 0, currentRoll.current, 'XYZ');
+
+    if (swimActionRef.current) swimActionRef.current.paused = !moving;
+
+    const camSmooth = isAboveWater ? CAMERA_SMOOTH * 0.5 : CAMERA_SMOOTH;
+    
+    // 🔥 Kamera takibindeki gizli çöp üretimi çözüldü
+    cameraTarget.set(fishPos.current.x, fishPos.current.y, CAMERA_Z);
+    state.camera.position.lerp(cameraTarget, 1 - Math.pow(0.001, dt * camSmooth));
+    state.camera.lookAt(fishPos.current.x, fishPos.current.y, 0); 
+  });
+
+  return (
+    <>
+      <group ref={seaGroup}> <primitive object={sea.scene} /> </group>
+      <WaterCeiling y={surfaceY} />
+      <group ref={fishGroup} scale={FISH_SCALE}> 
+         <group ref={fishInner}>
+            <primitive object={fish.scene} /> 
+         </group>
+      </group>
+      <CanvasEvents onDown={() => (dragging.current = true)} onUp={() => (dragging.current = false)} />
+    </>
+  );
+}
+
+export default function EslemeGame() {
+  const [urls, setUrls] = useState({ fish: "", sea: "", draco: "" });
+  
+  useEffect(() => {
+    const base = new URL("/assets/public/", window.location.origin).toString();
+    setUrls({ fish: new URL("models/balik.glb", base).toString(), sea: new URL("models/deniz.glb", base).toString(), draco: new URL("draco/", base).toString() });
+  }, []);
+
+  return (
+    <div style={{ width: "100vw", height: "100vh", background: `linear-gradient(to bottom, ${GRADIENT_TOP} 0%, ${GRADIENT_BOTTOM} 100%)`, touchAction: "none" }}>
+      <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45 }}>
+        <fog attach="fog" args={[FOG_COLOR, 30, 80]} />
+        <ambientLight intensity={1.5} />
+        <directionalLight position={[10, 10, 10]} intensity={2} />
+        <Suspense fallback={<Loader3D />}>
+          {urls.fish && <World fishUrl={urls.fish} seaUrl={urls.sea} dracoBase={urls.draco} />}
+        </Suspense>
+      </Canvas>
+    </div>
+  );
+              }
