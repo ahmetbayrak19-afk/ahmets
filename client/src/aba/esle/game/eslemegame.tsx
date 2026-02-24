@@ -1,10 +1,7 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Canvas, useFrame, useThree, extend, useLoader } from "@react-three/fiber";
-import { Html, useAnimations, useGLTF, useProgress, Environment } from "@react-three/drei";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Html, useAnimations, useGLTF, useProgress } from "@react-three/drei";
 import * as THREE from "three";
-import { Water } from "three-stdlib";
-
-extend({ Water });
 
 /** ---- Utils ---- */
 function lerp(start: number, end: number, t: number) {
@@ -49,13 +46,11 @@ const GRADIENT_TOP = "#3498db";
 const GRADIENT_BOTTOM = "#104068"; 
 const FOG_COLOR = GRADIENT_BOTTOM; 
 
-// Lazer (Park Sensörü) Mesafesi
-const SENSOR_DISTANCE = 3.5; 
+// 🔥 4 YÖNLÜ LAZER KAFESİNİN MESAFESİ (Ne kadar yaklaşabileceği)
+const BUMPER_SIZE = 2.5; 
 
-// 🔥 YENİ: Zıplama Limiti (Suyun ne kadar üstüne çıkabilir)
+// 🔥 Zıplama Limiti (Suyun 2 birim üstü, yani -30 hizası)
 const JUMP_LIMIT = 2.0;
-
-const WATER_NORMALS_URL = "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/waternormals.jpg";
 
 function Loader3D() {
   const { progress } = useProgress();
@@ -71,45 +66,53 @@ function CanvasEvents({ onDown, onUp }: { onDown: () => void; onUp: () => void; 
   );
 }
 
-// ÇİFT TARAFLI GERÇEKÇİ SU EFEKTİ
-function RealisticWater({ y }: { y: number }) {
-  const refTop = useRef<any>();
-  const refBottom = useRef<any>();
-  
-  const gl = useThree((state) => state.gl);
-  const waterNormals = useLoader(THREE.TextureLoader, WATER_NORMALS_URL);
-  waterNormals.wrapS = waterNormals.wrapT = THREE.RepeatWrapping;
-
-  const geom = useMemo(() => new THREE.PlaneGeometry(2000, 2000), []);
-  
-  const config = useMemo(
-    () => ({
-      textureWidth: 512,
-      textureHeight: 512,
-      waterNormals,
-      sunDirection: new THREE.Vector3(0.5, 1, 0.5).normalize(),
-      sunColor: 0xffffff,
-      waterColor: 0x0077be, 
-      distortionScale: 3.7,
-      fog: true,
-      format: gl.encoding,
-    }),
-    [waterNormals, gl.encoding]
-  );
-
-  useFrame((state, delta) => {
-    if (refTop.current) refTop.current.material.uniforms.time.value += delta * 0.5;
-    if (refBottom.current) refBottom.current.material.uniforms.time.value += delta * 0.5;
-  });
-
-  const GAP = 0.02;
-
-  return (
-    <group position={[0, y, 0]}>
-      <water ref={refTop} args={[geom, config]} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} />
-      <water ref={refBottom} args={[geom, config]} rotation={[Math.PI / 2, 0, 0]} position={[0, -GAP, 0]} />
-    </group>
-  );
+// 🔥 KASMAYAN, GTA 5 TARZI OKYANUS TAVANI (Geri Getirildi)
+function WaterCeiling({ y }: { y: number }) {
+  const mat = useMemo(() => {
+    return new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide, // Alttan da üstten de görünür
+      uniforms: { uTime: { value: 0 } },
+      vertexShader: `
+        varying vec2 vUv;
+        varying vec3 vWorldPos;
+        uniform float uTime;
+        void main() {
+          vUv = uv;
+          vec3 pos = position;
+          pos.z += sin(pos.x * 0.1 + uTime * 0.8) * cos(pos.y * 0.1 + uTime * 0.6) * 3.0;
+          vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
+          vWorldPos = worldPosition.xyz;
+          gl_Position = projectionMatrix * viewMatrix * worldPosition;
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        varying vec3 vWorldPos;
+        uniform float uTime;
+        void main() {
+          vec2 p = vWorldPos.xz * 0.05;
+          float time = uTime * 0.5;
+          float w1 = sin(p.x + time) * cos(p.y + time * 0.8);
+          float w2 = sin(p.x * 2.3 - time * 1.1) * cos(p.y * 2.1 + time * 0.9);
+          float w3 = sin(p.x * 5.1 + time * 1.5) * cos(p.y * 4.8 - time * 1.2);
+          float w = (w1 + w2 * 0.5 + w3 * 0.25);
+          vec3 deepColor = vec3(0.04, 0.18, 0.35);
+          vec3 lightColor = vec3(0.16, 0.71, 0.95);
+          vec3 col = mix(deepColor, lightColor, w * 0.5 + 0.5);
+          float sun = pow(max(0.0, w), 4.0);
+          col += vec3(0.8, 0.9, 1.0) * sun * 0.8;
+          float dist = distance(cameraPosition, vWorldPos);
+          float alpha = 1.0 - smoothstep(40.0, 120.0, dist);
+          gl_FragColor = vec4(col, 0.85 * alpha);
+        }
+      `
+    });
+  }, []);
+  const geom = useMemo(() => new THREE.PlaneGeometry(1000, 1000, 128, 128), []);
+  useFrame((_, dt) => { mat.uniforms.uTime.value += dt; });
+  return ( <mesh geometry={geom} material={mat} rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]} /> );
 }
 
 function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string; dracoBase: string; }) {
@@ -148,7 +151,8 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     boundsRef.current = { minX: box.min.x + 2, maxX: box.max.x - 2, minY: box.min.y + 2, maxY: box.max.y - 2 };
     
-    setSurfaceY(boundsRef.current.maxY - 27);
+    // 🔥 SU YÜZEYİ -32'YE İNDİ
+    setSurfaceY(boundsRef.current.maxY - 32);
   }, [sea.scene]);
 
   const fishPos = useRef(new THREE.Vector3(0, 0, Z_PLANE));
@@ -168,7 +172,7 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     if (!fishGroup.current || !fishInner.current) return;
 
     const isAboveWater = fishPos.current.y > surfaceY;
-    const maxJumpHeight = surfaceY + JUMP_LIMIT; // 🔥 Suyun 2 birim üstü
+    const maxJumpHeight = surfaceY + JUMP_LIMIT; // 🔥 Zıplama en fazla suyun 2 birim üstüne (-30 hizası)
 
     if (dragging.current) {
       raycaster.setFromCamera(state.pointer, state.camera);
@@ -177,7 +181,7 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
     const b = boundsRef.current;
     
-    // 🔥 YENİ: Parmağını uzaya kadar çeksen bile hedef suyun en fazla 2 birim üstü olabilir
+    // Hedef noktası kilitleri
     fishTarget.current.x = THREE.MathUtils.clamp(fishTarget.current.x, b.minX, b.maxX);
     fishTarget.current.y = THREE.MathUtils.clamp(fishTarget.current.y, b.minY, maxJumpHeight);
 
@@ -186,33 +190,12 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     const dist = Math.hypot(dx, dy);
     const moving = dragging.current && dist > 0.2;
 
-    // LAZER KONTROLÜ (PARK SENSÖRÜ)
-    let hitWall = false;
-    if (moving || fishVel.current.lengthSq() > 0.1) {
-       let dirX = moving ? dx : fishVel.current.x;
-       let dirY = moving ? dy : fishVel.current.y;
-       const moveDir = new THREE.Vector3(dirX, dirY, 0).normalize();
-       
-       collisionRaycaster.set(fishPos.current, moveDir);
-       
-       if (seaGroup.current) {
-           const hits = collisionRaycaster.intersectObject(seaGroup.current, true);
-           if (hits.length > 0 && hits[0].distance < SENSOR_DISTANCE) {
-               hitWall = true; 
-           }
-       }
-    }
-
     if (moving) {
       const nx = dx / dist; const ny = dy / dist;
+      const a = 1 - Math.pow(0.001, dt * ACCEL);
       
-      if (!hitWall) {
-          const a = 1 - Math.pow(0.001, dt * ACCEL);
-          fishVel.current.x = lerp(fishVel.current.x, nx * MAX_SPEED, a);
-          fishVel.current.y = lerp(fishVel.current.y, ny * MAX_SPEED, a);
-      } else {
-          fishVel.current.multiplyScalar(0.7);
-      }
+      fishVel.current.x = lerp(fishVel.current.x, nx * MAX_SPEED, a);
+      fishVel.current.y = lerp(fishVel.current.y, ny * MAX_SPEED, a);
 
       let targetYaw = currentYaw.current;
       if (nx > 0.05) targetYaw = -Math.PI / 2; 
@@ -231,37 +214,59 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
       currentRoll.current = lerp(currentRoll.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
     }
 
+    // 🔥 4 YÖNLÜ LAZER KAFESİ (Sağ, Sol, Yukarı, Aşağı ayrı ayrı kontrol ediliyor)
+    if (seaGroup.current) {
+        // Sağa gidiyorsan sağa lazer at
+        if (fishVel.current.x > 0.1) {
+            collisionRaycaster.set(fishPos.current, new THREE.Vector3(1, 0, 0));
+            const hits = collisionRaycaster.intersectObject(seaGroup.current, true);
+            if (hits.length > 0 && hits[0].distance < BUMPER_SIZE) fishVel.current.x = 0; // Duvara tosladın, sağa gidiş durdu
+        }
+        // Sola gidiyorsan sola lazer at
+        if (fishVel.current.x < -0.1) {
+            collisionRaycaster.set(fishPos.current, new THREE.Vector3(-1, 0, 0));
+            const hits = collisionRaycaster.intersectObject(seaGroup.current, true);
+            if (hits.length > 0 && hits[0].distance < BUMPER_SIZE) fishVel.current.x = 0; // Duvara tosladın, sola gidiş durdu
+        }
+        // Yukarı gidiyorsan yukarı lazer at (O yatay zeminlerden kaçışı önler)
+        if (fishVel.current.y > 0.1) {
+            collisionRaycaster.set(fishPos.current, new THREE.Vector3(0, 1, 0));
+            const hits = collisionRaycaster.intersectObject(seaGroup.current, true);
+            // Suyun üstündeyken gökyüzünde görünmez tavana çarpma kontrolü yok, sadece denizin içindeki kayalara çarpar
+            if (hits.length > 0 && hits[0].distance < BUMPER_SIZE && !isAboveWater) fishVel.current.y = 0;
+        }
+        // Aşağı gidiyorsan aşağı lazer at
+        if (fishVel.current.y < -0.1) {
+            collisionRaycaster.set(fishPos.current, new THREE.Vector3(0, -1, 0));
+            const hits = collisionRaycaster.intersectObject(seaGroup.current, true);
+            if (hits.length > 0 && hits[0].distance < BUMPER_SIZE) {
+                if (isAboveWater) fishVel.current.y *= -BOUNCE; // Sudan düşerken taşa çarparsa seker
+                else fishVel.current.y = 0; // Su altında yere değerse durur
+            }
+        }
+    }
+
+    // YERÇEKİMİ KONTROLÜ
     if (isAboveWater) {
       fishVel.current.y -= GRAVITY * dt;
       if (!moving && fishVel.current.y < 0) {
          currentPitch.current = lerp(currentPitch.current, -Math.PI/4, 0.1);
       }
-      
-      if (fishVel.current.y < 0) {
-          collisionRaycaster.set(fishPos.current, new THREE.Vector3(0, -1, 0));
-          if (seaGroup.current) {
-              const hits = collisionRaycaster.intersectObject(seaGroup.current, true);
-              if (hits.length > 0 && hits[0].distance < 2.0) {
-                  fishVel.current.y *= -BOUNCE; 
-              }
-          }
-      }
     }
 
+    // POZİSYONU GÜNCELLE
     fishPos.current.x += fishVel.current.x * dt;
     fishPos.current.y += fishVel.current.y * dt;
 
+    // 🔥 ANA SINIRLAR VE TAVAN/ZEMİN KİLİTLERİ (Haritadan çıkış yok)
     if (fishPos.current.x <= b.minX || fishPos.current.x >= b.maxX) fishVel.current.x *= -BOUNCE;
-    
-    // 🔥 ZEMİN VE TAVAN KİLİTLERİ
     if (fishPos.current.y <= b.minY) { 
         fishPos.current.y = b.minY; 
         fishVel.current.y *= -BOUNCE; 
     }
-    // 🔥 YENİ: Havaya zıpladı ve 2 birim sınırına çarptıysa hızı kes, cup diye suya düşsün!
+    // Zıplama sınırına ulaşınca hızı anında sıfırla (yerçekimi onu çekecek)
     else if (fishPos.current.y >= maxJumpHeight) {
         fishPos.current.y = maxJumpHeight;
-        // Eğer hala yukarı çıkmaya çalışıyorsa hızını sıfırla ki yerçekimi onu hemen aşağı çeksin
         if (fishVel.current.y > 0) fishVel.current.y = 0;
     }
 
@@ -279,7 +284,10 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   return (
     <>
       <group ref={seaGroup}> <primitive object={sea.scene} /> </group>
-      <RealisticWater y={surfaceY} />
+      
+      {/* O çok sevdiğin hafif ve muazzam deniz tavanı */}
+      <WaterCeiling y={surfaceY} />
+
       <group ref={fishGroup} scale={FISH_SCALE}> 
          <group ref={fishInner}>
             <primitive object={fish.scene} /> 
@@ -301,7 +309,8 @@ export default function EslemeGame() {
   return (
     <div style={{ width: "100vw", height: "100vh", background: `linear-gradient(to bottom, ${GRADIENT_TOP} 0%, ${GRADIENT_BOTTOM} 100%)`, touchAction: "none" }}>
       <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45 }}>
-        <Environment preset="sunset" />
+        
+        {/* Sis ortamı da gündüz hissiyatına uygun */}
         <fog attach="fog" args={[FOG_COLOR, 30, 80]} />
         <ambientLight intensity={1.5} />
         <directionalLight position={[10, 10, 10]} intensity={2} />
