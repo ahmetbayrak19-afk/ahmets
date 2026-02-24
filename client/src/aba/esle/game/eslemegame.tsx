@@ -19,7 +19,7 @@ const SEA_ANIM_NAME = "yeme";
 const SEA_ANIM_SPEED = 0.2;
 const FISH_SWIM_ANIM_NAME = "yuzme";
 
-// 🔥 1. İSTEK: Balık 1.5 kat hızlandı (7.2 * 1.5 = 10.8)
+// 🔥 4. İSTEK: Hız 1.5 katına çıktı
 const MAX_SPEED = 10.8; 
 const ACCEL = 8.0; 
 const DRAG_STOP = 0.90;
@@ -29,18 +29,23 @@ const CAMERA_Z = 10;
 const CAMERA_SMOOTH = 5.0;
 
 const SEA_ROT_Y = Math.PI / 2;
-// 🔥 2. İSTEK: Deniz 2 kat büyüdü (2.0'dan 4.0'a çıktı)
+// 🔥 3. İSTEK: Deniz 2 kat daha büyüdü
 const SEA_SCALE_MULT = 4.0; 
 const FISH_SCALE = 3.0;
 
 const TURN_SMOOTH_YAW = 8.0;   
 const TURN_SMOOTH_PITCH = 8.0; 
 const MAX_PITCH_ANGLE = Math.PI / 3; 
+const BELLY_ROLL_ANGLE = Math.PI / 5; 
 
 const BOUNCE = 0.6;
-const BG_COLOR = "#0b2a46";
 
-// 🔥 3. İSTEK: DENİZ YÜZEYİ İÇİN AYARLAR
+// 🔥 RENKLER VE SİS
+const GRADIENT_TOP = "#11426e"; // Yüzeye yakın daha açık mavi
+const GRADIENT_BOTTOM = "#051a2e"; // Derin okyanus laciverti
+const FOG_COLOR = GRADIENT_BOTTOM; // Sis, okyanusun dibiyle aynı renk olmalı
+
+// DENİZ YÜZEYİ AYARLARI
 const WATER_Y_OFFSET = -1.8;
 const WATER_THICKNESS = 2.8;
 const WATER_WAVE_STRENGTH = 0.35;
@@ -61,12 +66,12 @@ function CanvasEvents({ onDown, onUp }: { onDown: () => void; onUp: () => void; 
   );
 }
 
-// 🔥 DENİZ YÜZEYİ SHADER'I
+// 🔥 2. İSTEK: DENİZ YÜZEYİ (Dalgalı Shader)
 function useWaterRibbonMaterial() {
   return useMemo(() => {
     return new THREE.ShaderMaterial({
       transparent: true, depthWrite: false,
-      uniforms: { uTime: { value: 0 }, uOpacity: { value: 0.82 }, uWave: { value: WATER_WAVE_STRENGTH }, uScroll: { value: WATER_SCROLL_SPEED }, uColorDeep: { value: new THREE.Color("#06324a") }, uColorLight: { value: new THREE.Color("#2ab6ff") }, },
+      uniforms: { uTime: { value: 0 }, uOpacity: { value: 0.82 }, uWave: { value: WATER_WAVE_STRENGTH }, uScroll: { value: WATER_SCROLL_SPEED }, uColorDeep: { value: new THREE.Color(GRADIENT_TOP) }, uColorLight: { value: new THREE.Color("#2ab6ff") }, },
       vertexShader: `varying vec2 vUv; void main() { vUv = uv; vec4 wp = modelMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * viewMatrix * wp; }`,
       fragmentShader: `varying vec2 vUv; uniform float uTime; uniform float uOpacity; uniform float uWave; uniform float uScroll; uniform vec3 uColorDeep; uniform vec3 uColorLight; float wave(vec2 p) { float w = sin(p.x * 5.0 + uTime * uScroll * 10.0) * 0.5 + 0.5; w += cos(p.y * 3.0 - uTime * uScroll * 5.0) * 0.5 + 0.5; return w * 0.5; } void main() { vec2 uv = vUv; float w1 = wave(uv * vec2(4.0, 1.0)); float w2 = wave(uv * vec2(8.0, 2.0) + vec2(1.2, 0.5)); float combinedWave = (w1 + w2) * uWave; float edge = smoothstep(0.0, 0.35, vUv.y) * smoothstep(1.0, 0.75, vUv.y); float t = clamp(vUv.y + combinedWave * 0.45, 0.0, 1.0); vec3 col = mix(uColorDeep, uColorLight, t); float sparkle = pow(clamp(combinedWave, 0.0, 1.0), 6.0) * 0.35; col += sparkle; float a = uOpacity * (0.72 + 0.28 * smoothstep(0.6, 1.0, vUv.y)); gl_FragColor = vec4(col, a * edge); }`,
     });
@@ -93,7 +98,6 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   const fishAnim = useAnimations(fish.animations, fish.scene);
   const swimActionRef = useRef<THREE.AnimationAction | null>(null);
 
-  // Deniz yüzeyi için state
   const [surface, setSurface] = useState<{w: number, y: number, z: number} | null>(null);
 
   useEffect(() => { 
@@ -110,6 +114,7 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
   useEffect(() => {
     if (!seaGroup.current) return;
+    sea.scene.traverse((o: any) => { if (o?.isMesh && o.material) o.material.side = THREE.DoubleSide; });
     const rawBox = new THREE.Box3().setFromObject(sea.scene);
     const size = new THREE.Vector3(); rawBox.getSize(size);
     sea.scene.scale.setScalar((Math.max(size.x, size.y, size.z) > 0 ? 90 / Math.max(size.x, size.y, size.z) : 1) * SEA_SCALE_MULT);
@@ -119,7 +124,6 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     boundsRef.current = { minX: box.min.x + 2, maxX: box.max.x - 2, minY: box.min.y + 2, maxY: box.max.y - 2 };
     
-    // Yüzeyin konumunu hesaplayıp state'e atıyoruz
     setSurface({ w: (box.max.x - box.min.x) * 1.5, y: box.max.y, z: -20 });
   }, [sea.scene]);
 
@@ -128,8 +132,10 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   const fishTarget = useRef(new THREE.Vector3(0, 0, Z_PLANE));
   const dragging = useRef(false);
 
-  const currentYaw = useRef(Math.PI / 2); 
+  // BAŞLANGIÇ: Kusursuz orijinal halin
+  const currentYaw = useRef(0); 
   const currentPitch = useRef(0);
+  const currentRoll = useRef(0); 
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -Z_PLANE), []);
@@ -157,15 +163,22 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
       fishVel.current.x = lerp(fishVel.current.x, nx * MAX_SPEED, a);
       fishVel.current.y = lerp(fishVel.current.y, ny * MAX_SPEED, a);
 
-      // KUSURSUZ DÖNÜŞ KODLARIN (Zerre dokunulmadı)
-      let targetYaw = (nx > 0.05) ? -Math.PI / 2 : Math.PI / 2; 
+      // ==========================================
+      // ✅ SENİN KUSURSUZ YÜZÜŞ KODUN (Zerre dokunulmadı)
+      // ==========================================
+      let targetYaw = (nx > 0.05) ? Math.PI : 0; 
       let targetPitch = -ny * MAX_PITCH_ANGLE; 
+
+      const direction = (targetYaw > 1) ? 1 : -1;
+      let targetRoll = ny * BELLY_ROLL_ANGLE * direction;
 
       currentYaw.current = lerpAngle(currentYaw.current, targetYaw, 1 - Math.pow(0.001, dt * TURN_SMOOTH_YAW));
       currentPitch.current = lerp(currentPitch.current, targetPitch, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
+      currentRoll.current = lerp(currentRoll.current, targetRoll, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
     } else {
       fishVel.current.multiplyScalar(DRAG_STOP);
       currentPitch.current = lerp(currentPitch.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
+      currentRoll.current = lerp(currentRoll.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
     }
 
     fishPos.current.x += fishVel.current.x * dt;
@@ -176,7 +189,9 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
     fishGroup.current.position.copy(fishPos.current);
     fishGroup.current.rotation.y = currentYaw.current;
-    fishInner.current.rotation.x = currentPitch.current;
+    
+    // ✅ SENİN ONAYLADIĞIN EKSEN SIRALAMASI: ZXY
+    fishInner.current.rotation.set(currentRoll.current, 0, currentPitch.current, 'ZXY');
 
     if (swimActionRef.current) swimActionRef.current.paused = !moving;
 
@@ -187,10 +202,7 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   return (
     <>
       <group ref={seaGroup}> <primitive object={sea.scene} /> </group>
-      
-      {/* Yüzey Varsa Render Et */}
       {surface && <InfiniteWaterRibbon width={surface.w} y={surface.y} z={surface.z} />}
-
       <group ref={fishGroup} scale={FISH_SCALE}> 
          <group ref={fishInner}>
             <primitive object={fish.scene} /> 
@@ -203,17 +215,19 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
 export default function EslemeGame() {
   const [urls, setUrls] = useState({ fish: "", sea: "", draco: "" });
+  
   useEffect(() => {
     const base = new URL("/assets/public/", window.location.origin).toString();
     setUrls({ fish: new URL("models/balik.glb", base).toString(), sea: new URL("models/deniz.glb", base).toString(), draco: new URL("draco/", base).toString() });
   }, []);
 
   return (
-    <div style={{ width: "100vw", height: "100vh", background: BG_COLOR, touchAction: "none" }}>
+    // 🔥 YENİ: Aşağıya doğru koyulaşan okyanus gradyanı
+    <div style={{ width: "100vw", height: "100vh", background: `linear-gradient(to bottom, ${GRADIENT_TOP} 0%, ${GRADIENT_BOTTOM} 100%)`, touchAction: "none" }}>
       <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45 }}>
         
-        {/* 🔥 4. İSTEK: SİS (FOG) EKLENDİ - Derinlik hissini arşa çıkarır */}
-        <fog attach="fog" args={[BG_COLOR, 15, 45]} />
+        {/* 🔥 1. İSTEK: SİS AZALTILDI (Eskiden 15-45 arasıydı, şimdi 30'dan başlayıp 80'de bitiyor) */}
+        <fog attach="fog" args={[FOG_COLOR, 30, 80]} />
 
         <ambientLight intensity={1.5} />
         <directionalLight position={[10, 10, 10]} intensity={2} />
@@ -223,5 +237,5 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-    }
-    
+                                      }
+          
