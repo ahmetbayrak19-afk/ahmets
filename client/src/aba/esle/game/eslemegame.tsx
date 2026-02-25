@@ -45,8 +45,6 @@ const GRADIENT_TOP = "#3498db";
 const GRADIENT_BOTTOM = "#104068"; 
 const FOG_COLOR = GRADIENT_BOTTOM; 
 
-const BUMPER_SIZE = 2.5; 
-// 🔥 Zıplama sınırı: 2 birim
 const JUMP_LIMIT = 2.0;
 
 function Loader3D() {
@@ -126,10 +124,7 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
   const [surfaceY, setSurfaceY] = useState(20);
 
-  // 🔥 ÇÖP TOPLAMAYI SIFIRLAMAK İÇİN HAFIZADA TUTULAN VEKTÖRLER
-  const dirDown = useMemo(() => new THREE.Vector3(0, -1, 0), []);
-  const moveDirX = useMemo(() => new THREE.Vector3(1, 0, 0), []);
-  const cameraTarget = useMemo(() => new THREE.Vector3(), []); // Kamera takibindeki gizli çöpü çözdük!
+  const cameraTarget = useMemo(() => new THREE.Vector3(), []); 
 
   useEffect(() => { 
     const a = seaAnim.actions?.[SEA_ANIM_NAME] || (seaAnim.names?.[0] ? seaAnim.actions?.[seaAnim.names[0]] : null); 
@@ -154,7 +149,6 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     boundsRef.current = { minX: box.min.x + 2, maxX: box.max.x - 2, minY: box.min.y + 2, maxY: box.max.y - 2 };
     
-    // 🔥 İSTEK: Su seviyesi -32'den -36'ya indirildi
     setSurfaceY(boundsRef.current.maxY - 36);
   }, [sea.scene]);
 
@@ -168,7 +162,6 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   const currentRoll = useRef(0); 
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const collisionRaycaster = useMemo(() => new THREE.Raycaster(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -Z_PLANE), []);
 
   useFrame((state, dt) => {
@@ -215,28 +208,8 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
       currentRoll.current = lerp(currentRoll.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
     }
 
-    // 🔥 SENİN MANTIK: SADECE ÖN VE ALT LAZER KONTROLÜ
-    if (seaGroup.current) {
-        // 1. ÖN TARAF (X Ekseni: Sağa veya Sola)
-        if (Math.abs(fishVel.current.x) > 0.1) {
-            moveDirX.set(Math.sign(fishVel.current.x), 0, 0); // Yönüne göre sağ(1) veya sol(-1)
-            collisionRaycaster.set(fishPos.current, moveDirX);
-            const hits = collisionRaycaster.intersectObject(seaGroup.current, true);
-            if (hits.length > 0 && hits[0].distance < BUMPER_SIZE) {
-                fishVel.current.x = 0; // Duvara tosladı
-            }
-        }
-
-        // 2. ALT TARAF (Y Ekseni Aşağı)
-        if (fishVel.current.y < -0.1) {
-            collisionRaycaster.set(fishPos.current, dirDown);
-            const hits = collisionRaycaster.intersectObject(seaGroup.current, true);
-            if (hits.length > 0 && hits[0].distance < BUMPER_SIZE) {
-                if (isAboveWater) fishVel.current.y *= -BOUNCE; // Sudan düşerken çarparsa seker
-                else fishVel.current.y = 0; // Su altındayken zemine değerse durur
-            }
-        }
-    }
+    // 🔥 LAZER (PARK SENSÖRÜ) SİSTEMİ TEST İÇİN TAMAMEN KAPATILDI!
+    // Kasmayı test ediyoruz.
 
     if (isAboveWater) {
       fishVel.current.y -= GRAVITY * dt;
@@ -266,7 +239,6 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
     const camSmooth = isAboveWater ? CAMERA_SMOOTH * 0.5 : CAMERA_SMOOTH;
     
-    // 🔥 Kamera takibindeki gizli çöp üretimi çözüldü
     cameraTarget.set(fishPos.current.x, fishPos.current.y, CAMERA_Z);
     state.camera.position.lerp(cameraTarget, 1 - Math.pow(0.001, dt * camSmooth));
     state.camera.lookAt(fishPos.current.x, fishPos.current.y, 0); 
@@ -306,4 +278,4 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-              }
+                                                }
