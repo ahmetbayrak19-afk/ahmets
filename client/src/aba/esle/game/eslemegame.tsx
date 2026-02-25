@@ -29,8 +29,8 @@ const GRAVITY = 35.0;
 const CAMERA_Z = 10;
 const CAMERA_SMOOTH = 5.0;
 
-// 🔥 İSTEK: Harita 180 derece döndürüldü! (Eskiden Math.PI / 2 idi, şimdi -Math.PI / 2)
-const SEA_ROT_Y = -Math.PI / 2;
+// 🔥 Harita son halinden 180 derece döndürüldü (Orijinal açıya geri döndü)
+const SEA_ROT_Y = Math.PI / 2;
 const SEA_SCALE_MULT = 4.0; 
 const FISH_SCALE = 3.0;
 
@@ -46,7 +46,6 @@ const GRADIENT_TOP = "#3498db";
 const GRADIENT_BOTTOM = "#104068"; 
 const FOG_COLOR = GRADIENT_BOTTOM; 
 
-const BUMPER_SIZE = 2.5; 
 const JUMP_LIMIT = 2.0;
 
 function Loader3D() {
@@ -125,9 +124,6 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   const swimActionRef = useRef<THREE.AnimationAction | null>(null);
 
   const [surfaceY, setSurfaceY] = useState(20);
-
-  const dirDown = useMemo(() => new THREE.Vector3(0, -1, 0), []);
-  const moveDirX = useMemo(() => new THREE.Vector3(1, 0, 0), []);
   const cameraTarget = useMemo(() => new THREE.Vector3(), []); 
 
   useEffect(() => { 
@@ -148,14 +144,13 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     const size = new THREE.Vector3(); rawBox.getSize(size);
     sea.scene.scale.setScalar((Math.max(size.x, size.y, size.z) > 0 ? 90 / Math.max(size.x, size.y, size.z) : 1) * SEA_SCALE_MULT);
     seaGroup.current.position.set(0, 0, -20);
-    // Yeni 180 derece dönmüş açı uygulanıyor
     seaGroup.current.rotation.set(0, SEA_ROT_Y, 0);
     
-    // Kutu boyutları dönüşten sonra yeni haline göre hesaplanıyor
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     boundsRef.current = { minX: box.min.x + 2, maxX: box.max.x - 2, minY: box.min.y + 2, maxY: box.max.y - 2 };
     
-    setSurfaceY(boundsRef.current.maxY - 36);
+    // 🔥 Su seviyesi -36'dan 20 birim yukarı çekildi (-16 oldu)
+    setSurfaceY(boundsRef.current.maxY - 16);
   }, [sea.scene]);
 
   const fishPos = useRef(new THREE.Vector3(0, 0, Z_PLANE));
@@ -168,7 +163,6 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   const currentRoll = useRef(0); 
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const collisionRaycaster = useMemo(() => new THREE.Raycaster(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -Z_PLANE), []);
 
   useFrame((state, dt) => {
@@ -214,8 +208,6 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
       currentPitch.current = lerp(currentPitch.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
       currentRoll.current = lerp(currentRoll.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
     }
-
-    // 🔥 LAZERLER (PARK SENSÖRÜ) TEST İÇİN HALA KAPALI DURUYOR
 
     if (isAboveWater) {
       fishVel.current.y -= GRAVITY * dt;
