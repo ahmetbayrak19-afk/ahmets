@@ -1,10 +1,10 @@
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Html, useAnimations, useGLTF, useProgress } from "@react-three/drei";
+import { Html, useAnimations, useGLTF, useProgress, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
+import { ArrowLeft, CheckCircle2 } from "lucide-react";
 
 /** ==== OYUN VERİLERİ ==== */
-// ❗ ÖNEMLİ: animName kısımlarını Blender'da verdiğin aksiyon (action) isimleriyle birebir aynı yapmalısın.
 const GAME_DATA = {
   bilgisayar: {
     id: "bilgisayar",
@@ -52,14 +52,12 @@ const GAME_DATA = {
   },
 };
 
-const BG_COLOR = "#0b2a46"; // Referans kodundaki arka plan rengi
-
 /** ---- Yükleyici Bileşeni ---- */
 function Loader3D() {
   const { progress } = useProgress();
   return (
     <Html center>
-      <div style={{ color: "white", background: "rgba(0,0,0,0.75)", padding: "10px 12px", borderRadius: 10, fontFamily: "monospace" }}>
+      <div className="text-white bg-slate-900/80 px-4 py-2 rounded-xl font-mono text-sm border border-slate-700">
         Yükleniyor: %{progress.toFixed(0)}
       </div>
     </Html>
@@ -76,14 +74,12 @@ function ActiveModel({ url, dracoBase, activeAnim }: { url: string; dracoBase: s
   const { actions } = useAnimations(animations, scene);
 
   useEffect(() => {
-    // Model yüklendiğinde materyalleri çift taraflı yap (referans koddaki gibi)
     scene.traverse((o: any) => {
       if (o?.isMesh && o.material) o.material.side = THREE.DoubleSide;
     });
   }, [scene]);
 
   useEffect(() => {
-    // Butona basıldığında ilgili animasyonu tetikle
     if (activeAnim && actions[activeAnim]) {
       const action = actions[activeAnim];
       action.reset();
@@ -94,19 +90,25 @@ function ActiveModel({ url, dracoBase, activeAnim }: { url: string; dracoBase: s
   }, [activeAnim, actions]);
 
   return (
-    <group scale={3.0}> {/* FISH_SCALE gibi genel bir ölçek */}
+    <group scale={3.0}>
       <primitive object={scene} />
     </group>
   );
 }
 
-/** ==== ANA BİLEŞEN ==== */
-export default function IfadeEdiciGame14() {
+/** ==== ANA BİLEŞEN PROPLARI ==== */
+interface IfadeEdiciGame14Props {
+  studentId: string;
+  mode: 'assessment' | 'instruction';
+  onClose: () => void;
+  onComplete: (success: boolean) => void;
+}
+
+export default function IfadeEdiciGame14({ studentId, mode, onClose, onComplete }: IfadeEdiciGame14Props) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeAnim, setActiveAnim] = useState<string | null>(null);
   const [urls, setUrls] = useState({ model: "", draco: "" });
 
-  // Seçim yapıldığında referans koddaki mantıkla URL'leri oluştur
   useEffect(() => {
     if (selectedCategory) {
       const base = new URL("/assets/public/", window.location.origin).toString();
@@ -120,24 +122,35 @@ export default function IfadeEdiciGame14() {
     }
   }, [selectedCategory]);
 
-  // 1. EKRAN: KATEGORİ SEÇİMİ (Kare Butonlar)
+  // 1. EKRAN: KATEGORİ SEÇİMİ (Ana Temaya Uygun)
   if (!selectedCategory) {
     return (
-      <div style={{ width: "100vw", height: "100vh", background: BG_COLOR, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", touchAction: "none" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-          {Object.values(GAME_DATA).map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              style={{
-                width: "150px", height: "150px", borderRadius: "20px", fontSize: "1.5rem", fontWeight: "bold",
-                backgroundColor: "white", border: "none", color: "#0b2a46", cursor: "pointer",
-                boxShadow: "0 8px 15px rgba(0,0,0,0.3)"
-              }}
-            >
-              {cat.title}
-            </button>
-          ))}
+      <div className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-slate-200">
+        {/* Üst Bar */}
+        <div className="p-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/50 backdrop-blur-md">
+          <button onClick={onClose} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
+            <ArrowLeft size={20} />
+            <span className="font-medium">Geri Dön</span>
+          </button>
+          <div className="text-sm font-bold text-slate-500 bg-slate-900 px-3 py-1 rounded-full border border-slate-800">
+            {mode === 'assessment' ? 'Değerlendirme Modu' : 'Öğretim Modu'}
+          </div>
+        </div>
+
+        {/* İçerik */}
+        <div className="flex-1 flex flex-col items-center justify-center p-6">
+          <h1 className="text-2xl md:text-3xl font-bold text-white mb-8 text-center">Neyi İnceleyelim?</h1>
+          <div className="grid grid-cols-2 gap-4 md:gap-6 max-w-md w-full">
+            {Object.values(GAME_DATA).map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className="aspect-square rounded-2xl text-xl md:text-2xl font-bold bg-slate-800 border-2 border-slate-700 text-slate-200 hover:bg-slate-700 hover:border-blue-500 hover:text-white transition-all shadow-lg active:scale-95 flex items-center justify-center"
+              >
+                {cat.title}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -145,61 +158,80 @@ export default function IfadeEdiciGame14() {
 
   // 2. EKRAN: MODEL VE PARÇALAR
   const categoryData = GAME_DATA[selectedCategory as keyof typeof GAME_DATA];
-  
-  // Butonları sağa ve sola bölmek için
   const half = Math.ceil(categoryData.parts.length / 2);
   const leftParts = categoryData.parts.slice(0, half);
   const rightParts = categoryData.parts.slice(half);
 
-  const ButtonStyle: React.CSSProperties = {
-    padding: "15px 20px", fontSize: "1.5rem", fontWeight: "bold", borderRadius: "15px",
-    backgroundColor: "#FFD700", border: "none", color: "#333", cursor: "pointer",
-    boxShadow: "0 6px 0 #FFA500", pointerEvents: "auto", marginBottom: "15px", width: "100%"
-  };
-
   return (
-    <div style={{ width: "100vw", height: "100vh", background: BG_COLOR, touchAction: "none", position: "relative" }}>
+    <div className="fixed inset-0 z-50 flex flex-col bg-slate-950 overflow-hidden">
       
       {/* 3D KANVAS */}
-      <Canvas camera={{ position: [0, 0, 10], fov: 45 }}>
-        <ambientLight intensity={1.5} />
-        <directionalLight position={[10, 10, 10]} intensity={2} />
-        <Suspense fallback={<Loader3D />}>
-          {urls.model && <ActiveModel url={urls.model} dracoBase={urls.draco} activeAnim={activeAnim} />}
-        </Suspense>
-      </Canvas>
-
-      {/* ARAYÜZ (UI) */}
-      <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", display: "flex", justifyContent: "space-between", padding: "20px", boxSizing: "border-box", alignItems: "center" }}>
-        
-        {/* SOL BUTONLAR */}
-        <div style={{ display: "flex", flexDirection: "column", width: "180px" }}>
-          {leftParts.map((part) => (
-            <button key={part.id} style={ButtonStyle} onClick={() => setActiveAnim(part.animName)}>
-              {part.label}
-            </button>
-          ))}
-        </div>
-
-        {/* SAĞ BUTONLAR */}
-        <div style={{ display: "flex", flexDirection: "column", width: "180px" }}>
-          {rightParts.map((part) => (
-            <button key={part.id} style={ButtonStyle} onClick={() => setActiveAnim(part.animName)}>
-              {part.label}
-            </button>
-          ))}
-        </div>
-
+      <div className="absolute inset-0">
+        <Canvas camera={{ position: [0, 0, 10], fov: 45 }}>
+          <ambientLight intensity={1.5} />
+          <directionalLight position={[10, 10, 10]} intensity={2} />
+          {/* ✅ 3D Modeli döndürmeyi sağlayan kontrolcü */}
+          <OrbitControls enablePan={false} enableZoom={true} minDistance={3} maxDistance={20} />
+          <Suspense fallback={<Loader3D />}>
+            {urls.model && <ActiveModel url={urls.model} dracoBase={urls.draco} activeAnim={activeAnim} />}
+          </Suspense>
+        </Canvas>
       </div>
 
-      {/* GERİ BUTONU */}
-      <button 
-        onClick={() => setSelectedCategory(null)}
-        style={{ position: "absolute", top: "20px", left: "20px", padding: "10px 20px", fontSize: "1.2rem", fontWeight: "bold", borderRadius: "10px", backgroundColor: "#FF4500", color: "white", border: "none", cursor: "pointer", pointerEvents: "auto" }}
-      >
-        Menüye Dön
-      </button>
+      {/* ARAYÜZ (UI) - Kanvasın Üzerinde */}
+      <div className="absolute inset-0 pointer-events-none flex flex-col justify-between z-10">
+        
+        {/* Üst Bar */}
+        <div className="p-4 flex items-center justify-between">
+          <button 
+            onClick={() => setSelectedCategory(null)}
+            className="pointer-events-auto flex items-center gap-2 px-4 py-2 bg-slate-900/80 hover:bg-slate-800 text-white rounded-xl border border-slate-700 backdrop-blur-md transition-all active:scale-95"
+          >
+            <ArrowLeft size={18} /> Menü
+          </button>
+
+          {mode === 'assessment' && (
+            <button 
+              onClick={() => onComplete(true)}
+              className="pointer-events-auto flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-900/50 transition-all active:scale-95"
+            >
+              <CheckCircle2 size={18} /> Tamamla
+            </button>
+          )}
+        </div>
+
+        {/* Sağ ve Sol Butonlar */}
+        <div className="flex-1 flex justify-between items-center px-4 md:px-12 pb-10">
+          
+          {/* SOL BUTONLAR */}
+          <div className="flex flex-col gap-3 w-32 md:w-48 pointer-events-auto">
+            {leftParts.map((part) => (
+              <button 
+                key={part.id} 
+                onClick={() => setActiveAnim(part.animName)}
+                className="w-full py-3 md:py-4 px-2 text-sm md:text-lg font-bold rounded-xl bg-blue-600 hover:bg-blue-500 text-white border-b-4 border-blue-800 active:border-b-0 active:translate-y-1 transition-all shadow-lg"
+              >
+                {part.label}
+              </button>
+            ))}
+          </div>
+
+          {/* SAĞ BUTONLAR */}
+          <div className="flex flex-col gap-3 w-32 md:w-48 pointer-events-auto">
+            {rightParts.map((part) => (
+              <button 
+                key={part.id} 
+                onClick={() => setActiveAnim(part.animName)}
+                className="w-full py-3 md:py-4 px-2 text-sm md:text-lg font-bold rounded-xl bg-blue-600 hover:bg-blue-500 text-white border-b-4 border-blue-800 active:border-b-0 active:translate-y-1 transition-all shadow-lg"
+              >
+                {part.label}
+              </button>
+            ))}
+          </div>
+
+        </div>
+      </div>
 
     </div>
   );
-}
+  }
