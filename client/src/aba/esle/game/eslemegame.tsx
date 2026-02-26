@@ -29,7 +29,6 @@ const GRAVITY = 35.0;
 const CAMERA_Z = 10;
 const CAMERA_SMOOTH = 5.0;
 
-// 🔥 Harita son halinden 180 derece döndürüldü (Orijinal açıya geri döndü)
 const SEA_ROT_Y = Math.PI / 2;
 const SEA_SCALE_MULT = 4.0; 
 const FISH_SCALE = 3.0;
@@ -126,6 +125,11 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
   const [surfaceY, setSurfaceY] = useState(20);
   const cameraTarget = useMemo(() => new THREE.Vector3(), []); 
 
+  // 🔥 ÇARPMA HİSSİ İÇİN YENİ DEĞİŞKENLER
+  const shakeIntensity = useRef(0); 
+  const impactScale = useRef(new THREE.Vector3(FISH_SCALE, FISH_SCALE, FISH_SCALE)); 
+  const defaultScale = useMemo(() => new THREE.Vector3(FISH_SCALE, FISH_SCALE, FISH_SCALE), []);
+
   useEffect(() => { 
     const a = seaAnim.actions?.[SEA_ANIM_NAME] || (seaAnim.names?.[0] ? seaAnim.actions?.[seaAnim.names[0]] : null); 
     if (a) { a.reset().fadeIn(0.15).play(); a.timeScale = SEA_ANIM_SPEED; } 
@@ -147,9 +151,14 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     seaGroup.current.rotation.set(0, SEA_ROT_Y, 0);
     
     const box = new THREE.Box3().setFromObject(seaGroup.current);
-    boundsRef.current = { minX: box.min.x + 2, maxX: box.max.x - 2, minY: box.min.y + 2, maxY: box.max.y - 2 };
     
-    // 🔥 Su seviyesi -36'dan 20 birim yukarı çekildi (-16 oldu)
+    boundsRef.current = { 
+      minX: box.min.x + 8, 
+      maxX: box.max.x - 8, 
+      minY: box.min.y + 9, 
+      maxY: box.max.y - 2  
+    };
+    
     setSurfaceY(boundsRef.current.maxY - 16);
   }, [sea.scene]);
 
@@ -219,15 +228,55 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     fishPos.current.x += fishVel.current.x * dt;
     fishPos.current.y += fishVel.current.y * dt;
 
-    if (fishPos.current.x <= b.minX || fishPos.current.x >= b.maxX) fishVel.current.x *= -BOUNCE;
+    // 🔥 ÇARPIŞMA (IMPACT) KONTROLLERİ VE EFEKTLERİ 🔥
+    let hitOccurred = false;
+    let hitAxis = ""; // Hangi yönden çarptı (X yatay, Y dikey)
+
+    // X Ekseni (Sağ ve Sol Duvarlar)
+    if (fishPos.current.x <= b.minX) {
+        fishPos.current.x = b.minX;
+        if (Math.abs(fishVel.current.x) > 2.0) { hitOccurred = true; hitAxis = "X"; } // Sadece hızlı çarpınca etki etsin
+        fishVel.current.x *= -BOUNCE;
+    } else if (fishPos.current.x >= b.maxX) {
+        fishPos.current.x = b.maxX;
+        if (Math.abs(fishVel.current.x) > 2.0) { hitOccurred = true; hitAxis = "X"; }
+        fishVel.current.x *= -BOUNCE;
+    }
+
+    // Y Ekseni (Zemin ve Tavan)
     if (fishPos.current.y <= b.minY) { 
         fishPos.current.y = b.minY; 
+        if (Math.abs(fishVel.current.y) > 2.0) { hitOccurred = true; hitAxis = "Y"; }
         fishVel.current.y *= -BOUNCE; 
     }
     else if (fishPos.current.y >= maxJumpHeight) {
         fishPos.current.y = maxJumpHeight;
+        if (fishVel.current.y > 2.0) { hitOccurred = true; hitAxis = "Y"; }
         if (fishVel.current.y > 0) fishVel.current.y = 0;
     }
+
+    // 🔥 EFEKTİ TETİKLE: SADECE SERT ÇARPIŞMALARDA
+    if (hitOccurred) {
+        shakeIntensity.current = 0.4; // Kamera ne kadar sarsılacak
+        
+        // Jöle Etkisi (Squash & Stretch)
+        if (hitAxis === "X") {
+            // Yanlara çarptı: Boyu kısalır, karnı şişer
+            impactScale.current.set(FISH_SCALE * 0.4, FISH_SCALE * 1.5, FISH_SCALE * 1.5);
+        } else {
+            // Yere/Tavana çarptı: Karnı yassılaşır, boyu uzar
+            impactScale.current.set(FISH_SCALE * 1.5, FISH_SCALE * 0.4, FISH_SCALE * 1.5);
+        }
+
+        // Telefonda titreşim hissi (Eğer cihaz destekliyorsa)
+        if (typeof navigator !== "undefined" && navigator.vibrate) {
+            navigator.vibrate(40); // 40 milisaniyelik tok bir titreşim
+        }
+    }
+
+    // 🔥 Jöle halinden normal haline (defaultScale) pürüzsüz geri dönüş
+    impactScale.current.lerp(defaultScale, 0.15); // Hızlıca eski haline döner
+    fishGroup.current.scale.copy(impactScale.current);
 
     fishGroup.current.position.copy(fishPos.current);
     fishGroup.current.rotation.y = currentYaw.current;
@@ -235,18 +284,31 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
     if (swimActionRef.current) swimActionRef.current.paused = !moving;
 
+    // 🔥 KAMERA SARSINTISI UYGULAMA (Screen Shake)
+    let camX = fishPos.current.x;
+    let camY = fishPos.current.y;
+
+    if (shakeIntensity.current > 0) {
+        // Kamerayı rastgele sağa sola titret
+        camX += (Math.random() - 0.5) * shakeIntensity.current;
+        camY += (Math.random() - 0.5) * shakeIntensity.current;
+        
+        // Sarsıntı zamanla azalsın (Fade out)
+        shakeIntensity.current -= dt * 1.5; 
+        if (shakeIntensity.current < 0) shakeIntensity.current = 0;
+    }
+
     const camSmooth = isAboveWater ? CAMERA_SMOOTH * 0.5 : CAMERA_SMOOTH;
-    
-    cameraTarget.set(fishPos.current.x, fishPos.current.y, CAMERA_Z);
+    cameraTarget.set(camX, camY, CAMERA_Z);
     state.camera.position.lerp(cameraTarget, 1 - Math.pow(0.001, dt * camSmooth));
-    state.camera.lookAt(fishPos.current.x, fishPos.current.y, 0); 
+    state.camera.lookAt(camX, camY, 0); 
   });
 
   return (
     <>
       <group ref={seaGroup}> <primitive object={sea.scene} /> </group>
       <WaterCeiling y={surfaceY} />
-      <group ref={fishGroup} scale={FISH_SCALE}> 
+      <group ref={fishGroup}> 
          <group ref={fishInner}>
             <primitive object={fish.scene} /> 
          </group>
@@ -276,4 +338,4 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-}
+      }
