@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, LogOut, Trash2, UserCircle2, ShieldCheck, Loader2, Users, AlertTriangle, Baby, Stethoscope, ClipboardCheck, BookOpen, AlertCircle, Lock, Hourglass, CheckCircle, UserX, ShieldAlert, Camera } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Search, LogOut, Trash2, UserCircle2, ShieldCheck, Loader2, Users, AlertTriangle, Baby, Stethoscope, ClipboardCheck, BookOpen, AlertCircle, Lock, CheckCircle, UserX, ShieldAlert, Camera, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger, AlertDialogDescription
@@ -34,6 +34,11 @@ export default function Home() {
   // --- EKSİK BİLGİ UYARISI İÇİN STATE ---
   const [missingFieldsWarning, setMissingFieldsWarning] = useState(false);
   const [missingMessage, setMissingMessage] = useState('');
+
+  // --- DAHİLİ KAMERA (WEB RTC) STATE VE REFLERİ ---
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   
   const [_, setLocation] = useLocation();
 
@@ -69,6 +74,11 @@ export default function Home() {
 
   }, [isLoading, currentTeacher, teachers, setLocation]);
 
+  // Modal kapandığında veya sayfa değiştiğinde kamerayı kapat
+  useEffect(() => {
+    return () => stopCameraStream();
+  }, []);
+
   const handleLogout = async () => {
     localStorage.removeItem("kazanim-takip-teacher-name");
     setLocation('/login');
@@ -85,30 +95,87 @@ export default function Home() {
     return fullName;
   };
 
-  // --- FOTOĞRAF ÇEKME İŞLEMİ ---
-  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // --- DAHİLİ KAMERA FONKSİYONLARI ---
+  const startCamera = async () => {
+    setIsCameraModalOpen(true);
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); // Arka kamera öncelikli
+        streamRef.current = stream;
+        if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.play();
+        }
+    } catch (err) {
+        toast.error("Kamera açılamadı. Lütfen izinleri kontrol edin.");
+        setIsCameraModalOpen(false);
+    }
+  };
+
+  const stopCameraStream = () => {
+    if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+    }
+    setIsCameraModalOpen(false);
+  };
+
+  // Canvas ile videodan görüntüyü alıp File objesine dönüştürme
+  const capturePhotoFromVideo = () => {
+    if (!videoRef.current) return;
+    
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    
+    // Kare (square) kırpma mantığı
+    const size = Math.min(video.videoWidth, video.videoHeight);
+    canvas.width = size;
+    canvas.height = size;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Görüntüyü merkeze alarak çiz
+    const startX = (video.videoWidth - size) / 2;
+    const startY = (video.videoHeight - size) / 2;
+    ctx.drawImage(video, startX, startY, size, size, 0, 0, size, size);
+    
+    // Ekranda göstermek için Base64 al
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+    setPhotoPreview(dataUrl);
+
+    // Firebase Storage'a yüklemek için File objesine çevir
+    canvas.toBlob((blob) => {
+        if (blob) {
+            const file = new File([blob], `photo_${Date.now()}.jpg`, { type: "image/jpeg" });
+            setPhotoFile(file);
+        }
+    }, 'image/jpeg', 0.8);
+
+    stopCameraStream();
+  };
+
+  // Galeriden dosya seçme (Alternatif olarak hala duruyor)
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setPhotoFile(file); // Storage'a göndermek için dosyayı tut
+      setPhotoFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPhotoPreview(reader.result as string); // Ekranda göstermek için
+        setPhotoPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // --- YENİ KAYIT MANTIĞI: Kontrol Aşaması ---
+  // --- KAYIT İŞLEMLERİ ---
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // 1. Zorunlu Alan Kontrolü
     if(!name.trim() || !age.trim()) { 
         toast.warning("İsim ve Yaş zorunludur!");
         return;
     }
 
-    // 2. Çift Kayıt Kontrolü
     const normalizedName = name.trim().toLocaleLowerCase('tr');
     const isDuplicate = students.some(s => s.name.trim().toLocaleLowerCase('tr') === normalizedName);
     if (isDuplicate) {
@@ -116,7 +183,6 @@ export default function Home() {
       return; 
     }
 
-    // 3. Eksik (Opsiyonel) Bilgi Kontrolü
     const isDiagnosisMissing = !diagnosis.trim();
     const isPhotoMissing = !photoFile;
 
@@ -128,22 +194,19 @@ export default function Home() {
         } else {
             setMissingMessage("fotoğraf");
         }
-        setMissingFieldsWarning(true); // Uyarı penceresini aç ve durdur
+        setMissingFieldsWarning(true); 
         return;
     }
 
-    // Eğer her şey tamsa direkt kaydet
     await proceedToSaveStudent();
   };
 
-  // --- YENİ KAYIT MANTIĞI: Asıl Kaydetme İşlemi ---
   const proceedToSaveStudent = async () => {
-    setMissingFieldsWarning(false); // Pencereyi kapat (eğer açıksa)
+    setMissingFieldsWarning(false); 
     
-    const loadingToast = toast.loading("Öğrenci kaydediliyor..."); // Yükleme bildirimi
+    const loadingToast = toast.loading("Öğrenci kaydediliyor...");
     await addStudent(name, age, diagnosis, photoFile); 
     
-    // Formu Temizle
     setName(''); setAge(''); setDiagnosis('');
     setPhotoFile(null); 
     setPhotoPreview(null); 
@@ -192,12 +255,12 @@ export default function Home() {
             <div className="flex justify-between items-start gap-2">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className={twMerge(
-                      "h-12 w-12 rounded-full flex items-center justify-center font-bold text-lg border shadow-lg relative shrink-0",
+                      "h-12 w-12 rounded-full flex items-center justify-center font-bold text-lg border shadow-lg relative shrink-0 overflow-hidden",
                       !hasValidTeacher ? "bg-red-600 text-white border-red-400" :
                       isMyStudent ? "bg-green-500 text-black border-green-400" : "bg-blue-600/10 text-blue-500 border-blue-500/20"
                     )}>
                       {student.photoUrl ? (
-                        <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover rounded-full" />
+                        <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover" />
                       ) : (
                         student.name.charAt(0).toUpperCase()
                       )}
@@ -268,7 +331,6 @@ export default function Home() {
     </div>
   );
 
-  // --- ONAY BEKLEME EKRANI ---
   if (isPendingApproval) {
     return (
       <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center text-white p-6 text-center">
@@ -301,7 +363,47 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#020617] p-4 md:p-8 text-white font-sans">
       
-      {/* Çift Kayıt Uyarısı */}
+      {/* --- DAHİLİ KAMERA PENCERESİ (MODAL) --- */}
+      <AnimatePresence>
+        {isCameraModalOpen && (
+            <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }} 
+                className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm"
+            >
+                <div className="w-full max-w-sm bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-700">
+                    <div className="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                        <h3 className="font-bold flex items-center gap-2"><Camera size={18} className="text-blue-500"/> Fotoğraf Çek</h3>
+                        <button onClick={stopCameraStream} className="p-1.5 bg-red-900/30 text-red-400 rounded-full hover:bg-red-500 hover:text-white transition-colors">
+                            <X size={18} />
+                        </button>
+                    </div>
+                    
+                    <div className="relative aspect-square w-full bg-black overflow-hidden flex items-center justify-center">
+                        <video 
+                            ref={videoRef} 
+                            autoPlay 
+                            playsInline 
+                            className="w-full h-full object-cover" 
+                        />
+                        {/* Kılavuz Kare (İsteğe Bağlı) */}
+                        <div className="absolute inset-4 border-2 border-white/30 rounded-full pointer-events-none border-dashed" />
+                    </div>
+
+                    <div className="p-4 bg-slate-950 flex justify-center">
+                        <button 
+                            onClick={capturePhotoFromVideo} 
+                            className="w-16 h-16 bg-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+                        >
+                            <div className="w-14 h-14 bg-white border-4 border-black rounded-full" />
+                        </button>
+                    </div>
+                </div>
+            </motion.div>
+        )}
+      </AnimatePresence>
+
       <AlertDialog open={duplicateError} onOpenChange={setDuplicateError}>
         <AlertDialogContent className="bg-red-950 border-red-800 text-white">
           <AlertDialogHeader>
@@ -312,7 +414,6 @@ export default function Home() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* 🔥 YENİ: Eksik Bilgi Uyarısı (Tanı/Fotoğraf) */}
       <AlertDialog open={missingFieldsWarning} onOpenChange={setMissingFieldsWarning}>
         <AlertDialogContent className="bg-slate-900 border-slate-800 text-white">
           <AlertDialogHeader>
@@ -416,18 +517,27 @@ export default function Home() {
             <CardContent>
               <form onSubmit={handleAddStudent} className="space-y-3">
                 <div className="flex gap-2 items-center">
+                  
+                  {/* 🔥 KAMERA AÇMA BUTONU */}
                   <div 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="h-10 w-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center cursor-pointer shrink-0 overflow-hidden hover:bg-slate-700 transition-colors"
-                    title="Fotoğraf Çek/Ekle"
+                    onClick={startCamera}
+                    className="h-10 w-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center cursor-pointer shrink-0 overflow-hidden hover:bg-slate-700 transition-colors relative group"
+                    title="Kamerayı Aç"
                   >
                     {photoPreview ? (
-                      <img src={photoPreview} alt="Önizleme" className="w-full h-full object-cover" />
+                      <>
+                        <img src={photoPreview} alt="Önizleme" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/50 hidden group-hover:flex items-center justify-center">
+                            <Camera size={16} className="text-white" />
+                        </div>
+                      </>
                     ) : (
                       <Camera size={18} className="text-slate-400" />
                     )}
                   </div>
-                  <input type="file" accept="image/*" ref={fileInputRef} onChange={handlePhotoCapture} className="hidden" />
+                  
+                  {/* Galeriden seçmek isteyenler için hala gizli olarak duruyor, isteğe bağlı eklenebilir */}
+                  <input type="file" accept="image/*" ref={fileInputRef} onChange={handlePhotoUpload} className="hidden" />
                   
                   <Input placeholder="İsim Soyisim" value={name} onChange={(e) => setName(e.target.value)} className="bg-slate-950 border-slate-800 flex-1" />
                 </div>
