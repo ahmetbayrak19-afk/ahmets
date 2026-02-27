@@ -23,7 +23,7 @@ const FISH_EAT_ANIM_NAME = "yeme";
 const MAX_SPEED = 10.8; 
 const ACCEL = 8.0; 
 const DRAG_STOP = 0.90;
-const Z_PLANE = 0; 
+const MAIN_PLAY_Z_PLANE = 0; // Oyuncunun ve avlanabilir balıkların olduğu ana düzlem
 const GRAVITY = 35.0; 
 const CAMERA_Z = 10;
 const CAMERA_SMOOTH = 5.0;
@@ -50,7 +50,7 @@ function Loader3D() {
 
 function CanvasEvents({ onDown, onUp }: { onDown: () => void; onUp: () => void; }) {
   return ( 
-    <mesh position={[0, 0, Z_PLANE]} onPointerDown={onDown} onPointerUp={onUp} onPointerCancel={onUp} onPointerLeave={onUp}> 
+    <mesh position={[0, 0, MAIN_PLAY_Z_PLANE]} onPointerDown={onDown} onPointerUp={onUp} onPointerCancel={onUp} onPointerLeave={onUp}> 
       <planeGeometry args={[5000, 5000]} /> 
       <meshBasicMaterial transparent opacity={0} depthWrite={false} /> 
     </mesh> 
@@ -71,20 +71,20 @@ function WaterCeiling({ y }: { y: number }) {
   return ( <mesh geometry={geom} material={mat} rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]} /> );
 }
 
+// 🔥 AVLANABİLİR BALIKLAR (Ana düzlemde yüzer, yenebilir)
 function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
   const scene = useMemo(() => SkeletonUtils.clone(gltf.scene), [gltf.scene]);
   const anims = useAnimations(gltf.animations, scene);
   
   const [eaten, setEaten] = useState(false);
   const [isDead, setIsDead] = useState(false);
-  // 🔥 YENİ: Ağzın erken açıldığını takip eden state
   const [mouthOpened, setMouthOpened] = useState(false);
   const currentScale = useRef(scale);
   
   const pos = useRef(new THREE.Vector3(
      THREE.MathUtils.randFloat(boundsRef.current.minX, boundsRef.current.maxX),
      THREE.MathUtils.randFloat(boundsRef.current.minY, boundsRef.current.maxY),
-     Z_PLANE
+     MAIN_PLAY_Z_PLANE // Ana düzlemde kal
   ));
   const target = useRef(new THREE.Vector3().copy(pos.current));
   const vel = useRef(new THREE.Vector3());
@@ -106,24 +106,20 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
      
      const distToPlayer = pos.current.distanceTo(playerPos.current);
 
-     // 🔥 ZAMANLAMA ÇÖZÜMÜ BURADA 🔥
-     
-     // 1. AŞAMA: 2.5 birim kala balık ağzını açar (Animasyon başlar)
+     // Yeme Zamanlaması
      if (!mouthOpened && distToPlayer < 2.5) {
          setMouthOpened(true);
-         onEaten(); // Animasyonu tetikle ama küçültmeye başlama
+         onEaten(); 
      } 
-     // Diyelim ki ağzını açtı ama av kaçtı, sistemi sıfırla ki tekrar ağız açabilsin
      else if (mouthOpened && !eaten && distToPlayer > 3.5) {
          setMouthOpened(false);
      }
 
-     // 2. AŞAMA: 1.2 birim kala tam ağzına girdiğinde vakumlama başlar
      if (!eaten && distToPlayer < 1.2) {
          setEaten(true); 
      }
 
-     // Vakumlama (Yutulma) Aksiyonu
+     // Vakumlama (Yutulma)
      if (eaten) {
          currentScale.current = lerp(currentScale.current, 0, dt * 20.0); 
          pos.current.lerp(playerPos.current, dt * 15.0); 
@@ -135,12 +131,12 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
          return; 
      }
 
-     // Rastgele Gezinme Mantığı (Aynı kaldı)
+     // Gezinme
      if (pos.current.distanceTo(target.current) < 2) {
          target.current.set(
             THREE.MathUtils.randFloat(boundsRef.current.minX, boundsRef.current.maxX),
             THREE.MathUtils.randFloat(boundsRef.current.minY, boundsRef.current.maxY),
-            Z_PLANE
+            MAIN_PLAY_Z_PLANE
          );
      }
 
@@ -169,6 +165,91 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
       </group>
   );
 }
+
+// 🔥 ARKA PLAN DEKORASYON BALIKLARI (Z ekseninde yüzer, yenemez, karışık türler)
+function BackgroundDecoration({ gltfUrls, gltfFiles, boundary, count, zRange }: any) {
+  // Rastgele türleri seçmek için bir havuz oluştur
+  const preyModels = useMemo(() => [
+      { gltf: gltfFiles.vatoz, scaleMult: 1.2 },
+      { gltf: gltfFiles.kilicbalik, scaleMult: 1.5 },
+      { gltf: gltfFiles.hamsi, scaleMult: 1.0 }
+  ], [gltfFiles]);
+
+  return (
+    <group>
+      {Array.from({ length: count }).map((_, i) => {
+        const randomModel = preyModels[THREE.MathUtils.randInt(0, preyModels.length - 1)];
+        return (
+          <BackgroundFish 
+              key={i} 
+              gltf={randomModel.gltf} 
+              scaleMult={randomModel.scaleMult}
+              boundary={boundary} 
+              zRange={zRange}
+          />
+        );
+      })}
+    </group>
+  );
+}
+
+function BackgroundFish({ gltf, scaleMult, boundary, zRange }: any) {
+  // Modeli klonluyoruz
+  const scene = useMemo(() => SkeletonUtils.clone(gltf.scene), [gltf.scene]);
+  const anims = useAnimations(gltf.animations, scene);
+
+  // Derinlik (Z), Hız ve Boyutu rastgele ata (Derindekiler daha küçük)
+  const z = useMemo(() => THREE.MathUtils.randFloat(zRange[0], zRange[1]), [zRange]);
+  const speed = useMemo(() => THREE.MathUtils.randFloat(1, 4), []);
+  const direction = useMemo(() => (Math.random() > 0.5 ? 1 : -1), []); // Sol veya Sağ yüzüş
+  
+  // 🔥 İSTEK: Derinlik hissi (Derindekiler daha küçük ve daha karanlık)
+  const depthFactor = (z - zRange[0]) / (zRange[1] - zRange[0]); // Derinliğe göre küçültme (0-1 arası)
+  // Arka plan balıkları ana oyuncudan ve avlardan çok daha küçük olmalı (0.5 ile 1.5 arası scale)
+  const scale = (0.5 + depthFactor * 1.0) * scaleMult; 
+
+  const pos = useRef(new THREE.Vector3(
+     THREE.MathUtils.randFloat(boundary.minX - 50, boundary.maxX + 50), // Haritanın dışında doğ
+     THREE.MathUtils.randFloat(boundary.minY - 20, boundary.maxY + 10), // Kumun altına kadar gidebilir
+     z // Arka plandaki Z düzlemi
+  ));
+
+  const groupRef = useRef<THREE.Group>(null);
+
+  useEffect(() => {
+      // Rastgele gezen balıkların ilk animasyonunu aç
+      if (anims.names.length > 0) {
+         const action = anims.actions[anims.names[0]];
+         action?.reset().play();
+         action!.timeScale = THREE.MathUtils.randFloat(0.5, 1.2); // Sürü içinde farklı animasyon hızları
+      }
+  }, [anims]);
+
+  useFrame((state, dt) => {
+     if(!groupRef.current) return;
+     
+     // Sadece dümdüz yüz
+     pos.current.x += speed * direction * dt;
+
+     // Harita sınırına gelince diğer taraftan tekrar doğdur (Loop)
+     if (direction === 1 && pos.current.x > boundary.maxX + 50) {
+         pos.current.x = boundary.minX - 50;
+     } else if (direction === -1 && pos.current.x < boundary.minX - 50) {
+         pos.current.x = boundary.maxX + 50;
+     }
+
+     groupRef.current.position.copy(pos.current);
+     groupRef.current.rotation.y = direction === 1 ? -Math.PI / 2 : Math.PI / 2;
+     groupRef.current.scale.setScalar(scale);
+  });
+
+  return (
+      <group ref={groupRef}>
+         <primitive object={scene} />
+      </group>
+  );
+}
+
 
 function World({ urls }: any) {
   useMemo(() => { useGLTF.setDecoderPath(urls.draco.endsWith("/") ? urls.draco : `${urls.draco}/`); }, [urls.draco]);
@@ -200,10 +281,8 @@ function World({ urls }: any) {
     } 
   }, [seaAnim]);
   
-  // 🔥 ANİMASYON AĞIRLIKLARI (WEIGHT) BURADA AYARLANDI
   useEffect(() => { 
     if (fishAnim.actions) {
-        // Büyük/Küçük harf duyarlılığını kaldırdık
         const swimName = fishAnim.names.includes(FISH_SWIM_ANIM_NAME) ? FISH_SWIM_ANIM_NAME : fishAnim.names[0];
         const eatName = fishAnim.names.includes(FISH_EAT_ANIM_NAME) ? FISH_EAT_ANIM_NAME : fishAnim.names.find(n => n.toLowerCase().includes("yeme"));
 
@@ -212,12 +291,12 @@ function World({ urls }: any) {
         
         if (swim) { 
             swim.reset().play(); 
-            swim.setEffectiveWeight(1); // Yüzme başlangıçta tam görünür
+            swim.setEffectiveWeight(1); 
             swimActionRef.current = swim; 
         }
         if (eat) { 
             eat.reset().play(); 
-            eat.setEffectiveWeight(0); // Yeme animasyonu başlangıçta görünmez
+            eat.setEffectiveWeight(0); 
             eatActionRef.current = eat; 
         }
     }
@@ -235,10 +314,11 @@ function World({ urls }: any) {
     
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     
+    // Genişletilmiş yaşam alanı (Sınırlar daraltıldı)
     boundsRef.current = { 
-      minX: box.min.x + 28, 
-      maxX: box.max.x - 23, 
-      minY: box.min.y + 14, 
+      minX: box.min.x + 23, 
+      maxX: box.max.x - 18, 
+      minY: box.min.y + 4,  
       maxY: box.max.y - 2  
     };
     
@@ -246,9 +326,9 @@ function World({ urls }: any) {
     setBoundsReady(true); 
   }, [sea.scene]);
 
-  const fishPos = useRef(new THREE.Vector3(0, 0, Z_PLANE));
+  const fishPos = useRef(new THREE.Vector3(0, 0, MAIN_PLAY_Z_PLANE));
   const fishVel = useRef(new THREE.Vector2(0, 0));
-  const fishTarget = useRef(new THREE.Vector3(0, 0, Z_PLANE));
+  const fishTarget = useRef(new THREE.Vector3(0, 0, MAIN_PLAY_Z_PLANE));
   const dragging = useRef(false);
 
   const currentYaw = useRef(Math.PI / 2); 
@@ -256,21 +336,18 @@ function World({ urls }: any) {
   const currentRoll = useRef(0); 
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -Z_PLANE), []);
+  const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -MAIN_PLAY_Z_PLANE), []);
 
-  // 🔥 YEDİĞİ AN ÇALIŞACAK MANTIK
   const handleEaten = useCallback(() => {
       if (eatActionRef.current) {
-          // Yüzmeyi tamamen kapat
           if (swimActionRef.current) swimActionRef.current.setEffectiveWeight(0);
-          
-          // Yemeyi aç ve baştan oynat
           eatActionRef.current.setEffectiveWeight(1);
           eatActionRef.current.reset().play();
       }
-      eatTimer.current = 1.0; // 1 saniye boyunca yeme animasyonu devrede kalacak
+      eatTimer.current = 1.0; 
   }, []);
 
+  // Avlanabilir Sürü (Yarıya düşmüş boyutlar, ana düzlemde)
   const preys = useMemo(() => {
       return [
           ...Array(10).fill({ gltf: vatoz, scale: 3.0, speed: 1.0 }), 
@@ -343,18 +420,14 @@ function World({ urls }: any) {
         if (fishVel.current.y > 0) fishVel.current.y = 0;
     }
 
-    // 🔥 SÜRE BİTİNCE YÜZMEYE GERİ DÖN
     if (eatTimer.current > 0) {
         eatTimer.current -= dt;
         
         if (eatTimer.current <= 0) {
-            // Yeme bitti, yemeyi tamamen kapat
             if (eatActionRef.current) eatActionRef.current.setEffectiveWeight(0);
-            
-            // Yüzmeyi tekrar aç
             if (swimActionRef.current) {
                 swimActionRef.current.setEffectiveWeight(1);
-                swimActionRef.current.paused = !moving; // Sadece duruyorsa pause yap
+                swimActionRef.current.paused = !moving; 
             }
         }
     } else {
@@ -376,23 +449,37 @@ function World({ urls }: any) {
       <group ref={seaGroup}> <primitive object={sea.scene} /> </group>
       <WaterCeiling y={surfaceY} />
       
+      {/* OYUNCU BALIK */}
       <group ref={fishGroup} scale={FISH_SCALE}> 
          <group ref={fishInner}>
             <primitive object={fish.scene} /> 
          </group>
       </group>
 
-      {boundsReady && preys.map((p, i) => (
-          <PreyFish 
-             key={i} 
-             gltf={p.gltf} 
-             boundsRef={boundsRef} 
-             playerPos={fishPos} 
-             onEaten={handleEaten} 
-             scale={p.scale} 
-             speed={p.speed} 
-          />
-      ))}
+      {boundsReady && (
+        <>
+            {/* 🔥 YENİ: KARIŞIK ARKA PLAN DEKORASYONU (Zengin, Karanlık, Küçük, Yenemez) */}
+            <BackgroundDecoration 
+                gltfFiles={{vatoz, kilicbalik, hamsi}} // Tüm türleri gönder
+                boundary={boundsRef.current} 
+                count={50} // 50 tane karışık balığı derinliğe saldık
+                zRange={[-30, -10]} // -10 ile -30 Z ekseni arasında yüzecekler
+            />
+            
+            {/* AVLANABİLİR BALIKLAR (Ön düzlem) */}
+            {preys.map((p, i) => (
+                <PreyFish 
+                    key={i} 
+                    gltf={p.gltf} 
+                    boundsRef={boundsRef} 
+                    playerPos={fishPos} 
+                    onEaten={handleEaten} 
+                    scale={p.scale} 
+                    speed={p.speed} 
+                />
+            ))}
+        </>
+      )}
 
       <CanvasEvents onDown={() => (dragging.current = true)} onUp={() => (dragging.current = false)} />
     </>
@@ -426,4 +513,4 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-  }
+}
