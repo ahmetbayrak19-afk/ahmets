@@ -75,9 +75,10 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
   const scene = useMemo(() => SkeletonUtils.clone(gltf.scene), [gltf.scene]);
   const anims = useAnimations(gltf.animations, scene);
   
-  // 🔥 Yeni Yeme Efekti İçin State'ler
   const [eaten, setEaten] = useState(false);
   const [isDead, setIsDead] = useState(false);
+  // 🔥 YENİ: Ağzın erken açıldığını takip eden state
+  const [mouthOpened, setMouthOpened] = useState(false);
   const currentScale = useRef(scale);
   
   const pos = useRef(new THREE.Vector3(
@@ -103,25 +104,38 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
   useFrame((state, dt) => {
      if (isDead || !groupRef.current || !innerRef.current) return;
      
-     // 🔥 İSTEK: Av yenildiğinde hızlıca küçülüp kaybolsun (Vakumlama Hissi)
+     const distToPlayer = pos.current.distanceTo(playerPos.current);
+
+     // 🔥 ZAMANLAMA ÇÖZÜMÜ BURADA 🔥
+     
+     // 1. AŞAMA: 2.5 birim kala balık ağzını açar (Animasyon başlar)
+     if (!mouthOpened && distToPlayer < 2.5) {
+         setMouthOpened(true);
+         onEaten(); // Animasyonu tetikle ama küçültmeye başlama
+     } 
+     // Diyelim ki ağzını açtı ama av kaçtı, sistemi sıfırla ki tekrar ağız açabilsin
+     else if (mouthOpened && !eaten && distToPlayer > 3.5) {
+         setMouthOpened(false);
+     }
+
+     // 2. AŞAMA: 1.2 birim kala tam ağzına girdiğinde vakumlama başlar
+     if (!eaten && distToPlayer < 1.2) {
+         setEaten(true); 
+     }
+
+     // Vakumlama (Yutulma) Aksiyonu
      if (eaten) {
-         currentScale.current = lerp(currentScale.current, 0, dt * 20.0); // Çok hızlı küçül
-         pos.current.lerp(playerPos.current, dt * 15.0); // Balığın ağzına doğru hızla çekil
+         currentScale.current = lerp(currentScale.current, 0, dt * 20.0); 
+         pos.current.lerp(playerPos.current, dt * 15.0); 
          
          groupRef.current.position.copy(pos.current);
          groupRef.current.scale.setScalar(currentScale.current);
          
-         // Tamamen küçüldüğünde ekrandan sil
          if (currentScale.current < 0.05) setIsDead(true);
          return; 
      }
 
-     if (pos.current.distanceTo(playerPos.current) < 1.2) {
-         setEaten(true); // Küçülme animasyonunu başlat
-         onEaten(); 
-         return;
-     }
-
+     // Rastgele Gezinme Mantığı (Aynı kaldı)
      if (pos.current.distanceTo(target.current) < 2) {
          target.current.set(
             THREE.MathUtils.randFloat(boundsRef.current.minX, boundsRef.current.maxX),
@@ -143,14 +157,13 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
      groupRef.current.position.copy(pos.current);
      groupRef.current.rotation.y = yaw.current;
      innerRef.current.rotation.x = pitch.current;
-     groupRef.current.scale.setScalar(scale); // Normalde boyutunu koru
+     groupRef.current.scale.setScalar(scale); 
   });
 
   if (isDead) return null; 
   return (
       <group ref={groupRef}>
           <group ref={innerRef}>
-              {/* Scale artık group üzerinden yönetiliyor */}
               <primitive object={scene} />
           </group>
       </group>
@@ -187,8 +200,10 @@ function World({ urls }: any) {
     } 
   }, [seaAnim]);
   
+  // 🔥 ANİMASYON AĞIRLIKLARI (WEIGHT) BURADA AYARLANDI
   useEffect(() => { 
     if (fishAnim.actions) {
+        // Büyük/Küçük harf duyarlılığını kaldırdık
         const swimName = fishAnim.names.includes(FISH_SWIM_ANIM_NAME) ? FISH_SWIM_ANIM_NAME : fishAnim.names[0];
         const eatName = fishAnim.names.includes(FISH_EAT_ANIM_NAME) ? FISH_EAT_ANIM_NAME : fishAnim.names.find(n => n.toLowerCase().includes("yeme"));
 
@@ -197,12 +212,12 @@ function World({ urls }: any) {
         
         if (swim) { 
             swim.reset().play(); 
-            swim.setEffectiveWeight(1); 
+            swim.setEffectiveWeight(1); // Yüzme başlangıçta tam görünür
             swimActionRef.current = swim; 
         }
         if (eat) { 
             eat.reset().play(); 
-            eat.setEffectiveWeight(0); 
+            eat.setEffectiveWeight(0); // Yeme animasyonu başlangıçta görünmez
             eatActionRef.current = eat; 
         }
     }
@@ -243,20 +258,23 @@ function World({ urls }: any) {
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -Z_PLANE), []);
 
+  // 🔥 YEDİĞİ AN ÇALIŞACAK MANTIK
   const handleEaten = useCallback(() => {
       if (eatActionRef.current) {
+          // Yüzmeyi tamamen kapat
           if (swimActionRef.current) swimActionRef.current.setEffectiveWeight(0);
+          
+          // Yemeyi aç ve baştan oynat
           eatActionRef.current.setEffectiveWeight(1);
           eatActionRef.current.reset().play();
       }
-      eatTimer.current = 1.0; 
+      eatTimer.current = 1.0; // 1 saniye boyunca yeme animasyonu devrede kalacak
   }, []);
 
-  // 🔥 İSTEK: Vatoz ve Kılıçbalığı boyutları yarıya düştü
   const preys = useMemo(() => {
       return [
-          ...Array(10).fill({ gltf: vatoz, scale: 3.0, speed: 1.0 }), // 6.0'dan 3.0'a düştü
-          ...Array(10).fill({ gltf: kilicbalik, scale: 3.75, speed: 1.5 }), // 7.5'ten 3.75'e düştü
+          ...Array(10).fill({ gltf: vatoz, scale: 3.0, speed: 1.0 }), 
+          ...Array(10).fill({ gltf: kilicbalik, scale: 3.75, speed: 1.5 }), 
           ...Array(15).fill({ gltf: hamsi, scale: 3.0, speed: 1.2 }) 
       ];
   }, [vatoz, kilicbalik, hamsi]);
@@ -325,14 +343,18 @@ function World({ urls }: any) {
         if (fishVel.current.y > 0) fishVel.current.y = 0;
     }
 
+    // 🔥 SÜRE BİTİNCE YÜZMEYE GERİ DÖN
     if (eatTimer.current > 0) {
         eatTimer.current -= dt;
         
         if (eatTimer.current <= 0) {
+            // Yeme bitti, yemeyi tamamen kapat
             if (eatActionRef.current) eatActionRef.current.setEffectiveWeight(0);
+            
+            // Yüzmeyi tekrar aç
             if (swimActionRef.current) {
                 swimActionRef.current.setEffectiveWeight(1);
-                swimActionRef.current.paused = !moving; 
+                swimActionRef.current.paused = !moving; // Sadece duruyorsa pause yap
             }
         }
     } else {
@@ -404,4 +426,4 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-}
+  }
