@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { db, auth } from '../firebase';
+import { db, auth, storage } from '../firebase'; // 🔥 storage eklendi
 import { collection, onSnapshot, doc, addDoc, deleteDoc, query, orderBy, getDoc, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'; // 🔥 Storage fonksiyonları eklendi
 
 export function useStudentData() {
   const [students, setStudents] = useState<any[]>([]);
@@ -51,22 +52,38 @@ export function useStudentData() {
     loadData();
   }, []);
 
-  const addStudent = async (name: string, age: string, diagnosis: string) => {
+  // 🔥 YENİ: photoFile parametresi eklendi
+  const addStudent = async (name: string, age: string, diagnosis: string, photoFile: File | null = null) => {
     const instId = localStorage.getItem("kazanim-takip-institution-id");
     const tName = localStorage.getItem("kazanim-takip-teacher-name");
     if (!instId || !name.trim()) return { success: false, message: "Hata" };
     
     try {
+      let photoUrl = null;
+
+      // 🔥 FOTOĞRAF YÜKLEME İŞLEMİ
+      if (photoFile) {
+        const fileName = `${Date.now()}_${photoFile.name}`;
+        const storageRef = ref(storage, `institutions/${instId}/students/${fileName}`);
+        
+        await uploadBytes(storageRef, photoFile);
+        photoUrl = await getDownloadURL(storageRef); // Görüntüleme linkini alıyoruz
+      }
+
       await addDoc(collection(db, "institutions", instId, "students"), {
         name: name.trim(),
         age: age.trim(),
         diagnosis: diagnosis.trim(),
+        photoUrl: photoUrl, // 🔥 Linki veritabanına kaydediyoruz
         createdBy: tName,
         associatedTeacherIds: [tName],
         createdAt: new Date().toISOString()
       });
       return { success: true, message: "Öğrenci eklendi" };
-    } catch (e) { return { success: false, message: "Başarısız" }; }
+    } catch (e) { 
+      console.error(e);
+      return { success: false, message: "Başarısız" }; 
+    }
   };
 
   const deleteStudent = async (id: string) => {
@@ -79,7 +96,6 @@ export function useStudentData() {
     if (instId) await deleteDoc(doc(db, "institutions", instId, "teachers", teacherId));
   };
 
-  // 🔥 YENİ EKLENDİ: Öğretmen Onaylama/Reddetme Fonksiyonu
   const toggleTeacherApproval = async (teacherId: string, isApproved: boolean) => {
     const instId = localStorage.getItem("kazanim-takip-institution-id");
     if (instId) {
@@ -103,8 +119,7 @@ export function useStudentData() {
     addStudent, 
     deleteStudent, 
     deleteTeacher, 
-    toggleTeacherApproval, // Bunu dışarı aktardık
+    toggleTeacherApproval,
     logoutTeacher 
   };
-    }
-    
+}
