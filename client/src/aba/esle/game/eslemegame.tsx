@@ -2,7 +2,6 @@ import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } fr
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, useAnimations, useGLTF, useProgress } from "@react-three/drei";
 import * as THREE from "three";
-// Yem balıklarını klonlayıp sahnede çoğaltabilmek için gereken modül
 import { SkeletonUtils } from "three-stdlib";
 
 /** ---- Utils ---- */
@@ -19,7 +18,7 @@ function lerpAngle(a: number, b: number, t: number) {
 /** ==== AYARLAR ==== */
 const SEA_ANIM_NAME = "yeme"; 
 const FISH_SWIM_ANIM_NAME = "yuzme";
-const FISH_EAT_ANIM_NAME = "yeme"; // Balığının yeme animasyonu
+const FISH_EAT_ANIM_NAME = "yeme"; 
 
 const MAX_SPEED = 10.8; 
 const ACCEL = 8.0; 
@@ -58,7 +57,6 @@ function CanvasEvents({ onDown, onUp }: { onDown: () => void; onUp: () => void; 
   );
 }
 
-// OPTİMİZE EDİLMİŞ SU TAVANI (64x64 Poligon)
 function WaterCeiling({ y }: { y: number }) {
   const mat = useMemo(() => {
     return new THREE.ShaderMaterial({
@@ -73,7 +71,6 @@ function WaterCeiling({ y }: { y: number }) {
   return ( <mesh geometry={geom} material={mat} rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]} /> );
 }
 
-// 🔥 AV BALIKLARI BİLEŞENİ (YAPAY ZEKA İLE YÜZEN YEMLER)
 function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
   const scene = useMemo(() => SkeletonUtils.clone(gltf.scene), [gltf.scene]);
   const anims = useAnimations(gltf.animations, scene);
@@ -93,7 +90,6 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
   const innerRef = useRef<THREE.Group>(null);
 
   useEffect(() => {
-      // Yem balığının varsa ilk animasyonunu oynat
       if (anims.names.length > 0) {
          const action = anims.actions[anims.names[0]];
          action?.reset().play();
@@ -103,14 +99,12 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
   useFrame((state, dt) => {
      if (eaten || !groupRef.current || !innerRef.current) return;
      
-     // 1. Oyuncuya Yakalanma Kontrolü (Yenme)
-     if (pos.current.distanceTo(playerPos.current) < 3.5) {
+     if (pos.current.distanceTo(playerPos.current) < 1.2) {
          setEaten(true);
-         onEaten(); // Ana koddaki yeme animasyonunu tetikle
+         onEaten(); 
          return;
      }
 
-     // 2. Rastgele Gezinme (Roaming AI)
      if (pos.current.distanceTo(target.current) < 2) {
          target.current.set(
             THREE.MathUtils.randFloat(boundsRef.current.minX, boundsRef.current.maxX),
@@ -124,19 +118,17 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
 
      pos.current.add(vel.current.clone().multiplyScalar(dt));
      
-     // 3. Dönüş (Rotasyon) Hesaplama
      const targetYaw = vel.current.x < 0 ? Math.PI/2 : -Math.PI/2;
      yaw.current = lerpAngle(yaw.current, targetYaw, 0.1);
      const targetPitch = (vel.current.y / speed) * (Math.PI / 4);
      pitch.current = lerp(pitch.current, targetPitch, 0.1);
 
-     // 4. Modeli Güncelle
      groupRef.current.position.copy(pos.current);
      groupRef.current.rotation.y = yaw.current;
      innerRef.current.rotation.x = pitch.current;
   });
 
-  if (eaten) return null; // Yendiyse ekrandan silinir
+  if (eaten) return null; 
   return (
       <group ref={groupRef}>
           <group ref={innerRef}>
@@ -147,7 +139,6 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
 }
 
 function World({ urls }: any) {
-  // Tüm modelleri yükle
   useMemo(() => { useGLTF.setDecoderPath(urls.draco.endsWith("/") ? urls.draco : `${urls.draco}/`); }, [urls.draco]);
   const sea = useGLTF(urls.sea); 
   const fish = useGLTF(urls.fish);
@@ -164,13 +155,12 @@ function World({ urls }: any) {
   
   const swimActionRef = useRef<THREE.AnimationAction | null>(null);
   const eatActionRef = useRef<THREE.AnimationAction | null>(null);
-  const eatTimer = useRef(0); // Balığın ne kadar süre ağzını şapırdatacağı
+  const eatTimer = useRef(0); 
 
   const [surfaceY, setSurfaceY] = useState(20);
   const [boundsReady, setBoundsReady] = useState(false);
   const cameraTarget = useMemo(() => new THREE.Vector3(), []); 
 
-  // Animasyonların Ayarlanması
   useEffect(() => { 
     if (seaAnim.actions?.[SEA_ANIM_NAME]) { 
         seaAnim.actions[SEA_ANIM_NAME].reset().fadeIn(0.15).play(); 
@@ -178,22 +168,29 @@ function World({ urls }: any) {
     } 
   }, [seaAnim]);
   
+  // 🔥 ANİMASYON AĞIRLIKLARI (WEIGHT) BURADA AYARLANDI
   useEffect(() => { 
     if (fishAnim.actions) {
-        const swim = fishAnim.actions[FISH_SWIM_ANIM_NAME] || fishAnim.actions[fishAnim.names[0]];
-        const eat = fishAnim.actions[FISH_EAT_ANIM_NAME];
+        // Büyük/Küçük harf duyarlılığını kaldırdık
+        const swimName = fishAnim.names.includes(FISH_SWIM_ANIM_NAME) ? FISH_SWIM_ANIM_NAME : fishAnim.names[0];
+        const eatName = fishAnim.names.includes(FISH_EAT_ANIM_NAME) ? FISH_EAT_ANIM_NAME : fishAnim.names.find(n => n.toLowerCase().includes("yeme"));
+
+        const swim = fishAnim.actions[swimName];
+        const eat = eatName ? fishAnim.actions[eatName] : null;
         
-        if (swim) { swim.reset().play(); swimActionRef.current = swim; }
-        // Yeme animasyonunu bulursak hazırda bekletiyoruz
+        if (swim) { 
+            swim.reset().play(); 
+            swim.setEffectiveWeight(1); // Yüzme başlangıçta tam görünür
+            swimActionRef.current = swim; 
+        }
         if (eat) { 
             eat.reset().play(); 
-            eat.paused = true; 
+            eat.setEffectiveWeight(0); // Yeme animasyonu başlangıçta görünmez
             eatActionRef.current = eat; 
         }
     }
   }, [fishAnim]);
 
-  // Sınırların Ayarlanması
   const boundsRef = useRef({ minX: -50, maxX: 50, minY: -30, maxY: 30 });
 
   useEffect(() => {
@@ -206,16 +203,15 @@ function World({ urls }: any) {
     
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     
-    // 🔥 İSTEKLERİN UYGULANDIĞI YER: Daraltılmış ve Yukarı Çekilmiş Sınırlar
     boundsRef.current = { 
-      minX: box.min.x + 18, // Sol sınır daraldı
-      maxX: box.max.x - 18, // Sağ sınır daraldı
-      minY: box.min.y + 14, // Zemin çok daha yukarı çekildi (Toprağa girmeyecek)
+      minX: box.min.x + 28, 
+      maxX: box.max.x - 23, 
+      minY: box.min.y + 14, 
       maxY: box.max.y - 2  
     };
     
     setSurfaceY(boundsRef.current.maxY - 16);
-    setBoundsReady(true); // Sınırlar hazır, artık yemler doğabilir
+    setBoundsReady(true); 
   }, [sea.scene]);
 
   const fishPos = useRef(new THREE.Vector3(0, 0, Z_PLANE));
@@ -230,22 +226,24 @@ function World({ urls }: any) {
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -Z_PLANE), []);
 
-  // 🔥 YEME AKSİYONUNU TETİKLEYEN FONKSİYON
+  // 🔥 YEDİĞİ AN ÇALIŞACAK MANTIK
   const handleEaten = useCallback(() => {
-      // Yeme süresini başlat (1 saniye boyunca yeme animasyonu oynar)
-      if (eatTimer.current <= 0 && eatActionRef.current) {
+      if (eatActionRef.current) {
+          // Yüzmeyi tamamen kapat
+          if (swimActionRef.current) swimActionRef.current.setEffectiveWeight(0);
+          
+          // Yemeyi aç ve baştan oynat
+          eatActionRef.current.setEffectiveWeight(1);
           eatActionRef.current.reset().play();
-          eatActionRef.current.paused = false;
       }
-      eatTimer.current = 1.0; 
+      eatTimer.current = 1.0; // 1 saniye boyunca yeme animasyonu devrede kalacak
   }, []);
 
-  // Yem Balıklarının Listesini Oluştur
   const preys = useMemo(() => {
       return [
-          ...Array(3).fill({ gltf: vatoz, scale: 2.0, speed: 4.0 }),
-          ...Array(3).fill({ gltf: kilicbalik, scale: 2.5, speed: 6.0 }),
-          ...Array(5).fill({ gltf: hamsi, scale: 1.0, speed: 5.0 })
+          ...Array(10).fill({ gltf: vatoz, scale: 6.0, speed: 1.0 }), 
+          ...Array(10).fill({ gltf: kilicbalik, scale: 7.5, speed: 1.5 }), 
+          ...Array(15).fill({ gltf: hamsi, scale: 3.0, speed: 1.2 }) 
       ];
   }, [vatoz, kilicbalik, hamsi]);
 
@@ -313,18 +311,18 @@ function World({ urls }: any) {
         if (fishVel.current.y > 0) fishVel.current.y = 0;
     }
 
-    // 🔥 ANİMASYON YÖNETİMİ (Yüzme mi Yeme mi?)
+    // 🔥 SÜRE BİTİNCE YÜZMEYE GERİ DÖN
     if (eatTimer.current > 0) {
         eatTimer.current -= dt;
-        if (swimActionRef.current) swimActionRef.current.paused = true; // Yüzmeyi durdur
-        if (eatActionRef.current) eatActionRef.current.paused = false; // Yeme başlasın
         
         if (eatTimer.current <= 0) {
-            // Yeme süresi bitti, normal yüzmeye dön
-            if (eatActionRef.current) eatActionRef.current.stop();
+            // Yeme bitti, yemeyi tamamen kapat
+            if (eatActionRef.current) eatActionRef.current.setEffectiveWeight(0);
+            
+            // Yüzmeyi tekrar aç
             if (swimActionRef.current) {
-                swimActionRef.current.paused = !moving;
-                swimActionRef.current.reset().play();
+                swimActionRef.current.setEffectiveWeight(1);
+                swimActionRef.current.paused = !moving; // Sadece duruyorsa pause yap
             }
         }
     } else {
@@ -346,14 +344,12 @@ function World({ urls }: any) {
       <group ref={seaGroup}> <primitive object={sea.scene} /> </group>
       <WaterCeiling y={surfaceY} />
       
-      {/* ANA OYUNCU BALIK */}
       <group ref={fishGroup} scale={FISH_SCALE}> 
          <group ref={fishInner}>
             <primitive object={fish.scene} /> 
          </group>
       </group>
 
-      {/* YEM BALIKLARININ DOĞMASI (Sınırlar hesaplandıktan sonra) */}
       {boundsReady && preys.map((p, i) => (
           <PreyFish 
              key={i} 
@@ -398,5 +394,4 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-  }
-      
+}
