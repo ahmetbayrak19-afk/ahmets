@@ -2,6 +2,8 @@ import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } fr
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, useAnimations, useGLTF, useProgress } from "@react-three/drei";
 import * as THREE from "three";
+// Yem balıklarını klonlayıp sahnede çoğaltabilmek için gereken modül
+import { SkeletonUtils } from "three-stdlib";
 
 /** ---- Utils ---- */
 function lerp(start: number, end: number, t: number) {
@@ -15,17 +17,15 @@ function lerpAngle(a: number, b: number, t: number) {
 }
 
 /** ==== AYARLAR ==== */
-const SEA_ANIM_NAME = "yeme";
-const SEA_ANIM_SPEED = 0.2;
+const SEA_ANIM_NAME = "yeme"; 
 const FISH_SWIM_ANIM_NAME = "yuzme";
+const FISH_EAT_ANIM_NAME = "yeme"; // Balığının yeme animasyonu
 
 const MAX_SPEED = 10.8; 
 const ACCEL = 8.0; 
 const DRAG_STOP = 0.90;
 const Z_PLANE = 0; 
-
 const GRAVITY = 35.0; 
-
 const CAMERA_Z = 10;
 const CAMERA_SMOOTH = 5.0;
 
@@ -35,16 +35,13 @@ const FISH_SCALE = 3.0;
 
 const TURN_SMOOTH_YAW = 8.0;   
 const TURN_SMOOTH_PITCH = 8.0; 
-
 const MAX_PITCH_ANGLE = Math.PI / 2; 
 const BELLY_ROLL_ANGLE = Math.PI / 2; 
-
 const BOUNCE = 0.6;
 
 const GRADIENT_TOP = "#3498db"; 
 const GRADIENT_BOTTOM = "#104068"; 
 const FOG_COLOR = GRADIENT_BOTTOM; 
-
 const JUMP_LIMIT = 2.0;
 
 function Loader3D() {
@@ -65,81 +62,138 @@ function CanvasEvents({ onDown, onUp }: { onDown: () => void; onUp: () => void; 
 function WaterCeiling({ y }: { y: number }) {
   const mat = useMemo(() => {
     return new THREE.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      side: THREE.DoubleSide,
+      transparent: true, depthWrite: false, side: THREE.DoubleSide,
       uniforms: { uTime: { value: 0 } },
-      vertexShader: `
-        varying vec2 vUv;
-        varying vec3 vWorldPos;
-        uniform float uTime;
-        void main() {
-          vUv = uv;
-          vec3 pos = position;
-          pos.z += sin(pos.x * 0.1 + uTime * 0.8) * cos(pos.y * 0.1 + uTime * 0.6) * 3.0;
-          vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
-          vWorldPos = worldPosition.xyz;
-          gl_Position = projectionMatrix * viewMatrix * worldPosition;
-        }
-      `,
-      fragmentShader: `
-        varying vec2 vUv;
-        varying vec3 vWorldPos;
-        uniform float uTime;
-        void main() {
-          vec2 p = vWorldPos.xz * 0.05;
-          float time = uTime * 0.5;
-          float w1 = sin(p.x + time) * cos(p.y + time * 0.8);
-          float w2 = sin(p.x * 2.3 - time * 1.1) * cos(p.y * 2.1 + time * 0.9);
-          float w3 = sin(p.x * 5.1 + time * 1.5) * cos(p.y * 4.8 - time * 1.2);
-          float w = (w1 + w2 * 0.5 + w3 * 0.25);
-          vec3 deepColor = vec3(0.04, 0.18, 0.35);
-          vec3 lightColor = vec3(0.16, 0.71, 0.95);
-          vec3 col = mix(deepColor, lightColor, w * 0.5 + 0.5);
-          float sun = pow(max(0.0, w), 4.0);
-          col += vec3(0.8, 0.9, 1.0) * sun * 0.8;
-          float dist = distance(cameraPosition, vWorldPos);
-          float alpha = 1.0 - smoothstep(40.0, 120.0, dist);
-          gl_FragColor = vec4(col, 0.85 * alpha);
-        }
-      `
+      vertexShader: ` varying vec2 vUv; varying vec3 vWorldPos; uniform float uTime; void main() { vUv = uv; vec3 pos = position; pos.z += sin(pos.x * 0.1 + uTime * 0.8) * cos(pos.y * 0.1 + uTime * 0.6) * 3.0; vec4 worldPosition = modelMatrix * vec4(pos, 1.0); vWorldPos = worldPosition.xyz; gl_Position = projectionMatrix * viewMatrix * worldPosition; } `,
+      fragmentShader: ` varying vec2 vUv; varying vec3 vWorldPos; uniform float uTime; void main() { vec2 p = vWorldPos.xz * 0.05; float time = uTime * 0.5; float w1 = sin(p.x + time) * cos(p.y + time * 0.8); float w2 = sin(p.x * 2.3 - time * 1.1) * cos(p.y * 2.1 + time * 0.9); float w3 = sin(p.x * 5.1 + time * 1.5) * cos(p.y * 4.8 - time * 1.2); float w = (w1 + w2 * 0.5 + w3 * 0.25); vec3 deepColor = vec3(0.04, 0.18, 0.35); vec3 lightColor = vec3(0.16, 0.71, 0.95); vec3 col = mix(deepColor, lightColor, w * 0.5 + 0.5); float sun = pow(max(0.0, w), 4.0); col += vec3(0.8, 0.9, 1.0) * sun * 0.8; float dist = distance(cameraPosition, vWorldPos); float alpha = 1.0 - smoothstep(40.0, 120.0, dist); gl_FragColor = vec4(col, 0.85 * alpha); } `
     });
   }, []);
-  
   const geom = useMemo(() => new THREE.PlaneGeometry(1000, 1000, 64, 64), []);
   useFrame((_, dt) => { mat.uniforms.uTime.value += dt; });
   return ( <mesh geometry={geom} material={mat} rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]} /> );
 }
 
-function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string; dracoBase: string; }) {
-  useMemo(() => { useGLTF.setDecoderPath(dracoBase.endsWith("/") ? dracoBase : `${dracoBase}/`); }, [dracoBase]);
-  const sea = useGLTF(seaUrl); const fish = useGLTF(fishUrl);
+// 🔥 AV BALIKLARI BİLEŞENİ (YAPAY ZEKA İLE YÜZEN YEMLER)
+function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
+  const scene = useMemo(() => SkeletonUtils.clone(gltf.scene), [gltf.scene]);
+  const anims = useAnimations(gltf.animations, scene);
+  const [eaten, setEaten] = useState(false);
+  
+  const pos = useRef(new THREE.Vector3(
+     THREE.MathUtils.randFloat(boundsRef.current.minX, boundsRef.current.maxX),
+     THREE.MathUtils.randFloat(boundsRef.current.minY, boundsRef.current.maxY),
+     Z_PLANE
+  ));
+  const target = useRef(new THREE.Vector3().copy(pos.current));
+  const vel = useRef(new THREE.Vector3());
+  const yaw = useRef(0);
+  const pitch = useRef(0);
+
+  const groupRef = useRef<THREE.Group>(null);
+  const innerRef = useRef<THREE.Group>(null);
+
+  useEffect(() => {
+      // Yem balığının varsa ilk animasyonunu oynat
+      if (anims.names.length > 0) {
+         const action = anims.actions[anims.names[0]];
+         action?.reset().play();
+      }
+  }, [anims]);
+
+  useFrame((state, dt) => {
+     if (eaten || !groupRef.current || !innerRef.current) return;
+     
+     // 1. Oyuncuya Yakalanma Kontrolü (Yenme)
+     if (pos.current.distanceTo(playerPos.current) < 3.5) {
+         setEaten(true);
+         onEaten(); // Ana koddaki yeme animasyonunu tetikle
+         return;
+     }
+
+     // 2. Rastgele Gezinme (Roaming AI)
+     if (pos.current.distanceTo(target.current) < 2) {
+         target.current.set(
+            THREE.MathUtils.randFloat(boundsRef.current.minX, boundsRef.current.maxX),
+            THREE.MathUtils.randFloat(boundsRef.current.minY, boundsRef.current.maxY),
+            Z_PLANE
+         );
+     }
+
+     const dir = new THREE.Vector3().subVectors(target.current, pos.current).normalize();
+     vel.current.lerp(dir.multiplyScalar(speed), 0.05);
+
+     pos.current.add(vel.current.clone().multiplyScalar(dt));
+     
+     // 3. Dönüş (Rotasyon) Hesaplama
+     const targetYaw = vel.current.x < 0 ? Math.PI/2 : -Math.PI/2;
+     yaw.current = lerpAngle(yaw.current, targetYaw, 0.1);
+     const targetPitch = (vel.current.y / speed) * (Math.PI / 4);
+     pitch.current = lerp(pitch.current, targetPitch, 0.1);
+
+     // 4. Modeli Güncelle
+     groupRef.current.position.copy(pos.current);
+     groupRef.current.rotation.y = yaw.current;
+     innerRef.current.rotation.x = pitch.current;
+  });
+
+  if (eaten) return null; // Yendiyse ekrandan silinir
+  return (
+      <group ref={groupRef}>
+          <group ref={innerRef}>
+              <primitive object={scene} scale={scale} />
+          </group>
+      </group>
+  );
+}
+
+function World({ urls }: any) {
+  // Tüm modelleri yükle
+  useMemo(() => { useGLTF.setDecoderPath(urls.draco.endsWith("/") ? urls.draco : `${urls.draco}/`); }, [urls.draco]);
+  const sea = useGLTF(urls.sea); 
+  const fish = useGLTF(urls.fish);
+  const vatoz = useGLTF(urls.vatoz);
+  const kilicbalik = useGLTF(urls.kilicbalik);
+  const hamsi = useGLTF(urls.hamsi);
+
   const seaGroup = useRef<THREE.Group>(null); 
   const fishGroup = useRef<THREE.Group>(null); 
   const fishInner = useRef<THREE.Group>(null); 
   
   const seaAnim = useAnimations(sea.animations, sea.scene); 
   const fishAnim = useAnimations(fish.animations, fish.scene);
+  
   const swimActionRef = useRef<THREE.AnimationAction | null>(null);
+  const eatActionRef = useRef<THREE.AnimationAction | null>(null);
+  const eatTimer = useRef(0); // Balığın ne kadar süre ağzını şapırdatacağı
 
   const [surfaceY, setSurfaceY] = useState(20);
+  const [boundsReady, setBoundsReady] = useState(false);
   const cameraTarget = useMemo(() => new THREE.Vector3(), []); 
 
-  // 🔥 ÇARPMA HİSSİ İÇİN YENİ DEĞİŞKENLER
-  const shakeIntensity = useRef(0); 
-  const impactScale = useRef(new THREE.Vector3(FISH_SCALE, FISH_SCALE, FISH_SCALE)); 
-  const defaultScale = useMemo(() => new THREE.Vector3(FISH_SCALE, FISH_SCALE, FISH_SCALE), []);
-
+  // Animasyonların Ayarlanması
   useEffect(() => { 
-    const a = seaAnim.actions?.[SEA_ANIM_NAME] || (seaAnim.names?.[0] ? seaAnim.actions?.[seaAnim.names[0]] : null); 
-    if (a) { a.reset().fadeIn(0.15).play(); a.timeScale = SEA_ANIM_SPEED; } 
+    if (seaAnim.actions?.[SEA_ANIM_NAME]) { 
+        seaAnim.actions[SEA_ANIM_NAME].reset().fadeIn(0.15).play(); 
+        seaAnim.actions[SEA_ANIM_NAME].timeScale = 0.2; 
+    } 
   }, [seaAnim]);
   
   useEffect(() => { 
-    const a = fishAnim.actions?.[FISH_SWIM_ANIM_NAME] || (fishAnim.names?.[0] ? fishAnim.actions?.[fishAnim.names[0]] : null); 
-    if (a) { a.reset(); a.paused = true; a.play(); swimActionRef.current = a; } 
+    if (fishAnim.actions) {
+        const swim = fishAnim.actions[FISH_SWIM_ANIM_NAME] || fishAnim.actions[fishAnim.names[0]];
+        const eat = fishAnim.actions[FISH_EAT_ANIM_NAME];
+        
+        if (swim) { swim.reset().play(); swimActionRef.current = swim; }
+        // Yeme animasyonunu bulursak hazırda bekletiyoruz
+        if (eat) { 
+            eat.reset().play(); 
+            eat.paused = true; 
+            eatActionRef.current = eat; 
+        }
+    }
   }, [fishAnim]);
 
+  // Sınırların Ayarlanması
   const boundsRef = useRef({ minX: -50, maxX: 50, minY: -30, maxY: 30 });
 
   useEffect(() => {
@@ -152,14 +206,16 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     
+    // 🔥 İSTEKLERİN UYGULANDIĞI YER: Daraltılmış ve Yukarı Çekilmiş Sınırlar
     boundsRef.current = { 
-      minX: box.min.x + 8, 
-      maxX: box.max.x - 8, 
-      minY: box.min.y + 9, 
+      minX: box.min.x + 18, // Sol sınır daraldı
+      maxX: box.max.x - 18, // Sağ sınır daraldı
+      minY: box.min.y + 14, // Zemin çok daha yukarı çekildi (Toprağa girmeyecek)
       maxY: box.max.y - 2  
     };
     
     setSurfaceY(boundsRef.current.maxY - 16);
+    setBoundsReady(true); // Sınırlar hazır, artık yemler doğabilir
   }, [sea.scene]);
 
   const fishPos = useRef(new THREE.Vector3(0, 0, Z_PLANE));
@@ -173,6 +229,25 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -Z_PLANE), []);
+
+  // 🔥 YEME AKSİYONUNU TETİKLEYEN FONKSİYON
+  const handleEaten = useCallback(() => {
+      // Yeme süresini başlat (1 saniye boyunca yeme animasyonu oynar)
+      if (eatTimer.current <= 0 && eatActionRef.current) {
+          eatActionRef.current.reset().play();
+          eatActionRef.current.paused = false;
+      }
+      eatTimer.current = 1.0; 
+  }, []);
+
+  // Yem Balıklarının Listesini Oluştur
+  const preys = useMemo(() => {
+      return [
+          ...Array(3).fill({ gltf: vatoz, scale: 2.0, speed: 4.0 }),
+          ...Array(3).fill({ gltf: kilicbalik, scale: 2.5, speed: 6.0 }),
+          ...Array(5).fill({ gltf: hamsi, scale: 1.0, speed: 5.0 })
+      ];
+  }, [vatoz, kilicbalik, hamsi]);
 
   useFrame((state, dt) => {
     if (!fishGroup.current || !fishInner.current) return;
@@ -228,102 +303,87 @@ function World({ fishUrl, seaUrl, dracoBase }: { fishUrl: string; seaUrl: string
     fishPos.current.x += fishVel.current.x * dt;
     fishPos.current.y += fishVel.current.y * dt;
 
-    // 🔥 ÇARPIŞMA (IMPACT) KONTROLLERİ VE EFEKTLERİ 🔥
-    let hitOccurred = false;
-    let hitAxis = ""; // Hangi yönden çarptı (X yatay, Y dikey)
-
-    // X Ekseni (Sağ ve Sol Duvarlar)
-    if (fishPos.current.x <= b.minX) {
-        fishPos.current.x = b.minX;
-        if (Math.abs(fishVel.current.x) > 2.0) { hitOccurred = true; hitAxis = "X"; } // Sadece hızlı çarpınca etki etsin
-        fishVel.current.x *= -BOUNCE;
-    } else if (fishPos.current.x >= b.maxX) {
-        fishPos.current.x = b.maxX;
-        if (Math.abs(fishVel.current.x) > 2.0) { hitOccurred = true; hitAxis = "X"; }
-        fishVel.current.x *= -BOUNCE;
-    }
-
-    // Y Ekseni (Zemin ve Tavan)
+    if (fishPos.current.x <= b.minX || fishPos.current.x >= b.maxX) fishVel.current.x *= -BOUNCE;
     if (fishPos.current.y <= b.minY) { 
         fishPos.current.y = b.minY; 
-        if (Math.abs(fishVel.current.y) > 2.0) { hitOccurred = true; hitAxis = "Y"; }
         fishVel.current.y *= -BOUNCE; 
     }
     else if (fishPos.current.y >= maxJumpHeight) {
         fishPos.current.y = maxJumpHeight;
-        if (fishVel.current.y > 2.0) { hitOccurred = true; hitAxis = "Y"; }
         if (fishVel.current.y > 0) fishVel.current.y = 0;
     }
 
-    // 🔥 EFEKTİ TETİKLE: SADECE SERT ÇARPIŞMALARDA
-    if (hitOccurred) {
-        shakeIntensity.current = 0.4; // Kamera ne kadar sarsılacak
+    // 🔥 ANİMASYON YÖNETİMİ (Yüzme mi Yeme mi?)
+    if (eatTimer.current > 0) {
+        eatTimer.current -= dt;
+        if (swimActionRef.current) swimActionRef.current.paused = true; // Yüzmeyi durdur
+        if (eatActionRef.current) eatActionRef.current.paused = false; // Yeme başlasın
         
-        // Jöle Etkisi (Squash & Stretch)
-        if (hitAxis === "X") {
-            // Yanlara çarptı: Boyu kısalır, karnı şişer
-            impactScale.current.set(FISH_SCALE * 0.4, FISH_SCALE * 1.5, FISH_SCALE * 1.5);
-        } else {
-            // Yere/Tavana çarptı: Karnı yassılaşır, boyu uzar
-            impactScale.current.set(FISH_SCALE * 1.5, FISH_SCALE * 0.4, FISH_SCALE * 1.5);
+        if (eatTimer.current <= 0) {
+            // Yeme süresi bitti, normal yüzmeye dön
+            if (eatActionRef.current) eatActionRef.current.stop();
+            if (swimActionRef.current) {
+                swimActionRef.current.paused = !moving;
+                swimActionRef.current.reset().play();
+            }
         }
-
-        // Telefonda titreşim hissi (Eğer cihaz destekliyorsa)
-        if (typeof navigator !== "undefined" && navigator.vibrate) {
-            navigator.vibrate(40); // 40 milisaniyelik tok bir titreşim
-        }
+    } else {
+        if (swimActionRef.current) swimActionRef.current.paused = !moving;
     }
-
-    // 🔥 Jöle halinden normal haline (defaultScale) pürüzsüz geri dönüş
-    impactScale.current.lerp(defaultScale, 0.15); // Hızlıca eski haline döner
-    fishGroup.current.scale.copy(impactScale.current);
 
     fishGroup.current.position.copy(fishPos.current);
     fishGroup.current.rotation.y = currentYaw.current;
     fishInner.current.rotation.set(currentPitch.current, 0, currentRoll.current, 'XYZ');
 
-    if (swimActionRef.current) swimActionRef.current.paused = !moving;
-
-    // 🔥 KAMERA SARSINTISI UYGULAMA (Screen Shake)
-    let camX = fishPos.current.x;
-    let camY = fishPos.current.y;
-
-    if (shakeIntensity.current > 0) {
-        // Kamerayı rastgele sağa sola titret
-        camX += (Math.random() - 0.5) * shakeIntensity.current;
-        camY += (Math.random() - 0.5) * shakeIntensity.current;
-        
-        // Sarsıntı zamanla azalsın (Fade out)
-        shakeIntensity.current -= dt * 1.5; 
-        if (shakeIntensity.current < 0) shakeIntensity.current = 0;
-    }
-
     const camSmooth = isAboveWater ? CAMERA_SMOOTH * 0.5 : CAMERA_SMOOTH;
-    cameraTarget.set(camX, camY, CAMERA_Z);
+    cameraTarget.set(fishPos.current.x, fishPos.current.y, CAMERA_Z);
     state.camera.position.lerp(cameraTarget, 1 - Math.pow(0.001, dt * camSmooth));
-    state.camera.lookAt(camX, camY, 0); 
+    state.camera.lookAt(fishPos.current.x, fishPos.current.y, 0); 
   });
 
   return (
     <>
       <group ref={seaGroup}> <primitive object={sea.scene} /> </group>
       <WaterCeiling y={surfaceY} />
-      <group ref={fishGroup}> 
+      
+      {/* ANA OYUNCU BALIK */}
+      <group ref={fishGroup} scale={FISH_SCALE}> 
          <group ref={fishInner}>
             <primitive object={fish.scene} /> 
          </group>
       </group>
+
+      {/* YEM BALIKLARININ DOĞMASI (Sınırlar hesaplandıktan sonra) */}
+      {boundsReady && preys.map((p, i) => (
+          <PreyFish 
+             key={i} 
+             gltf={p.gltf} 
+             boundsRef={boundsRef} 
+             playerPos={fishPos} 
+             onEaten={handleEaten} 
+             scale={p.scale} 
+             speed={p.speed} 
+          />
+      ))}
+
       <CanvasEvents onDown={() => (dragging.current = true)} onUp={() => (dragging.current = false)} />
     </>
   );
 }
 
 export default function EslemeGame() {
-  const [urls, setUrls] = useState({ fish: "", sea: "", draco: "" });
+  const [urls, setUrls] = useState<any>(null);
   
   useEffect(() => {
     const base = new URL("/assets/public/", window.location.origin).toString();
-    setUrls({ fish: new URL("models/balik.glb", base).toString(), sea: new URL("models/deniz.glb", base).toString(), draco: new URL("draco/", base).toString() });
+    setUrls({ 
+        fish: new URL("models/balik.glb", base).toString(), 
+        sea: new URL("models/deniz.glb", base).toString(), 
+        vatoz: new URL("models/vatoz.glb", base).toString(), 
+        kilicbalik: new URL("models/kilicbalik.glb", base).toString(), 
+        hamsi: new URL("models/hamsi.glb", base).toString(), 
+        draco: new URL("draco/", base).toString() 
+    });
   }, []);
 
   return (
@@ -333,9 +393,10 @@ export default function EslemeGame() {
         <ambientLight intensity={1.5} />
         <directionalLight position={[10, 10, 10]} intensity={2} />
         <Suspense fallback={<Loader3D />}>
-          {urls.fish && <World fishUrl={urls.fish} seaUrl={urls.sea} dracoBase={urls.draco} />}
+          {urls && <World urls={urls} />}
         </Suspense>
       </Canvas>
     </div>
   );
-      }
+  }
+      
