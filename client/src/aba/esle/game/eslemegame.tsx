@@ -74,7 +74,11 @@ function WaterCeiling({ y }: { y: number }) {
 function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
   const scene = useMemo(() => SkeletonUtils.clone(gltf.scene), [gltf.scene]);
   const anims = useAnimations(gltf.animations, scene);
+  
+  // 🔥 Yeni Yeme Efekti İçin State'ler
   const [eaten, setEaten] = useState(false);
+  const [isDead, setIsDead] = useState(false);
+  const currentScale = useRef(scale);
   
   const pos = useRef(new THREE.Vector3(
      THREE.MathUtils.randFloat(boundsRef.current.minX, boundsRef.current.maxX),
@@ -97,10 +101,23 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
   }, [anims]);
 
   useFrame((state, dt) => {
-     if (eaten || !groupRef.current || !innerRef.current) return;
+     if (isDead || !groupRef.current || !innerRef.current) return;
      
+     // 🔥 İSTEK: Av yenildiğinde hızlıca küçülüp kaybolsun (Vakumlama Hissi)
+     if (eaten) {
+         currentScale.current = lerp(currentScale.current, 0, dt * 20.0); // Çok hızlı küçül
+         pos.current.lerp(playerPos.current, dt * 15.0); // Balığın ağzına doğru hızla çekil
+         
+         groupRef.current.position.copy(pos.current);
+         groupRef.current.scale.setScalar(currentScale.current);
+         
+         // Tamamen küçüldüğünde ekrandan sil
+         if (currentScale.current < 0.05) setIsDead(true);
+         return; 
+     }
+
      if (pos.current.distanceTo(playerPos.current) < 1.2) {
-         setEaten(true);
+         setEaten(true); // Küçülme animasyonunu başlat
          onEaten(); 
          return;
      }
@@ -126,13 +143,15 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
      groupRef.current.position.copy(pos.current);
      groupRef.current.rotation.y = yaw.current;
      innerRef.current.rotation.x = pitch.current;
+     groupRef.current.scale.setScalar(scale); // Normalde boyutunu koru
   });
 
-  if (eaten) return null; 
+  if (isDead) return null; 
   return (
       <group ref={groupRef}>
           <group ref={innerRef}>
-              <primitive object={scene} scale={scale} />
+              {/* Scale artık group üzerinden yönetiliyor */}
+              <primitive object={scene} />
           </group>
       </group>
   );
@@ -168,10 +187,8 @@ function World({ urls }: any) {
     } 
   }, [seaAnim]);
   
-  // 🔥 ANİMASYON AĞIRLIKLARI (WEIGHT) BURADA AYARLANDI
   useEffect(() => { 
     if (fishAnim.actions) {
-        // Büyük/Küçük harf duyarlılığını kaldırdık
         const swimName = fishAnim.names.includes(FISH_SWIM_ANIM_NAME) ? FISH_SWIM_ANIM_NAME : fishAnim.names[0];
         const eatName = fishAnim.names.includes(FISH_EAT_ANIM_NAME) ? FISH_EAT_ANIM_NAME : fishAnim.names.find(n => n.toLowerCase().includes("yeme"));
 
@@ -180,12 +197,12 @@ function World({ urls }: any) {
         
         if (swim) { 
             swim.reset().play(); 
-            swim.setEffectiveWeight(1); // Yüzme başlangıçta tam görünür
+            swim.setEffectiveWeight(1); 
             swimActionRef.current = swim; 
         }
         if (eat) { 
             eat.reset().play(); 
-            eat.setEffectiveWeight(0); // Yeme animasyonu başlangıçta görünmez
+            eat.setEffectiveWeight(0); 
             eatActionRef.current = eat; 
         }
     }
@@ -226,23 +243,20 @@ function World({ urls }: any) {
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -Z_PLANE), []);
 
-  // 🔥 YEDİĞİ AN ÇALIŞACAK MANTIK
   const handleEaten = useCallback(() => {
       if (eatActionRef.current) {
-          // Yüzmeyi tamamen kapat
           if (swimActionRef.current) swimActionRef.current.setEffectiveWeight(0);
-          
-          // Yemeyi aç ve baştan oynat
           eatActionRef.current.setEffectiveWeight(1);
           eatActionRef.current.reset().play();
       }
-      eatTimer.current = 1.0; // 1 saniye boyunca yeme animasyonu devrede kalacak
+      eatTimer.current = 1.0; 
   }, []);
 
+  // 🔥 İSTEK: Vatoz ve Kılıçbalığı boyutları yarıya düştü
   const preys = useMemo(() => {
       return [
-          ...Array(10).fill({ gltf: vatoz, scale: 6.0, speed: 1.0 }), 
-          ...Array(10).fill({ gltf: kilicbalik, scale: 7.5, speed: 1.5 }), 
+          ...Array(10).fill({ gltf: vatoz, scale: 3.0, speed: 1.0 }), // 6.0'dan 3.0'a düştü
+          ...Array(10).fill({ gltf: kilicbalik, scale: 3.75, speed: 1.5 }), // 7.5'ten 3.75'e düştü
           ...Array(15).fill({ gltf: hamsi, scale: 3.0, speed: 1.2 }) 
       ];
   }, [vatoz, kilicbalik, hamsi]);
@@ -311,18 +325,14 @@ function World({ urls }: any) {
         if (fishVel.current.y > 0) fishVel.current.y = 0;
     }
 
-    // 🔥 SÜRE BİTİNCE YÜZMEYE GERİ DÖN
     if (eatTimer.current > 0) {
         eatTimer.current -= dt;
         
         if (eatTimer.current <= 0) {
-            // Yeme bitti, yemeyi tamamen kapat
             if (eatActionRef.current) eatActionRef.current.setEffectiveWeight(0);
-            
-            // Yüzmeyi tekrar aç
             if (swimActionRef.current) {
                 swimActionRef.current.setEffectiveWeight(1);
-                swimActionRef.current.paused = !moving; // Sadece duruyorsa pause yap
+                swimActionRef.current.paused = !moving; 
             }
         }
     } else {
