@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useStudentData } from '@/hooks/useStudentData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, LogOut, Trash2, UserCircle2, ShieldCheck, Loader2, Users, AlertTriangle, Baby, Stethoscope, ClipboardCheck, BookOpen, AlertCircle, Lock, Hourglass, CheckCircle, UserX, ShieldAlert } from 'lucide-react';
+import { Search, LogOut, Trash2, UserCircle2, ShieldCheck, Loader2, Users, AlertTriangle, Baby, Stethoscope, ClipboardCheck, BookOpen, AlertCircle, Lock, Hourglass, CheckCircle, UserX, ShieldAlert, Camera } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
@@ -26,9 +26,13 @@ export default function Home() {
   const [duplicateError, setDuplicateError] = useState(false);
   const [isPendingApproval, setIsPendingApproval] = useState(false);
   
+  // --- YENİ: FOTOĞRAF STATE'LERİ ---
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [_, setLocation] = useLocation();
 
-  // toggleTeacherApproval fonksiyonunu buradan çekiyoruz
   const { students, teachers, addStudent, deleteStudent, deleteTeacher, toggleTeacherApproval, currentTeacher, isLoading } = useStudentData();
 
   // --- GÜVENLİK KONTROLÜ ---
@@ -77,35 +81,18 @@ export default function Home() {
     return fullName;
   };
 
-  // --- ONAY BEKLEME EKRANI ---
-  if (isPendingApproval) {
-    return (
-      <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center text-white p-6 text-center">
-        <div className="bg-orange-500/10 p-6 rounded-full border border-orange-500/20 mb-6 animate-pulse">
-            <Lock className="w-16 h-16 text-orange-500" />
-        </div>
-        <h1 className="text-2xl font-bold mb-2 text-white">Hesap Onay Bekliyor</h1>
-        <p className="text-slate-400 max-w-md mb-8">
-            Merhaba <strong>{currentTeacher?.name}</strong>, kurum girişini başarıyla yaptınız ancak 
-            öğrenci verilerine erişmek için <strong>Yönetici Onayı</strong> gerekmektedir.
-        </p>
-        <Button variant="outline" onClick={handleLogout} className="border-slate-700 hover:bg-slate-800 text-white">
-            <LogOut className="mr-2 h-4 w-4" /> Çıkış Yap
-        </Button>
-      </div>
-    );
-  }
-
-  if (isLoading) return (
-    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center text-white">
-      <Loader2 className="animate-spin text-blue-500 mb-4" size={40} />
-      <p className="italic">Veriler doğrulanıyor...</p>
-    </div>
-  );
-
-  if (!currentTeacher) return null;
-
-  const isAdmin = currentTeacher?.name?.toLowerCase() === 'admin';
+  // --- YENİ: FOTOĞRAF ÇEKME İŞLEMİ ---
+  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPhotoFile(file); // Storage'a göndermek için dosyayı tut
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string); // Ekranda göstermek için
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,8 +104,14 @@ export default function Home() {
         setDuplicateError(true); 
         return; 
       }
-      await addStudent(name, age, diagnosis); 
+      
+      const loadingToast = toast.loading("Öğrenci kaydediliyor..."); // Yükleme bildirimi
+      await addStudent(name, age, diagnosis, photoFile); // 🔥 photoFile eklendi
+      
       setName(''); setAge(''); setDiagnosis('');
+      setPhotoFile(null); // Temizle
+      setPhotoPreview(null); // Temizle
+      toast.dismiss(loadingToast);
       toast.success("Öğrenci Eklendi"); 
     } else {
       toast.warning("İsim ve Yaş zorunludur");
@@ -169,7 +162,13 @@ export default function Home() {
                       !hasValidTeacher ? "bg-red-600 text-white border-red-400" :
                       isMyStudent ? "bg-green-500 text-black border-green-400" : "bg-blue-600/10 text-blue-500 border-blue-500/20"
                     )}>
-                      {student.name.charAt(0).toUpperCase()}
+                      {/* 🔥 YENİ: Fotoğraf varsa onu, yoksa harfi göster */}
+                      {student.photoUrl ? (
+                        <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover rounded-full" />
+                      ) : (
+                        student.name.charAt(0).toUpperCase()
+                      )}
+                      
                       {!hasValidTeacher && (
                          <div className="absolute -top-1 -right-1 bg-red-500 rounded-full p-0.5 border border-slate-900">
                            <AlertTriangle size={12} className="text-white" />
@@ -236,6 +235,36 @@ export default function Home() {
     </div>
   );
 
+  // --- ONAY BEKLEME EKRANI ---
+  if (isPendingApproval) {
+    return (
+      <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center text-white p-6 text-center">
+        <div className="bg-orange-500/10 p-6 rounded-full border border-orange-500/20 mb-6 animate-pulse">
+            <Lock className="w-16 h-16 text-orange-500" />
+        </div>
+        <h1 className="text-2xl font-bold mb-2 text-white">Hesap Onay Bekliyor</h1>
+        <p className="text-slate-400 max-w-md mb-8">
+            Merhaba <strong>{currentTeacher?.name}</strong>, kurum girişini başarıyla yaptınız ancak 
+            öğrenci verilerine erişmek için <strong>Yönetici Onayı</strong> gerekmektedir.
+        </p>
+        <Button variant="outline" onClick={handleLogout} className="border-slate-700 hover:bg-slate-800 text-white">
+            <LogOut className="mr-2 h-4 w-4" /> Çıkış Yap
+        </Button>
+      </div>
+    );
+  }
+
+  if (isLoading) return (
+    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center text-white">
+      <Loader2 className="animate-spin text-blue-500 mb-4" size={40} />
+      <p className="italic">Veriler doğrulanıyor...</p>
+    </div>
+  );
+
+  if (!currentTeacher) return null;
+
+  const isAdmin = currentTeacher?.name?.toLowerCase() === 'admin';
+
   return (
     <div className="min-h-screen bg-[#020617] p-4 md:p-8 text-white font-sans">
       <AlertDialog open={duplicateError} onOpenChange={setDuplicateError}>
@@ -286,7 +315,6 @@ export default function Home() {
                             </div>
 
                             <div className="flex items-center gap-2 w-full sm:w-auto">
-                                {/* ONAY / DONDUR BUTONLARI */}
                                 {t.isApproved === false ? (
                                     <Button 
                                         onClick={() => toggleTeacherApproval(t.id, true)} 
@@ -334,7 +362,25 @@ export default function Home() {
             <CardHeader><CardTitle className="text-lg">Öğrenci Ekle</CardTitle></CardHeader>
             <CardContent>
               <form onSubmit={handleAddStudent} className="space-y-3">
-                <Input placeholder="İsim Soyisim" value={name} onChange={(e) => setName(e.target.value)} className="bg-slate-950 border-slate-800" />
+                {/* 🔥 YENİ: KAMERA BUTONU VE İSİM İNPUTU YAN YANA */}
+                <div className="flex gap-2 items-center">
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-10 w-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center cursor-pointer shrink-0 overflow-hidden hover:bg-slate-700 transition-colors"
+                    title="Fotoğraf Çek/Ekle"
+                  >
+                    {photoPreview ? (
+                      <img src={photoPreview} alt="Önizleme" className="w-full h-full object-cover" />
+                    ) : (
+                      <Camera size={18} className="text-slate-400" />
+                    )}
+                  </div>
+                  <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={handlePhotoCapture} className="hidden" />
+                  
+                  <Input placeholder="İsim Soyisim" value={name} onChange={(e) => setName(e.target.value)} className="bg-slate-950 border-slate-800 flex-1" />
+                </div>
+                {/* ------------------------------------------------ */}
+
                 <div className="flex gap-2">
                   <Input placeholder="Yaş" type="number" value={age} onChange={(e) => setAge(e.target.value)} className="bg-slate-950 border-slate-800 w-20" />
                   <Input placeholder="Tanı" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} className="bg-slate-950 border-slate-800 flex-1" />
