@@ -26,10 +26,14 @@ export default function Home() {
   const [duplicateError, setDuplicateError] = useState(false);
   const [isPendingApproval, setIsPendingApproval] = useState(false);
   
-  // --- YENİ: FOTOĞRAF STATE'LERİ ---
+  // --- FOTOĞRAF STATE'LERİ ---
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- EKSİK BİLGİ UYARISI İÇİN STATE ---
+  const [missingFieldsWarning, setMissingFieldsWarning] = useState(false);
+  const [missingMessage, setMissingMessage] = useState('');
   
   const [_, setLocation] = useLocation();
 
@@ -81,7 +85,7 @@ export default function Home() {
     return fullName;
   };
 
-  // --- YENİ: FOTOĞRAF ÇEKME İŞLEMİ ---
+  // --- FOTOĞRAF ÇEKME İŞLEMİ ---
   const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -94,28 +98,58 @@ export default function Home() {
     }
   };
 
+  // --- YENİ KAYIT MANTIĞI: Kontrol Aşaması ---
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if(name.trim() && age.trim()) { 
-      const normalizedName = name.trim().toLocaleLowerCase('tr');
-      const isDuplicate = students.some(s => s.name.trim().toLocaleLowerCase('tr') === normalizedName);
-
-      if (isDuplicate) {
-        setDuplicateError(true); 
-        return; 
-      }
-      
-      const loadingToast = toast.loading("Öğrenci kaydediliyor..."); // Yükleme bildirimi
-      await addStudent(name, age, diagnosis, photoFile); // 🔥 photoFile eklendi
-      
-      setName(''); setAge(''); setDiagnosis('');
-      setPhotoFile(null); // Temizle
-      setPhotoPreview(null); // Temizle
-      toast.dismiss(loadingToast);
-      toast.success("Öğrenci Eklendi"); 
-    } else {
-      toast.warning("İsim ve Yaş zorunludur");
+    
+    // 1. Zorunlu Alan Kontrolü
+    if(!name.trim() || !age.trim()) { 
+        toast.warning("İsim ve Yaş zorunludur!");
+        return;
     }
+
+    // 2. Çift Kayıt Kontrolü
+    const normalizedName = name.trim().toLocaleLowerCase('tr');
+    const isDuplicate = students.some(s => s.name.trim().toLocaleLowerCase('tr') === normalizedName);
+    if (isDuplicate) {
+      setDuplicateError(true); 
+      return; 
+    }
+
+    // 3. Eksik (Opsiyonel) Bilgi Kontrolü
+    const isDiagnosisMissing = !diagnosis.trim();
+    const isPhotoMissing = !photoFile;
+
+    if (isDiagnosisMissing || isPhotoMissing) {
+        if (isDiagnosisMissing && isPhotoMissing) {
+            setMissingMessage("tanı ve fotoğraf");
+        } else if (isDiagnosisMissing) {
+            setMissingMessage("tanı");
+        } else {
+            setMissingMessage("fotoğraf");
+        }
+        setMissingFieldsWarning(true); // Uyarı penceresini aç ve durdur
+        return;
+    }
+
+    // Eğer her şey tamsa direkt kaydet
+    await proceedToSaveStudent();
+  };
+
+  // --- YENİ KAYIT MANTIĞI: Asıl Kaydetme İşlemi ---
+  const proceedToSaveStudent = async () => {
+    setMissingFieldsWarning(false); // Pencereyi kapat (eğer açıksa)
+    
+    const loadingToast = toast.loading("Öğrenci kaydediliyor..."); // Yükleme bildirimi
+    await addStudent(name, age, diagnosis, photoFile); 
+    
+    // Formu Temizle
+    setName(''); setAge(''); setDiagnosis('');
+    setPhotoFile(null); 
+    setPhotoPreview(null); 
+    
+    toast.dismiss(loadingToast);
+    toast.success("Öğrenci başarıyla eklendi"); 
   };
 
   const searchedStudents = students.filter(s => 
@@ -162,7 +196,6 @@ export default function Home() {
                       !hasValidTeacher ? "bg-red-600 text-white border-red-400" :
                       isMyStudent ? "bg-green-500 text-black border-green-400" : "bg-blue-600/10 text-blue-500 border-blue-500/20"
                     )}>
-                      {/* 🔥 YENİ: Fotoğraf varsa onu, yoksa harfi göster */}
                       {student.photoUrl ? (
                         <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover rounded-full" />
                       ) : (
@@ -267,6 +300,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#020617] p-4 md:p-8 text-white font-sans">
+      
+      {/* Çift Kayıt Uyarısı */}
       <AlertDialog open={duplicateError} onOpenChange={setDuplicateError}>
         <AlertDialogContent className="bg-red-950 border-red-800 text-white">
           <AlertDialogHeader>
@@ -274,6 +309,24 @@ export default function Home() {
             <AlertDialogDescription className="text-red-200 text-base mt-2">Bu isimde bir öğrenci zaten kayıtlı!</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter><AlertDialogAction onClick={() => setDuplicateError(false)} className="bg-red-600 hover:bg-red-700 text-white border-0">Tamam</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 🔥 YENİ: Eksik Bilgi Uyarısı (Tanı/Fotoğraf) */}
+      <AlertDialog open={missingFieldsWarning} onOpenChange={setMissingFieldsWarning}>
+        <AlertDialogContent className="bg-slate-900 border-slate-800 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-orange-400">
+              <AlertTriangle className="h-6 w-6" /> Eksik Bilgi
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-300 text-base mt-2">
+              Öğrenciye ait <strong>{missingMessage}</strong> girmediniz. Bu şekilde devam edip kaydetmek istiyor musunuz?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-slate-800 text-white border-0 hover:bg-slate-700">Vazgeç</AlertDialogCancel>
+            <AlertDialogAction onClick={proceedToSaveStudent} className="bg-blue-600 hover:bg-blue-700 text-white border-0">Yine de Kaydet</AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
@@ -362,7 +415,6 @@ export default function Home() {
             <CardHeader><CardTitle className="text-lg">Öğrenci Ekle</CardTitle></CardHeader>
             <CardContent>
               <form onSubmit={handleAddStudent} className="space-y-3">
-                {/* 🔥 YENİ: KAMERA BUTONU VE İSİM İNPUTU YAN YANA */}
                 <div className="flex gap-2 items-center">
                   <div 
                     onClick={() => fileInputRef.current?.click()}
@@ -375,11 +427,10 @@ export default function Home() {
                       <Camera size={18} className="text-slate-400" />
                     )}
                   </div>
-                  <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={handlePhotoCapture} className="hidden" />
+                  <input type="file" accept="image/*" ref={fileInputRef} onChange={handlePhotoCapture} className="hidden" />
                   
                   <Input placeholder="İsim Soyisim" value={name} onChange={(e) => setName(e.target.value)} className="bg-slate-950 border-slate-800 flex-1" />
                 </div>
-                {/* ------------------------------------------------ */}
 
                 <div className="flex gap-2">
                   <Input placeholder="Yaş" type="number" value={age} onChange={(e) => setAge(e.target.value)} className="bg-slate-950 border-slate-800 w-20" />
