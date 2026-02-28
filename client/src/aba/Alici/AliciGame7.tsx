@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { db } from '../firebase';
+import { db } from '../../firebase'; // 🔥 Hata veren yol düzeltildi (../../firebase)
 import { doc, getDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Loader2, ArrowLeft, ShieldCheck, AlertCircle, User } from 'lucide-react';
@@ -264,5 +264,5 @@ export default function AliciGame7({ studentId, onClose }: AliciGame7Props) {
       </main>
     </div>
   );
-    }
-    
+                                        }
+          
