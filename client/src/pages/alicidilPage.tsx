@@ -9,7 +9,8 @@ import { ABA_MODULES } from '@/shared/abaData';
 
 // --- OYUN IMPORTLARI ---
 import AliciGame4 from '@/aba/Alici/AliciGame4';   // ADB 2.1 - İnsan Tanıma
-import AliciGame15 from '@/aba/Alici/AliciGame15'; // ADB 4.2 - Tüm Vücut Bölümlerini Tanıma (YENİ)
+import AliciGame15 from '@/aba/Alici/AliciGame15'; // ADB 4.2 - Tüm Vücut Bölümlerini Tanıma 
+import AliciGame7 from '@/aba/Alici/AliciGame7';   // ADB 2.4 - Dedektif Oyunu (YENİ)
 
 interface AliciDilPageProps {
   studentId: string;
@@ -89,7 +90,12 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
                  <AliciGame4 onClose={() => setActiveGameItem(null)} />
              )}
 
-             {/* OYUN 2: ADB 4.2 Tüm Vücut Bölümlerini Tanıma (YENİ EKLENDİ) */}
+             {/* OYUN 2: ADB 2.4 Büyük, Karmaşık Bir Resimdeki Nesneleri Ayırt Etme (YENİ DEDEKTİF OYUNU) */}
+             {(activeGameItem.includes("2.4") || activeGameItem.includes("Büyük, Karmaşık")) && (
+                 <AliciGame7 studentId={studentId} onClose={() => setActiveGameItem(null)} />
+             )}
+
+             {/* OYUN 3: ADB 4.2 Tüm Vücut Bölümlerini Tanıma */}
              {(activeGameItem.includes("4.2") || activeGameItem.includes("Tüm Vücut")) && (
                  <AliciGame15 onClose={() => setActiveGameItem(null)} />
              )}
@@ -131,9 +137,9 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
             const isCompleted = status === true;
 
             // --- OYUN KONTROLÜ (GÜNCELLENDİ) ---
-            // Hem 2.1 hem de 4.2 için oyun butonu aktif olacak
             const hasGame = 
                 (item.includes("2.1") || item.includes("İnsan Tanıma")) ||
+                (item.includes("2.4") || item.includes("Büyük, Karmaşık")) ||
                 (item.includes("4.2") || item.includes("Tüm Vücut"));
 
             return (
