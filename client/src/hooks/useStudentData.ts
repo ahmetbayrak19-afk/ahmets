@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { db, auth, storage } from '../firebase'; // 🔥 storage eklendi
+import { db, auth, storage } from '../firebase'; 
 import { collection, onSnapshot, doc, addDoc, deleteDoc, query, orderBy, getDoc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'; // 🔥 Storage fonksiyonları eklendi
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'; // 🔥 deleteObject eklendi
 
 export function useStudentData() {
   const [students, setStudents] = useState<any[]>([]);
@@ -52,7 +52,6 @@ export function useStudentData() {
     loadData();
   }, []);
 
-  // 🔥 YENİ: photoFile parametresi eklendi
   const addStudent = async (name: string, age: string, diagnosis: string, photoFile: File | null = null) => {
     const instId = localStorage.getItem("kazanim-takip-institution-id");
     const tName = localStorage.getItem("kazanim-takip-teacher-name");
@@ -61,20 +60,19 @@ export function useStudentData() {
     try {
       let photoUrl = null;
 
-      // 🔥 FOTOĞRAF YÜKLEME İŞLEMİ
       if (photoFile) {
         const fileName = `${Date.now()}_${photoFile.name}`;
         const storageRef = ref(storage, `institutions/${instId}/students/${fileName}`);
         
         await uploadBytes(storageRef, photoFile);
-        photoUrl = await getDownloadURL(storageRef); // Görüntüleme linkini alıyoruz
+        photoUrl = await getDownloadURL(storageRef); 
       }
 
       await addDoc(collection(db, "institutions", instId, "students"), {
         name: name.trim(),
         age: age.trim(),
         diagnosis: diagnosis.trim(),
-        photoUrl: photoUrl, // 🔥 Linki veritabanına kaydediyoruz
+        photoUrl: photoUrl, 
         createdBy: tName,
         associatedTeacherIds: [tName],
         createdAt: new Date().toISOString()
@@ -86,9 +84,31 @@ export function useStudentData() {
     }
   };
 
+  // 🔥 YENİ: Hem Firestore kaydını hem de Storage'daki fotoğrafı silen fonksiyon
   const deleteStudent = async (id: string) => {
     const instId = localStorage.getItem("kazanim-takip-institution-id");
-    if (instId) await deleteDoc(doc(db, "institutions", instId, "students", id));
+    if (!instId) return;
+
+    try {
+      // 1. Fotoğraf URL'sini bulmak için öğrenci verisini çek
+      const studentDocRef = doc(db, "institutions", instId, "students", id);
+      const studentSnap = await getDoc(studentDocRef);
+
+      if (studentSnap.exists()) {
+        const studentData = studentSnap.data();
+
+        // 2. Önce Firestore'dan metin verilerini sil
+        await deleteDoc(studentDocRef);
+
+        // 3. Eğer kayıtlı bir fotoğraf URL'si varsa, Firebase Storage'dan dosyayı sil
+        if (studentData.photoUrl) {
+          const photoRef = ref(storage, studentData.photoUrl);
+          await deleteObject(photoRef).catch(err => console.error("Fotoğraf silinemedi:", err));
+        }
+      }
+    } catch (error) {
+      console.error("Öğrenci silinirken hata oluştu:", error);
+    }
   };
 
   const deleteTeacher = async (teacherId: string) => {
@@ -122,4 +142,4 @@ export function useStudentData() {
     toggleTeacherApproval,
     logoutTeacher 
   };
-}
+    }
