@@ -1,26 +1,26 @@
 import { useState, useEffect, useRef } from 'react';
-import { db, storage } from '../firebase'; // Firebase bağlantıları
+import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, Camera, ShieldCheck, AlertCircle } from 'lucide-react';
-import { useRoute, useLocation } from 'wouter';
+import { Loader2, ArrowLeft, ShieldCheck, AlertCircle, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // 🔥 YAPAY ZEKA KÜTÜPHANELERİ 🔥
-// Bu kütüphaneler cihaz üzerinde (on-device) çalışır, ücretsizdir ve internet gerektirmez.
 import * as tf from '@tensorflow/tfjs';
-import '@tensorflow/tfjs-backend-webgl'; // Performans için WebGL backend'i
+import '@tensorflow/tfjs-backend-webgl';
 import * as bodySegmentation from '@tensorflow-models/body-segmentation';
 
 // --- VARLIKLAR (ASSETS) ---
-// Dikkat: Bu dosyayı AliciGame7.tsx ile aynı klasöre koymalısın.
-// Görsel şeffaf (PNG) olmalı ve boyun/kafa kısmı boş olmalıdır.
+// Bu görsel AliciGame7.tsx ile aynı klasörde olmalı (boynu boş şeffaf PNG)
 import dedektifKostumImg from './dedektif_kostum.png'; 
 
-export default function AliciGame7() {
-  const [match, params] = useRoute('/alici-game-7/:studentId');
-  const [_, setLocation] = useLocation();
+interface AliciGame7Props {
+  studentId: string;
+  onClose: () => void;
+}
+
+export default function AliciGame7({ studentId, onClose }: AliciGame7Props) {
   const [student, setStudent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -36,16 +36,18 @@ export default function AliciGame7() {
   // --- ADIM 1: ÖĞRENCİ VERİSİNİ ÇEK ---
   useEffect(() => {
     const instId = localStorage.getItem("kazanim-takip-institution-id");
-    if (!params?.studentId || !instId) {
+    
+    if (!studentId || !instId) {
         toast.error("Hatalı erişim!");
-        setLocation('/home');
+        onClose();
         return;
     }
 
     const fetchStudent = async () => {
       try {
-        const studentRef = doc(db, "institutions", instId, "students", params.studentId);
+        const studentRef = doc(db, "institutions", instId, "students", studentId);
         const docSnap = await getDoc(studentRef);
+        
         if (docSnap.exists()) {
           const data = docSnap.data();
           setStudent({ id: docSnap.id, ...data });
@@ -55,33 +57,34 @@ export default function AliciGame7() {
           }
         } else {
           toast.error("Öğrenci bulunamadı!");
-          setLocation('/home');
+          onClose();
         }
       } catch (error) {
         console.error("Hata:", error);
         toast.error("Bir hata oluştu.");
+        onClose();
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchStudent();
-  }, [params?.studentId]);
+  }, [studentId, onClose]);
 
-  // --- ADIM 2: YAPAY ZEKA MODELİNİ YÜKLE (Cihaz Üzerinde) ---
+  // --- ADIM 2: YAPAY ZEKA MODELİNİ YÜKLE ---
   useEffect(() => {
     const loadAIModel = async () => {
         try {
             setIsProcessing(true);
-            // TensorFlow backend'ini hazırla
             await tf.ready();
-            // Selfie Segmentation modelini yükle (En hızlı ve ücretsiz model)
+            
             const model = bodySegmentation.SupportedModels.MediaPipeSelfieSegmentation;
             const segmenterConfig: bodySegmentation.MediaPipeSelfieSegmentationMediaPipeModelConfig = {
-                runtime: 'mediapipe', // Veya 'tfjs' ama mediapipe daha hızlıdır
+                runtime: 'mediapipe', 
                 solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation',
-                modelType: 'general', // 'landscape' daha az güçlü ama hızlıdır
+                modelType: 'general',
             };
+            
             const loadedSegmenter = await bodySegmentation.createSegmenter(model, segmenterConfig);
             setSegmenter(loadedSegmenter);
             console.log("Yapay zeka modeli yüklendi.");
@@ -107,52 +110,47 @@ export default function AliciGame7() {
         setIsProcessing(true);
         setAiError(null);
         setProcessedImage(null);
+        
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         const img = originalImageRef.current;
         
         if (!ctx) return;
 
-        // 1. Canvas boyutlarını 512x512 yap (Optimizasyon için kilitliyoruz)
+        // 1. Canvas boyutlarını sabitle
         const TARGET_SIZE = 512;
         canvas.width = TARGET_SIZE;
         canvas.height = TARGET_SIZE;
 
-        // 2. Orijinal kedi fotoğrafını canvas'a çiz (merkeze alarak kare kırp)
+        // 2. Orijinal fotoğrafı çiz
         const minDim = Math.min(img.naturalWidth, img.naturalHeight);
         const startX = (img.naturalWidth - minDim) / 2;
         const startY = (img.naturalHeight - minDim) / 2;
         ctx.drawImage(img, startX, startY, minDim, minDim, 0, 0, TARGET_SIZE, TARGET_SIZE);
 
-        // 3. 🔥 YAPAY ZEKA İLE ARKAPLANI SİL 🔥
-        // Canvas'taki kedi fotoğrafını analiz et
+        // 3. Arkaplanı Sil
         const segmentation = await segmenter.segmentPeople(canvas);
         
         if (segmentation && segmentation.length > 0) {
-            // Arkaplanı şeffaf (transparent) yapan maskeyi oluştur
-            const foregroundColor = { r: 0, g: 0, b: 0, a: 0 }; // İnsan (kedi) yeri şeffaf
-            const backgroundColor = { r: 0, g: 0, b: 0, a: 255 }; // Arkaplan siyah (silinecek)
+            const foregroundColor = { r: 0, g: 0, b: 0, a: 0 }; 
+            const backgroundColor = { r: 0, g: 0, b: 0, a: 255 }; 
             
             const backgroundMask = await bodySegmentation.toBinaryMask(
                 segmentation, foregroundColor, backgroundColor
             );
 
-            // Canvas'ın piksellerini al
             const imageData = ctx.getImageData(0, 0, TARGET_SIZE, TARGET_SIZE);
             const data = imageData.data;
 
-            // Maskeyi kullanarak arkaplan piksellerini şeffaf yap
             for (let i = 0; i < data.length; i += 4) {
-                // Eğer maske bu pikselin arkaplan (255) olduğunu söylüyorsa
                 if (backgroundMask.data[i / 4] === 255) {
-                    data[i + 3] = 0; // Alpha (saydamlık) değerini 0 yap (sil)
+                    data[i + 3] = 0; 
                 }
             }
             
-            // Temizlenmiş kediyi canvas'a geri yaz
             ctx.putImageData(imageData, 0, 0);
 
-            // 4. 🔥 DEDEKTİF KOSTÜMÜNÜ GİYDİR 🔥
+            // 4. Kostümü Giydir
             const kostumImg = new Image();
             kostumImg.src = dedektifKostumImg;
             
@@ -161,11 +159,9 @@ export default function AliciGame7() {
                 kostumImg.onerror = reject;
             });
 
-            // Temizlenmiş kedinin ÜZERİNE dedektif kostümünü çiz
-            // (Hizalamayı görseline göre TARGET_SIZE içinde ayarlamalısın)
             ctx.drawImage(kostumImg, 0, 0, TARGET_SIZE, TARGET_SIZE);
 
-            // 5. Final görseli Base64 olarak state'e kaydet
+            // 5. Finali Kaydet
             const finalDataUrl = canvas.toDataURL('image/png', 0.9);
             setProcessedImage(finalDataUrl);
             toast.success("Öğrenci dedektif oldu!");
@@ -184,22 +180,25 @@ export default function AliciGame7() {
   };
 
   if (isLoading) return (
-    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center text-white p-6">
+    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center text-white p-6 absolute inset-0 z-50">
       <Loader2 className="animate-spin text-blue-500 mb-4" size={48} />
       <span className="italic text-slate-400">Öğrenci dosyası açılıyor...</span>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white font-sans p-4 pb-12">
+    <div className="min-h-screen bg-[#020617] text-white font-sans p-4 pb-12 absolute inset-0 z-50 overflow-y-auto">
+      
       {/* ÜST BAR */}
       <header className="flex items-center gap-3 pb-4 border-b border-white/10 mb-6 sticky top-0 bg-[#020617] z-10">
-        <Button variant="ghost" size="icon" onClick={() => window.history.back()}>
+        <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-slate-800">
           <ArrowLeft />
         </Button>
         <div>
             <h1 className="text-xl font-bold">{student?.name}</h1>
-            <p className="text-xs text-slate-400 flex items-center gap-1.5"><ShieldCheck size={12} className="text-blue-500"/> Dedektif Eğitimi</p>
+            <p className="text-xs text-slate-400 flex items-center gap-1.5">
+              <ShieldCheck size={12} className="text-blue-500"/> Dedektif Eğitimi
+            </p>
         </div>
       </header>
 
@@ -210,8 +209,8 @@ export default function AliciGame7() {
                 ref={originalImageRef}
                 src={student.photoUrl}
                 alt="Orijinal"
-                crossOrigin="anonymous" // 🔥 Kritik: Firebase'den veri çekmek için şart
-                className="hidden" // Ekranda gösterme
+                crossOrigin="anonymous" 
+                className="hidden" 
             />
         )}
         
@@ -225,7 +224,7 @@ export default function AliciGame7() {
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center z-10 p-6 text-center">
                         <Loader2 className="animate-spin text-blue-500 mb-4" size={40} />
                         <p className="text-blue-400 font-bold text-lg animate-pulse">Yapay Zeka Çalışıyor...</p>
-                        <p className="text-slate-500 text-xs mt-2">Arkaplan siliniyor ve kostüm giydiriliyor (Bu işlem cihazınıza göre 5-10 saniye sürebilir).</p>
+                        <p className="text-slate-500 text-xs mt-2">Arkaplan siliniyor ve kostüm giydiriliyor (Cihazınıza göre 5-10 saniye sürebilir).</p>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -266,4 +265,4 @@ export default function AliciGame7() {
     </div>
   );
     }
-      
+    
