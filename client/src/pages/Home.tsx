@@ -39,6 +39,9 @@ export default function Home() {
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // --- INSTAGRAM TARZI BÜYÜK FOTOĞRAF GÖSTERİCİ STATE'İ ---
+  const [viewingStudentPhoto, setViewingStudentPhoto] = useState<{url: string, name: string} | null>(null);
   
   const [_, setLocation] = useLocation();
 
@@ -99,7 +102,7 @@ export default function Home() {
   const startCamera = async () => {
     setIsCameraModalOpen(true);
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); // Arka kamera öncelikli
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); 
         streamRef.current = stream;
         if (videoRef.current) {
             videoRef.current.srcObject = stream;
@@ -119,31 +122,35 @@ export default function Home() {
     setIsCameraModalOpen(false);
   };
 
-  // Canvas ile videodan görüntüyü alıp File objesine dönüştürme
+  // Canvas ile videodan görüntüyü alıp 512x512 olarak optimize etme
   const capturePhotoFromVideo = () => {
     if (!videoRef.current) return;
     
     const video = videoRef.current;
     const canvas = document.createElement('canvas');
     
-    // Kare (square) kırpma mantığı
-    const size = Math.min(video.videoWidth, video.videoHeight);
-    canvas.width = size;
-    canvas.height = size;
+    // Kameradan gelen asıl boyut
+    const minDimension = Math.min(video.videoWidth, video.videoHeight);
+    
+    // OPTİMİZASYON: Çıktı boyutunu 512x512 piksele kilitliyoruz
+    const TARGET_SIZE = 512;
+    canvas.width = TARGET_SIZE;
+    canvas.height = TARGET_SIZE;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    // Görüntüyü merkeze alarak çiz
-    const startX = (video.videoWidth - size) / 2;
-    const startY = (video.videoHeight - size) / 2;
-    ctx.drawImage(video, startX, startY, size, size, 0, 0, size, size);
+    // Görüntüyü merkeze al ve hedef boyuta (512x512) sıkıştırarak çiz
+    const startX = (video.videoWidth - minDimension) / 2;
+    const startY = (video.videoHeight - minDimension) / 2;
     
-    // Ekranda göstermek için Base64 al
+    ctx.drawImage(video, startX, startY, minDimension, minDimension, 0, 0, TARGET_SIZE, TARGET_SIZE);
+    
+    // Ekranda göstermek için Base64 al (Kalite %80)
     const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
     setPhotoPreview(dataUrl);
 
-    // Firebase Storage'a yüklemek için File objesine çevir
+    // Firebase Storage'a yüklemek için Blob ve File objesine çevir
     canvas.toBlob((blob) => {
         if (blob) {
             const file = new File([blob], `photo_${Date.now()}.jpg`, { type: "image/jpeg" });
@@ -154,7 +161,6 @@ export default function Home() {
     stopCameraStream();
   };
 
-  // Galeriden dosya seçme (Alternatif olarak hala duruyor)
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -254,11 +260,16 @@ export default function Home() {
           >
             <div className="flex justify-between items-start gap-2">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className={twMerge(
-                      "h-12 w-12 rounded-full flex items-center justify-center font-bold text-lg border shadow-lg relative shrink-0 overflow-hidden",
-                      !hasValidTeacher ? "bg-red-600 text-white border-red-400" :
-                      isMyStudent ? "bg-green-500 text-black border-green-400" : "bg-blue-600/10 text-blue-500 border-blue-500/20"
-                    )}>
+                    {/* PROFİL FOTOĞRAFI YUVARLAĞI (TIKLANABİLİR) */}
+                    <div 
+                      onClick={() => student.photoUrl && setViewingStudentPhoto({url: student.photoUrl, name: student.name})}
+                      className={twMerge(
+                        "h-12 w-12 rounded-full flex items-center justify-center font-bold text-lg border shadow-lg relative shrink-0 overflow-hidden",
+                        student.photoUrl ? "cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all" : "",
+                        !hasValidTeacher ? "bg-red-600 text-white border-red-400" :
+                        isMyStudent ? "bg-green-500 text-black border-green-400" : "bg-blue-600/10 text-blue-500 border-blue-500/20"
+                      )}
+                    >
                       {student.photoUrl ? (
                         <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover" />
                       ) : (
@@ -363,6 +374,39 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#020617] p-4 md:p-8 text-white font-sans">
       
+      {/* --- INSTAGRAM TARZI FOTOĞRAF GÖRÜNTÜLEYİCİ (MODAL) --- */}
+      <AnimatePresence>
+        {viewingStudentPhoto && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            onClick={() => setViewingStudentPhoto(null)} // Arkaplana tıklayınca kapat
+            className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-4 backdrop-blur-sm cursor-zoom-out"
+          >
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0, y: 50 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.8, opacity: 0, y: 50 }} 
+              className="relative flex flex-col items-center max-w-sm w-full"
+              onClick={(e) => e.stopPropagation()} // Resme tıklayınca kapanmasını engelle
+            >
+              <div className="w-64 h-64 sm:w-80 sm:h-80 rounded-full border-4 border-slate-700 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.6)]">
+                <img src={viewingStudentPhoto.url} alt={viewingStudentPhoto.name} className="w-full h-full object-cover" />
+              </div>
+              <h2 className="text-white text-3xl font-bold mt-8 text-center">{viewingStudentPhoto.name}</h2>
+              
+              <button 
+                onClick={() => setViewingStudentPhoto(null)}
+                className="mt-8 bg-slate-800 text-white p-4 rounded-full hover:bg-slate-700 hover:scale-105 active:scale-95 transition-all shadow-lg"
+              >
+                <X size={28} />
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* --- DAHİLİ KAMERA PENCERESİ (MODAL) --- */}
       <AnimatePresence>
         {isCameraModalOpen && (
@@ -387,7 +431,6 @@ export default function Home() {
                             playsInline 
                             className="w-full h-full object-cover" 
                         />
-                        {/* Kılavuz Kare (İsteğe Bağlı) */}
                         <div className="absolute inset-4 border-2 border-white/30 rounded-full pointer-events-none border-dashed" />
                     </div>
 
@@ -518,7 +561,6 @@ export default function Home() {
               <form onSubmit={handleAddStudent} className="space-y-3">
                 <div className="flex gap-2 items-center">
                   
-                  {/* 🔥 KAMERA AÇMA BUTONU */}
                   <div 
                     onClick={startCamera}
                     className="h-10 w-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center cursor-pointer shrink-0 overflow-hidden hover:bg-slate-700 transition-colors relative group"
@@ -536,7 +578,6 @@ export default function Home() {
                     )}
                   </div>
                   
-                  {/* Galeriden seçmek isteyenler için hala gizli olarak duruyor, isteğe bağlı eklenebilir */}
                   <input type="file" accept="image/*" ref={fileInputRef} onChange={handlePhotoUpload} className="hidden" />
                   
                   <Input placeholder="İsim Soyisim" value={name} onChange={(e) => setName(e.target.value)} className="bg-slate-950 border-slate-800 flex-1" />
