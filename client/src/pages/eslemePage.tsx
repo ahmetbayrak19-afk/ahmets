@@ -1,8 +1,4 @@
-import { useState, useEffect } from 'react';
-import { db } from '@/firebase'; 
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Gamepad2, GraduationCap, ClipboardCheck } from 'lucide-react';
+@@ -6,50 +6,51 @@ import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Gamepad2, Grad
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
@@ -28,6 +24,7 @@ import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16'; // EB.4.2 (Klavye/
 
 // 🔥 YENİ EKLENEN: EB.4.3 (Sözcük-Nesne)
 import NesneEslemeGame17 from '@/aba/esle/NesneEslemeGame17'; 
+import NesneEslemeGame22 from '@/aba/esle/NesneEslemeGame22'; // EB.4.8 (İlişkili Resimler)
 
 // --- ÖYKÜ EŞLEME OYUNU ---
 import NesneEslemeGame23 from '@/aba/esle/NesneEslemeGame23'; // EB.4.9 (Öykü)
@@ -53,77 +50,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
 
   useEffect(() => {
     const load = async () => {
-      if (!studentId) return;
-      try {
-        const instId = localStorage.getItem("kazanim-takip-institution-id");
-        if (instId) {
-            const docSnap = await getDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"));
-            if (docSnap.exists()) setFormData(docSnap.data());
-        }
-      } catch (error) {
-        toast.error("Veri yüklenirken hata oluştu.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [studentId]);
-
-  const handleSave = async (newData?: Record<string, any>) => {
-    try {
-      const instId = localStorage.getItem("kazanim-takip-institution-id");
-      const dataToSave = newData || formData;
-      if (instId) {
-          await setDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"), dataToSave, { merge: true });
-          if (!newData) toast.success("Değişiklikler kaydedildi.");
-      }
-    } catch (error) {
-      toast.error("Kaydetme hatası.");
-    }
-  };
-
-  const setStatus = (itemString: string, status: boolean) => {
-    setFormData(prev => ({ ...prev, [itemString]: prev[itemString] === status ? null : status }));
-  };
-
-  const handleGameComplete = async (success: boolean) => {
-    if (success && activeGameMode === 'assessment' && activeGameItem) {
-        const updatedData = { ...formData, [activeGameItem]: true };
-        setFormData(updatedData);
-        await handleSave(updatedData);
-        toast.success("Tebrikler! Kazanım tamamlandı. 🎉");
-    }
-    setActiveGameMode(null);
-    setActiveGameItem(null);
-  };
-
-  const calculateProgress = () => {
-    if (items.length === 0) return 0;
-    const completedCount = items.filter(item => formData[item] === true).length;
-    return Math.round((completedCount / items.length) * 100);
-  };
-
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
-
-  return (
-    <div className="space-y-6 relative">
-      
-      {/* --- OYUN MODALLARI --- */}
-      {activeGameMode && activeGameItem && (
-          <>
-            {activeGameItem.startsWith("EB.1.1") && <NesneEslemeGame1 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
-            {activeGameItem.startsWith("EB.1.2") && <NesneEslemeGame2 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
-            {activeGameItem.startsWith("EB.1.3") && <NesneEslemeGame3 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
-            {activeGameItem.startsWith("EB.1.4") && <NesneEslemeGame4 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
-            
-            {/* EB.2.1 (Geçici) */}
-            {activeGameItem.startsWith("EB.2.1") && <div className="fixed inset-0 z-[100] bg-white"><EslemeGame onClose={() => setActiveGameMode(null)} /></div>}
-
-            {activeGameItem.startsWith("EB.2.2") && <NesneEslemeGame6 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
-            {activeGameItem.startsWith("EB.2.3") && <NesneEslemeGame7 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
-            {activeGameItem.startsWith("EB.2.4") && <NesneEslemeGame8 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
-
-            {activeGameItem.startsWith("EB.2.5") && <NesneEslemeGame9 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
+@@ -127,97 +128,103 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             {activeGameItem.startsWith("EB.3.1") && <NesneEslemeGame10 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.3.2") && <NesneEslemeGame11 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.3.3") && <NesneEslemeGame12 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
@@ -147,6 +74,11 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             {/* 🔥 YENİ: EB.4.3 (Sözcük-Nesne) */}
             {activeGameItem.startsWith("EB.4.3") && (
                 <NesneEslemeGame17 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
+            )}
+
+            {/* EB.4.8 - İlişkili Resimleri Eşleme */}
+            {activeGameItem.startsWith("EB.4.8") && (
+                <NesneEslemeGame22 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
 
             {/* EB.4.9 - Öykü Eşleme */}
@@ -196,6 +128,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                 item.startsWith("EB.4.1.") || 
                 item.startsWith("EB.4.2") ||
                 item.startsWith("EB.4.3") || // 🔥 YENİ EKLENEN
+                item.startsWith("EB.4.8") ||
                 item.startsWith("EB.4.9");
             
             const firstSpaceIndex = item.indexOf(' ');
@@ -221,16 +154,3 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                                 <button onClick={() => { setActiveGameItem(item); setActiveGameMode('assessment'); }} className="h-8 px-3 rounded-md bg-blue-600/90 text-white text-[10px] font-bold flex items-center gap-1 hover:bg-blue-500 border border-blue-400 shadow-sm transition-transform active:scale-95"><ClipboardCheck size={14} /> Test</button>
                             </div>
                         )}
-                        <div className="flex items-center gap-1">
-                             <button onClick={() => setStatus(item, false)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center", status === false ? "bg-red-500/20 border-red-500 text-red-400" : "bg-slate-950 border-slate-800 text-slate-500")}><XCircle size={16} /></button>
-                             <button onClick={() => setStatus(item, true)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center", status === true ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-800 text-slate-500")}><CheckCircle2 size={16} /></button>
-                        </div>
-                    </div>
-                </div>
-            );
-        })}
-      </div>
-    </div>
-  );
-  }
-          
