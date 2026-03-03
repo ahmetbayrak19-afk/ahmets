@@ -215,7 +215,10 @@ export default function NesneEslemeGame22({ mode, onClose, onComplete }: GamePro
   useEffect(() => {
     if (!isCompleted || !questionGroup) return;
 
-    playSoundEffect('success');
+    // Not: playSoundEffect('success') burada bilerek kapatıldı 
+    // çünkü artık her parça eşlendiğinde handleDragEnd içinde o sesi çalıyoruz.
+    // İki defa üst üste ses çıkmasını engelliyor.
+    
     setShowFinalImage(true);
     setShowFeedback('correct');
 
@@ -269,9 +272,19 @@ export default function NesneEslemeGame22({ mode, onClose, onComplete }: GamePro
     const alreadyMatched = matchedPieceIds.includes(droppedPiece.id);
 
     if (isRequiredPiece && !alreadyMatched) {
+      // 🔥 YENİ: Parçayı doğru yere bıraktığı an "Bravo" desin
+      playSoundEffect('success');
+      
       setMatchedPieceIds(prev => [...prev, droppedPiece.id]);
       setOptions(prev => prev.filter(option => option.id !== droppedPiece.id));
-      setShowFeedback(null);
+      
+      setShowFeedback('correct');
+      
+      // Eğer henüz bütün grup tamamlanmadıysa yeşil tiki kısa süre sonra kaldır.
+      // (Tamamlandıysa useEffect içindeki kod zaten kendi bekletmesini yapacak)
+      if (matchedPieceIds.length + 1 !== requiredPieceIds.length) {
+          setTimeout(() => setShowFeedback(null), 900);
+      }
       return;
     }
 
@@ -337,10 +350,28 @@ export default function NesneEslemeGame22({ mode, onClose, onComplete }: GamePro
             <div
               ref={dropZoneRef}
               className={twMerge(
-                'w-72 h-72 bg-white rounded-[3rem] border-4 border-dashed flex items-center justify-center shadow-inner relative z-0 transition-all duration-300',
+                'w-72 h-72 bg-white rounded-[3rem] border-4 border-dashed flex flex-col items-center justify-center shadow-inner relative z-0 transition-all duration-300',
                 showFinalImage ? 'border-green-500 bg-green-50 border-solid' : 'border-slate-300',
               )}
             >
+              {/* 🔥 YENİ: Başarıyla eşlenen parçaların yukarıda küçük görünmesi */}
+              {!showFinalImage && matchedPieceIds.length > 0 && (
+                <div className="absolute -top-6 flex gap-3 z-20">
+                  {questionGroup.pieces
+                    .filter(p => matchedPieceIds.includes(p.id))
+                    .map(p => (
+                      <motion.div
+                        key={p.id}
+                        initial={{ scale: 0, y: 15 }}
+                        animate={{ scale: 1, y: 0 }}
+                        className="w-16 h-16 bg-white border-2 border-green-400 rounded-xl shadow-[0_4px_0_0_#bbf7d0] flex items-center justify-center p-2"
+                      >
+                        <img src={p.src} alt={p.name} className="w-full h-full object-contain drop-shadow-sm" />
+                      </motion.div>
+                    ))}
+                </div>
+              )}
+
               <img
                 src={showFinalImage ? questionGroup.finalImage : targetPiece.src}
                 alt={showFinalImage ? 'eşleşme sonucu' : targetPiece.name}
