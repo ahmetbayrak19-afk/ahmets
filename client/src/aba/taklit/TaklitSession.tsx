@@ -129,28 +129,32 @@ export default function TaklitSession({ mode, itemCode, itemText, onClose, onSav
 
   return (
     <div className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white">
-      {/* Üst Bar - padding daraltıldı, shrink-0 eklendi */}
-      <div className="shrink-0 py-2 px-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md relative z-10">
-        <button onClick={onClose} className="p-1.5 sm:p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
-          <XCircle size={24} />
+      
+      {/* ÜST BAR: Dikeyde geniş (p-4), Yatayda dar (landscape:py-2) */}
+      <div className="shrink-0 p-4 landscape:py-2 landscape:px-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md relative z-10">
+        <button onClick={onClose} className="p-2 landscape:p-1.5 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
+          <XCircle className="w-7 h-7 landscape:w-6 landscape:h-6" />
         </button>
         <div className="text-center flex flex-col items-center">
-          <h2 className="text-sm sm:text-lg font-bold truncate max-w-[200px] sm:max-w-md">{itemCode} - {currentVideo.name}</h2>
-          <p className="text-[10px] sm:text-xs text-slate-400 font-medium tracking-widest uppercase">
+          <h2 className="text-lg landscape:text-sm font-bold truncate max-w-[200px] sm:max-w-md">{itemCode} - {currentVideo.name}</h2>
+          <p className="text-xs landscape:text-[10px] text-slate-400 font-medium tracking-widest uppercase mt-1 landscape:mt-0">
             {mode === 'instruction' ? 'ÇALIŞMA MODU' : `TEST MODU (${currentIndex + 1}/${activePlaylist.length})`}
           </p>
         </div>
-        <div className="w-8 sm:w-10"></div> 
+        <div className="w-10 landscape:w-8"></div> 
       </div>
 
-      {/* Ekran (Yarı Video / Yarı Kamera) - p-4'ten p-2'ye düşürüldü */}
-      <div className="flex-1 relative flex flex-row p-2 gap-2 overflow-hidden bg-black">
+      {/* VİDEO EKRANI: Dikeyde alt alta (flex-col), Yatayda yan yana (landscape:flex-row) */}
+      <div className="flex-1 relative flex flex-col landscape:flex-row p-4 landscape:p-2 gap-4 landscape:gap-2 overflow-hidden bg-black">
         {phase === 'playing' ? (
           <>
-            {/* SOL: ÖRNEK VİDEO */}
-            <div className="flex-1 relative bg-slate-900 rounded-xl overflow-hidden border border-slate-800 flex flex-col justify-center">
-              <div className="absolute top-2 left-2 bg-black/60 backdrop-blur px-2 py-1 rounded-md flex items-center gap-1.5 z-10 text-slate-200 text-[10px] font-bold tracking-wider">
-                <VideoIcon size={12} className="text-blue-400" /> VİDEO
+            {/* ÖRNEK VİDEO */}
+            <div className="flex-1 relative bg-slate-900 rounded-2xl landscape:rounded-xl overflow-hidden border border-slate-800 flex flex-col justify-center">
+              <div className="absolute top-3 left-3 landscape:top-2 landscape:left-2 bg-black/60 backdrop-blur px-3 py-1.5 landscape:px-2 landscape:py-1 rounded-lg landscape:rounded-md flex items-center gap-2 landscape:gap-1.5 z-10 text-slate-200 text-xs landscape:text-[10px] font-bold tracking-wider">
+                <VideoIcon className="w-4 h-4 landscape:w-3 landscape:h-3 text-blue-400" />
+                {/* Dikeyde uzun yazı, yatayda kısa yazı */}
+                <span className="hidden landscape:inline">VİDEO</span>
+                <span className="landscape:hidden">ÖRNEK VİDEO</span>
               </div>
               <video
                 ref={videoRef}
@@ -159,21 +163,23 @@ export default function TaklitSession({ mode, itemCode, itemText, onClose, onSav
                 loop
                 playsInline
                 muted
-                className="w-full h-full object-contain"
+                className="w-full h-full object-cover landscape:object-contain"
               />
             </div>
 
-            {/* SAĞ: KAMERA */}
-            <div className="flex-1 relative bg-slate-900 rounded-xl overflow-hidden border border-slate-800 flex flex-col justify-center">
-              <div className="absolute top-2 left-2 bg-black/60 backdrop-blur px-2 py-1 rounded-md flex items-center gap-1.5 z-10 text-slate-200 text-[10px] font-bold tracking-wider">
-                <CameraIcon size={12} className="text-purple-400" /> SEN
+            {/* KAMERA */}
+            <div className="flex-1 relative bg-slate-900 rounded-2xl landscape:rounded-xl overflow-hidden border border-slate-800 flex flex-col justify-center">
+              <div className="absolute top-3 left-3 landscape:top-2 landscape:left-2 bg-black/60 backdrop-blur px-3 py-1.5 landscape:px-2 landscape:py-1 rounded-lg landscape:rounded-md flex items-center gap-2 landscape:gap-1.5 z-10 text-slate-200 text-xs landscape:text-[10px] font-bold tracking-wider">
+                <CameraIcon className="w-4 h-4 landscape:w-3 landscape:h-3 text-purple-400" />
+                <span className="hidden landscape:inline">SEN</span>
+                <span className="landscape:hidden">ÖĞRENCİ (SEN)</span>
               </div>
               <video
                 ref={webcamRef}
                 autoPlay
                 playsInline
                 muted
-                className="w-full h-full object-cover transform -scale-x-100" 
+                className="w-full h-full object-cover landscape:object-contain transform -scale-x-100" 
               />
             </div>
           </>
@@ -189,28 +195,30 @@ export default function TaklitSession({ mode, itemCode, itemText, onClose, onSav
         )}
       </div>
 
-      {/* Alt Kontrol Paneli - Yatay butonlar ile inceltildi */}
+      {/* ALT BUTONLAR: Dikeyde kare (flex-col), Yatayda kapsül (landscape:flex-row) */}
       {phase === 'playing' && (
-        <div className="shrink-0 py-2 sm:py-3 px-4 bg-slate-900 border-t border-slate-800 flex items-center justify-center gap-4 relative z-10">
+        <div className="shrink-0 p-6 pb-10 landscape:py-2 landscape:px-4 landscape:pb-2 bg-slate-900 border-t border-slate-800 flex items-center justify-center gap-6 landscape:gap-4 relative z-10">
           {mode === 'instruction' ? (
             <>
-              <button onClick={handlePrev} className="flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-800 rounded-xl active:scale-95 transition-all text-slate-300 hover:bg-slate-700 hover:text-white min-w-[120px] border border-slate-700">
-                <ChevronLeft size={20} />
+              <button onClick={handlePrev} className="flex flex-col landscape:flex-row items-center justify-center gap-2 p-4 w-32 landscape:w-auto landscape:px-6 landscape:py-2.5 landscape:min-w-[120px] bg-slate-800 rounded-2xl landscape:rounded-xl active:scale-95 transition-all text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700">
+                <ChevronLeft className="w-8 h-8 landscape:w-5 landscape:h-5" />
                 <span className="text-xs font-bold uppercase tracking-wider">Önceki</span>
               </button>
-              <button onClick={handleNext} className="flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 rounded-xl active:scale-95 transition-all text-white hover:bg-blue-500 min-w-[120px] shadow-lg shadow-blue-900/50">
+              
+              <button onClick={handleNext} className="flex flex-col landscape:flex-row items-center justify-center gap-2 p-4 w-32 landscape:w-auto landscape:px-6 landscape:py-2.5 landscape:min-w-[120px] bg-blue-600 rounded-2xl landscape:rounded-xl active:scale-95 transition-all text-white hover:bg-blue-500 shadow-lg shadow-blue-900/50">
+                <ChevronRight className="w-8 h-8 landscape:w-5 landscape:h-5 landscape:order-last" />
                 <span className="text-xs font-bold uppercase tracking-wider">Sonraki</span>
-                <ChevronRight size={20} />
               </button>
             </>
           ) : (
             <>
-              <button onClick={() => handleAssess(false)} className="flex items-center justify-center gap-2 px-6 py-2.5 bg-red-500/10 border border-red-500/50 rounded-xl active:scale-95 transition-all text-red-500 hover:bg-red-500/20 min-w-[130px]">
-                <X size={20} />
+              <button onClick={() => handleAssess(false)} className="flex flex-col landscape:flex-row items-center justify-center gap-2 p-4 w-32 landscape:w-auto landscape:px-6 landscape:py-2.5 landscape:min-w-[130px] bg-red-500/10 border-2 border-red-500/50 rounded-2xl landscape:rounded-xl active:scale-95 transition-all text-red-500 hover:bg-red-500/20">
+                <X className="w-8 h-8 landscape:w-5 landscape:h-5" />
                 <span className="text-xs font-bold uppercase tracking-wider text-center">Yapamadı</span>
               </button>
-              <button onClick={() => handleAssess(true)} className="flex items-center justify-center gap-2 px-6 py-2.5 bg-green-500 rounded-xl active:scale-95 transition-all text-white hover:bg-green-400 min-w-[130px] shadow-lg shadow-green-900/50 border border-green-400">
-                <Check size={20} />
+              
+              <button onClick={() => handleAssess(true)} className="flex flex-col landscape:flex-row items-center justify-center gap-2 p-4 w-32 landscape:w-auto landscape:px-6 landscape:py-2.5 landscape:min-w-[130px] bg-green-500 rounded-2xl landscape:rounded-xl active:scale-95 transition-all text-white hover:bg-green-400 shadow-lg shadow-green-900/50 border border-green-400">
+                <Check className="w-8 h-8 landscape:w-5 landscape:h-5" />
                 <span className="text-xs font-bold uppercase tracking-wider text-center">Yaptı</span>
               </button>
             </>
@@ -219,5 +227,4 @@ export default function TaklitSession({ mode, itemCode, itemText, onClose, onSav
       )}
     </div>
   );
-      }
-              
+          }
