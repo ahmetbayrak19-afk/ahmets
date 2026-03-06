@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 
-// 🔥 YENİ EKLENEN BİLEŞEN
+// 🔥 YONERGE1 BİLEŞENİ
 import Yonerge1 from '@/aba/yonerge/yonerge1';
 
 interface YonergeTakipPageProps {
@@ -95,8 +95,8 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
     const code = activeItem.substring(0, firstSpaceIndex);
     const text = activeItem.substring(firstSpaceIndex + 1);
 
-    // Sadece 1. Kazanım (AD.1.1) için Yonerge1 bileşenini aç
-    if (activeItem.startsWith("AD.1.1")) {
+    // Kökten Çözüm: Kodu ne olursa olsun içinde "1.1" geçiyorsa Yonerge1'i aç
+    if (code.includes("1.1")) {
         return (
             <Yonerge1 
                 itemCode={code}
@@ -143,8 +143,8 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
 
             const isCompleted = status === true;
             
-            // Sadece ilk kazanımda "Değerlendir" butonu görünsün
-            const hasTest = item.startsWith("AD.1.1"); 
+            // 🔥 Kökten Çözüm: Kodun içinde "1.1" geçiyorsa Değerlendir butonunu göster
+            const hasTest = code.includes("1.1"); 
 
             return (
                 <div 
@@ -172,7 +172,7 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
 
                     <div className="flex items-center gap-2 self-end sm:self-center">
                         
-                        {/* 🔥 DEĞERLENDİR BUTONU (Sadece AD.1.1 için) */}
+                        {/* 🔥 DEĞERLENDİR BUTONU (Sadece 1.1 içerenler için) */}
                         {hasTest && (
                             <button 
                                 onClick={() => setActiveItem(item)}
@@ -215,4 +215,4 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
       </div>
     </div>
   );
-              }
+  }
