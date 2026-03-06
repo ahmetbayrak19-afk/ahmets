@@ -1,230 +1,218 @@
-import { useState } from 'react';
-import { XCircle, Check, X, Trophy, Ear, PlayCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { db } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, ClipboardCheck } from 'lucide-react';
+import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
-import confetti from 'canvas-confetti';
+import { ABA_MODULES } from '@/shared/abaData';
 
-// --- AKILLI YÖNERGE HAVUZU ---
-// req: Bu hareketin yapılabilmesi için çocuğun hangi pozisyonda olması lazım?
-// effect: Bu hareket yapıldıktan sonra çocuğun pozisyonu ne oluyor?
-type Posture = 'STAND' | 'SIT' | 'LIE';
+// 🔥 YONERGE1 BİLEŞENİ
+import Yonerge1 from '@/aba/yonerge/yonerge1';
 
-interface InstructionDef {
-  text: string;
-  effect?: Posture;
-  req?: Posture[];
+interface YonergeTakipPageProps {
+  studentId: string;
+  onBack: () => void;
 }
 
-const INSTRUCTION_POOL: InstructionDef[] = [
-  { text: "Ayağa kalk", effect: 'STAND' }, // İlk soru bu olacak
-  { text: "Zıpla", req: ['STAND'] },
-  { text: "Etrafında dön", req: ['STAND'] },
-  { text: "Yere yat", effect: 'LIE' },
-  { text: "Otur / Yere otur", effect: 'SIT' },
-  { text: "Ayaklarını yere vur", req: ['STAND', 'SIT'] }, // Yatarken zor olur
-  { text: "Kollarını kaldır" }, // req yazmayanlar her pozisyonda yapılabilir
-  { text: "Bay bay yap" },
-  { text: "Ellerini çırp / Alkışla" },
-  { text: "Kollarını bağla" },
-  { text: "Gözlerini kapat" },
-  { text: "Ağzını aç" },
-  { text: "Karnını ovala" },
-  { text: "Burnuna dokun" },
-  { text: "Kafanı salla" }
-];
-
-// 10 SORULUK AKILLI LİSTE OLUŞTURUCU
-const generateSmartSequence = (): string[] => {
-  const sequence: string[] = [];
-  let currentPosture: Posture = 'STAND'; // "Ayağa kalk" sonrası pozisyon STAND olacak
+export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPageProps) {
+  const [formData, setFormData] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(true);
   
-  // Havuzun kopyasını alıyoruz ki seçtiklerimizi silelim (Aynı soru 2 kere gelmesin)
-  const available = [...INSTRUCTION_POOL];
-  
-  // 1. KURAL: İlk komut HER ZAMAN "Ayağa kalk"
-  const firstIndex = available.findIndex(i => i.text === "Ayağa kalk");
-  sequence.push(available[firstIndex].text);
-  available.splice(firstIndex, 1);
-  
-  // 2. KURAL: Rastgele ama pozisyona uygun 9 komut daha seç (Toplam 10)
-  while (sequence.length < 10) {
-    // Çocuğun o anki pozisyonuna UYGUN olan komutları filtrele
-    const candidates = available.filter(item => {
-      // Eğer bir pozisyon gerektiriyorsa ve çocuk o pozisyonda değilse, bu komutu sorma
-      if (item.req && !item.req.includes(currentPosture)) return false;
-      
-      // Zaten oturuyorsa tekrar "Otur" deme
-      if (item.effect === currentPosture) return false; 
-      
-      return true;
-    });
-    
-    // Uygun olanlardan rastgele birini seç
-    // (Eğer uygun kalmadıysa havuzdaki herhangi birini seç ki sonsuz döngü olmasın)
-    const poolToPickFrom = candidates.length > 0 ? candidates : available;
-    const randomIndex = Math.floor(Math.random() * poolToPickFrom.length);
-    const selected = poolToPickFrom[randomIndex];
-    
-    sequence.push(selected.text);
-    
-    // Eğer bu hareket pozisyon değiştiriyorsa (örn: Otur), güncel pozisyonu kaydet
-    if (selected.effect) currentPosture = selected.effect;
-    
-    // Seçilen soruyu havuzdan sil (Bir daha sorulmasın)
-    const indexInAvailable = available.findIndex(i => i.text === selected.text);
-    available.splice(indexInAvailable, 1);
-  }
-  
-  return sequence;
-};
+  // Hangi kazanım değerlendiriliyor?
+  const [activeItem, setActiveItem] = useState<string | null>(null);
 
+  // --- MODÜL SEÇİMİ ---
+  const moduleData = ABA_MODULES.find(m => m.name.includes("YÖNERGE TAKİP"));
+  const items = moduleData ? moduleData.achievements : [];
 
-interface Yonerge1Props {
-  itemCode?: string;
-  itemText?: string;
-  onClose: () => void;
-  onComplete: (success: boolean) => void;
-}
-
-export default function Yonerge1({ 
-  itemCode = "AD.1.1", 
-  itemText = "Tek basamaklı yönergeleri takip eder.", 
-  onClose, 
-  onComplete 
-}: Yonerge1Props) {
-  
-  // Soruları bileşen yüklendiğinde 1 kere oluştur
-  const [instructions] = useState<string[]>(generateSmartSequence);
-  
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [phase, setPhase] = useState<'intro' | 'playing' | 'result'>('intro');
-
-  const currentInstruction = instructions[currentIndex];
-
-  const handleAssess = (correct: boolean) => {
-    if (correct) setScore(prev => prev + 1);
-
-    if (currentIndex + 1 < instructions.length) {
-      setCurrentIndex(prev => prev + 1);
-    } else {
-      setPhase('result');
-      // 10 sorunun en az 8'ini bilirse konfeti (%80 başarı)
-      if (score + (correct ? 1 : 0) >= 8) {
-        confetti({ particleCount: 250, spread: 90, origin: { y: 0.6 } });
+  useEffect(() => {
+    const load = async () => {
+      if (!studentId) return;
+      try {
+        const instId = localStorage.getItem("kazanim-takip-institution-id");
+        const docSnap = await getDoc(doc(db, "institutions", instId!, "students", studentId, "assessments", "aba"));
+        if (docSnap.exists()) {
+            setFormData(docSnap.data());
+        }
+      } catch (error) {
+        console.error("Veri çekme hatası:", error);
+        toast.error("Veri yüklenirken hata oluştu.");
+      } finally {
+        setLoading(false);
       }
+    };
+    load();
+  }, [studentId]);
+
+  const handleSave = async (newData?: Record<string, any>) => {
+    try {
+      const instId = localStorage.getItem("kazanim-takip-institution-id");
+      const dataToSave = newData || formData;
+      await setDoc(doc(db, "institutions", instId!, "students", studentId, "assessments", "aba"), dataToSave, { merge: true });
+      if (!newData) toast.success("Yönerge Takip becerileri kaydedildi!");
+    } catch (error) {
+      toast.error("Kaydetme hatası oluştu.");
     }
   };
 
-  const completeSession = () => {
-    // Toplam 10 sorunun 8'ini yaparsa kazanım sağlanmış kabul edilir
-    const isSuccess = score >= 8; 
-    onComplete(isSuccess);
+  const setStatus = (itemCode: string, status: boolean) => {
+    setFormData(prev => ({ 
+        ...prev, 
+        [itemCode]: prev[itemCode] === status ? null : status 
+    }));
   };
 
-  return (
-    <div className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none">
-      
-      {/* ÜST BAR */}
-      <div className="shrink-0 p-4 landscape:py-2 landscape:px-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md relative z-10">
-        <button onClick={onClose} className="p-2 landscape:p-1.5 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
-          <XCircle className="w-7 h-7 landscape:w-6 landscape:h-6" />
-        </button>
-        <div className="text-center flex flex-col items-center">
-          <h2 className="text-lg landscape:text-sm font-bold truncate max-w-[250px] sm:max-w-md text-slate-100">
-            {itemCode} - {itemText}
-          </h2>
-          <p className="text-xs landscape:text-[10px] text-slate-400 font-medium tracking-widest uppercase mt-1 landscape:mt-0">
-            {phase === 'playing' ? `ADIM ${currentIndex + 1} / 10` : 'ÖĞRETMEN DEĞERLENDİRMESİ'}
-          </p>
-        </div>
-        <div className="w-10 landscape:w-8"></div> 
-      </div>
-
-      {/* ORTA İÇERİK ALANI */}
-      <div className="flex-1 relative flex flex-col items-center justify-center p-4 overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-slate-950">
+  // 🔥 DEĞERLENDİRME EKRANINDAN DÖNEN SONUCU KAYDETME
+  const handleSessionSave = async (success: boolean) => {
+    if (activeItem) {
+        const updatedData = { ...formData, [activeItem]: success };
+        setFormData(updatedData);
+        await handleSave(updatedData);
         
-        {/* BAŞLANGIÇ EKRANI */}
-        {phase === 'intro' && (
-          <div className="text-center max-w-md animate-in zoom-in-95 duration-300">
-            <Ear size={80} className="mx-auto text-blue-500 mb-6 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
-            <h1 className="text-3xl font-black mb-4 text-white">Hazır mısınız?</h1>
-            <p className="text-slate-400 mb-8 text-base md:text-lg leading-relaxed">
-              Ekranda sırayla fiziksel duruma uygun yönergeler belirecek. Komutu öğrenciye söyleyin ve tepkisini değerlendirin. Toplam <strong>10 komut</strong> sorulacaktır.
-            </p>
-            <button 
-              onClick={() => setPhase('playing')} 
-              className="bg-blue-600 hover:bg-blue-500 text-white px-10 py-4 rounded-2xl font-bold text-xl flex items-center justify-center gap-3 w-full shadow-xl shadow-blue-900/50 active:scale-95 transition-all"
-            >
-              <PlayCircle size={24} /> TESTE BAŞLA
-            </button>
-          </div>
-        )}
+        if (success) {
+            toast.success("Tebrikler! Yönerge değerlendirmesi başarıyla tamamlandı. 🎉");
+        } else {
+            toast.info("Değerlendirme kaydedildi. Henüz bağımsız düzeyde değil.");
+        }
+    }
+    setActiveItem(null);
+  };
 
-        {/* BİLGİ KARTI EKRANI */}
-        {phase === 'playing' && (
-          <div className="w-full max-w-3xl flex flex-col items-center justify-center animate-in slide-in-from-right-8 duration-300" key={currentIndex}>
-            <div className="w-full bg-slate-800/60 border-2 border-slate-700 rounded-[2.5rem] p-10 md:p-16 flex flex-col items-center justify-center shadow-2xl backdrop-blur-sm min-h-[250px] md:min-h-[350px] relative overflow-hidden">
-                <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl"></div>
-                
-                <span className="text-blue-400 font-bold tracking-widest uppercase mb-4 md:mb-6 text-sm md:text-base flex items-center gap-2">
-                  <Ear size={18} /> Öğrenciye Söyleyin:
-                </span>
-                
-                <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-center text-white leading-tight tracking-tight">
-                  "{currentInstruction}"
-                </h1>
+  const calculateProgress = () => {
+    if (items.length === 0) return 0;
+    const completedCount = items.filter(item => formData[item] === true).length;
+    return Math.round((completedCount / items.length) * 100);
+  };
+
+  const progress = calculateProgress();
+
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
+
+  // --- MODAL (DEĞERLENDİRME EKRANI) AÇIKSA ---
+  if (activeItem) {
+    const firstSpaceIndex = activeItem.indexOf(' ');
+    const code = activeItem.substring(0, firstSpaceIndex);
+    const text = activeItem.substring(firstSpaceIndex + 1);
+
+    // 🔥 KÖKTEN ÇÖZÜM: Parçalamaya bakmaksızın tüm cümlede "1.1" geçiyorsa aç!
+    if (activeItem.includes("1.1")) {
+        return (
+            <Yonerge1 
+                itemCode={code}
+                itemText={text}
+                onClose={() => setActiveItem(null)}
+                onComplete={handleSessionSave}
+            />
+        );
+    }
+  }
+
+  return (
+    <div className="space-y-6 relative">
+      {/* HEADER */}
+      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex items-center justify-between sticky top-0 backdrop-blur-md z-10 shadow-lg">
+        <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={onBack} className="text-slate-400 hover:text-white">
+                <ArrowLeft size={20} />
+            </Button>
+            <div>
+                <h2 className="text-lg font-bold text-white">Yönerge Takip Becerileri</h2>
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <div className="h-1.5 w-24 bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${progress}%` }}></div>
+                    </div>
+                    <span>%{progress} Tamamlandı</span>
+                </div>
             </div>
-          </div>
-        )}
-
-        {/* SONUÇ EKRANI */}
-        {phase === 'result' && (
-          <div className="flex flex-col items-center justify-center text-center p-8 bg-slate-900/90 rounded-3xl border border-slate-700 shadow-2xl m-auto max-w-xl animate-in zoom-in-95 duration-500 backdrop-blur-md">
-            <Trophy size={80} className={score >= 8 ? "text-yellow-500 mb-6 animate-bounce drop-shadow-[0_0_20px_rgba(234,179,8,0.4)]" : "text-slate-500 mb-6"} />
-            <h1 className="text-3xl font-black mb-2 text-white">Değerlendirme Bitti!</h1>
-            <p className="text-slate-400 mb-6 text-lg">
-              Doğru Tepki: <span className="text-white font-black text-3xl mx-2">{score}</span> / 10
-            </p>
-            
-            {score >= 8 ? (
-              <div className="bg-green-500/10 text-green-400 border border-green-500/20 px-6 py-3 rounded-xl mb-8 font-bold text-lg flex items-center gap-2">
-                <Check size={24} /> Kazanım başarıyla sağlandı!
-              </div>
-            ) : (
-              <div className="bg-orange-500/10 text-orange-400 border border-orange-500/20 px-6 py-3 rounded-xl mb-8 font-bold text-lg flex items-center gap-2">
-                <X size={24} /> Henüz yeterli bağımsızlık düzeyinde değil.
-              </div>
-            )}
-
-            <button onClick={completeSession} className="bg-blue-600 hover:bg-blue-500 text-white px-12 py-4 rounded-xl font-bold text-xl transition-all active:scale-95 shadow-xl shadow-blue-900/50 w-full sm:w-auto">
-              KAYDET VE ÇIK
-            </button>
-          </div>
-        )}
+        </div>
+        <Button onClick={() => handleSave()} className="bg-green-600 hover:bg-green-700 h-8 text-xs shadow-lg shadow-green-900/20">
+            <Save className="mr-2 h-3.5 w-3.5" /> Kaydet
+        </Button>
       </div>
 
-      {/* ALT BUTONLAR */}
-      {phase === 'playing' && (
-        <div className="shrink-0 p-6 pb-10 landscape:py-3 landscape:px-6 landscape:pb-4 bg-slate-900 border-t border-slate-800 flex items-stretch justify-center gap-4 sm:gap-6 relative z-10">
-          
-          <button 
-            onClick={() => handleAssess(false)} 
-            className="flex-1 max-w-[250px] flex flex-col landscape:flex-row items-center justify-center gap-2 p-5 landscape:p-3 bg-red-500/10 border border-red-500/30 rounded-2xl active:scale-95 transition-all text-red-500 hover:bg-red-500/20 hover:border-red-500"
-          >
-            <X className="w-10 h-10 landscape:w-6 landscape:h-6" />
-            <span className="text-base landscape:text-sm font-bold uppercase tracking-wider text-center">Yapamadı</span>
-          </button>
-          
-          <button 
-            onClick={() => handleAssess(true)} 
-            className="flex-1 max-w-[250px] flex flex-col landscape:flex-row items-center justify-center gap-2 p-5 landscape:p-3 bg-green-500/10 border border-green-500/30 rounded-2xl active:scale-95 transition-all text-green-500 hover:bg-green-500/20 hover:border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.1)]"
-          >
-            <Check className="w-10 h-10 landscape:w-6 landscape:h-6" />
-            <span className="text-base landscape:text-sm font-bold uppercase tracking-wider text-center">Yaptı</span>
-          </button>
+      {/* LISTE */}
+      <div className="grid gap-3 animate-in slide-in-from-bottom-4 duration-500 pb-20">
+        {items.map((item) => {
+            const status = formData[item];
+            
+            // Kod ve Metin Ayırma (Sadece görsel olarak ayırmak için)
+            const firstSpaceIndex = item.indexOf(' ');
+            const code = item.substring(0, firstSpaceIndex);
+            const text = item.substring(firstSpaceIndex + 1);
 
-        </div>
-      )}
+            const isCompleted = status === true;
+            
+            // 🔥 KÖKTEN ÇÖZÜM: Tüm cümlede "1.1" varsa butonu göster
+            const hasTest = item.includes("1.1"); 
+
+            return (
+                <div 
+                    key={item} 
+                    className={twMerge(
+                        "group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4",
+                        isCompleted 
+                            ? "bg-green-950/10 border-green-500/20" 
+                            : "bg-slate-900/40 border-slate-800 hover:bg-slate-800 hover:border-slate-700"
+                    )}
+                >
+                    <div className="flex items-start gap-4 flex-1">
+                        <div className={twMerge(
+                            "min-w-[48px] h-10 rounded-lg flex items-center justify-center text-[10px] font-bold font-mono border mt-0.5 px-1 text-center",
+                            isCompleted ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-700 text-slate-500"
+                        )}>
+                            {isCompleted ? <Trophy size={18} /> : code}
+                        </div>
+                        <div>
+                            <p className={twMerge("font-medium text-sm leading-relaxed", isCompleted ? "text-green-100" : "text-slate-200")}>
+                                {text}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                        
+                        {/* 🔥 DEĞERLENDİR BUTONU */}
+                        {hasTest && (
+                            <button 
+                                onClick={() => setActiveItem(item)}
+                                className="h-9 px-3 mr-2 rounded-lg bg-blue-600/90 text-white text-[10px] font-bold flex items-center gap-1.5 hover:bg-blue-500 border border-blue-400 shadow-sm transition-transform active:scale-95"
+                            >
+                                <ClipboardCheck size={16} /> 
+                                <span className="hidden sm:inline">DEĞERLENDİR</span>
+                            </button>
+                        )}
+
+                        <button 
+                            onClick={() => setStatus(item, false)}
+                            className={twMerge(
+                                "flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
+                                status === false 
+                                    ? "bg-red-500/20 border-red-500 text-red-400" 
+                                    : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-red-400"
+                            )}
+                            title="Yapamıyor"
+                        >
+                            <XCircle size={18} />
+                        </button>
+
+                        <button 
+                            onClick={() => setStatus(item, true)}
+                            className={twMerge(
+                                "flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
+                                status === true 
+                                    ? "bg-green-500/20 border-green-500 text-green-400 shadow-[0_0_10px_rgba(34,197,94,0.1)]" 
+                                    : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-green-400 hover:border-green-500/50"
+                            )}
+                            title="Bağımsız Yapıyor"
+                        >
+                            <CheckCircle2 size={18} />
+                        </button>
+                    </div>
+                </div>
+            );
+        })}
+      </div>
     </div>
   );
-}
+      }
