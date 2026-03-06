@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
+
+// 🔥 YENİ EKLENEN BİLEŞEN
+import Yonerge1 from '@/aba/yonerge/yonerge1';
 
 interface YonergeTakipPageProps {
   studentId: string;
@@ -15,9 +18,11 @@ interface YonergeTakipPageProps {
 export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPageProps) {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
+  
+  // Hangi kazanım değerlendiriliyor?
+  const [activeItem, setActiveItem] = useState<string | null>(null);
 
-  // --- MODÜL SEÇİMİ (GARANTİLİ YÖNTEM) ---
-  // "YÖNERGE TAKİP" içeren modülü bulur
+  // --- MODÜL SEÇİMİ ---
   const moduleData = ABA_MODULES.find(m => m.name.includes("YÖNERGE TAKİP"));
   const items = moduleData ? moduleData.achievements : [];
 
@@ -40,11 +45,12 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
     load();
   }, [studentId]);
 
-  const handleSave = async () => {
+  const handleSave = async (newData?: Record<string, any>) => {
     try {
       const instId = localStorage.getItem("kazanim-takip-institution-id");
-      await setDoc(doc(db, "institutions", instId!, "students", studentId, "assessments", "aba"), formData, { merge: true });
-      toast.success("Yönerge Takip becerileri kaydedildi!");
+      const dataToSave = newData || formData;
+      await setDoc(doc(db, "institutions", instId!, "students", studentId, "assessments", "aba"), dataToSave, { merge: true });
+      if (!newData) toast.success("Yönerge Takip becerileri kaydedildi!");
     } catch (error) {
       toast.error("Kaydetme hatası oluştu.");
     }
@@ -57,6 +63,22 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
     }));
   };
 
+  // 🔥 DEĞERLENDİRME EKRANINDAN DÖNEN SONUCU KAYDETME
+  const handleSessionSave = async (success: boolean) => {
+    if (activeItem) {
+        const updatedData = { ...formData, [activeItem]: success };
+        setFormData(updatedData);
+        await handleSave(updatedData);
+        
+        if (success) {
+            toast.success("Tebrikler! Yönerge değerlendirmesi başarıyla tamamlandı. 🎉");
+        } else {
+            toast.info("Değerlendirme kaydedildi. Henüz bağımsız düzeyde değil.");
+        }
+    }
+    setActiveItem(null);
+  };
+
   const calculateProgress = () => {
     if (items.length === 0) return 0;
     const completedCount = items.filter(item => formData[item] === true).length;
@@ -67,8 +89,27 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
 
+  // --- MODAL (DEĞERLENDİRME EKRANI) AÇIKSA ---
+  if (activeItem) {
+    const firstSpaceIndex = activeItem.indexOf(' ');
+    const code = activeItem.substring(0, firstSpaceIndex);
+    const text = activeItem.substring(firstSpaceIndex + 1);
+
+    // Sadece 1. Kazanım (AD.1.1) için Yonerge1 bileşenini aç
+    if (activeItem.startsWith("AD.1.1")) {
+        return (
+            <Yonerge1 
+                itemCode={code}
+                itemText={text}
+                onClose={() => setActiveItem(null)}
+                onComplete={handleSessionSave}
+            />
+        );
+    }
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       {/* HEADER */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex items-center justify-between sticky top-0 backdrop-blur-md z-10 shadow-lg">
         <div className="flex items-center gap-3">
@@ -85,7 +126,7 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
                 </div>
             </div>
         </div>
-        <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 h-8 text-xs shadow-lg shadow-green-900/20">
+        <Button onClick={() => handleSave()} className="bg-green-600 hover:bg-green-700 h-8 text-xs shadow-lg shadow-green-900/20">
             <Save className="mr-2 h-3.5 w-3.5" /> Kaydet
         </Button>
       </div>
@@ -101,6 +142,9 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
             const text = item.substring(firstSpaceIndex + 1);
 
             const isCompleted = status === true;
+            
+            // Sadece ilk kazanımda "Değerlendir" butonu görünsün
+            const hasTest = item.startsWith("AD.1.1"); 
 
             return (
                 <div 
@@ -112,7 +156,7 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
                             : "bg-slate-900/40 border-slate-800 hover:bg-slate-800 hover:border-slate-700"
                     )}
                 >
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-4 flex-1">
                         <div className={twMerge(
                             "min-w-[48px] h-10 rounded-lg flex items-center justify-center text-[10px] font-bold font-mono border mt-0.5 px-1 text-center",
                             isCompleted ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-700 text-slate-500"
@@ -127,6 +171,18 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
                     </div>
 
                     <div className="flex items-center gap-2 self-end sm:self-center">
+                        
+                        {/* 🔥 DEĞERLENDİR BUTONU (Sadece AD.1.1 için) */}
+                        {hasTest && (
+                            <button 
+                                onClick={() => setActiveItem(item)}
+                                className="h-9 px-3 mr-2 rounded-lg bg-blue-600/90 text-white text-[10px] font-bold flex items-center gap-1.5 hover:bg-blue-500 border border-blue-400 shadow-sm transition-transform active:scale-95"
+                            >
+                                <ClipboardCheck size={16} /> 
+                                <span className="hidden sm:inline">DEĞERLENDİR</span>
+                            </button>
+                        )}
+
                         <button 
                             onClick={() => setStatus(item, false)}
                             className={twMerge(
@@ -159,4 +215,4 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
       </div>
     </div>
   );
-}
+              }
