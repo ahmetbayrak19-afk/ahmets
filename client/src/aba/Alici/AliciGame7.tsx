@@ -2,20 +2,15 @@ import { useState, useEffect, useRef } from 'react';
 import { db } from '../../firebase'; 
 import { doc, getDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, Search, Backpack, Star, Sparkles, User, Move, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, Search, Backpack, Star, Sparkles, User, Move, CheckCircle2, XCircle, ZoomIn, ZoomOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 
-// --- RESİMLER (Sadece var olanları import ediyoruz) ---
+// --- SADECE VAR OLAN RESİMLERİ İÇERİ ALIYORUZ ---
 import canta1 from './dedektif/canta1.jpg';
 import canta1x from './dedektif/canta1x.png';
-
-import canta2 from './dedektif/canta2.jpg';
-import canta3 from './dedektif/canta3.jpg';
-import canta4 from './dedektif/canta4.jpg';
-import canta5 from './dedektif/canta5.jpg';
 
 const GAMES = [
   { id: 'dedektif', title: 'Not Defteri', icon: Search, color: 'from-blue-600 to-indigo-900', btnColor: 'bg-blue-600', disabled: true },
@@ -24,14 +19,13 @@ const GAMES = [
   { id: 'gizemli_4', title: 'Gizem 4', icon: Sparkles, color: 'from-slate-700 to-slate-900', btnColor: 'bg-slate-700', disabled: true }
 ];
 
-// --- ÇANTA OYUNU BÖLÜM VERİLERİ ---
+// --- OYUN GÖREVLERİ (HEPSİ AYNI PNG'Yİ KULLANACAK) ---
 const CANTA_LEVELS = [
   { id: 1, bgSrc: canta1, overlaySrc: canta1x, targetName: "Kalem" }, 
-  // Diğer png'ler gelene kadar build patlamasın diye hepsine canta1x'i yer tutucu yaptık
-  { id: 2, bgSrc: canta2, overlaySrc: canta1x, targetName: "Silgi" },
-  { id: 3, bgSrc: canta3, overlaySrc: canta1x, targetName: "Defter" },
-  { id: 4, bgSrc: canta4, overlaySrc: canta1x, targetName: "Matara" },
-  { id: 5, bgSrc: canta5, overlaySrc: canta1x, targetName: "Makas" },
+  { id: 2, bgSrc: canta1, overlaySrc: canta1x, targetName: "Silgi" },
+  { id: 3, bgSrc: canta1, overlaySrc: canta1x, targetName: "Defter" },
+  { id: 4, bgSrc: canta1, overlaySrc: canta1x, targetName: "Çanta" },
+  { id: 5, bgSrc: canta1, overlaySrc: canta1x, targetName: "Kitap" },
 ];
 
 export default function AliciGame7({ studentId, onClose }: { studentId: string, onClose: () => void }) {
@@ -68,7 +62,7 @@ export default function AliciGame7({ studentId, onClose }: { studentId: string, 
                   <button onClick={() => setGameMode('instruction')} className="w-40 h-40 bg-purple-600/20 border-2 border-purple-500 rounded-3xl flex flex-col items-center justify-center gap-4 hover:bg-purple-600/40 active:scale-95 transition-all">
                       <Search size={40} className="text-purple-400" />
                       <span className="font-bold text-lg">Çalışma</span>
-                      <span className="text-xs text-purple-300 text-center px-2">Yardım edilebilir, hedefler parlar.</span>
+                      <span className="text-xs text-purple-300 text-center px-2">Yanlış yaparsan söyler, ipucu verir.</span>
                   </button>
                   <button onClick={() => setGameMode('assessment')} className="w-40 h-40 bg-blue-600/20 border-2 border-blue-500 rounded-3xl flex flex-col items-center justify-center gap-4 hover:bg-blue-600/40 active:scale-95 transition-all">
                       <CheckCircle2 size={40} className="text-blue-400" />
@@ -141,6 +135,9 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
     const [phase, setPhase] = useState<'intro'|'playing'|'result'>('intro');
     const [score, setScore] = useState(0);
     
+    // Zoom/Scale State'i
+    const [scale, setScale] = useState(1.5); // Başlangıçta biraz büyük açsın
+
     const [showHint, setShowHint] = useState(false);
     const [showDragHint, setShowDragHint] = useState(true); 
     const [feedback, setFeedback] = useState<'correct'|'wrong'|null>(null);
@@ -150,20 +147,46 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
 
     const level = levels[currentLvlIndex];
 
+    // 🔥 İŞTE O EFSANE TEK PNG RADARI 🔥
+    const identifyObject = (xPercent: number, yPercent: number) => {
+        // Çanta çok net şekilde ekranın üst-orta kısmında
+        if (yPercent < 60) return "Çanta";
+        
+        // Kitap sağ tarafta
+        if (xPercent > 55) return "Kitap";
+        
+        // Sol tarafta 2 obje var: Silgi ve Kalem
+        if (xPercent < 35) {
+            // Kalem en altta, Silgi onun bir tık üstünde
+            if (yPercent > 80) return "Kalem";
+            else return "Silgi";
+        }
+        
+        // Geriye sadece orta-alt kısımdaki defter kalıyor
+        return "Defter";
+    };
+
     const handleTap = (e: any, info: any) => {
         setShowDragHint(false);
         const img = overlayImgRef.current;
         if (!img) return;
 
         const rect = img.getBoundingClientRect();
+        
+        // Tıklanan koordinatların resim içindeki yeri (Zoom yapılmış olsa bile doğru çalışır)
         const clickX = info.point.x - rect.left;
         const clickY = info.point.y - rect.top;
+
+        // X ve Y'nin yüzdelik değerini buluyoruz (Örn: %30 soldan, %85 yukarıdan)
+        const xPercent = (clickX / rect.width) * 100;
+        const yPercent = (clickY / rect.height) * 100;
 
         const scaleX = img.naturalWidth / rect.width;
         const scaleY = img.naturalHeight / rect.height;
         const targetX = clickX * scaleX;
         const targetY = clickY * scaleY;
 
+        // Gizli canvas ile piksel şeffaflığı kontrolü
         const canvas = document.createElement('canvas');
         canvas.width = 1;
         canvas.height = 1;
@@ -174,9 +197,22 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
         const pixelData = ctx.getImageData(0, 0, 1, 1).data;
         const alpha = pixelData[3];
 
+        // Eğer alpha > 10 ise BOŞLUĞA DEĞİL BİR CİSME DOKUNDU DEMEKTİR!
         if (alpha > 10) {
-            handleSuccess();
+            // Hangi cisme dokunduğunu radara soralım
+            const touchedObjectName = identifyObject(xPercent, yPercent);
+            
+            // DENEME İÇİN TOAST MESAJI BASALIM
+            toast(`Algılanan Nesne: ${touchedObjectName}`, { icon: '🔍' });
+
+            // Dokunduğu nesne ile hedeflenen nesne aynı mı?
+            if (touchedObjectName === level.targetName) {
+                handleSuccess();
+            } else {
+                handleFail();
+            }
         } else {
+            // Boşluğa dokundu, yanlış say
             handleFail();
         }
     };
@@ -200,12 +236,18 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
     const nextLevel = () => {
         setFeedback(null);
         setShowHint(false);
+        // Her bölümde zoom'u sıfırlayalım ki çocuk rahat etsin
+        setScale(1.5); 
+        
         if (currentLvlIndex + 1 < levels.length) {
             setCurrentLevelIndex(prev => prev + 1);
             setShowDragHint(true); 
         } else {
             setPhase('result');
-            if (score >= levels.length / 2) confetti({ particleCount: 200, spread: 80, origin: { y: 0.6 } });
+            // 🔥 KONFETİ GÜNCELLEMESİ (zIndex: 9999 eklendi)
+            if (score >= levels.length / 2) {
+                confetti({ particleCount: 200, spread: 80, origin: { y: 0.6 }, zIndex: 9999 });
+            }
         }
     };
 
@@ -215,7 +257,7 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
                 <Search size={80} className="text-blue-500 mb-6" />
                 <h2 className="text-3xl font-black mb-4">Görevin: Bul ve Dokun!</h2>
                 <p className="text-slate-400 mb-8 text-lg">
-                    Resmi parmağınla <strong className="text-white">sağa, sola, yukarı ve aşağı kaydırarak</strong> gizli nesneyi ara. Bulduğunda üzerine dokun!
+                    Resmi parmağınla <strong className="text-white">sağa, sola, yukarı ve aşağı kaydırarak</strong> gizli nesneyi ara. İstersen mercekle büyütebilirsin.
                 </p>
                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-8 w-full max-w-sm">
                     <span className="text-slate-500 uppercase font-bold text-xs tracking-widest">İlk Aranacak Nesne:</span>
@@ -240,8 +282,9 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
     return (
         <div ref={containerRef} className="fixed inset-0 z-[110] bg-black overflow-hidden flex items-center justify-center touch-none">
             
+            {/* ÜST GÖREV BARI */}
             <div className="absolute top-4 left-4 right-4 z-50 flex items-center justify-between pointer-events-none">
-                <button onClick={onClose} className="pointer-events-auto w-12 h-12 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20">
+                <button onClick={onClose} className="pointer-events-auto w-12 h-12 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20 active:scale-95 transition-transform">
                     <ArrowLeft size={24} />
                 </button>
                 <div className="bg-black/70 backdrop-blur-md border-2 border-blue-500 rounded-2xl px-6 py-3 flex flex-col items-center shadow-[0_0_20px_rgba(59,130,246,0.3)] pointer-events-auto">
@@ -249,6 +292,22 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
                     <span className="text-xl font-black text-white">{level.targetName}</span>
                 </div>
                 <div className="w-12"></div>
+            </div>
+
+            {/* 🔥 ZOOM KONTROLLERİ (Büyüt / Küçült) 🔥 */}
+            <div className="absolute right-4 bottom-8 z-50 flex flex-col gap-3 pointer-events-auto">
+                <button 
+                    onClick={() => setScale(prev => Math.min(prev + 0.5, 3))} // Maksimum 3x büyüt
+                    className="w-14 h-14 bg-slate-800/80 backdrop-blur-md border border-slate-600 rounded-2xl flex items-center justify-center text-white active:scale-90 transition-all shadow-xl"
+                >
+                    <ZoomIn size={28} />
+                </button>
+                <button 
+                    onClick={() => setScale(prev => Math.max(prev - 0.5, 1))} // Minimum 1x küçült
+                    className="w-14 h-14 bg-slate-800/80 backdrop-blur-md border border-slate-600 rounded-2xl flex items-center justify-center text-white active:scale-90 transition-all shadow-xl"
+                >
+                    <ZoomOut size={28} />
+                </button>
             </div>
 
             <AnimatePresence>
@@ -261,6 +320,7 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
                 )}
             </AnimatePresence>
 
+            {/* SÜRÜKLENEBİLİR VE BÜYÜTÜLEBİLİR ALAN */}
             <motion.div 
                 drag
                 dragConstraints={containerRef} 
@@ -268,13 +328,15 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
                 dragMomentum={true}
                 onDragStart={() => setShowDragHint(false)}
                 onTap={handleTap} 
-                className="w-[200vw] h-[200vh] shrink-0 cursor-grab active:cursor-grabbing relative"
+                animate={{ scale: scale }} // Zoom state'ine bağladık
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="w-[100vw] h-[100vh] shrink-0 cursor-grab active:cursor-grabbing relative"
             >
                 <img 
                     src={level.bgSrc} 
                     alt="Arka Plan" 
                     draggable="false" 
-                    className="absolute inset-0 w-full h-full object-fill pointer-events-none" 
+                    className="absolute inset-0 w-full h-full object-contain pointer-events-none" 
                 />
                 
                 <img 
@@ -284,8 +346,8 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
                     draggable="false" 
                     crossOrigin="anonymous"
                     className={twMerge(
-                        "absolute inset-0 w-full h-full object-fill pointer-events-none transition-all duration-300",
-                        mode === 'instruction' && showHint ? "drop-shadow-[0_0_30px_rgba(59,130,246,1)] scale-[1.02]" : ""
+                        "absolute inset-0 w-full h-full object-contain pointer-events-none transition-all duration-300",
+                        mode === 'instruction' && showHint ? "drop-shadow-[0_0_30px_rgba(59,130,246,1)]" : ""
                     )}
                 />
             </motion.div>
@@ -306,4 +368,4 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
 
         </div>
     );
-    }
+   }
