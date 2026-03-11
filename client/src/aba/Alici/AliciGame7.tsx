@@ -7,8 +7,8 @@ import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// --- SADECE VAR OLAN RESİMLERİ İÇERİ ALIYORUZ ---
-import canta1 from './dedektif/canta1.jpg';
+// --- UZANTILAR DÜZELTİLDİ (.png ve .png) ---
+import canta1 from './dedektif/canta1.png';
 import canta1x from './dedektif/canta1x.png';
 
 const GAMES = [
@@ -43,7 +43,7 @@ export default function AliciGame7({ studentId, onClose }: { studentId: string, 
 
   if (isLoading) return <div className="fixed inset-0 z-[100] bg-slate-950 flex justify-center items-center"><Loader2 className="animate-spin text-blue-500" size={48} /></div>;
 
-  // Direkt Test Motoruna Gider (Çalışma/Test seçimi sormadan)
+  // Direkt Test Motoruna Gider
   if (activeGameId === 'canta') {
       return <HiddenObjectEngine onClose={() => setActiveGameId(null)} />;
   }
@@ -102,7 +102,7 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const overlayImgRef = useRef<HTMLImageElement>(null);
 
-    // 🔥 SENİN YERLEŞTİRDİĞİN NESNELERİ BULAN RADAR 🔥
+    // RADAR
     const identifyObject = (xPercent: number, yPercent: number) => {
         // Çanta (Yukarıda)
         if (yPercent < 60) return "Çanta 🎒";
@@ -149,20 +149,17 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
         const pixelData = ctx.getImageData(0, 0, 1, 1).data;
         const alpha = pixelData[3];
 
-        // 🔥 TAM İSTEDİĞİN TEST MANTIĞI 🔥
         if (alpha > 10) {
-            // 1. Dolu (boyalı) bir yere tıklandıysa, nesnenin adını bul ve ekrana yaz!
+            // Dolu (boyalı) yere tıklandı
             const touchedObjectName = identifyObject(xPercent, yPercent);
             
-            // Toast mesajı ile tepede tatlı bir şekilde gösterir
             toast.success(`Algılanan Nesne: ${touchedObjectName}`, { 
                 position: 'top-center',
                 duration: 2000 
             });
             
         } else {
-            // 2. Boş (transparan) yere tıklandıysa HİÇBİR ŞEY YAPMA!
-            // Kırmızı çarpı falan çıkmaz, oyun devam eder.
+            // Boşluğa tıklandı, oyun devam
             console.log("Boşluğa tıklandı, tepki verilmedi.");
         }
     };
@@ -239,4 +236,5 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
 
         </div>
     );
-      }
+    }
+    
