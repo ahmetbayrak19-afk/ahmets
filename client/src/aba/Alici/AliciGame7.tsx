@@ -8,17 +8,14 @@ import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 
-// --- RESİMLER ---
+// --- RESİMLER (Sadece var olanları import ediyoruz) ---
 import canta1 from './dedektif/canta1.jpg';
 import canta1x from './dedektif/canta1x.png';
+
 import canta2 from './dedektif/canta2.jpg';
-import canta2x from './dedektif/canta2x.png';
 import canta3 from './dedektif/canta3.jpg';
-import canta3x from './dedektif/canta3x.png';
 import canta4 from './dedektif/canta4.jpg';
-import canta4x from './dedektif/canta4x.png';
 import canta5 from './dedektif/canta5.jpg';
-import canta5x from './dedektif/canta5x.png';
 
 const GAMES = [
   { id: 'dedektif', title: 'Not Defteri', icon: Search, color: 'from-blue-600 to-indigo-900', btnColor: 'bg-blue-600', disabled: true },
@@ -30,10 +27,11 @@ const GAMES = [
 // --- ÇANTA OYUNU BÖLÜM VERİLERİ ---
 const CANTA_LEVELS = [
   { id: 1, bgSrc: canta1, overlaySrc: canta1x, targetName: "Kalem" }, 
-  { id: 2, bgSrc: canta2, overlaySrc: canta2x, targetName: "Silgi" },
-  { id: 3, bgSrc: canta3, overlaySrc: canta3x, targetName: "Defter" },
-  { id: 4, bgSrc: canta4, overlaySrc: canta4x, targetName: "Matara" },
-  { id: 5, bgSrc: canta5, overlaySrc: canta5x, targetName: "Makas" },
+  // Diğer png'ler gelene kadar build patlamasın diye hepsine canta1x'i yer tutucu yaptık
+  { id: 2, bgSrc: canta2, overlaySrc: canta1x, targetName: "Silgi" },
+  { id: 3, bgSrc: canta3, overlaySrc: canta1x, targetName: "Defter" },
+  { id: 4, bgSrc: canta4, overlaySrc: canta1x, targetName: "Matara" },
+  { id: 5, bgSrc: canta5, overlaySrc: canta1x, targetName: "Makas" },
 ];
 
 export default function AliciGame7({ studentId, onClose }: { studentId: string, onClose: () => void }) {
@@ -137,7 +135,7 @@ export default function AliciGame7({ studentId, onClose }: { studentId: string, 
 }
 
 
-// --- GİZLİ NESNE BULMA MOTORU (TRANSPARAN KATMAN MANTIĞI) ---
+// --- GİZLİ NESNE BULMA MOTORU ---
 function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'assessment', levels: any[], onClose: () => void }) {
     const [currentLvlIndex, setCurrentLevelIndex] = useState(0);
     const [phase, setPhase] = useState<'intro'|'playing'|'result'>('intro');
@@ -147,31 +145,25 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
     const [showDragHint, setShowDragHint] = useState(true); 
     const [feedback, setFeedback] = useState<'correct'|'wrong'|null>(null);
 
-    // KAFES REFERANSI: Resmin dışarı çıkmasını engeller
     const containerRef = useRef<HTMLDivElement>(null);
     const overlayImgRef = useRef<HTMLImageElement>(null);
 
     const level = levels[currentLvlIndex];
 
-    // 🔥 SADECE TIKLAMAYI YAKALAYAN ÖZEL FONKSİYON (Kaydırmalarda tetiklenmez)
     const handleTap = (e: any, info: any) => {
         setShowDragHint(false);
         const img = overlayImgRef.current;
         if (!img) return;
 
         const rect = img.getBoundingClientRect();
-        
-        // info.point, Framer Motion'ın verdiği tam kesin tıklama noktasıdır
         const clickX = info.point.x - rect.left;
         const clickY = info.point.y - rect.top;
 
-        // Orijinal resim boyutuna göre oranı hesapla
         const scaleX = img.naturalWidth / rect.width;
         const scaleY = img.naturalHeight / rect.height;
         const targetX = clickX * scaleX;
         const targetY = clickY * scaleY;
 
-        // Piksel verisini oku
         const canvas = document.createElement('canvas');
         canvas.width = 1;
         canvas.height = 1;
@@ -182,7 +174,6 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
         const pixelData = ctx.getImageData(0, 0, 1, 1).data;
         const alpha = pixelData[3];
 
-        // Eğer alpha 10'dan büyükse (yani şeffaf değilse, nesneye denk geldiyse) DOĞRU!
         if (alpha > 10) {
             handleSuccess();
         } else {
@@ -247,10 +238,8 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
     }
 
     return (
-        // Kafesimiz: flex center ve taşmaları gizleyen (overflow-hidden) yapı
         <div ref={containerRef} className="fixed inset-0 z-[110] bg-black overflow-hidden flex items-center justify-center touch-none">
             
-            {/* ÜST GÖREV BARI: Sürüklemeyi engellememesi için pointer-events-none ile ayarladık */}
             <div className="absolute top-4 left-4 right-4 z-50 flex items-center justify-between pointer-events-none">
                 <button onClick={onClose} className="pointer-events-auto w-12 h-12 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20">
                     <ArrowLeft size={24} />
@@ -272,17 +261,15 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
                 )}
             </AnimatePresence>
 
-            {/* SÜRÜKLENEBİLİR ALAN (200vw büyüklüğünde, sadece kafes içinde hareket eder) */}
             <motion.div 
                 drag
-                dragConstraints={containerRef} // Siyah boşlukların çıkmasını önler
-                dragElastic={0} // Sınır dışına esnemeyi tamamen kapatır
+                dragConstraints={containerRef} 
+                dragElastic={0} 
                 dragMomentum={true}
                 onDragStart={() => setShowDragHint(false)}
-                onTap={handleTap} // Sürüklemede asla tetiklenmez, sadece temiz tıklamalarda çalışır!
+                onTap={handleTap} 
                 className="w-[200vw] h-[200vh] shrink-0 cursor-grab active:cursor-grabbing relative"
             >
-                {/* KATMAN 1: ARKA PLAN JPG */}
                 <img 
                     src={level.bgSrc} 
                     alt="Arka Plan" 
@@ -290,7 +277,6 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
                     className="absolute inset-0 w-full h-full object-fill pointer-events-none" 
                 />
                 
-                {/* KATMAN 2: TRANSPARAN PNG */}
                 <img 
                     ref={overlayImgRef}
                     src={level.overlaySrc} 
@@ -304,7 +290,6 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
                 />
             </motion.div>
 
-            {/* SÜRÜKLE İPUCU (Animasyonlu Oklar) */}
             <AnimatePresence>
                 {showDragHint && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 pointer-events-none flex items-center justify-center z-40">
@@ -321,5 +306,4 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
 
         </div>
     );
-   }
-              
+    }
