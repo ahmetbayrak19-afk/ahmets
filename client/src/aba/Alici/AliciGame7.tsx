@@ -10,62 +10,36 @@ import confetti from 'canvas-confetti';
 
 // --- RESİMLER ---
 import canta1 from './dedektif/canta1.jpg';
+import canta1x from './dedektif/canta1x.png';
 import canta2 from './dedektif/canta2.jpg';
+import canta2x from './dedektif/canta2x.png';
 import canta3 from './dedektif/canta3.jpg';
+import canta3x from './dedektif/canta3x.png';
 import canta4 from './dedektif/canta4.jpg';
+import canta4x from './dedektif/canta4x.png';
 import canta5 from './dedektif/canta5.jpg';
+import canta5x from './dedektif/canta5x.png';
 
 const GAMES = [
-  {
-    id: 'dedektif',
-    title: 'Not Defteri',
-    icon: Search,
-    color: 'from-blue-600 to-indigo-900',
-    btnColor: 'bg-blue-600',
-    disabled: true 
-  },
-  {
-    id: 'canta',
-    title: 'Okul Çantası',
-    icon: Backpack,
-    color: 'from-orange-500 to-red-800',
-    btnColor: 'bg-orange-600',
-    disabled: false 
-  },
-  {
-    id: 'gizemli_3',
-    title: 'Gizem 3',
-    icon: Star,
-    color: 'from-slate-700 to-slate-900',
-    btnColor: 'bg-slate-700',
-    disabled: true
-  },
-  {
-    id: 'gizemli_4',
-    title: 'Gizem 4',
-    icon: Sparkles,
-    color: 'from-slate-700 to-slate-900',
-    btnColor: 'bg-slate-700',
-    disabled: true
-  }
+  { id: 'dedektif', title: 'Not Defteri', icon: Search, color: 'from-blue-600 to-indigo-900', btnColor: 'bg-blue-600', disabled: true },
+  { id: 'canta', title: 'Okul Çantası', icon: Backpack, color: 'from-orange-500 to-red-800', btnColor: 'bg-orange-600', disabled: false },
+  { id: 'gizemli_3', title: 'Gizem 3', icon: Star, color: 'from-slate-700 to-slate-900', btnColor: 'bg-slate-700', disabled: true },
+  { id: 'gizemli_4', title: 'Gizem 4', icon: Sparkles, color: 'from-slate-700 to-slate-900', btnColor: 'bg-slate-700', disabled: true }
 ];
 
 // --- ÇANTA OYUNU BÖLÜM VERİLERİ ---
-// Ekranda çıkan X ve Y değerlerini buraya yazacaksın. width ve height hitbox (dokunma alanı) genişliğidir.
 const CANTA_LEVELS = [
-  { id: 1, src: canta1, targetName: "Kalem", targetX: 50, targetY: 50, width: 15, height: 15 }, 
-  { id: 2, src: canta2, targetName: "Silgi", targetX: 30, targetY: 40, width: 15, height: 15 },
-  { id: 3, src: canta3, targetName: "Defter", targetX: 70, targetY: 60, width: 15, height: 15 },
-  { id: 4, src: canta4, targetName: "Matara", targetX: 20, targetY: 80, width: 15, height: 15 },
-  { id: 5, src: canta5, targetName: "Makas", targetX: 80, targetY: 20, width: 15, height: 15 },
+  { id: 1, bgSrc: canta1, overlaySrc: canta1x, targetName: "Kalem" }, 
+  { id: 2, bgSrc: canta2, overlaySrc: canta2x, targetName: "Silgi" },
+  { id: 3, bgSrc: canta3, overlaySrc: canta3x, targetName: "Defter" },
+  { id: 4, bgSrc: canta4, overlaySrc: canta4x, targetName: "Matara" },
+  { id: 5, bgSrc: canta5, overlaySrc: canta5x, targetName: "Makas" },
 ];
-
 
 export default function AliciGame7({ studentId, onClose }: { studentId: string, onClose: () => void }) {
   const [student, setStudent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
-  
   const [gameMode, setGameMode] = useState<'instruction' | 'assessment' | null>(null);
 
   useEffect(() => {
@@ -134,7 +108,7 @@ export default function AliciGame7({ studentId, onClose }: { studentId: string, 
               ) : (
                   <div className="w-24 h-24 rounded-full bg-slate-800 flex items-center justify-center border-4 border-slate-700 mb-4"><User size={40} className="text-slate-500" /></div>
               )}
-              <h2 className="text-2xl font-black">{student?.name.split(' ')[0]}</h2>
+              <h2 className="text-2xl font-black">{student?.name?.split(' ')[0]}</h2>
               <p className="text-slate-400 text-sm mt-1">Süper Dedektif</p>
           </div>
 
@@ -144,9 +118,7 @@ export default function AliciGame7({ studentId, onClose }: { studentId: string, 
                       key={game.id} 
                       className={twMerge(
                           "relative overflow-hidden rounded-[2rem] aspect-square flex flex-col items-center justify-center text-center p-4 transition-all duration-300",
-                          game.disabled 
-                            ? "bg-slate-900/50 border-2 border-slate-800/50 opacity-50 grayscale" 
-                            : "bg-slate-900 border-2 border-slate-700 hover:border-slate-500 hover:-translate-y-1 active:scale-95 cursor-pointer shadow-xl"
+                          game.disabled ? "bg-slate-900/50 border-2 border-slate-800/50 opacity-50 grayscale" : "bg-slate-900 border-2 border-slate-700 hover:border-slate-500 hover:-translate-y-1 active:scale-95 cursor-pointer shadow-xl"
                       )}
                       onClick={() => !game.disabled && setActiveGameId(game.id)}
                   >
@@ -165,7 +137,7 @@ export default function AliciGame7({ studentId, onClose }: { studentId: string, 
 }
 
 
-// --- GİZLİ NESNE BULMA MOTORU ---
+// --- GİZLİ NESNE BULMA MOTORU (TRANSPARAN KATMAN MANTIĞI) ---
 function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'assessment', levels: any[], onClose: () => void }) {
     const [currentLvlIndex, setCurrentLevelIndex] = useState(0);
     const [phase, setPhase] = useState<'intro'|'playing'|'result'>('intro');
@@ -175,34 +147,43 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
     const [showDragHint, setShowDragHint] = useState(true); 
     const [feedback, setFeedback] = useState<'correct'|'wrong'|null>(null);
 
-    // 🔥 APK'da test edebilmen için ekranda koordinatları tutacağımız state
-    const [debugCoords, setDebugCoords] = useState<{x: number, y: number} | null>(null);
+    // KAFES REFERANSI: Resmin dışarı çıkmasını engeller
+    const containerRef = useRef<HTMLDivElement>(null);
+    const overlayImgRef = useRef<HTMLImageElement>(null);
 
     const level = levels[currentLvlIndex];
 
-    const handleDragStart = () => {
+    // 🔥 SADECE TIKLAMAYI YAKALAYAN ÖZEL FONKSİYON (Kaydırmalarda tetiklenmez)
+    const handleTap = (e: any, info: any) => {
         setShowDragHint(false);
-    };
+        const img = overlayImgRef.current;
+        if (!img) return;
 
-    const handleImageClick = (e: any) => {
-        const rect = e.currentTarget.getBoundingClientRect();
+        const rect = img.getBoundingClientRect();
         
-        // Touch eventleri (telefonda dokunma) veya fare tıklamasını destekler
-        const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
-        const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+        // info.point, Framer Motion'ın verdiği tam kesin tıklama noktasıdır
+        const clickX = info.point.x - rect.left;
+        const clickY = info.point.y - rect.top;
 
-        const xPercent = ((clientX - rect.left) / rect.width) * 100;
-        const yPercent = ((clientY - rect.top) / rect.height) * 100;
-        
-        // Ekrana basması için state'i güncelliyoruz
-        setDebugCoords({ x: xPercent, y: yPercent });
-        
-        setShowDragHint(false);
+        // Orijinal resim boyutuna göre oranı hesapla
+        const scaleX = img.naturalWidth / rect.width;
+        const scaleY = img.naturalHeight / rect.height;
+        const targetX = clickX * scaleX;
+        const targetY = clickY * scaleY;
 
-        const hitX = Math.abs(xPercent - level.targetX) <= (level.width / 2);
-        const hitY = Math.abs(yPercent - level.targetY) <= (level.height / 2);
+        // Piksel verisini oku
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
 
-        if (hitX && hitY) {
+        ctx.drawImage(img, -targetX, -targetY);
+        const pixelData = ctx.getImageData(0, 0, 1, 1).data;
+        const alpha = pixelData[3];
+
+        // Eğer alpha 10'dan büyükse (yani şeffaf değilse, nesneye denk geldiyse) DOĞRU!
+        if (alpha > 10) {
             handleSuccess();
         } else {
             handleFail();
@@ -217,19 +198,17 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
 
     const handleFail = () => {
         setFeedback('wrong');
-        
         if (mode === 'assessment') {
             setTimeout(() => nextLevel(), 1000);
         } else {
             setShowHint(true);
-            setTimeout(() => setFeedback(null), 1000);
+            setTimeout(() => { setFeedback(null); setShowHint(false); }, 1500);
         }
     };
 
     const nextLevel = () => {
         setFeedback(null);
         setShowHint(false);
-        setDebugCoords(null); // Yeni bölüme geçerken koordinat yazısını temizle
         if (currentLvlIndex + 1 < levels.length) {
             setCurrentLevelIndex(prev => prev + 1);
             setShowDragHint(true); 
@@ -268,21 +247,21 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
     }
 
     return (
-        <div className="fixed inset-0 z-[110] bg-black overflow-hidden flex flex-col">
+        // Kafesimiz: flex center ve taşmaları gizleyen (overflow-hidden) yapı
+        <div ref={containerRef} className="fixed inset-0 z-[110] bg-black overflow-hidden flex items-center justify-center touch-none">
             
-            {/* ÜST GÖREV BARI */}
-            <div className="absolute top-4 left-4 right-4 z-50 flex items-center justify-between">
-                <button onClick={onClose} className="w-12 h-12 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20">
+            {/* ÜST GÖREV BARI: Sürüklemeyi engellememesi için pointer-events-none ile ayarladık */}
+            <div className="absolute top-4 left-4 right-4 z-50 flex items-center justify-between pointer-events-none">
+                <button onClick={onClose} className="pointer-events-auto w-12 h-12 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20">
                     <ArrowLeft size={24} />
                 </button>
-                <div className="bg-black/70 backdrop-blur-md border-2 border-blue-500 rounded-2xl px-6 py-3 flex flex-col items-center shadow-[0_0_20px_rgba(59,130,246,0.3)]">
+                <div className="bg-black/70 backdrop-blur-md border-2 border-blue-500 rounded-2xl px-6 py-3 flex flex-col items-center shadow-[0_0_20px_rgba(59,130,246,0.3)] pointer-events-auto">
                     <span className="text-[10px] text-blue-300 font-bold uppercase tracking-widest">Görevin: Bul!</span>
                     <span className="text-xl font-black text-white">{level.targetName}</span>
                 </div>
                 <div className="w-12"></div>
             </div>
 
-            {/* GERİ BİLDİRİM İKONLARI */}
             <AnimatePresence>
                 {feedback && (
                     <motion.div initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }} className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
@@ -293,43 +272,42 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
                 )}
             </AnimatePresence>
 
-            {/* SÜRÜKLENEBİLİR RESİM */}
+            {/* SÜRÜKLENEBİLİR ALAN (200vw büyüklüğünde, sadece kafes içinde hareket eder) */}
             <motion.div 
-                className="w-full h-full cursor-grab active:cursor-grabbing relative touch-none" // Telefondaki varsayılan kaydırmaları engellemek için touch-none eklendi
                 drag
-                dragConstraints={{ top: -500, left: -500, right: 500, bottom: 500 }} 
-                dragElastic={0.1}
-                onDragStart={handleDragStart}
-                onPointerUp={handleImageClick} 
+                dragConstraints={containerRef} // Siyah boşlukların çıkmasını önler
+                dragElastic={0} // Sınır dışına esnemeyi tamamen kapatır
+                dragMomentum={true}
+                onDragStart={() => setShowDragHint(false)}
+                onTap={handleTap} // Sürüklemede asla tetiklenmez, sadece temiz tıklamalarda çalışır!
+                className="w-[200vw] h-[200vh] shrink-0 cursor-grab active:cursor-grabbing relative"
             >
+                {/* KATMAN 1: ARKA PLAN JPG */}
                 <img 
-                    src={level.src} 
+                    src={level.bgSrc} 
                     alt="Arka Plan" 
                     draggable="false" 
-                    className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 min-w-[200vw] min-h-[200vh] object-cover pointer-events-none" 
+                    className="absolute inset-0 w-full h-full object-fill pointer-events-none" 
                 />
-
-                {mode === 'instruction' && showHint && (
-                    <div 
-                        className="absolute bg-blue-500/40 rounded-full animate-ping border-2 border-blue-300 shadow-[0_0_30px_rgba(59,130,246,0.8)] pointer-events-none"
-                        style={{ 
-                            left: `${level.targetX}%`, 
-                            top: `${level.targetY}%`, 
-                            width: `${level.width}%`, 
-                            height: `${level.height}%`,
-                            transform: 'translate(-50%, -50%)'
-                        }}
-                    />
-                )}
+                
+                {/* KATMAN 2: TRANSPARAN PNG */}
+                <img 
+                    ref={overlayImgRef}
+                    src={level.overlaySrc} 
+                    alt="Hedef Katman" 
+                    draggable="false" 
+                    crossOrigin="anonymous"
+                    className={twMerge(
+                        "absolute inset-0 w-full h-full object-fill pointer-events-none transition-all duration-300",
+                        mode === 'instruction' && showHint ? "drop-shadow-[0_0_30px_rgba(59,130,246,1)] scale-[1.02]" : ""
+                    )}
+                />
             </motion.div>
 
-            {/* SÜRÜKLE İPUCU */}
+            {/* SÜRÜKLE İPUCU (Animasyonlu Oklar) */}
             <AnimatePresence>
                 {showDragHint && (
-                    <motion.div 
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="absolute inset-0 pointer-events-none flex items-center justify-center z-40"
-                    >
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 pointer-events-none flex items-center justify-center z-40">
                         <div className="relative w-48 h-48">
                             <Move size={64} className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white/50 animate-pulse" />
                             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4 h-4 border-t-4 border-l-4 border-white/50 rotate-45 animate-bounce"></div>
@@ -341,13 +319,7 @@ function HiddenObjectEngine({ mode, levels, onClose }: { mode: 'instruction'|'as
                 )}
             </AnimatePresence>
 
-            {/* 🔥 GELİŞTİRİCİ CANLI KOORDİNAT PANELİ (Telefonda görmek için) 🔥 */}
-            {debugCoords && (
-                <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-yellow-400 font-mono px-4 py-2 rounded-xl z-[120] pointer-events-none shadow-xl border border-yellow-400/30 text-sm font-bold tracking-widest whitespace-nowrap">
-                    X: {debugCoords.x.toFixed(2)} | Y: {debugCoords.y.toFixed(2)}
-                </div>
-            )}
-
         </div>
     );
-}
+   }
+              
