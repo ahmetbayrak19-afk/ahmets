@@ -2,12 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { db } from '../../firebase'; 
 import { doc, getDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, Search, Backpack, Star, Sparkles, User, Move, ZoomIn, ZoomOut } from 'lucide-react';
+import { Loader2, ArrowLeft, Search, Backpack, Star, Sparkles, User, Move, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// --- UZANTILAR DÜZELTİLDİ (.png ve .png) ---
 import canta1 from './dedektif/canta1.png';
 import canta1x from './dedektif/canta1x.png';
 
@@ -41,11 +40,25 @@ export default function AliciGame7({ studentId, onClose }: { studentId: string, 
     fetchStudent();
   }, [studentId]);
 
+  // 🔥 TAM EKRAN YAPMA FONKSİYONU 🔥
+  const enterFullScreen = () => {
+      if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch((err) => console.log("Tam ekran hatası:", err));
+      }
+      setActiveGameId('canta');
+  };
+
+  const exitFullScreenAndClose = () => {
+      if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+      }
+      setActiveGameId(null);
+  };
+
   if (isLoading) return <div className="fixed inset-0 z-[100] bg-slate-950 flex justify-center items-center"><Loader2 className="animate-spin text-blue-500" size={48} /></div>;
 
-  // Direkt Test Motoruna Gider
   if (activeGameId === 'canta') {
-      return <HiddenObjectEngine onClose={() => setActiveGameId(null)} />;
+      return <HiddenObjectEngine onClose={exitFullScreenAndClose} />;
   }
 
   return (
@@ -77,7 +90,7 @@ export default function AliciGame7({ studentId, onClose }: { studentId: string, 
                           "relative overflow-hidden rounded-[2rem] aspect-square flex flex-col items-center justify-center text-center p-4 transition-all duration-300",
                           game.disabled ? "bg-slate-900/50 border-2 border-slate-800/50 opacity-50 grayscale" : "bg-slate-900 border-2 border-slate-700 hover:border-slate-500 hover:-translate-y-1 active:scale-95 cursor-pointer shadow-xl"
                       )}
-                      onClick={() => !game.disabled && setActiveGameId(game.id)}
+                      onClick={() => !game.disabled && enterFullScreen()} // Tıklayınca Tam Ekrana Geçer
                   >
                       <div className={twMerge("absolute inset-0 bg-gradient-to-br opacity-20", game.color)}></div>
                       <div className={twMerge("w-14 h-14 rounded-2xl flex items-center justify-center mb-3 relative z-10", game.disabled ? "bg-slate-800 text-slate-500" : game.btnColor)}>
@@ -94,7 +107,7 @@ export default function AliciGame7({ studentId, onClose }: { studentId: string, 
 }
 
 
-// --- GİZLİ NESNE BULMA MOTORU (SADECE TEST MANTIĞI) ---
+// --- GİZLİ NESNE BULMA MOTORU ---
 function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
     const [scale, setScale] = useState(1.5); 
     const [showDragHint, setShowDragHint] = useState(true); 
@@ -102,23 +115,21 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const overlayImgRef = useRef<HTMLImageElement>(null);
 
-    // RADAR
+    // 🔥 SENİN YERLEŞİME GÖRE GÜNCELLENMİŞ RADAR 🔥
     const identifyObject = (xPercent: number, yPercent: number) => {
-        // Çanta (Yukarıda)
-        if (yPercent < 60) return "Çanta 🎒";
+        // 1. Yukarıdaki Çanta
+        if (yPercent < 45) return "Çanta 🎒";
         
-        // Kitap (En Sağda)
-        if (xPercent > 55) return "Kitap 📚";
+        // 2. En Sağdaki Kitap
+        if (xPercent > 75) return "Kitap 📚";
         
-        // Sol taraftaki nesneler
-        if (xPercent < 35) {
-            // Kalem (Sol alt)
-            if (yPercent > 80) return "Kalem ✏️";
-            // Silgi (Kalemin üstünde)
-            else return "Silgi 🧽";
+        // 3. Sol Taraf (Kalem ve Silgi)
+        if (xPercent < 45) {
+            if (yPercent > 70) return "Kalem ✏️"; // Sol alt
+            else return "Silgi 🧽"; // Kalemin üstündeki silgi
         }
         
-        // Geriye sadece Defter kalıyor (Sağdaki)
+        // 4. Geriye kalan (Kalemin sağındaki Defter)
         return "Defter 📖";
     };
 
@@ -128,39 +139,39 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
         if (!img) return;
 
         const rect = img.getBoundingClientRect();
+        
+        // Dokunulan koordinat
         const clickX = info.point.x - rect.left;
         const clickY = info.point.y - rect.top;
 
+        // X ve Y yüzdesi
         const xPercent = (clickX / rect.width) * 100;
         const yPercent = (clickY / rect.height) * 100;
 
-        const scaleX = img.naturalWidth / rect.width;
-        const scaleY = img.naturalHeight / rect.height;
-        const targetX = clickX * scaleX;
-        const targetY = clickY * scaleY;
+        // APK'da hatasız okuma yapabilmesi için gerçek boyutlara dönüştürme
+        const naturalClickX = (clickX / rect.width) * img.naturalWidth;
+        const naturalClickY = (clickY / rect.height) * img.naturalHeight;
 
         const canvas = document.createElement('canvas');
-        canvas.width = 1;
-        canvas.height = 1;
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        ctx.drawImage(img, -targetX, -targetY);
-        const pixelData = ctx.getImageData(0, 0, 1, 1).data;
-        const alpha = pixelData[3];
+        // Resmi çiz ve sadece dokunulan pikseli oku
+        ctx.drawImage(img, 0, 0);
+        const pixelData = ctx.getImageData(naturalClickX, naturalClickY, 1, 1).data;
+        const alpha = pixelData[3]; // Şeffaflık (Boya) değeri
 
         if (alpha > 10) {
-            // Dolu (boyalı) yere tıklandı
+            // Boyalı (dolu) yere tıklandı!
             const touchedObjectName = identifyObject(xPercent, yPercent);
-            
             toast.success(`Algılanan Nesne: ${touchedObjectName}`, { 
                 position: 'top-center',
-                duration: 2000 
+                duration: 2500 
             });
-            
         } else {
-            // Boşluğa tıklandı, oyun devam
-            console.log("Boşluğa tıklandı, tepki verilmedi.");
+            console.log("Boşluğa tıklandı.");
         }
     };
 
@@ -205,22 +216,24 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
                 onTap={handleTap} 
                 animate={{ scale: scale }} 
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                className="w-[100vw] h-[100vh] shrink-0 cursor-grab active:cursor-grabbing relative"
+                // Koordinatların şaşmaması için w-max h-max kullanıldı
+                className="w-max h-max shrink-0 cursor-grab active:cursor-grabbing relative"
             >
+                {/* h-[120vh] veya h-[150vh] vererek resmin en boy oranını asla bozmuyoruz */}
                 <img 
                     src={canta1} 
                     alt="Arka Plan" 
                     draggable="false" 
-                    className="absolute inset-0 w-full h-full object-contain pointer-events-none" 
+                    className="h-[120vh] sm:h-[150vh] w-auto max-w-none pointer-events-none" 
                 />
                 
+                {/* ŞEFFAF KATMAN (crossOrigin kaldırıldı, APK'da sorun yaratmaz) */}
                 <img 
                     ref={overlayImgRef}
                     src={canta1x} 
                     alt="Hedef Katman" 
                     draggable="false" 
-                    crossOrigin="anonymous"
-                    className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                    className="absolute inset-0 h-[120vh] sm:h-[150vh] w-auto max-w-none pointer-events-none"
                 />
             </motion.div>
 
@@ -236,5 +249,5 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
 
         </div>
     );
-    }
-    
+            }
+              
