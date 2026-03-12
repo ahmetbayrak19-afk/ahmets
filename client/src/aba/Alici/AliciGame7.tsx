@@ -96,8 +96,18 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
     const [scale, setScale] = useState(1.5); 
     const [showDragHint, setShowDragHint] = useState(true); 
 
+    // 🔥 O MOR KUTU ARTIK BU STATE'E BAĞLI! 🔥
+    const [radarState, setRadarState] = useState({ 
+        title: "RADAR TEST MODU", 
+        message: "Sistem Hazır. Dokun!", 
+        theme: "bg-purple-600/90 border-purple-400 text-purple-200" 
+    });
+
     const containerRef = useRef<HTMLDivElement>(null);
     const overlayImgRef = useRef<HTMLImageElement>(null);
+    
+    // Parmak izleme noktası
+    const pointerDownPos = useRef({ x: 0, y: 0 });
 
     const identifyObject = (xPercent: number, yPercent: number) => {
         if (yPercent < 45) return "Çanta 🎒";
@@ -109,77 +119,93 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
         return "Defter 📖";
     };
 
-    // 🔥 KUSURSUZ TIKLAMA VE PİKSEL OKUMA SENSÖRÜ 🔥
-    const handleTap = (e: any, info: any) => {
+    // Ekrana ilk dokunduğun anı kaydeder
+    const handlePointerDown = (e: React.PointerEvent) => {
+        pointerDownPos.current = { x: e.clientX, y: e.clientY };
+    };
+
+    // Ekranda parmağını çektiğin an (Tıklamayı burada algılıyoruz)
+    const handlePointerUp = (e: React.PointerEvent) => {
+        // Parmağın ne kadar kaydığını ölçüyoruz
+        const dist = Math.hypot(e.clientX - pointerDownPos.current.x, e.clientY - pointerDownPos.current.y);
+        
+        // Eğer parmağını 15 pikselden fazla kaydırdıysan, bu bir "Sürükleme"dir, tıklama saymayız.
+        if (dist > 15) return;
+
+        // Tıklama geçerli! İpucunu gizle.
         setShowDragHint(false);
         const img = overlayImgRef.current;
         if (!img) return;
 
         const rect = img.getBoundingClientRect();
         
-        // Ekranda tıklanan yerin resim üzerindeki konumu
-        const clickX = info.point.x - rect.left;
-        const clickY = info.point.y - rect.top;
+        // Dokunulan noktanın resim üzerindeki yeri
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
 
-        // Yüzdelik konum (Radar için)
         const xPercent = (clickX / rect.width) * 100;
         const yPercent = (clickY / rect.height) * 100;
 
-        // Resmin orijinal boyutlarına göre gerçek piksel konumu
-        const naturalClickX = Math.floor((clickX / rect.width) * img.naturalWidth);
-        const naturalClickY = Math.floor((clickY / rect.height) * img.naturalHeight);
+        const naturalClickX = (clickX / rect.width) * img.naturalWidth;
+        const naturalClickY = (clickY / rect.height) * img.naturalHeight;
 
         try {
             const canvas = document.createElement('canvas');
             canvas.width = 1;
             canvas.height = 1;
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
             if (!ctx) return;
 
-            // Sadece dokunulan 1 pikseli mikroskop gibi kesip canvasa çiziyoruz (En hatasız yöntem)
-            ctx.drawImage(img, naturalClickX, naturalClickY, 1, 1, 0, 0, 1, 1);
-            
-            // O 1 pikselin rengini/şeffaflığını okuyoruz
+            ctx.drawImage(img, -naturalClickX, -naturalClickY);
             const pixelData = ctx.getImageData(0, 0, 1, 1).data;
-            const alpha = pixelData[3]; // Şeffaflık kanalı (0 = boş, 255 = tam dolu)
+            const alpha = pixelData[3]; // Şeffaflık (0: boş, 255: dolu)
 
             if (alpha > 10) {
-                // Dolu bir yere dokundu!
+                // DOLU YERE DOKUNULDU -> Kutu YEŞİL olacak!
                 const touchedObjectName = identifyObject(xPercent, yPercent);
-                toast.success(`BULUNDU: ${touchedObjectName}`, { 
-                    position: 'top-center',
-                    duration: 2000 
+                setRadarState({
+                    title: "HEDEF VURULDU!",
+                    message: touchedObjectName,
+                    theme: "bg-green-600/90 border-green-400 text-green-100"
                 });
             } else {
-                // Boş bir yere dokundu, artık ekranda bunu da göreceksin!
-                toast.info("Burada bir şey yok (Boşluk)", { 
-                    position: 'bottom-center',
-                    duration: 1000 
+                // BOŞLUĞA DOKUNULDU -> Kutu MAVİ olacak!
+                setRadarState({
+                    title: "BİLGİ",
+                    message: "Burada bir şey yok (Boşluk)",
+                    theme: "bg-blue-600/90 border-blue-400 text-blue-200"
                 });
             }
         } catch (error: any) {
-            // Güvenlik duvarına takılırsa kırmızı hata basacak
-            toast.error(`SİSTEM HATASI: Resmi okuyamıyorum. (${error.message})`, { duration: 4000 });
+            // GÜVENLİK ENGELİ -> Kutu KIRMIZI olacak!
+            setRadarState({
+                title: "SİSTEM HATASI",
+                message: "Güvenlik resmi okutmadı!",
+                theme: "bg-red-600/90 border-red-400 text-red-200"
+            });
         }
     };
 
     return (
         <div ref={containerRef} className="fixed inset-0 z-[110] bg-black overflow-hidden flex items-center justify-center touch-none">
             
-            {/* ÜST GÖREV BARI */}
-            <div className="absolute top-4 left-4 right-4 z-50 flex items-center justify-between pointer-events-none">
-                <button onClick={onClose} className="pointer-events-auto w-12 h-12 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20 active:scale-95 transition-transform">
+            {/* 🔥 TEPEDEKİ CANLI RADAR KUTUMUZ (Fotoğrafını attığın mor kutu artık renk değiştiriyor) 🔥 */}
+            <div className="absolute top-4 left-4 right-4 z-[9999] flex items-center justify-between pointer-events-none">
+                <button onClick={onClose} className="pointer-events-auto w-12 h-12 bg-black/80 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20 active:scale-95 transition-transform">
                     <ArrowLeft size={24} />
                 </button>
-                <div className="bg-purple-600/80 backdrop-blur-md border-2 border-purple-400 rounded-2xl px-6 py-2 flex flex-col items-center shadow-xl pointer-events-auto">
-                    <span className="text-[10px] text-purple-200 font-bold uppercase tracking-widest animate-pulse">RADAR TEST MODU</span>
-                    <span className="text-sm font-bold text-white">Nesnelere Dokun!</span>
+                
+                {/* RADAR KUTUSU BURASI */}
+                <div className={twMerge("backdrop-blur-md border-2 rounded-2xl px-6 py-2 flex flex-col items-center shadow-xl pointer-events-auto transition-colors duration-300", radarState.theme)}>
+                    <span className="text-[10px] font-bold uppercase tracking-widest animate-pulse opacity-80">{radarState.title}</span>
+                    <span className="text-sm font-bold text-white">{radarState.message}</span>
                 </div>
+                
                 <div className="w-12"></div>
             </div>
 
             {/* ZOOM KONTROLLERİ */}
-            <div className="absolute right-4 bottom-8 z-50 flex flex-col gap-3 pointer-events-auto">
+            <div className="absolute right-4 bottom-8 z-[9999] flex flex-col gap-3 pointer-events-auto">
                 <button 
                     onClick={() => setScale(prev => Math.min(prev + 0.5, 3))} 
                     className="w-14 h-14 bg-slate-800/80 backdrop-blur-md border border-slate-600 rounded-2xl flex items-center justify-center text-white active:scale-90 transition-all shadow-xl"
@@ -194,13 +220,16 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
                 </button>
             </div>
 
+            {/* SÜRÜKLENEBİLİR VE BÜYÜTÜLEBİLİR ALAN */}
             <motion.div 
                 drag
                 dragConstraints={containerRef} 
                 dragElastic={0} 
                 dragMomentum={true}
                 onDragStart={() => setShowDragHint(false)}
-                onTap={handleTap} // Framer Motion'ın kendi Tıklama Sensörü
+                // 🔥 TIKLAMA SENSÖRLERİNİ BURAYA BAĞLADIK (Garantili Çalışır) 🔥
+                onPointerDown={handlePointerDown}
+                onPointerUp={handlePointerUp}
                 animate={{ scale: scale }} 
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className="w-max h-max shrink-0 cursor-grab active:cursor-grabbing relative"
@@ -233,4 +262,5 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
 
         </div>
     );
-    }
+   }
+                    
