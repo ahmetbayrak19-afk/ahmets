@@ -98,9 +98,6 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
 
     const containerRef = useRef<HTMLDivElement>(null);
     const overlayImgRef = useRef<HTMLImageElement>(null);
-    
-    // Sürükleme ile tıklamayı ayırmak için parmak izleme noktası
-    const pointerDownPos = useRef({ x: 0, y: 0 });
 
     const identifyObject = (xPercent: number, yPercent: number) => {
         if (yPercent < 45) return "Çanta 🎒";
@@ -112,66 +109,64 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
         return "Defter 📖";
     };
 
-    // 🔥 DOKUNMA BAŞLANGICI
-    const handlePointerDown = (e: React.PointerEvent) => {
-        pointerDownPos.current = { x: e.clientX, y: e.clientY };
-    };
-
-    // 🔥 DOKUNMA BİTİŞİ (Gerçek Tıklama Sensörü)
-    const handlePointerUp = (e: React.PointerEvent) => {
-        // Parmağı koyduğu yer ile kaldırdığı yer arasındaki mesafeyi ölçüyoruz
-        const dist = Math.sqrt(Math.pow(e.clientX - pointerDownPos.current.x, 2) + Math.pow(e.clientY - pointerDownPos.current.y, 2));
-        
-        // Eğer 15 pikselden fazla kaydırdıysa bu "sürüklemedir", iptal et!
-        if (dist > 15) return;
-
+    // 🔥 KUSURSUZ TIKLAMA VE PİKSEL OKUMA SENSÖRÜ 🔥
+    const handleTap = (e: any, info: any) => {
         setShowDragHint(false);
         const img = overlayImgRef.current;
         if (!img) return;
 
         const rect = img.getBoundingClientRect();
         
-        // Dokunulan koordinat
-        const clickX = e.clientX - rect.left;
-        const clickY = e.clientY - rect.top;
+        // Ekranda tıklanan yerin resim üzerindeki konumu
+        const clickX = info.point.x - rect.left;
+        const clickY = info.point.y - rect.top;
 
+        // Yüzdelik konum (Radar için)
         const xPercent = (clickX / rect.width) * 100;
         const yPercent = (clickY / rect.height) * 100;
 
-        const naturalClickX = (clickX / rect.width) * img.naturalWidth;
-        const naturalClickY = (clickY / rect.height) * img.naturalHeight;
+        // Resmin orijinal boyutlarına göre gerçek piksel konumu
+        const naturalClickX = Math.floor((clickX / rect.width) * img.naturalWidth);
+        const naturalClickY = Math.floor((clickY / rect.height) * img.naturalHeight);
 
         try {
             const canvas = document.createElement('canvas');
             canvas.width = 1;
             canvas.height = 1;
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            const ctx = canvas.getContext('2d');
             if (!ctx) return;
 
-            // Pikselleri oku
-            ctx.drawImage(img, -naturalClickX, -naturalClickY);
+            // Sadece dokunulan 1 pikseli mikroskop gibi kesip canvasa çiziyoruz (En hatasız yöntem)
+            ctx.drawImage(img, naturalClickX, naturalClickY, 1, 1, 0, 0, 1, 1);
+            
+            // O 1 pikselin rengini/şeffaflığını okuyoruz
             const pixelData = ctx.getImageData(0, 0, 1, 1).data;
-            const alpha = pixelData[3];
+            const alpha = pixelData[3]; // Şeffaflık kanalı (0 = boş, 255 = tam dolu)
 
             if (alpha > 10) {
+                // Dolu bir yere dokundu!
                 const touchedObjectName = identifyObject(xPercent, yPercent);
-                toast.success(`Algılanan Nesne: ${touchedObjectName}`, { 
+                toast.success(`BULUNDU: ${touchedObjectName}`, { 
                     position: 'top-center',
-                    duration: 2500 
+                    duration: 2000 
                 });
             } else {
-                console.log("Boşluğa tıklandı.");
+                // Boş bir yere dokundu, artık ekranda bunu da göreceksin!
+                toast.info("Burada bir şey yok (Boşluk)", { 
+                    position: 'bottom-center',
+                    duration: 1000 
+                });
             }
-        } catch (error) {
-            // 🔥 EĞER APK GÜVENLİĞİ ENGELLİYORSA BURAYA DÜŞECEK 🔥
-            toast.error("HATA: APK Güvenlik Duvarı resmi okumayı engelledi!", { duration: 5000 });
-            console.error(error);
+        } catch (error: any) {
+            // Güvenlik duvarına takılırsa kırmızı hata basacak
+            toast.error(`SİSTEM HATASI: Resmi okuyamıyorum. (${error.message})`, { duration: 4000 });
         }
     };
 
     return (
         <div ref={containerRef} className="fixed inset-0 z-[110] bg-black overflow-hidden flex items-center justify-center touch-none">
             
+            {/* ÜST GÖREV BARI */}
             <div className="absolute top-4 left-4 right-4 z-50 flex items-center justify-between pointer-events-none">
                 <button onClick={onClose} className="pointer-events-auto w-12 h-12 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20 active:scale-95 transition-transform">
                     <ArrowLeft size={24} />
@@ -183,6 +178,7 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
                 <div className="w-12"></div>
             </div>
 
+            {/* ZOOM KONTROLLERİ */}
             <div className="absolute right-4 bottom-8 z-50 flex flex-col gap-3 pointer-events-auto">
                 <button 
                     onClick={() => setScale(prev => Math.min(prev + 0.5, 3))} 
@@ -204,8 +200,7 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
                 dragElastic={0} 
                 dragMomentum={true}
                 onDragStart={() => setShowDragHint(false)}
-                onPointerDown={handlePointerDown}
-                onPointerUp={handlePointerUp}
+                onTap={handleTap} // Framer Motion'ın kendi Tıklama Sensörü
                 animate={{ scale: scale }} 
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className="w-max h-max shrink-0 cursor-grab active:cursor-grabbing relative"
@@ -238,4 +233,4 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
 
         </div>
     );
-}
+    }
