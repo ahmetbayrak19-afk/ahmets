@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { db } from '../../firebase'; 
 import { doc, getDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, Search, Backpack, Star, Sparkles, User, Move, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { Loader2, ArrowLeft, Search, Backpack, Star, Sparkles, User, Move, ZoomIn, ZoomOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -40,25 +40,10 @@ export default function AliciGame7({ studentId, onClose }: { studentId: string, 
     fetchStudent();
   }, [studentId]);
 
-  // 🔥 TAM EKRAN YAPMA FONKSİYONU 🔥
-  const enterFullScreen = () => {
-      if (document.documentElement.requestFullscreen) {
-          document.documentElement.requestFullscreen().catch((err) => console.log("Tam ekran hatası:", err));
-      }
-      setActiveGameId('canta');
-  };
-
-  const exitFullScreenAndClose = () => {
-      if (document.fullscreenElement && document.exitFullscreen) {
-          document.exitFullscreen().catch(() => {});
-      }
-      setActiveGameId(null);
-  };
-
   if (isLoading) return <div className="fixed inset-0 z-[100] bg-slate-950 flex justify-center items-center"><Loader2 className="animate-spin text-blue-500" size={48} /></div>;
 
   if (activeGameId === 'canta') {
-      return <HiddenObjectEngine onClose={exitFullScreenAndClose} />;
+      return <HiddenObjectEngine onClose={() => setActiveGameId(null)} />;
   }
 
   return (
@@ -90,14 +75,13 @@ export default function AliciGame7({ studentId, onClose }: { studentId: string, 
                           "relative overflow-hidden rounded-[2rem] aspect-square flex flex-col items-center justify-center text-center p-4 transition-all duration-300",
                           game.disabled ? "bg-slate-900/50 border-2 border-slate-800/50 opacity-50 grayscale" : "bg-slate-900 border-2 border-slate-700 hover:border-slate-500 hover:-translate-y-1 active:scale-95 cursor-pointer shadow-xl"
                       )}
-                      onClick={() => !game.disabled && enterFullScreen()} // Tıklayınca Tam Ekrana Geçer
+                      onClick={() => !game.disabled && setActiveGameId(game.id)}
                   >
                       <div className={twMerge("absolute inset-0 bg-gradient-to-br opacity-20", game.color)}></div>
                       <div className={twMerge("w-14 h-14 rounded-2xl flex items-center justify-center mb-3 relative z-10", game.disabled ? "bg-slate-800 text-slate-500" : game.btnColor)}>
                           <game.icon size={28} className={game.disabled ? "opacity-50" : "text-white"} />
                       </div>
                       <h4 className="text-sm font-bold text-white relative z-10">{game.title}</h4>
-                      {game.disabled && <span className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-wider relative z-10">Yakında</span>}
                   </div>
               ))}
           </div>
@@ -107,33 +91,40 @@ export default function AliciGame7({ studentId, onClose }: { studentId: string, 
 }
 
 
-// --- GİZLİ NESNE BULMA MOTORU ---
+// --- GİZLİ NESNE BULMA MOTORU (SADECE TEST MANTIĞI) ---
 function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
     const [scale, setScale] = useState(1.5); 
     const [showDragHint, setShowDragHint] = useState(true); 
 
     const containerRef = useRef<HTMLDivElement>(null);
     const overlayImgRef = useRef<HTMLImageElement>(null);
+    
+    // Sürükleme ile tıklamayı ayırmak için parmak izleme noktası
+    const pointerDownPos = useRef({ x: 0, y: 0 });
 
-    // 🔥 SENİN YERLEŞİME GÖRE GÜNCELLENMİŞ RADAR 🔥
     const identifyObject = (xPercent: number, yPercent: number) => {
-        // 1. Yukarıdaki Çanta
         if (yPercent < 45) return "Çanta 🎒";
-        
-        // 2. En Sağdaki Kitap
         if (xPercent > 75) return "Kitap 📚";
-        
-        // 3. Sol Taraf (Kalem ve Silgi)
         if (xPercent < 45) {
-            if (yPercent > 70) return "Kalem ✏️"; // Sol alt
-            else return "Silgi 🧽"; // Kalemin üstündeki silgi
+            if (yPercent > 70) return "Kalem ✏️";
+            else return "Silgi 🧽";
         }
-        
-        // 4. Geriye kalan (Kalemin sağındaki Defter)
         return "Defter 📖";
     };
 
-    const handleTap = (e: any, info: any) => {
+    // 🔥 DOKUNMA BAŞLANGICI
+    const handlePointerDown = (e: React.PointerEvent) => {
+        pointerDownPos.current = { x: e.clientX, y: e.clientY };
+    };
+
+    // 🔥 DOKUNMA BİTİŞİ (Gerçek Tıklama Sensörü)
+    const handlePointerUp = (e: React.PointerEvent) => {
+        // Parmağı koyduğu yer ile kaldırdığı yer arasındaki mesafeyi ölçüyoruz
+        const dist = Math.sqrt(Math.pow(e.clientX - pointerDownPos.current.x, 2) + Math.pow(e.clientY - pointerDownPos.current.y, 2));
+        
+        // Eğer 15 pikselden fazla kaydırdıysa bu "sürüklemedir", iptal et!
+        if (dist > 15) return;
+
         setShowDragHint(false);
         const img = overlayImgRef.current;
         if (!img) return;
@@ -141,44 +132,46 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
         const rect = img.getBoundingClientRect();
         
         // Dokunulan koordinat
-        const clickX = info.point.x - rect.left;
-        const clickY = info.point.y - rect.top;
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
 
-        // X ve Y yüzdesi
         const xPercent = (clickX / rect.width) * 100;
         const yPercent = (clickY / rect.height) * 100;
 
-        // APK'da hatasız okuma yapabilmesi için gerçek boyutlara dönüştürme
         const naturalClickX = (clickX / rect.width) * img.naturalWidth;
         const naturalClickY = (clickY / rect.height) * img.naturalHeight;
 
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1;
+            canvas.height = 1;
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            if (!ctx) return;
 
-        // Resmi çiz ve sadece dokunulan pikseli oku
-        ctx.drawImage(img, 0, 0);
-        const pixelData = ctx.getImageData(naturalClickX, naturalClickY, 1, 1).data;
-        const alpha = pixelData[3]; // Şeffaflık (Boya) değeri
+            // Pikselleri oku
+            ctx.drawImage(img, -naturalClickX, -naturalClickY);
+            const pixelData = ctx.getImageData(0, 0, 1, 1).data;
+            const alpha = pixelData[3];
 
-        if (alpha > 10) {
-            // Boyalı (dolu) yere tıklandı!
-            const touchedObjectName = identifyObject(xPercent, yPercent);
-            toast.success(`Algılanan Nesne: ${touchedObjectName}`, { 
-                position: 'top-center',
-                duration: 2500 
-            });
-        } else {
-            console.log("Boşluğa tıklandı.");
+            if (alpha > 10) {
+                const touchedObjectName = identifyObject(xPercent, yPercent);
+                toast.success(`Algılanan Nesne: ${touchedObjectName}`, { 
+                    position: 'top-center',
+                    duration: 2500 
+                });
+            } else {
+                console.log("Boşluğa tıklandı.");
+            }
+        } catch (error) {
+            // 🔥 EĞER APK GÜVENLİĞİ ENGELLİYORSA BURAYA DÜŞECEK 🔥
+            toast.error("HATA: APK Güvenlik Duvarı resmi okumayı engelledi!", { duration: 5000 });
+            console.error(error);
         }
     };
 
     return (
         <div ref={containerRef} className="fixed inset-0 z-[110] bg-black overflow-hidden flex items-center justify-center touch-none">
             
-            {/* ÜST GÖREV BARI */}
             <div className="absolute top-4 left-4 right-4 z-50 flex items-center justify-between pointer-events-none">
                 <button onClick={onClose} className="pointer-events-auto w-12 h-12 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20 active:scale-95 transition-transform">
                     <ArrowLeft size={24} />
@@ -190,7 +183,6 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
                 <div className="w-12"></div>
             </div>
 
-            {/* ZOOM KONTROLLERİ */}
             <div className="absolute right-4 bottom-8 z-50 flex flex-col gap-3 pointer-events-auto">
                 <button 
                     onClick={() => setScale(prev => Math.min(prev + 0.5, 3))} 
@@ -206,20 +198,18 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
                 </button>
             </div>
 
-            {/* SÜRÜKLENEBİLİR VE BÜYÜTÜLEBİLİR ALAN */}
             <motion.div 
                 drag
                 dragConstraints={containerRef} 
                 dragElastic={0} 
                 dragMomentum={true}
                 onDragStart={() => setShowDragHint(false)}
-                onTap={handleTap} 
+                onPointerDown={handlePointerDown}
+                onPointerUp={handlePointerUp}
                 animate={{ scale: scale }} 
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                // Koordinatların şaşmaması için w-max h-max kullanıldı
                 className="w-max h-max shrink-0 cursor-grab active:cursor-grabbing relative"
             >
-                {/* h-[120vh] veya h-[150vh] vererek resmin en boy oranını asla bozmuyoruz */}
                 <img 
                     src={canta1} 
                     alt="Arka Plan" 
@@ -227,7 +217,6 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
                     className="h-[120vh] sm:h-[150vh] w-auto max-w-none pointer-events-none" 
                 />
                 
-                {/* ŞEFFAF KATMAN (crossOrigin kaldırıldı, APK'da sorun yaratmaz) */}
                 <img 
                     ref={overlayImgRef}
                     src={canta1x} 
@@ -249,5 +238,4 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
 
         </div>
     );
-            }
-              
+}
