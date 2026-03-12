@@ -109,13 +109,22 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
     // Parmak izleme noktası
     const pointerDownPos = useRef({ x: 0, y: 0 });
 
+    // 🔥 GÜNCELLENMİŞ VE DARALTILMIŞ RADAR HARİTASI 🔥
     const identifyObject = (xPercent: number, yPercent: number) => {
-        if (yPercent < 45) return "Çanta 🎒";
-        if (xPercent > 75) return "Kitap 📚";
-        if (xPercent < 45) {
-            if (yPercent > 70) return "Kalem ✏️";
-            else return "Silgi 🧽";
+        // 1. Çanta: Ekranın üst yarısı (Sınırı 45'ten 55'e indirdik)
+        if (yPercent < 55) return "Çanta 🎒";
+        
+        // 2. Kitap: Sağ taraf (Sınırı 75'ten 55'e çektik)
+        if (xPercent > 55) return "Kitap 📚";
+        
+        // 3. Sol Taraf (Kalem ve Silgi) - Sınırı 45'ten 35'e çektik ki ortadaki defteri yutmasın!
+        if (xPercent < 35) {
+            // Kalem en dipte (Sınırı 70'ten 85'e çektik ki silginin alt yarısını kalem sanmasın)
+            if (yPercent > 85) return "Kalem ✏️"; 
+            else return "Silgi 🧽"; 
         }
+        
+        // 4. Geriye kalan orta-alt alanın tek sahibi:
         return "Defter 📖";
     };
 
@@ -189,7 +198,7 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
     return (
         <div ref={containerRef} className="fixed inset-0 z-[110] bg-black overflow-hidden flex items-center justify-center touch-none">
             
-            {/* 🔥 TEPEDEKİ CANLI RADAR KUTUMUZ (Fotoğrafını attığın mor kutu artık renk değiştiriyor) 🔥 */}
+            {/* 🔥 TEPEDEKİ CANLI RADAR KUTUMUZ 🔥 */}
             <div className="absolute top-4 left-4 right-4 z-[9999] flex items-center justify-between pointer-events-none">
                 <button onClick={onClose} className="pointer-events-auto w-12 h-12 bg-black/80 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20 active:scale-95 transition-transform">
                     <ArrowLeft size={24} />
@@ -262,5 +271,4 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
 
         </div>
     );
-   }
-                    
+}
