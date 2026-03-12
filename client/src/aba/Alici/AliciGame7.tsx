@@ -96,7 +96,6 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
     const [scale, setScale] = useState(1.5); 
     const [showDragHint, setShowDragHint] = useState(true); 
 
-    // 🔥 O MOR KUTU ARTIK BU STATE'E BAĞLI! 🔥
     const [radarState, setRadarState] = useState({ 
         title: "RADAR TEST MODU", 
         message: "Sistem Hazır. Dokun!", 
@@ -106,49 +105,41 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const overlayImgRef = useRef<HTMLImageElement>(null);
     
-    // Parmak izleme noktası
     const pointerDownPos = useRef({ x: 0, y: 0 });
 
     // 🔥 GÜNCELLENMİŞ VE DARALTILMIŞ RADAR HARİTASI 🔥
     const identifyObject = (xPercent: number, yPercent: number) => {
-        // 1. Çanta: Ekranın üst yarısı (Sınırı 45'ten 55'e indirdik)
+        // 1. Çanta: Ekranın üst kısmı 
         if (yPercent < 55) return "Çanta 🎒";
         
-        // 2. Kitap: Sağ taraf (Sınırı 75'ten 55'e çektik)
+        // 2. Kitap: Sağ taraf 
         if (xPercent > 55) return "Kitap 📚";
         
-        // 3. Sol Taraf (Kalem ve Silgi) - Sınırı 45'ten 35'e çektik ki ortadaki defteri yutmasın!
-        if (xPercent < 35) {
-            // Kalem en dipte (Sınırı 70'ten 85'e çektik ki silginin alt yarısını kalem sanmasın)
-            if (yPercent > 85) return "Kalem ✏️"; 
-            else return "Silgi 🧽"; 
+        // 3. Sol Taraf (Kalem ve Silgi)
+        // DİKEY ÇİZGİYİ 35'TEN 26'YA ÇEKTİK: Defterin solunu artık rahat bıraktık!
+        if (xPercent < 26) {
+            // YATAY ÇİZGİYİ 85'TEN 75'E ÇEKTİK: Kalemin havaya kalkan sağ ucunu kurtardık!
+            if (yPercent > 75) return "Kalem ✏️";
+            else return "Silgi 🧽";
         }
         
-        // 4. Geriye kalan orta-alt alanın tek sahibi:
+        // 4. Geriye kalan orta alan (26 ile 55 arası): Tamamen Defter!
         return "Defter 📖";
     };
 
-    // Ekrana ilk dokunduğun anı kaydeder
     const handlePointerDown = (e: React.PointerEvent) => {
         pointerDownPos.current = { x: e.clientX, y: e.clientY };
     };
 
-    // Ekranda parmağını çektiğin an (Tıklamayı burada algılıyoruz)
     const handlePointerUp = (e: React.PointerEvent) => {
-        // Parmağın ne kadar kaydığını ölçüyoruz
         const dist = Math.hypot(e.clientX - pointerDownPos.current.x, e.clientY - pointerDownPos.current.y);
-        
-        // Eğer parmağını 15 pikselden fazla kaydırdıysan, bu bir "Sürükleme"dir, tıklama saymayız.
         if (dist > 15) return;
 
-        // Tıklama geçerli! İpucunu gizle.
         setShowDragHint(false);
         const img = overlayImgRef.current;
         if (!img) return;
 
         const rect = img.getBoundingClientRect();
-        
-        // Dokunulan noktanın resim üzerindeki yeri
         const clickX = e.clientX - rect.left;
         const clickY = e.clientY - rect.top;
 
@@ -167,10 +158,9 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
 
             ctx.drawImage(img, -naturalClickX, -naturalClickY);
             const pixelData = ctx.getImageData(0, 0, 1, 1).data;
-            const alpha = pixelData[3]; // Şeffaflık (0: boş, 255: dolu)
+            const alpha = pixelData[3]; 
 
             if (alpha > 10) {
-                // DOLU YERE DOKUNULDU -> Kutu YEŞİL olacak!
                 const touchedObjectName = identifyObject(xPercent, yPercent);
                 setRadarState({
                     title: "HEDEF VURULDU!",
@@ -178,7 +168,6 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
                     theme: "bg-green-600/90 border-green-400 text-green-100"
                 });
             } else {
-                // BOŞLUĞA DOKUNULDU -> Kutu MAVİ olacak!
                 setRadarState({
                     title: "BİLGİ",
                     message: "Burada bir şey yok (Boşluk)",
@@ -186,7 +175,6 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
                 });
             }
         } catch (error: any) {
-            // GÜVENLİK ENGELİ -> Kutu KIRMIZI olacak!
             setRadarState({
                 title: "SİSTEM HATASI",
                 message: "Güvenlik resmi okutmadı!",
@@ -198,13 +186,12 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
     return (
         <div ref={containerRef} className="fixed inset-0 z-[110] bg-black overflow-hidden flex items-center justify-center touch-none">
             
-            {/* 🔥 TEPEDEKİ CANLI RADAR KUTUMUZ 🔥 */}
+            {/* TEPEDEKİ CANLI RADAR KUTUMUZ */}
             <div className="absolute top-4 left-4 right-4 z-[9999] flex items-center justify-between pointer-events-none">
                 <button onClick={onClose} className="pointer-events-auto w-12 h-12 bg-black/80 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20 active:scale-95 transition-transform">
                     <ArrowLeft size={24} />
                 </button>
                 
-                {/* RADAR KUTUSU BURASI */}
                 <div className={twMerge("backdrop-blur-md border-2 rounded-2xl px-6 py-2 flex flex-col items-center shadow-xl pointer-events-auto transition-colors duration-300", radarState.theme)}>
                     <span className="text-[10px] font-bold uppercase tracking-widest animate-pulse opacity-80">{radarState.title}</span>
                     <span className="text-sm font-bold text-white">{radarState.message}</span>
@@ -236,7 +223,6 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
                 dragElastic={0} 
                 dragMomentum={true}
                 onDragStart={() => setShowDragHint(false)}
-                // 🔥 TIKLAMA SENSÖRLERİNİ BURAYA BAĞLADIK (Garantili Çalışır) 🔥
                 onPointerDown={handlePointerDown}
                 onPointerUp={handlePointerUp}
                 animate={{ scale: scale }} 
@@ -271,4 +257,5 @@ function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
 
         </div>
     );
-}
+                                                             }
+      
