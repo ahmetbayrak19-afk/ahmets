@@ -9,6 +9,7 @@ import { ABA_MODULES } from '@/shared/abaData';
 
 // 🔥 YONERGE1 BİLEŞENİ (Yolu senin projendeki klasöre göre)
 import Yonerge1 from '@/aba/yonerge/yonerge1';
+import Yonerge2 from '@/aba/yonerge/yonerge2';
 
 interface YonergeTakipPageProps {
   studentId: string;
@@ -95,11 +96,21 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
                 itemText={text}
                 onClose={() => setActiveItem(null)}
                 onComplete={handleSessionSave}
-            />
-        );
-    }
+          />
+      );
   }
 
+  if (activeItem.includes("1.2")) {
+      return (
+          <Yonerge2 
+              itemCode={code}
+              itemText={text}
+              onClose={() => setActiveItem(null)}
+              onComplete={handleSessionSave}
+          />
+      );
+  }
+  }
   return (
     <div className="space-y-6 relative">
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex items-center justify-between sticky top-0 backdrop-blur-md z-10 shadow-lg">
@@ -129,8 +140,7 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
             const code = item.substring(0, firstSpaceIndex);
             const text = item.substring(firstSpaceIndex + 1);
             const isCompleted = status === true;
-            const hasTest = item.includes("1.1"); 
-
+            const hasTest = item.includes("1.1") || item.includes("1.2");
             return (
                 <div key={item} className={twMerge("group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4", isCompleted ? "bg-green-950/10 border-green-500/20" : "bg-slate-900/40 border-slate-800 hover:bg-slate-800 hover:border-slate-700")}>
                     <div className="flex items-start gap-4 flex-1">
