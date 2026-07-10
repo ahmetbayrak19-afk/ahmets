@@ -7,11 +7,13 @@ import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 
-// 🔥 YÖNERGE BİLEŞENLERİ
+// 🔥 TÜM YÖNERGE BİLEŞENLERİ
 import Yonerge1 from '@/aba/yonerge/yonerge1';
 import Yonerge2 from '@/aba/yonerge/yonerge2';
 import Yonerge3 from '@/aba/yonerge/yonerge3';
 import Yonerge4 from '@/aba/yonerge/yonerge4';
+import Yonerge5 from '@/aba/yonerge/yonerge5';
+import Yonerge6 from '@/aba/yonerge/yonerge6';
 
 interface YonergeTakipPageProps {
   studentId: string;
@@ -101,8 +103,14 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
     if (activeItem.includes("2.1")) {
         return <Yonerge3 itemCode={code} itemText={text} onClose={() => setActiveItem(null)} onComplete={handleSessionSave} />;
     }
-    if (activeItem.includes("3")) { // YTB 3.x için
+    if (activeItem.includes("2.2")) {
         return <Yonerge4 itemCode={code} itemText={text} onClose={() => setActiveItem(null)} onComplete={handleSessionSave} />;
+    }
+    if (activeItem.includes("2.3")) {
+        return <Yonerge5 itemCode={code} itemText={text} onClose={() => setActiveItem(null)} onComplete={handleSessionSave} />;
+    }
+    if (activeItem.includes("2.4")) {
+        return <Yonerge6 itemCode={code} itemText={text} onClose={() => setActiveItem(null)} onComplete={handleSessionSave} />;
     }
   }
 
@@ -136,8 +144,14 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
             const text = item.substring(firstSpaceIndex + 1);
             const isCompleted = status === true;
             
-            // Hangi maddelerde değerlendirme butonu çıkacak
-            const hasTest = item.includes("1.1") || item.includes("1.2") || item.includes("2.1") || item.includes("3");
+            // Hangi maddelerde DEĞERLENDİR butonu çıkacak
+            const hasTest = 
+                item.includes("1.1") || 
+                item.includes("1.2") || 
+                item.includes("2.1") || 
+                item.includes("2.2") || 
+                item.includes("2.3") || 
+                item.includes("2.4");
 
             return (
                 <div key={item} className={twMerge("group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4", 
@@ -179,4 +193,4 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
       </div>
     </div>
   );
-}
+      }
