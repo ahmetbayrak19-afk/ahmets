@@ -141,7 +141,7 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
             const code = item.substring(0, firstSpaceIndex);
             const text = item.substring(firstSpaceIndex + 1);
             const isCompleted = status === true;
-            const hasTest = item.includes("1.1"); 
+            const hasTest = item.includes("1.1") || item.includes("1.2");
 
             return (
                 <div key={item} className={twMerge("group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4", isCompleted ? "bg-green-950/10 border-green-500/20" : "bg-slate-900/40 border-slate-800 hover:bg-slate-800 hover:border-slate-700")}>
