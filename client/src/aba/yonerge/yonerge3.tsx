@@ -8,31 +8,31 @@ interface InstructionDef {
 }
 
 const INSTRUCTION_POOL: InstructionDef[] = [
-  { text: "Topu al" },
-  { text: "Kitabı masaya koy" },
-  { text: "Kalemi ver" },
-  { text: "Çantayı aç" },
-  { text: "Oyuncağı yere bırak" },
-  { text: "Aracı it" },
-  { text: "Topu at" },
-  { text: "Kitabı aç" },
-  { text: "Kalemi masaya bırak" },
-  { text: "Çiçeği göster" },
-  { text: "Elmayı al" },
-  { text: "Su bardağını al" },
-  { text: "Kutuyu aç" },
-  { text: "Topu masaya koy" },
-  { text: "Kitabı ver" },
-  { text: "Kalemi yere bırak" },
-  { text: "Çantayı kapat" },
-  { text: "Oyuncağı al" },
-  { text: "Kalemi al" },
-  { text: "Kitabı kapat" },
-  { text: "Topu ver" },
-  { text: "Çantayı koy" },
-  { text: "Oyuncağı göster" },
-  { text: "Aracı al" },
-  { text: "Su bardağını koy" }
+  { text: "Topu al ve masaya koy" },
+  { text: "Kitabı al ve rafa koy" },
+  { text: "Kalemi al ve çekmeceye koy" },
+  { text: "Oyuncağı al ve kutuya koy" },
+  { text: "Çantayı al ve masaya koy" },
+  { text: "Topu al ve sandalyeye koy" },
+  { text: "Kitabı al ve dolaba koy" },
+  { text: "Kalemi al ve masaya bırak" },
+  { text: "Oyuncağı al ve rafa koy" },
+  { text: "Çantayı aç ve kitabı içine koy" },
+  { text: "Topu al ve duvara at" },
+  { text: "Kitabı al ve masaya koy" },
+  { text: "Kalemi al ve çekmeceye bırak" },
+  { text: "Oyuncağı al ve kutuya bırak" },
+  { text: "Çantayı al ve rafa koy" },
+  { text: "Kalemi al ve kağıda yaz" },
+  { text: "Topu al ve yerine at" },
+  { text: "Kitabı al ve sayfayı çevir" },
+  { text: "Oyuncağı al ve rafa bırak" },
+  { text: "Çantayı aç ve kalemi içine koy" },
+  { text: "Aracı al ve it" },
+  { text: "Su bardağını al ve masaya koy" },
+  { text: "Kitabı al ve yerine koy" },
+  { text: "Topu al ve sandalyeye bırak" },
+  { text: "Kalemi al ve çekmeceye koy" }
 ];
 
 const generateSmartSequence = (): string[] => {
@@ -40,19 +40,19 @@ const generateSmartSequence = (): string[] => {
   return shuffled.slice(0, 10).map(item => item.text);
 };
 
-interface Yonerge2Props {
+interface Yonerge3Props {
   itemCode?: string;
   itemText?: string;
   onClose: () => void;
   onComplete: (success: boolean) => void;
 }
 
-export default function Yonerge2({ 
-  itemCode = "YTB 1.2", 
-  itemText = "Bir Nesne ile İlgili Verilen Tek Basamaklı Yönergeleri Yerine Getirme", 
+export default function Yonerge3({ 
+  itemCode = "YTB 2.1", 
+  itemText = "İki Basamaklı Yönergeleri Takip Etme", 
   onClose, 
   onComplete 
-}: Yonerge2Props) {
+}: Yonerge3Props) {
   
   const [instructions] = useState<string[]>(generateSmartSequence);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -192,4 +192,4 @@ export default function Yonerge2({
       )}
     </div>
   );
-   }
+                                              }

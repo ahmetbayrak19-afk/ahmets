@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { XCircle, Check, X, Trophy, Ear, PlayCircle } from 'lucide-react';
-import { twMerge } from 'tailwind-merge';
 import confetti from 'canvas-confetti';
 
 interface InstructionDef {
@@ -8,31 +7,31 @@ interface InstructionDef {
 }
 
 const INSTRUCTION_POOL: InstructionDef[] = [
-  { text: "Topu al" },
-  { text: "Kitabı masaya koy" },
-  { text: "Kalemi ver" },
-  { text: "Çantayı aç" },
-  { text: "Oyuncağı yere bırak" },
-  { text: "Aracı it" },
-  { text: "Topu at" },
-  { text: "Kitabı aç" },
-  { text: "Kalemi masaya bırak" },
-  { text: "Çiçeği göster" },
-  { text: "Elmayı al" },
-  { text: "Su bardağını al" },
-  { text: "Kutuyu aç" },
-  { text: "Topu masaya koy" },
-  { text: "Kitabı ver" },
-  { text: "Kalemi yere bırak" },
-  { text: "Çantayı kapat" },
-  { text: "Oyuncağı al" },
-  { text: "Kalemi al" },
-  { text: "Kitabı kapat" },
-  { text: "Topu ver" },
-  { text: "Çantayı koy" },
-  { text: "Oyuncağı göster" },
-  { text: "Aracı al" },
-  { text: "Su bardağını koy" }
+  { text: "Bebek markete gitmek için hazırlanmalı. Hadi elbisesini bul ve bana ver giydirelim." },
+  { text: "Ayıcığı uyutmak istiyoruz. Yatağını hazırla, ayıcığı yatır ve üstünü ört." },
+  { text: "Arabayı yıkayalım. Kovayı doldur, arabayı ıslat ve sabunla." },
+  { text: "Masayı kur. Tabağı koy, kaşığı yanına koy ve bardağı doldur." },
+  { text: "Bebeği banyo yapalım. Suyu hazırla, bebeği soy ve sabunla." },
+  { text: "Oyuncakları toplayalım. Arabayı kutuya koy, topu rafa kaldır ve kitabı yerine koy." },
+  { text: "Pikniğe gideceğiz. Sepeti hazırla, meyveyi koy ve battaniyeyi katla." },
+  { text: "Bebeği giydirelim. Çorabını giydir, ayakkabısını tak ve hırkasını giydir." },
+  { text: "Yemeği hazırlayalım. Tabağı doldur, kaşığı ver ve suyu getir." },
+  { text: "Kitap okuyalım. Kitabı aç, resmi göster ve hikayeyi anlat." },
+  { text: "Aracı tamir edelim. Tekerleği tak, kapıyı kapat ve boyasını yap." },
+  { text: "Bebeği doktora götürelim. Çantasını al, bebeği kucağına al ve kapıyı aç." },
+  { text: "Yatağı yapalım. Çarşafı düzelt, yastığı koy ve battaniyeyi ser." },
+  { text: "Çiçekleri sulayalım. Kovayı doldur, çiçeğe git ve suyu dök." },
+  { text: "Oyuncağı tamir edelim. Parçayı bul, yerine tak ve boyasını yap." },
+  { text: "Bebeği besleyelim. Mama tabağını doldur, kaşığı al ve bebeğe ver." },
+  { text: "Aracı park edelim. Arabayı sür, park yerine getir ve motoru kapat." },
+  { text: "Kitapları yerleştir. Kitabı al, rafa koy ve sırayı düzelt." },
+  { text: "Bebeği gezmeye çıkaralım. Arabasını hazırla, bebeği oturt ve kapıyı aç." },
+  { text: "Yemeği bitirelim. Tabağı kaldır, bardağı koy ve masayı sil." },
+  { text: "Oyuncakları yerleştirelim. Topu kutuya koy, arabayı rafa kaldır ve bebeği yatağa yatır." },
+  { text: "Bebeği giydirelim. Elbisesini bul, giydir ve düğmelerini ilikle." },
+  { text: "Masayı toplayalım. Tabağı kaldır, kaşığı koy ve masayı sil." },
+  { text: "Aracı yıkayalım. Kovayı doldur, arabayı ıslat ve kurulayın." },
+  { text: "Bebeği uyutalım. Yatağını hazırla, bebeği yatır ve lambayı kapat." }
 ];
 
 const generateSmartSequence = (): string[] => {
@@ -40,19 +39,19 @@ const generateSmartSequence = (): string[] => {
   return shuffled.slice(0, 10).map(item => item.text);
 };
 
-interface Yonerge2Props {
+interface Yonerge4Props {
   itemCode?: string;
   itemText?: string;
   onClose: () => void;
   onComplete: (success: boolean) => void;
 }
 
-export default function Yonerge2({ 
-  itemCode = "YTB 1.2", 
-  itemText = "Bir Nesne ile İlgili Verilen Tek Basamaklı Yönergeleri Yerine Getirme", 
+export default function Yonerge4({ 
+  itemCode = "YTB 3.x", 
+  itemText = "Çok Basamaklı Yönergeleri Takip Etme", 
   onClose, 
   onComplete 
-}: Yonerge2Props) {
+}: Yonerge4Props) {
   
   const [instructions] = useState<string[]>(generateSmartSequence);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -108,7 +107,8 @@ export default function Yonerge2({
             <Ear size={80} className="mx-auto text-blue-500 mb-6 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
             <h1 className="text-3xl font-black mb-4 text-white">Hazır mısınız?</h1>
             <p className="text-slate-400 mb-8 text-base md:text-lg leading-relaxed">
-              Ekranda sırayla <strong>10 yönerge</strong> belirecek. Komutu öğrenciye söyleyin ve tepkisini değerlendirin.
+              Ekranda sırayla <strong>10 çok basamaklı yönerge</strong> belirecek. 
+              Öğrenciden tüm adımları yapmasını isteyin.
             </p>
             <button 
               onClick={() => setPhase('playing')} 
@@ -121,12 +121,12 @@ export default function Yonerge2({
 
         {phase === 'playing' && (
           <div className="w-full max-w-3xl flex flex-col items-center justify-center animate-in slide-in-from-right-8 duration-300" key={currentIndex}>
-            <div className="w-full bg-slate-800/60 border-2 border-slate-700 rounded-[2.5rem] p-10 md:p-16 flex flex-col items-center justify-center shadow-2xl backdrop-blur-sm min-h-[280px] md:min-h-[380px] relative overflow-hidden">
+            <div className="w-full bg-slate-800/60 border-2 border-slate-700 rounded-[2.5rem] p-10 md:p-16 flex flex-col items-center justify-center shadow-2xl backdrop-blur-sm min-h-[300px] md:min-h-[400px] relative overflow-hidden">
                 <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl"></div>
                 <span className="text-blue-400 font-bold tracking-widest uppercase mb-4 md:mb-6 text-sm md:text-base flex items-center gap-2">
                   <Ear size={18} /> Öğrenciye Söyleyin:
                 </span>
-                <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-center text-white leading-tight tracking-tight">
+                <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-center text-white leading-tight tracking-tight">
                   "{currentInstruction}"
                 </h1>
             </div>
@@ -192,4 +192,4 @@ export default function Yonerge2({
       )}
     </div>
   );
-   }
+  }
