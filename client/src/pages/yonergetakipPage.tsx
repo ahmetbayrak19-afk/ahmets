@@ -96,9 +96,20 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
                 itemText={text}
                 onClose={() => setActiveItem(null)}
                 onComplete={handleSessionSave}
-            />
-        );
-    }
+          />
+      );
+  }
+
+  if (activeItem.includes("1.2")) {
+      return (
+          <Yonerge2 
+              itemCode={code}
+              itemText={text}
+              onClose={() => setActiveItem(null)}
+              onComplete={handleSessionSave}
+          />
+      );
+  }
   }
 
   return (
