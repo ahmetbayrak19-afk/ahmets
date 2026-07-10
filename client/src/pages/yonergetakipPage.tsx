@@ -9,6 +9,7 @@ import { ABA_MODULES } from '@/shared/abaData';
 
 // 🔥 YONERGE1 BİLEŞENİ (Yolu senin projendeki klasöre göre)
 import Yonerge1 from '@/aba/yonerge/yonerge1';
+import Yonerge2 from '@/aba/yonerge/yonerge2';
 
 interface YonergeTakipPageProps {
   studentId: string;
