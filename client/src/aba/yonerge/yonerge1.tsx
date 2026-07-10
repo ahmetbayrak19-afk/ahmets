@@ -3,23 +3,18 @@ import { XCircle, Check, X, Trophy, Ear, PlayCircle } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import confetti from 'canvas-confetti';
 
-// --- AKILLI YÖNERGE HAVUZU ---
-type Posture = 'STAND' | 'SIT' | 'LIE';
-
 interface InstructionDef {
   text: string;
-  effect?: Posture;
-  req?: Posture[];
 }
 
 const INSTRUCTION_POOL: InstructionDef[] = [
-  { text: "Ayağa kalk", effect: 'STAND' }, 
-  { text: "Zıpla", req: ['STAND'] },
-  { text: "Etrafında dön", req: ['STAND'] },
-  { text: "Yere yat", effect: 'LIE' },
-  { text: "Otur / Yere otur", effect: 'SIT' },
-  { text: "Ayaklarını yere vur", req: ['STAND', 'SIT'] }, 
-  { text: "Kollarını kaldır" }, 
+  { text: "Ayağa kalk" },
+  { text: "Zıpla" },
+  { text: "Etrafında dön" },
+  { text: "Yere yat" },
+  { text: "Otur / Yere otur" },
+  { text: "Ayaklarını yere vur" },
+  { text: "Kollarını kaldır" },
   { text: "Bay bay yap" },
   { text: "Ellerini çırp / Alkışla" },
   { text: "Kollarını bağla" },
@@ -27,39 +22,22 @@ const INSTRUCTION_POOL: InstructionDef[] = [
   { text: "Ağzını aç" },
   { text: "Karnını ovala" },
   { text: "Burnuna dokun" },
-  { text: "Kafanı salla" }
+  { text: "Kafanı salla" },
+  { text: "Elini kaldır" },
+  { text: "Parmaklarını aç" },
+  { text: "Başını sağa sola çevir" },
+  { text: "Omuzlarını silk" },
+  { text: "Dizlerini bük" },
+  { text: "Eliyle selam ver" },
+  { text: "Ayağını yere vur" },
+  { text: "Ellerinle çember yap" },
+  { text: "Eliyle işaret et" },
+  { text: "Başını eğ" }
 ];
 
 const generateSmartSequence = (): string[] => {
-  const sequence: string[] = [];
-  let currentPosture: Posture = 'STAND'; 
-  
-  const available = [...INSTRUCTION_POOL];
-  
-  const firstIndex = available.findIndex(i => i.text === "Ayağa kalk");
-  sequence.push(available[firstIndex].text);
-  available.splice(firstIndex, 1);
-  
-  while (sequence.length < 10) {
-    const candidates = available.filter(item => {
-      if (item.req && !item.req.includes(currentPosture)) return false;
-      if (item.effect === currentPosture) return false; 
-      return true;
-    });
-    
-    const poolToPickFrom = candidates.length > 0 ? candidates : available;
-    const randomIndex = Math.floor(Math.random() * poolToPickFrom.length);
-    const selected = poolToPickFrom[randomIndex];
-    
-    sequence.push(selected.text);
-    
-    if (selected.effect) currentPosture = selected.effect;
-    
-    const indexInAvailable = available.findIndex(i => i.text === selected.text);
-    available.splice(indexInAvailable, 1);
-  }
-  
-  return sequence;
+  const shuffled = [...INSTRUCTION_POOL].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, 10).map(item => item.text);
 };
 
 interface Yonerge1Props {
@@ -70,8 +48,8 @@ interface Yonerge1Props {
 }
 
 export default function Yonerge1({ 
-  itemCode = "AD.1.1", 
-  itemText = "Tek basamaklı yönergeleri takip eder.", 
+  itemCode = "YTB 1.1", 
+  itemText = "Tek Basamaklı Yönergeleri Takip Etme", 
   onClose, 
   onComplete 
 }: Yonerge1Props) {
@@ -83,14 +61,16 @@ export default function Yonerge1({
 
   const currentInstruction = instructions[currentIndex];
 
-  const handleAssess = (correct: boolean) => {
-    if (correct) setScore(prev => prev + 1);
+  const handleAssess = (result: boolean | 'pass') => {
+    if (result === true) {
+      setScore(prev => prev + 1);
+    }
 
     if (currentIndex + 1 < instructions.length) {
       setCurrentIndex(prev => prev + 1);
     } else {
       setPhase('result');
-      if (score + (correct ? 1 : 0) >= 8) {
+      if (score + (result === true ? 1 : 0) >= 8) {
         confetti({ particleCount: 250, spread: 90, origin: { y: 0.6 } });
       }
     }
@@ -120,7 +100,7 @@ export default function Yonerge1({
         <div className="w-10 landscape:w-8"></div> 
       </div>
 
-      {/* ORTA İÇERİK ALANI */}
+      {/* ORTA İÇERİK */}
       <div className="flex-1 relative flex flex-col items-center justify-center p-4 overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-slate-950">
         
         {phase === 'intro' && (
@@ -128,7 +108,7 @@ export default function Yonerge1({
             <Ear size={80} className="mx-auto text-blue-500 mb-6 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
             <h1 className="text-3xl font-black mb-4 text-white">Hazır mısınız?</h1>
             <p className="text-slate-400 mb-8 text-base md:text-lg leading-relaxed">
-              Ekranda sırayla fiziksel duruma uygun yönergeler belirecek. Komutu öğrenciye söyleyin ve tepkisini değerlendirin. Toplam <strong>10 komut</strong> sorulacaktır.
+              Ekranda sırayla <strong>10 yönerge</strong> belirecek. Komutu öğrenciye söyleyin ve tepkisini değerlendirin.
             </p>
             <button 
               onClick={() => setPhase('playing')} 
@@ -141,7 +121,7 @@ export default function Yonerge1({
 
         {phase === 'playing' && (
           <div className="w-full max-w-3xl flex flex-col items-center justify-center animate-in slide-in-from-right-8 duration-300" key={currentIndex}>
-            <div className="w-full bg-slate-800/60 border-2 border-slate-700 rounded-[2.5rem] p-10 md:p-16 flex flex-col items-center justify-center shadow-2xl backdrop-blur-sm min-h-[250px] md:min-h-[350px] relative overflow-hidden">
+            <div className="w-full bg-slate-800/60 border-2 border-slate-700 rounded-[2.5rem] p-10 md:p-16 flex flex-col items-center justify-center shadow-2xl backdrop-blur-sm min-h-[280px] md:min-h-[380px] relative overflow-hidden">
                 <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl"></div>
                 <span className="text-blue-400 font-bold tracking-widest uppercase mb-4 md:mb-6 text-sm md:text-base flex items-center gap-2">
                   <Ear size={18} /> Öğrenciye Söyleyin:
@@ -178,27 +158,38 @@ export default function Yonerge1({
         )}
       </div>
 
-      {/* ALT BUTONLAR */}
+      {/* ALT BUTONLAR - GEÇ BUTONU EKLENDİ */}
       {phase === 'playing' && (
-        <div className="shrink-0 p-6 pb-10 landscape:py-3 landscape:px-6 landscape:pb-4 bg-slate-900 border-t border-slate-800 flex items-stretch justify-center gap-4 sm:gap-6 relative z-10">
+        <div className="shrink-0 p-6 pb-10 landscape:py-3 landscape:px-6 landscape:pb-4 bg-slate-900 border-t border-slate-800 flex items-stretch justify-center gap-3 sm:gap-4 relative z-10">
+          
+          {/* YAPAMADI */}
           <button 
             onClick={() => handleAssess(false)} 
-            className="flex-1 max-w-[250px] flex flex-col landscape:flex-row items-center justify-center gap-2 p-5 landscape:p-3 bg-red-500/10 border border-red-500/30 rounded-2xl active:scale-95 transition-all text-red-500 hover:bg-red-500/20 hover:border-red-500"
+            className="flex-1 max-w-[200px] flex flex-col landscape:flex-row items-center justify-center gap-2 p-5 landscape:p-3 bg-red-500/10 border border-red-500/30 rounded-2xl active:scale-95 transition-all text-red-500 hover:bg-red-500/20 hover:border-red-500"
           >
-            <X className="w-10 h-10 landscape:w-6 landscape:h-6" />
-            <span className="text-base landscape:text-sm font-bold uppercase tracking-wider text-center">Yapamadı</span>
+            <X className="w-9 h-9 landscape:w-6 landscape:h-6" />
+            <span className="text-sm landscape:text-xs font-bold uppercase tracking-wider">Yapamadı</span>
           </button>
-          
+
+          {/* GEÇ */}
+          <button 
+            onClick={() => handleAssess('pass')} 
+            className="flex-1 max-w-[200px] flex flex-col landscape:flex-row items-center justify-center gap-2 p-5 landscape:p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl active:scale-95 transition-all text-yellow-400 hover:bg-yellow-500/20 hover:border-yellow-500"
+          >
+            <span className="text-sm landscape:text-xs font-bold uppercase tracking-wider">Geç</span>
+          </button>
+
+          {/* YAPTI */}
           <button 
             onClick={() => handleAssess(true)} 
-            className="flex-1 max-w-[250px] flex flex-col landscape:flex-row items-center justify-center gap-2 p-5 landscape:p-3 bg-green-500/10 border border-green-500/30 rounded-2xl active:scale-95 transition-all text-green-500 hover:bg-green-500/20 hover:border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.1)]"
+            className="flex-1 max-w-[200px] flex flex-col landscape:flex-row items-center justify-center gap-2 p-5 landscape:p-3 bg-green-500/10 border border-green-500/30 rounded-2xl active:scale-95 transition-all text-green-500 hover:bg-green-500/20 hover:border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.1)]"
           >
-            <Check className="w-10 h-10 landscape:w-6 landscape:h-6" />
-            <span className="text-base landscape:text-sm font-bold uppercase tracking-wider text-center">Yaptı</span>
+            <Check className="w-9 h-9 landscape:w-6 landscape:h-6" />
+            <span className="text-sm landscape:text-xs font-bold uppercase tracking-wider">Yaptı</span>
           </button>
+
         </div>
       )}
     </div>
   );
-                }
-              
+}
