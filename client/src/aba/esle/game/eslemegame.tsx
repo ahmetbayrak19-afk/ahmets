@@ -244,7 +244,7 @@ function BackgroundFish({ gltf, scaleMult, boundary, zRange }: any) {
   return <group ref={groupRef}><primitive object={scene} /></group>;
 }
 
-function World({ urls }: any) {
+function World({ urls, setFishPosition }: any) {
   useMemo(() => { useGLTF.setDecoderPath(urls.draco.endsWith("/") ? urls.draco : `${urls.draco}/`); }, [urls.draco]);
 
   const sea = useGLTF(urls.sea);
@@ -297,9 +297,9 @@ function World({ urls }: any) {
     seaGroup.current.rotation.set(0, SEA_ROT_Y, 0);
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     boundsRef.current = {
-      minX: box.min.x + 50,     // Sola gitmeyi azalttık
+      minX: box.min.x + 50,
       maxX: box.max.x - 27,
-      minY: box.min.y + 28,     // Aşağı gitmeyi biraz artırdık
+      minY: box.min.y + 28,
       maxY: box.max.y - 2
     };
     setSurfaceY(boundsRef.current.maxY - 16);
@@ -421,6 +421,14 @@ function World({ urls }: any) {
     cameraTarget.set(fishPos.current.x, fishPos.current.y, CAMERA_Z);
     state.camera.position.lerp(cameraTarget, 1 - Math.pow(0.001, dt * camSmooth));
     state.camera.lookAt(fishPos.current.x, fishPos.current.y, 0);
+
+    // === KOORDİNAT GÜNCELLEME ===
+    if (setFishPosition) {
+      setFishPosition({
+        x: fishPos.current.x,
+        y: fishPos.current.y
+      });
+    }
   });
 
   return (
@@ -459,6 +467,8 @@ function World({ urls }: any) {
 
 export default function EslemeGame() {
   const [urls, setUrls] = useState<any>(null);
+  const [fishPosition, setFishPosition] = useState({ x: 0, y: 0 });
+
   useEffect(() => {
     const base = new URL("/assets/public/", window.location.origin).toString();
     setUrls({
@@ -472,15 +482,34 @@ export default function EslemeGame() {
   }, []);
 
   return (
-    <div style={{ width: "100vw", height: "100vh", background: `linear-gradient(to bottom, ${GRADIENT_TOP} 0%, ${GRADIENT_BOTTOM} 100%)`, touchAction: "none" }}>
+    <div style={{ width: "100vw", height: "100vh", background: `linear-gradient(to bottom, ${GRADIENT_TOP} 0%, ${GRADIENT_BOTTOM} 100%)`, touchAction: "none", position: "relative" }}>
+      
+      {/* === GEÇİCİ KOORDİNAT KUTUCUĞU === */}
+      <div style={{
+        position: "absolute",
+        top: 10,
+        left: 10,
+        background: "rgba(0,0,0,0.75)",
+        color: "white",
+        padding: "8px 12px",
+        borderRadius: "8px",
+        fontFamily: "monospace",
+        fontSize: "14px",
+        zIndex: 1000,
+        pointerEvents: "none"
+      }}>
+        X: {fishPosition.x.toFixed(1)}<br />
+        Y: {fishPosition.y.toFixed(1)}
+      </div>
+
       <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45 }}>
         <fog attach="fog" args={[FOG_COLOR, 30, 80]} />
         <ambientLight intensity={1.5} />
         <directionalLight position={[10, 10, 10]} intensity={2} />
         <Suspense fallback={<Loader3D />}>
-          {urls && <World urls={urls} />}
+          {urls && <World urls={urls} setFishPosition={setFishPosition} />}
         </Suspense>
       </Canvas>
     </div>
   );
-}
+    }
