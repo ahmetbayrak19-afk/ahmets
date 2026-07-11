@@ -297,9 +297,9 @@ function World({ urls }: any) {
     seaGroup.current.rotation.set(0, SEA_ROT_Y, 0);
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     boundsRef.current = {
-      minX: box.min.x + 32,
+      minX: box.min.x + 35,     // Sola gitmeyi azalttık
       maxX: box.max.x - 27,
-      minY: box.min.y + 35,   // ← BELİRGİN ŞEKİLDE YÜKSELTİLDİ (önce +10 idi)
+      minY: box.min.y + 25,     // Aşağı gitmeyi biraz artırdık
       maxY: box.max.y - 2
     };
     setSurfaceY(boundsRef.current.maxY - 16);
