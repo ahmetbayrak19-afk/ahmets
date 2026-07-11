@@ -4,6 +4,50 @@ import { Html, useAnimations, useGLTF, useProgress } from "@react-three/drei";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 
+// === SENİN VERDİĞİN SINIRLAR (7-8 köşeli alan) ===
+const BOUNDARY_POINTS = [
+  { x: -194, y: 40 },      // Sol üst
+  { x: 68, y: 40 },        // Sağ üst
+  { x: 68, y: 15 },        // Sağ çıkıntı üst
+  { x: 52, y: 4.5 },       // Sağ alt
+  { x: -140, y: 4.5 },     // Orta alt
+  { x: -140, y: 6.6 },     // Orta çıkıntı
+  { x: -194, y: 6.6 }      // Sol alt
+];
+
+function isPointInPolygon(point: { x: number; y: number }, polygon: { x: number; y: number }[]) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y;
+    const xj = polygon[j].x, yj = polygon[j].y;
+    const intersect = ((yi > point.y) !== (yj > point.y)) &&
+      (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function getClosestPointOnBoundary(point: { x: number; y: number }, polygon: { x: number; y: number }[]) {
+  let closest = { x: polygon[0].x, y: polygon[0].y };
+  let minDist = Infinity;
+
+  for (let i = 0; i < polygon.length; i++) {
+    const p1 = polygon[i];
+    const p2 = polygon[(i + 1) % polygon.length];
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const t = Math.max(0, Math.min(1, ((point.x - p1.x) * dx + (point.y - p1.y) * dy) / (dx * dx + dy * dy)));
+    const projX = p1.x + t * dx;
+    const projY = p1.y + t * dy;
+    const dist = Math.hypot(point.x - projX, point.y - projY);
+    if (dist < minDist) {
+      minDist = dist;
+      closest = { x: projX, y: projY };
+    }
+  }
+  return closest;
+}
+
 function lerp(start: number, end: number, t: number) {
   return start * (1 - t) + end * t;
 }
@@ -286,7 +330,7 @@ function World({ urls, setFishPosition }: any) {
     }
   }, [fishAnim]);
 
-  const boundsRef = useRef({ minX: -50, maxX: 50, minY: -30, maxY: 30 });
+  const boundsRef = useRef({ minX: -194, maxX: 68, minY: 4.5, maxY: 40 });
 
   useEffect(() => {
     if (!seaGroup.current) return;
@@ -295,20 +339,13 @@ function World({ urls, setFishPosition }: any) {
     sea.scene.scale.setScalar((Math.max(size.x, size.y, size.z) > 0 ? 90 / Math.max(size.x, size.y, size.z) : 1) * SEA_SCALE_MULT);
     seaGroup.current.position.set(0, 0, -20);
     seaGroup.current.rotation.set(0, SEA_ROT_Y, 0);
-    const box = new THREE.Box3().setFromObject(seaGroup.current);
-    boundsRef.current = {
-      minX: box.min.x + 50,
-      maxX: box.max.x - 27,
-      minY: box.min.y + 28,
-      maxY: box.max.y - 2
-    };
-    setSurfaceY(boundsRef.current.maxY - 16);
+    setSurfaceY(40);
     setBoundsReady(true);
   }, [sea.scene]);
 
-  const fishPos = useRef(new THREE.Vector3(0, 0, MAIN_PLAY_Z_PLANE));
+  const fishPos = useRef(new THREE.Vector3(0, 20, MAIN_PLAY_Z_PLANE));
   const fishVel = useRef(new THREE.Vector2(0, 0));
-  const fishTarget = useRef(new THREE.Vector3(0, 0, MAIN_PLAY_Z_PLANE));
+  const fishTarget = useRef(new THREE.Vector3(0, 20, MAIN_PLAY_Z_PLANE));
   const dragging = useRef(false);
   const currentYaw = useRef(Math.PI / 2);
   const currentPitch = useRef(0);
@@ -370,15 +407,17 @@ function World({ urls, setFishPosition }: any) {
     fishPos.current.x += fishVel.current.x * dt;
     fishPos.current.y += fishVel.current.y * dt;
 
-    if (fishPos.current.x < b.minX) fishPos.current.x = b.minX;
-    if (fishPos.current.x > b.maxX) fishPos.current.x = b.maxX;
-    if (fishPos.current.y < b.minY) {
-      fishPos.current.y = b.minY;
-      fishVel.current.y = 0;
-    }
-    if (fishPos.current.y > maxJumpHeight) {
-      fishPos.current.y = maxJumpHeight;
-      if (fishVel.current.y > 0) fishVel.current.y = 0;
+    // === POLYGON SINIR KONTROLÜ ===
+    const currentPoint = { x: fishPos.current.x, y: fishPos.current.y };
+    if (!isPointInPolygon(currentPoint, BOUNDARY_POINTS)) {
+      const closest = getClosestPointOnBoundary(currentPoint, BOUNDARY_POINTS);
+      const dx = closest.x - fishPos.current.x;
+      const dy = closest.y - fishPos.current.y;
+      const distToBoundary = Math.hypot(dx, dy);
+      if (distToBoundary > 0.1) {
+        fishVel.current.x += (dx / distToBoundary) * 12 * dt;
+        fishVel.current.y += (dy / distToBoundary) * 12 * dt;
+      }
     }
 
     if (eatTimer.current > 0) {
@@ -403,7 +442,6 @@ function World({ urls, setFishPosition }: any) {
     state.camera.position.lerp(cameraTarget, 1 - Math.pow(0.001, dt * camSmooth));
     state.camera.lookAt(fishPos.current.x, fishPos.current.y, 0);
 
-    // === KOORDİNAT GÜNCELLEME ===
     if (setFishPosition) {
       setFishPosition({
         x: fishPos.current.x,
@@ -465,7 +503,6 @@ export default function EslemeGame() {
   return (
     <div style={{ width: "100vw", height: "100vh", background: `linear-gradient(to bottom, ${GRADIENT_TOP} 0%, ${GRADIENT_BOTTOM} 100%)`, touchAction: "none", position: "relative" }}>
       
-      {/* === GEÇİCİ KOORDİNAT KUTUCUĞU === */}
       <div style={{
         position: "absolute",
         top: 10,
@@ -493,4 +530,4 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-      }
+   }
