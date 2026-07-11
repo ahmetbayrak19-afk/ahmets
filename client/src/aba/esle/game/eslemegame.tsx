@@ -3,6 +3,10 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, useAnimations, useGLTF, useProgress } from "@react-three/drei";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
+import { MeshBVH, acceleratedRaycast } from "three-mesh-bvh";
+
+// Raycast'i hızlandırmak için
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
 function lerp(start: number, end: number, t: number) {
   return start * (1 - t) + end * t;
@@ -268,6 +272,20 @@ function World({ urls }: any) {
   const [boundsReady, setBoundsReady] = useState(false);
   const cameraTarget = useMemo(() => new THREE.Vector3(), []);
 
+  // === MESH BVH (Gerçek Collision İçin) ===
+  useEffect(() => {
+    if (!sea.scene) return;
+
+    sea.scene.traverse((child) => {
+      if (child.isMesh) {
+        child.raycast = acceleratedRaycast;
+        child.geometry.computeBoundsTree();
+      }
+    });
+
+    console.log("✅ Deniz modeli BVH'ye dönüştürüldü");
+  }, [sea.scene]);
+
   useEffect(() => {
     if (seaAnim.actions?.[SEA_ANIM_NAME]) {
       seaAnim.actions[SEA_ANIM_NAME].reset().fadeIn(0.15).play();
@@ -297,9 +315,9 @@ function World({ urls }: any) {
     seaGroup.current.rotation.set(0, SEA_ROT_Y, 0);
     const box = new THREE.Box3().setFromObject(seaGroup.current);
     boundsRef.current = {
-      minX: box.min.x + 35,     // Sola gitmeyi azalttık
+      minX: box.min.x + 50,
       maxX: box.max.x - 27,
-      minY: box.min.y + 25,     // Aşağı gitmeyi biraz artırdık
+      minY: box.min.y + 28,
       maxY: box.max.y - 2
     };
     setSurfaceY(boundsRef.current.maxY - 16);
@@ -367,23 +385,23 @@ function World({ urls }: any) {
       currentPitch.current = lerp(currentPitch.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
     }
 
-    // === DANGER ZONE ===
-    const dangerDistance = 18;
-    const nearLeft = fishPos.current.x < b.minX + dangerDistance;
-    const nearRight = fishPos.current.x > b.maxX - dangerDistance;
-    const nearBottom = fishPos.current.y < b.minY + dangerDistance;
+    // === GERÇEK MESH COLLISION ===
+    if (boundsReady && sea.scene) {
+      const raycasterBVH = new THREE.Raycaster();
+      const direction = new THREE.Vector3(0, -1, 0);
+      const origin = fishPos.current.clone();
+      origin.y += 2;
 
-    if (nearLeft) {
-      const force = ((b.minX + dangerDistance) - fishPos.current.x) / dangerDistance;
-      fishVel.current.x += force * 18 * dt;
-    }
-    if (nearRight) {
-      const force = (fishPos.current.x - (b.maxX - dangerDistance)) / dangerDistance;
-      fishVel.current.x -= force * 18 * dt;
-    }
-    if (nearBottom) {
-      const force = ((b.minY + dangerDistance) - fishPos.current.y) / dangerDistance;
-      fishVel.current.y += force * 22 * dt;
+      raycasterBVH.set(origin, direction);
+      const intersects = raycasterBVH.intersectObject(sea.scene, true);
+
+      if (intersects.length > 0) {
+        const hit = intersects[0];
+        if (hit.distance < 3) {
+          fishVel.current.y = Math.max(fishVel.current.y, 18);
+          fishPos.current.y = hit.point.y + 3;
+        }
+      }
     }
 
     fishPos.current.x += fishVel.current.x * dt;
@@ -483,4 +501,4 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-}
+      }
