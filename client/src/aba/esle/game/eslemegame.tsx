@@ -316,9 +316,9 @@ function World({ urls }: any) {
     
     // Genişletilmiş yaşam alanı (Sınırlar daraltıldı)
     boundsRef.current = { 
-      minX: box.min.x + 23, 
-      maxX: box.max.x - 18, 
-      minY: box.min.y + 4,  
+      minX: box.min.x + 28, 
+      maxX: box.max.x - 23, 
+      minY: box.min.y + 6,  
       maxY: box.max.y - 2  
     };
     
