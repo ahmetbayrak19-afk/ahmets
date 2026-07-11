@@ -6,13 +6,13 @@ import { SkeletonUtils } from "three-stdlib";
 
 // === SENİN VERDİĞİN KESİN SINIRLAR ===
 const BOUNDARY_POINTS = [
-  { x: -194, y: 40 },
-  { x: 68, y: 40 },
+  { x: -194, y: 37.5 },
+  { x: 68, y: 37.5 },
   { x: 68, y: 15 },
-  { x: 52, y: 4.5 },
-  { x: -140, y: 4.5 },
-  { x: -140, y: 6.6 },
-  { x: -194, y: 6.6 }
+  { x: 52, y: 3.5 },
+  { x: -140, y: 3.5 },
+  { x: -140, y: 10 },
+  { x: -194, y: 10 }
 ];
 
 function isPointInPolygon(point: { x: number; y: number }, polygon: { x: number; y: number }[]) {
