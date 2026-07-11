@@ -4,15 +4,15 @@ import { Html, useAnimations, useGLTF, useProgress } from "@react-three/drei";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 
-// === SENİN VERDİĞİN SINIRLAR (7-8 köşeli alan) ===
+// === SENİN VERDİĞİN KESİN SINIRLAR ===
 const BOUNDARY_POINTS = [
-  { x: -194, y: 40 },      // Sol üst
-  { x: 68, y: 40 },        // Sağ üst
-  { x: 68, y: 15 },        // Sağ çıkıntı üst
-  { x: 52, y: 4.5 },       // Sağ alt
-  { x: -140, y: 4.5 },     // Orta alt
-  { x: -140, y: 6.6 },     // Orta çıkıntı
-  { x: -194, y: 6.6 }      // Sol alt
+  { x: -194, y: 40 },
+  { x: 68, y: 40 },
+  { x: 68, y: 15 },
+  { x: 52, y: 4.5 },
+  { x: -140, y: 4.5 },
+  { x: -140, y: 6.6 },
+  { x: -194, y: 6.6 }
 ];
 
 function isPointInPolygon(point: { x: number; y: number }, polygon: { x: number; y: number }[]) {
@@ -407,17 +407,14 @@ function World({ urls, setFishPosition }: any) {
     fishPos.current.x += fishVel.current.x * dt;
     fishPos.current.y += fishVel.current.y * dt;
 
-    // === POLYGON SINIR KONTROLÜ ===
+    // === KESİN SINIR KONTROLÜ (Kuvvet yok, doğrudan konum sınırlama) ===
     const currentPoint = { x: fishPos.current.x, y: fishPos.current.y };
     if (!isPointInPolygon(currentPoint, BOUNDARY_POINTS)) {
       const closest = getClosestPointOnBoundary(currentPoint, BOUNDARY_POINTS);
-      const dx = closest.x - fishPos.current.x;
-      const dy = closest.y - fishPos.current.y;
-      const distToBoundary = Math.hypot(dx, dy);
-      if (distToBoundary > 0.1) {
-        fishVel.current.x += (dx / distToBoundary) * 12 * dt;
-        fishVel.current.y += (dy / distToBoundary) * 12 * dt;
-      }
+      fishPos.current.x = closest.x;
+      fishPos.current.y = closest.y;
+      fishVel.current.x = 0;
+      fishVel.current.y = 0;
     }
 
     if (eatTimer.current > 0) {
@@ -530,4 +527,4 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-   }
+  }
