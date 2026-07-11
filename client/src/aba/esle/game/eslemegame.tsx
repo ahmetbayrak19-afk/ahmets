@@ -4,7 +4,6 @@ import { Html, useAnimations, useGLTF, useProgress } from "@react-three/drei";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 
-/** ---- Utils ---- */
 function lerp(start: number, end: number, t: number) {
   return start * (1 - t) + end * t;
 }
@@ -15,7 +14,6 @@ function lerpAngle(a: number, b: number, t: number) {
   return a + diff * t;
 }
 
-/** ==== AYARLAR ==== */
 const SEA_ANIM_NAME = "yeme";
 const FISH_SWIM_ANIM_NAME = "yuzme";
 const FISH_EAT_ANIM_NAME = "yeme";
@@ -27,17 +25,14 @@ const MAIN_PLAY_Z_PLANE = 0;
 const GRAVITY = 35.0;
 const CAMERA_Z = 10;
 const CAMERA_SMOOTH = 5.0;
-
 const SEA_ROT_Y = Math.PI / 2;
 const SEA_SCALE_MULT = 4.0;
 const FISH_SCALE = 3.0;
-
 const TURN_SMOOTH_YAW = 8.0;
 const TURN_SMOOTH_PITCH = 8.0;
 const MAX_PITCH_ANGLE = Math.PI / 2;
 const BELLY_ROLL_ANGLE = Math.PI / 2;
 const BOUNCE = 0.6;
-
 const GRADIENT_TOP = "#3498db";
 const GRADIENT_BOTTOM = "#104068";
 const FOG_COLOR = GRADIENT_BOTTOM;
@@ -71,9 +66,7 @@ function WaterCeiling({ y }: { y: number }) {
       side: THREE.DoubleSide,
       uniforms: { uTime: { value: 0 } },
       vertexShader: `
-        varying vec2 vUv;
-        varying vec3 vWorldPos;
-        uniform float uTime;
+        varying vec2 vUv; varying vec3 vWorldPos; uniform float uTime;
         void main() {
           vUv = uv;
           vec3 pos = position;
@@ -84,9 +77,7 @@ function WaterCeiling({ y }: { y: number }) {
         }
       `,
       fragmentShader: `
-        varying vec2 vUv;
-        varying vec3 vWorldPos;
-        uniform float uTime;
+        varying vec2 vUv; varying vec3 vWorldPos; uniform float uTime;
         void main() {
           vec2 p = vWorldPos.xz * 0.05;
           float time = uTime * 0.5;
@@ -109,20 +100,16 @@ function WaterCeiling({ y }: { y: number }) {
 
   const geom = useMemo(() => new THREE.PlaneGeometry(1000, 1000, 64, 64), []);
   useFrame((_, dt) => { mat.uniforms.uTime.value += dt; });
-
   return <mesh geometry={geom} material={mat} rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]} />;
 }
 
-// AVLANABİLİR BALIKLAR
 function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
   const scene = useMemo(() => SkeletonUtils.clone(gltf.scene), [gltf.scene]);
   const anims = useAnimations(gltf.animations, scene);
-
   const [eaten, setEaten] = useState(false);
   const [isDead, setIsDead] = useState(false);
   const [mouthOpened, setMouthOpened] = useState(false);
   const currentScale = useRef(scale);
-
   const pos = useRef(new THREE.Vector3(
     THREE.MathUtils.randFloat(boundsRef.current.minX, boundsRef.current.maxX),
     THREE.MathUtils.randFloat(boundsRef.current.minY, boundsRef.current.maxY),
@@ -132,7 +119,6 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
   const vel = useRef(new THREE.Vector3());
   const yaw = useRef(0);
   const pitch = useRef(0);
-
   const groupRef = useRef<THREE.Group>(null);
   const innerRef = useRef<THREE.Group>(null);
 
@@ -145,7 +131,6 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
 
   useFrame((state, dt) => {
     if (isDead || !groupRef.current || !innerRef.current) return;
-
     const distToPlayer = pos.current.distanceTo(playerPos.current);
 
     if (!mouthOpened && distToPlayer < 2.5) {
@@ -154,10 +139,7 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
     } else if (mouthOpened && !eaten && distToPlayer > 3.5) {
       setMouthOpened(false);
     }
-
-    if (!eaten && distToPlayer < 1.2) {
-      setEaten(true);
-    }
+    if (!eaten && distToPlayer < 1.2) setEaten(true);
 
     if (eaten) {
       currentScale.current = lerp(currentScale.current, 0, dt * 20.0);
@@ -192,7 +174,6 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
   });
 
   if (isDead) return null;
-
   return (
     <group ref={groupRef}>
       <group ref={innerRef}>
@@ -202,8 +183,7 @@ function PreyFish({ gltf, boundsRef, playerPos, onEaten, scale, speed }: any) {
   );
 }
 
-// ARKA PLAN BALIKLARI
-function BackgroundDecoration({ gltfUrls, gltfFiles, boundary, count, zRange }: any) {
+function BackgroundDecoration({ gltfFiles, boundary, count, zRange }: any) {
   const preyModels = useMemo(() => [
     { gltf: gltfFiles.vatoz, scaleMult: 1.2 },
     { gltf: gltfFiles.kilicbalik, scaleMult: 1.5 },
@@ -231,20 +211,16 @@ function BackgroundDecoration({ gltfUrls, gltfFiles, boundary, count, zRange }: 
 function BackgroundFish({ gltf, scaleMult, boundary, zRange }: any) {
   const scene = useMemo(() => SkeletonUtils.clone(gltf.scene), [gltf.scene]);
   const anims = useAnimations(gltf.animations, scene);
-
   const z = useMemo(() => THREE.MathUtils.randFloat(zRange[0], zRange[1]), [zRange]);
   const speed = useMemo(() => THREE.MathUtils.randFloat(1, 4), []);
   const direction = useMemo(() => (Math.random() > 0.5 ? 1 : -1), []);
-
   const depthFactor = (z - zRange[0]) / (zRange[1] - zRange[0]);
   const scale = (0.5 + depthFactor * 1.0) * scaleMult;
-
   const pos = useRef(new THREE.Vector3(
     THREE.MathUtils.randFloat(boundary.minX - 50, boundary.maxX + 50),
     THREE.MathUtils.randFloat(boundary.minY - 20, boundary.maxY + 10),
     z
   ));
-
   const groupRef = useRef<THREE.Group>(null);
 
   useEffect(() => {
@@ -258,23 +234,14 @@ function BackgroundFish({ gltf, scaleMult, boundary, zRange }: any) {
   useFrame((state, dt) => {
     if (!groupRef.current) return;
     pos.current.x += speed * direction * dt;
-
-    if (direction === 1 && pos.current.x > boundary.maxX + 50) {
-      pos.current.x = boundary.minX - 50;
-    } else if (direction === -1 && pos.current.x < boundary.minX - 50) {
-      pos.current.x = boundary.maxX + 50;
-    }
-
+    if (direction === 1 && pos.current.x > boundary.maxX + 50) pos.current.x = boundary.minX - 50;
+    else if (direction === -1 && pos.current.x < boundary.minX - 50) pos.current.x = boundary.maxX + 50;
     groupRef.current.position.copy(pos.current);
     groupRef.current.rotation.y = direction === 1 ? -Math.PI / 2 : Math.PI / 2;
     groupRef.current.scale.setScalar(scale);
   });
 
-  return (
-    <group ref={groupRef}>
-      <primitive object={scene} />
-    </group>
-  );
+  return <group ref={groupRef}><primitive object={scene} /></group>;
 }
 
 function World({ urls }: any) {
@@ -312,20 +279,10 @@ function World({ urls }: any) {
     if (fishAnim.actions) {
       const swimName = fishAnim.names.includes(FISH_SWIM_ANIM_NAME) ? FISH_SWIM_ANIM_NAME : fishAnim.names[0];
       const eatName = fishAnim.names.includes(FISH_EAT_ANIM_NAME) ? FISH_EAT_ANIM_NAME : fishAnim.names.find(n => n.toLowerCase().includes("yeme"));
-
       const swim = fishAnim.actions[swimName];
       const eat = eatName ? fishAnim.actions[eatName] : null;
-
-      if (swim) {
-        swim.reset().play();
-        swim.setEffectiveWeight(1);
-        swimActionRef.current = swim;
-      }
-      if (eat) {
-        eat.reset().play();
-        eat.setEffectiveWeight(0);
-        eatActionRef.current = eat;
-      }
+      if (swim) { swim.reset().play(); swim.setEffectiveWeight(1); swimActionRef.current = swim; }
+      if (eat) { eat.reset().play(); eat.setEffectiveWeight(0); eatActionRef.current = eat; }
     }
   }, [fishAnim]);
 
@@ -333,24 +290,18 @@ function World({ urls }: any) {
 
   useEffect(() => {
     if (!seaGroup.current) return;
-
     const rawBox = new THREE.Box3().setFromObject(sea.scene);
-    const size = new THREE.Vector3();
-    rawBox.getSize(size);
-
+    const size = new THREE.Vector3(); rawBox.getSize(size);
     sea.scene.scale.setScalar((Math.max(size.x, size.y, size.z) > 0 ? 90 / Math.max(size.x, size.y, size.z) : 1) * SEA_SCALE_MULT);
     seaGroup.current.position.set(0, 0, -20);
     seaGroup.current.rotation.set(0, SEA_ROT_Y, 0);
-
     const box = new THREE.Box3().setFromObject(seaGroup.current);
-
     boundsRef.current = {
-      minX: box.min.x + 28,
-      maxX: box.max.x - 23,
-      minY: box.min.y + 8,
+      minX: box.min.x + 32,
+      maxX: box.max.x - 27,
+      minY: box.min.y + 10,
       maxY: box.max.y - 2
     };
-
     setSurfaceY(boundsRef.current.maxY - 16);
     setBoundsReady(true);
   }, [sea.scene]);
@@ -359,11 +310,9 @@ function World({ urls }: any) {
   const fishVel = useRef(new THREE.Vector2(0, 0));
   const fishTarget = useRef(new THREE.Vector3(0, 0, MAIN_PLAY_Z_PLANE));
   const dragging = useRef(false);
-
   const currentYaw = useRef(Math.PI / 2);
   const currentPitch = useRef(0);
   const currentRoll = useRef(0);
-
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, 1), -MAIN_PLAY_Z_PLANE), []);
 
@@ -376,13 +325,11 @@ function World({ urls }: any) {
     eatTimer.current = 1.0;
   }, []);
 
-  const preys = useMemo(() => {
-    return [
-      ...Array(10).fill({ gltf: vatoz, scale: 3.0, speed: 1.0 }),
-      ...Array(10).fill({ gltf: kilicbalik, scale: 3.75, speed: 1.5 }),
-      ...Array(15).fill({ gltf: hamsi, scale: 3.0, speed: 1.2 })
-    ];
-  }, [vatoz, kilicbalik, hamsi]);
+  const preys = useMemo(() => [
+    ...Array(10).fill({ gltf: vatoz, scale: 3.0, speed: 1.0 }),
+    ...Array(10).fill({ gltf: kilicbalik, scale: 3.75, speed: 1.5 }),
+    ...Array(15).fill({ gltf: hamsi, scale: 3.0, speed: 1.2 })
+  ], [vatoz, kilicbalik, hamsi]);
 
   useFrame((state, dt) => {
     if (!fishGroup.current || !fishInner.current) return;
@@ -408,14 +355,11 @@ function World({ urls }: any) {
       const nx = dx / dist;
       const ny = dy / dist;
       const a = 1 - Math.pow(0.001, dt * ACCEL);
-
       fishVel.current.x = lerp(fishVel.current.x, nx * MAX_SPEED, a);
       fishVel.current.y = lerp(fishVel.current.y, ny * MAX_SPEED, a);
-
       let targetYaw = currentYaw.current;
       if (nx > 0.05) targetYaw = -Math.PI / 2;
       else if (nx < -0.05) targetYaw = Math.PI / 2;
-
       currentYaw.current = lerpAngle(currentYaw.current, targetYaw, 1 - Math.pow(0.001, dt * TURN_SMOOTH_YAW));
       currentPitch.current = lerp(currentPitch.current, ny * MAX_PITCH_ANGLE, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
     } else {
@@ -423,24 +367,23 @@ function World({ urls }: any) {
       currentPitch.current = lerp(currentPitch.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
     }
 
-    // === DANGER ZONE ===
-    const dangerDistance = 12;
-
+    // === DANGER ZONE (Güçlendirilmiş) ===
+    const dangerDistance = 18;
     const nearLeft = fishPos.current.x < b.minX + dangerDistance;
     const nearRight = fishPos.current.x > b.maxX - dangerDistance;
     const nearBottom = fishPos.current.y < b.minY + dangerDistance;
 
     if (nearLeft) {
       const force = ((b.minX + dangerDistance) - fishPos.current.x) / dangerDistance;
-      fishVel.current.x += force * 9 * dt;
+      fishVel.current.x += force * 18 * dt;
     }
     if (nearRight) {
       const force = (fishPos.current.x - (b.maxX - dangerDistance)) / dangerDistance;
-      fishVel.current.x -= force * 9 * dt;
+      fishVel.current.x -= force * 18 * dt;
     }
     if (nearBottom) {
       const force = ((b.minY + dangerDistance) - fishPos.current.y) / dangerDistance;
-      fishVel.current.y += force * 12 * dt;
+      fishVel.current.y += force * 22 * dt;
     }
 
     fishPos.current.x += fishVel.current.x * dt;
@@ -482,15 +425,10 @@ function World({ urls }: any) {
 
   return (
     <>
-      <group ref={seaGroup}>
-        <primitive object={sea.scene} />
-      </group>
+      <group ref={seaGroup}><primitive object={sea.scene} /></group>
       <WaterCeiling y={surfaceY} />
-
       <group ref={fishGroup} scale={FISH_SCALE}>
-        <group ref={fishInner}>
-          <primitive object={fish.scene} />
-        </group>
+        <group ref={fishInner}><primitive object={fish.scene} /></group>
       </group>
 
       {boundsReady && (
@@ -501,7 +439,6 @@ function World({ urls }: any) {
             count={50}
             zRange={[-30, -10]}
           />
-
           {preys.map((p, i) => (
             <PreyFish
               key={i}
@@ -515,7 +452,6 @@ function World({ urls }: any) {
           ))}
         </>
       )}
-
       <CanvasEvents onDown={() => (dragging.current = true)} onUp={() => (dragging.current = false)} />
     </>
   );
@@ -523,7 +459,6 @@ function World({ urls }: any) {
 
 export default function EslemeGame() {
   const [urls, setUrls] = useState<any>(null);
-
   useEffect(() => {
     const base = new URL("/assets/public/", window.location.origin).toString();
     setUrls({
