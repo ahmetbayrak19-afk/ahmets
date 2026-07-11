@@ -299,7 +299,7 @@ function World({ urls }: any) {
     boundsRef.current = {
       minX: box.min.x + 32,
       maxX: box.max.x - 27,
-      minY: box.min.y + 10,
+      minY: box.min.y + 35,   // ← BELİRGİN ŞEKİLDE YÜKSELTİLDİ (önce +10 idi)
       maxY: box.max.y - 2
     };
     setSurfaceY(boundsRef.current.maxY - 16);
@@ -367,7 +367,7 @@ function World({ urls }: any) {
       currentPitch.current = lerp(currentPitch.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
     }
 
-    // === DANGER ZONE (Güçlendirilmiş) ===
+    // === DANGER ZONE ===
     const dangerDistance = 18;
     const nearLeft = fishPos.current.x < b.minX + dangerDistance;
     const nearRight = fishPos.current.x > b.maxX - dangerDistance;
