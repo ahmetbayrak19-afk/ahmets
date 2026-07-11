@@ -367,25 +367,6 @@ function World({ urls, setFishPosition }: any) {
       currentPitch.current = lerp(currentPitch.current, 0, 1 - Math.pow(0.001, dt * TURN_SMOOTH_PITCH));
     }
 
-    // === DANGER ZONE ===
-    const dangerDistance = 18;
-    const nearLeft = fishPos.current.x < b.minX + dangerDistance;
-    const nearRight = fishPos.current.x > b.maxX - dangerDistance;
-    const nearBottom = fishPos.current.y < b.minY + dangerDistance;
-
-    if (nearLeft) {
-      const force = ((b.minX + dangerDistance) - fishPos.current.x) / dangerDistance;
-      fishVel.current.x += force * 18 * dt;
-    }
-    if (nearRight) {
-      const force = (fishPos.current.x - (b.maxX - dangerDistance)) / dangerDistance;
-      fishVel.current.x -= force * 18 * dt;
-    }
-    if (nearBottom) {
-      const force = ((b.minY + dangerDistance) - fishPos.current.y) / dangerDistance;
-      fishVel.current.y += force * 22 * dt;
-    }
-
     fishPos.current.x += fishVel.current.x * dt;
     fishPos.current.y += fishVel.current.y * dt;
 
@@ -512,4 +493,4 @@ export default function EslemeGame() {
       </Canvas>
     </div>
   );
-    }
+      }
