@@ -4,13 +4,13 @@ import { Html, useAnimations, useGLTF, useProgress } from "@react-three/drei";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 
-// === YENİ SINIRLAR ===
+// === SON SINIRLAR ===
 const BOUNDARY_POINTS = [
-  { x: -194, y: 37.5 },
-  { x: 68, y: 37.5 },
+  { x: -194, y: 36 },
+  { x: 68, y: 36 },
   { x: 68, y: 15 },
-  { x: 52, y: 3.5 },
-  { x: -140, y: 3.5 },
+  { x: 52, y: 4.2 },
+  { x: -140, y: 4.2 },
   { x: -140, y: 10 },
   { x: -194, y: 10 }
 ];
@@ -30,7 +30,6 @@ function isPointInPolygon(point: { x: number; y: number }, polygon: { x: number;
 function getClosestPointOnBoundary(point: { x: number; y: number }, polygon: { x: number; y: number }[]) {
   let closest = { x: polygon[0].x, y: polygon[0].y };
   let minDist = Infinity;
-
   for (let i = 0; i < polygon.length; i++) {
     const p1 = polygon[i];
     const p2 = polygon[(i + 1) % polygon.length];
@@ -81,6 +80,13 @@ const GRADIENT_TOP = "#3498db";
 const GRADIENT_BOTTOM = "#104068";
 const FOG_COLOR = GRADIENT_BOTTOM;
 const JUMP_LIMIT = 2.0;
+
+// === AFERİN SESİ ===
+const playAferinSound = () => {
+  const audio = new Audio("/assets/sounds/aferin.mp3");
+  audio.volume = 0.6;
+  audio.play().catch(() => {});
+};
 
 function Loader3D() {
   const { progress } = useProgress();
@@ -288,7 +294,7 @@ function BackgroundFish({ gltf, scaleMult, boundary, zRange }: any) {
   return <group ref={groupRef}><primitive object={scene} /></group>;
 }
 
-function World({ urls }: any) {
+function World({ urls, onFishEaten }: any) {
   useMemo(() => { useGLTF.setDecoderPath(urls.draco.endsWith("/") ? urls.draco : `${urls.draco}/`); }, [urls.draco]);
 
   const sea = useGLTF(urls.sea);
@@ -330,7 +336,7 @@ function World({ urls }: any) {
     }
   }, [fishAnim]);
 
-  const boundsRef = useRef({ minX: -194, maxX: 68, minY: 3.5, maxY: 37.5 });
+  const boundsRef = useRef({ minX: -194, maxX: 68, minY: 4.2, maxY: 36 });
 
   useEffect(() => {
     if (!seaGroup.current) return;
@@ -339,7 +345,7 @@ function World({ urls }: any) {
     sea.scene.scale.setScalar((Math.max(size.x, size.y, size.z) > 0 ? 90 / Math.max(size.x, size.y, size.z) : 1) * SEA_SCALE_MULT);
     seaGroup.current.position.set(0, 0, -20);
     seaGroup.current.rotation.set(0, SEA_ROT_Y, 0);
-    setSurfaceY(37.5);
+    setSurfaceY(36);
     setBoundsReady(true);
   }, [sea.scene]);
 
@@ -360,12 +366,13 @@ function World({ urls }: any) {
       eatActionRef.current.reset().play();
     }
     eatTimer.current = 1.0;
-  }, []);
+    if (onFishEaten) onFishEaten();
+  }, [onFishEaten]);
 
   const preys = useMemo(() => [
-    ...Array(10).fill({ gltf: vatoz, scale: 3.0, speed: 1.0 }),
+    ...Array(12).fill({ gltf: vatoz, scale: 3.0, speed: 1.0 }),
     ...Array(10).fill({ gltf: kilicbalik, scale: 3.75, speed: 1.5 }),
-    ...Array(15).fill({ gltf: hamsi, scale: 3.0, speed: 1.2 })
+    ...Array(18).fill({ gltf: hamsi, scale: 3.0, speed: 1.2 })
   ], [vatoz, kilicbalik, hamsi]);
 
   useFrame((state, dt) => {
@@ -407,7 +414,7 @@ function World({ urls }: any) {
     fishPos.current.x += fishVel.current.x * dt;
     fishPos.current.y += fishVel.current.y * dt;
 
-    // === KESİN SINIR KONTROLÜ ===
+    // === KESİN SINIR ===
     const currentPoint = { x: fishPos.current.x, y: fishPos.current.y };
     if (!isPointInPolygon(currentPoint, BOUNDARY_POINTS)) {
       const closest = getClosestPointOnBoundary(currentPoint, BOUNDARY_POINTS);
@@ -453,7 +460,7 @@ function World({ urls }: any) {
           <BackgroundDecoration
             gltfFiles={{ vatoz, kilicbalik, hamsi }}
             boundary={boundsRef.current}
-            count={50}
+            count={40}
             zRange={[-30, -10]}
           />
           {preys.map((p, i) => (
@@ -476,6 +483,22 @@ function World({ urls }: any) {
 
 export default function EslemeGame() {
   const [urls, setUrls] = useState<any>(null);
+  const [score, setScore] = useState(0);
+  const [level, setLevel] = useState(1);
+
+  const handleFishEaten = useCallback(() => {
+    const newScore = score + 10;
+    setScore(newScore);
+
+    // Seviye atlama
+    const newLevel = Math.floor(newScore / 100) + 1;
+    if (newLevel > level) {
+      setLevel(newLevel);
+    }
+
+    // Aferin sesi
+    playAferinSound();
+  }, [score, level]);
 
   useEffect(() => {
     const base = new URL("/assets/public/", window.location.origin).toString();
@@ -490,15 +513,35 @@ export default function EslemeGame() {
   }, []);
 
   return (
-    <div style={{ width: "100vw", height: "100vh", background: `linear-gradient(to bottom, ${GRADIENT_TOP} 0%, ${GRADIENT_BOTTOM} 100%)`, touchAction: "none" }}>
+    <div style={{ width: "100vw", height: "100vh", background: `linear-gradient(to bottom, ${GRADIENT_TOP} 0%, ${GRADIENT_BOTTOM} 100%)`, touchAction: "none", position: "relative" }}>
+      
+      {/* SKOR VE SEVİYE */}
+      <div style={{
+        position: "absolute",
+        top: 12,
+        right: 16,
+        background: "rgba(0,0,0,0.65)",
+        color: "white",
+        padding: "10px 16px",
+        borderRadius: "12px",
+        fontFamily: "monospace",
+        fontSize: "15px",
+        zIndex: 1000,
+        textAlign: "right",
+        lineHeight: "1.3"
+      }}>
+        <div>Puan: <span style={{ color: "#4ade80", fontWeight: "bold" }}>{score}</span></div>
+        <div>Seviye: <span style={{ color: "#60a5fa", fontWeight: "bold" }}>{level}</span></div>
+      </div>
+
       <Canvas camera={{ position: [0, 0, CAMERA_Z], fov: 45 }}>
         <fog attach="fog" args={[FOG_COLOR, 30, 80]} />
         <ambientLight intensity={1.5} />
         <directionalLight position={[10, 10, 10]} intensity={2} />
         <Suspense fallback={<Loader3D />}>
-          {urls && <World urls={urls} />}
+          {urls && <World urls={urls} onFishEaten={handleFishEaten} />}
         </Suspense>
       </Canvas>
     </div>
   );
-        }
+  }
