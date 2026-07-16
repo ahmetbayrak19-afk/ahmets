@@ -25,43 +25,21 @@ export default function Yonerge1({
     "Ellerinle çember yap", "Eliyle işaret et", "Başını eğ"
   ];
 
-  // === YENİ: Dinamik Havuz Sistemi ===
-  const [availableQuestions, setAvailableQuestions] = useState([...allInstructions]);
-  const [passedQuestions, setPassedQuestions] = useState<string[]>([]); // Geçilen sorular
-
-  const [currentInstruction, setCurrentInstruction] = useState(() => {
-    const randomIndex = Math.floor(Math.random() * allInstructions.length);
-    return allInstructions[randomIndex];
+  // Basit rastgele 10 soru
+  const [instructions] = useState(() => {
+    const shuffled = [...allInstructions].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, 10);
   });
 
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
-  const [validCount, setValidCount] = useState(0);
+  const [validCount, setValidCount] = useState(0); // Sadece Yaptı + Yapamadı
   const [phase, setPhase] = useState<'intro' | 'playing' | 'result'>('intro');
 
-  // Yeni soru getir (havuzdan)
-  const getNextQuestion = () => {
-    if (availableQuestions.length === 0) {
-      // Havuz boşsa, geçilen soruları tekrar ekle
-      if (passedQuestions.length > 0) {
-        setAvailableQuestions([...passedQuestions]);
-        setPassedQuestions([]);
-        const randomIndex = Math.floor(Math.random() * passedQuestions.length);
-        return passedQuestions[randomIndex];
-      } else {
-        // Hiç geçilen soru yoksa baştan başla
-        return allInstructions[Math.floor(Math.random() * allInstructions.length)];
-      }
-    }
-
-    const randomIndex = Math.floor(Math.random() * availableQuestions.length);
-    return availableQuestions[randomIndex];
-  };
+  const currentInstruction = instructions[currentIndex];
 
   const handleAssess = (correct: boolean) => {
     if (correct) setScore(prev => prev + 1);
-
-    // Soruyu havuzdan çıkar
-    setAvailableQuestions(prev => prev.filter(q => q !== currentInstruction));
 
     const newValidCount = validCount + 1;
     setValidCount(newValidCount);
@@ -72,23 +50,17 @@ export default function Yonerge1({
         confetti({ particleCount: 250, spread: 90, origin: { y: 0.6 } });
       }
     } else {
-      const nextQuestion = getNextQuestion();
-      setCurrentInstruction(nextQuestion);
+      setCurrentIndex(prev => prev + 1);
     }
   };
 
-  // === GEÇ BUTONU (Geliştirilmiş) ===
+  // === GEÇ BUTONU (Düzeltilmiş) ===
   const handlePass = () => {
-    // Soruyu "geçilenler" listesine ekle
-    setPassedQuestions(prev => [...prev, currentInstruction]);
-
-    // Soruyu havuzdan çıkar
-    setAvailableQuestions(prev => prev.filter(q => q !== currentInstruction));
-
-    if (validCount < 10) {
-      const nextQuestion = getNextQuestion();
-      setCurrentInstruction(nextQuestion);
+    // Geç basıldığında sadece yeni soru getir, sayaç artmasın
+    if (currentIndex < instructions.length - 1) {
+      setCurrentIndex(prev => prev + 1);
     } else {
+      // Eğer son sorudaysa ve geçe basılırsa, sonucu göster
       setPhase('result');
     }
   };
@@ -101,7 +73,7 @@ export default function Yonerge1({
   return (
     <div className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none">
       
-      {/* ÜST BAR */}
+      {/* ÜST BAR - SAYAÇ SADECE GEÇERLİ CEVAPLAR İÇİN */}
       <div className="shrink-0 p-4 landscape:py-2 landscape:px-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md relative z-10">
         <button onClick={onClose} className="p-2 landscape:p-1.5 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
           <XCircle className="w-7 h-7 landscape:w-6 landscape:h-6" />
