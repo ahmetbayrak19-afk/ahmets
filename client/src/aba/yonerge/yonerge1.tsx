@@ -25,7 +25,7 @@ export default function Yonerge1({
     "Ellerinle çember yap", "Eliyle işaret et", "Başını eğ"
   ];
 
-  // Basit rastgele 10 soru
+  // Rastgele 10 soru (sadece başlangıç için)
   const [instructions] = useState(() => {
     const shuffled = [...allInstructions].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, 10);
@@ -33,7 +33,7 @@ export default function Yonerge1({
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
-  const [validCount, setValidCount] = useState(0); // Sadece Yaptı + Yapamadı
+  const [validCount, setValidCount] = useState(0);
   const [phase, setPhase] = useState<'intro' | 'playing' | 'result'>('intro');
 
   const currentInstruction = instructions[currentIndex];
@@ -50,19 +50,20 @@ export default function Yonerge1({
         confetti({ particleCount: 250, spread: 90, origin: { y: 0.6 } });
       }
     } else {
-      setCurrentIndex(prev => prev + 1);
+      // Yeni soru getir (rastgele)
+      const randomIndex = Math.floor(Math.random() * instructions.length);
+      setCurrentIndex(randomIndex);
     }
   };
 
-  // === GEÇ BUTONU (Düzeltilmiş) ===
+  // === GEÇ BUTONU (İstediğin Gibi) ===
   const handlePass = () => {
-    // Geç basıldığında sadece yeni soru getir, sayaç artmasın
-    if (currentIndex < instructions.length - 1) {
-      setCurrentIndex(prev => prev + 1);
-    } else {
-      // Eğer son sorudaysa ve geçe basılırsa, sonucu göster
-      setPhase('result');
-    }
+    // Geç butonuna basıldığında:
+    // - Hiçbir şey sayılmıyor
+    // - Sayaç artmıyor
+    // - Sadece yeni soru geliyor
+    const randomIndex = Math.floor(Math.random() * instructions.length);
+    setCurrentIndex(randomIndex);
   };
 
   const completeSession = () => {
@@ -73,7 +74,7 @@ export default function Yonerge1({
   return (
     <div className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none">
       
-      {/* ÜST BAR - SAYAÇ SADECE GEÇERLİ CEVAPLAR İÇİN */}
+      {/* ÜST BAR */}
       <div className="shrink-0 p-4 landscape:py-2 landscape:px-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md relative z-10">
         <button onClick={onClose} className="p-2 landscape:p-1.5 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
           <XCircle className="w-7 h-7 landscape:w-6 landscape:h-6" />
@@ -177,4 +178,4 @@ export default function Yonerge1({
       )}
     </div>
   );
-}
+    }
