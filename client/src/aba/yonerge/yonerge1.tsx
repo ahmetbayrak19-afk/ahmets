@@ -2,64 +2,6 @@ import { useState } from 'react';
 import { XCircle, Check, X, Trophy, Ear, PlayCircle, SkipForward } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-type Posture = 'STAND' | 'SIT' | 'LIE';
-
-interface InstructionDef {
-  text: string;
-  effect?: Posture;
-  req?: Posture[];
-}
-
-const INSTRUCTION_POOL: InstructionDef[] = [
-  { text: "Ayağa kalk", effect: 'STAND' }, 
-  { text: "Zıpla", req: ['STAND'] },
-  { text: "Etrafında dön", req: ['STAND'] },
-  { text: "Yere yat", effect: 'LIE' },
-  { text: "Otur / Yere otur", effect: 'SIT' },
-  { text: "Ayaklarını yere vur", req: ['STAND', 'SIT'] }, 
-  { text: "Kollarını kaldır" }, 
-  { text: "Bay bay yap" },
-  { text: "Ellerini çırp / Alkışla" },
-  { text: "Kollarını bağla" },
-  { text: "Gözlerini kapat" },
-  { text: "Ağzını aç" },
-  { text: "Karnını ovala" },
-  { text: "Burnuna dokun" },
-  { text: "Kafanı salla" }
-];
-
-const generateSmartSequence = (): string[] => {
-  const sequence: string[] = [];
-  let currentPosture: Posture = 'STAND'; 
-  
-  const available = [...INSTRUCTION_POOL];
-  
-  const firstIndex = available.findIndex(i => i.text === "Ayağa kalk");
-  sequence.push(available[firstIndex].text);
-  available.splice(firstIndex, 1);
-  
-  while (sequence.length < 10) {
-    const candidates = available.filter(item => {
-      if (item.req && !item.req.includes(currentPosture)) return false;
-      if (item.effect === currentPosture) return false; 
-      return true;
-    });
-    
-    const poolToPickFrom = candidates.length > 0 ? candidates : available;
-    const randomIndex = Math.floor(Math.random() * poolToPickFrom.length);
-    const selected = poolToPickFrom[randomIndex];
-    
-    sequence.push(selected.text);
-    
-    if (selected.effect) currentPosture = selected.effect;
-    
-    const indexInAvailable = available.findIndex(i => i.text === selected.text);
-    available.splice(indexInAvailable, 1);
-  }
-  
-  return sequence;
-};
-
 interface Yonerge1Props {
   itemCode?: string;
   itemText?: string;
@@ -74,42 +16,78 @@ export default function Yonerge1({
   onComplete 
 }: Yonerge1Props) {
   
-  const [instructions] = useState<string[]>(generateSmartSequence);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const allInstructions = [
+    "Ayağa kalk", "Zıpla", "Etrafında dön", "Yere yat", "Otur / Yere otur",
+    "Ayaklarını yere vur", "Kollarını kaldır", "Bay bay yap", "Ellerini çırp / Alkışla",
+    "Kollarını bağla", "Gözlerini kapat", "Ağzını aç", "Karnını ovala", "Burnuna dokun",
+    "Kafanı salla", "Elini kaldır", "Parmaklarını aç", "Başını sağa sola çevir",
+    "Omuzlarını silk", "Dizlerini bük", "Eliyle selam ver", "Ayağını yere vur",
+    "Ellerinle çember yap", "Eliyle işaret et", "Başını eğ"
+  ];
+
+  // === YENİ: Dinamik Havuz Sistemi ===
+  const [availableQuestions, setAvailableQuestions] = useState([...allInstructions]);
+  const [passedQuestions, setPassedQuestions] = useState<string[]>([]); // Geçilen sorular
+
+  const [currentInstruction, setCurrentInstruction] = useState(() => {
+    const randomIndex = Math.floor(Math.random() * allInstructions.length);
+    return allInstructions[randomIndex];
+  });
+
   const [score, setScore] = useState(0);
   const [validCount, setValidCount] = useState(0);
   const [phase, setPhase] = useState<'intro' | 'playing' | 'result'>('intro');
 
-  const currentInstruction = instructions[currentIndex];
+  // Yeni soru getir (havuzdan)
+  const getNextQuestion = () => {
+    if (availableQuestions.length === 0) {
+      // Havuz boşsa, geçilen soruları tekrar ekle
+      if (passedQuestions.length > 0) {
+        setAvailableQuestions([...passedQuestions]);
+        setPassedQuestions([]);
+        const randomIndex = Math.floor(Math.random() * passedQuestions.length);
+        return passedQuestions[randomIndex];
+      } else {
+        // Hiç geçilen soru yoksa baştan başla
+        return allInstructions[Math.floor(Math.random() * allInstructions.length)];
+      }
+    }
 
-  // === DÜZELTİLMİŞ handleAssess ===
-  const handleAssess = (correct: boolean) => {
-    setScore(prev => {
-      const newScore = correct ? prev + 1 : prev;
-      
-      setValidCount(prevValid => {
-        const newValid = prevValid + 1;
-        
-        if (newValid >= 10) {
-          setPhase('result');
-          if (newScore >= 8) {
-            confetti({ particleCount: 250, spread: 90, origin: { y: 0.6 } });
-          }
-        } else {
-          setCurrentIndex(prevIndex => prevIndex + 1);
-        }
-        
-        return newValid;
-      });
-      
-      return newScore;
-    });
+    const randomIndex = Math.floor(Math.random() * availableQuestions.length);
+    return availableQuestions[randomIndex];
   };
 
-  // === DÜZELTİLMİŞ GEÇ BUTONU ===
+  const handleAssess = (correct: boolean) => {
+    if (correct) setScore(prev => prev + 1);
+
+    // Soruyu havuzdan çıkar
+    setAvailableQuestions(prev => prev.filter(q => q !== currentInstruction));
+
+    const newValidCount = validCount + 1;
+    setValidCount(newValidCount);
+
+    if (newValidCount >= 10) {
+      setPhase('result');
+      if (score + (correct ? 1 : 0) >= 8) {
+        confetti({ particleCount: 250, spread: 90, origin: { y: 0.6 } });
+      }
+    } else {
+      const nextQuestion = getNextQuestion();
+      setCurrentInstruction(nextQuestion);
+    }
+  };
+
+  // === GEÇ BUTONU (Geliştirilmiş) ===
   const handlePass = () => {
+    // Soruyu "geçilenler" listesine ekle
+    setPassedQuestions(prev => [...prev, currentInstruction]);
+
+    // Soruyu havuzdan çıkar
+    setAvailableQuestions(prev => prev.filter(q => q !== currentInstruction));
+
     if (validCount < 10) {
-      setCurrentIndex(prev => prev + 1);
+      const nextQuestion = getNextQuestion();
+      setCurrentInstruction(nextQuestion);
     } else {
       setPhase('result');
     }
@@ -133,7 +111,7 @@ export default function Yonerge1({
             {itemCode} - {itemText}
           </h2>
           <p className="text-xs landscape:text-[10px] text-slate-400 font-medium tracking-widest uppercase mt-1 landscape:mt-0">
-            {phase === 'playing' ? `ADIM ${currentIndex + 1} / 10` : 'ÖĞRETMEN DEĞERLENDİRMESİ'}
+            {phase === 'playing' ? `ADIM ${validCount} / 10` : 'ÖĞRETMEN DEĞERLENDİRMESİ'}
           </p>
         </div>
         <div className="w-10 landscape:w-8"></div> 
@@ -147,7 +125,7 @@ export default function Yonerge1({
             <Ear size={80} className="mx-auto text-blue-500 mb-6 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
             <h1 className="text-3xl font-black mb-4 text-white">Hazır mısınız?</h1>
             <p className="text-slate-400 mb-8 text-base md:text-lg leading-relaxed">
-              Ekranda sırayla fiziksel duruma uygun yönergeler belirecek. Komutu öğrenciye söyleyin ve tepkisini değerlendirin.
+              Ekranda sırayla yönergeler belirecek. Komutu öğrenciye söyleyin ve tepkisini değerlendirin.
             </p>
             <button 
               onClick={() => setPhase('playing')} 
@@ -159,15 +137,14 @@ export default function Yonerge1({
         )}
 
         {phase === 'playing' && (
-          <div className="w-full max-w-3xl flex flex-col items-center justify-center animate-in slide-in-from-right-8 duration-300" key={currentIndex}>
-            <div className="w-full bg-slate-800/60 border-2 border-slate-700 rounded-[2.5rem] p-10 md:p-16 flex flex-col items-center justify-center shadow-2xl backdrop-blur-sm min-h-[250px] md:min-h-[350px] relative overflow-hidden">
-                <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl"></div>
-                <span className="text-blue-400 font-bold tracking-widest uppercase mb-4 md:mb-6 text-sm md:text-base flex items-center gap-2">
-                  <Ear size={18} /> Öğrenciye Söyleyin:
-                </span>
-                <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-center text-white leading-tight tracking-tight">
-                  "{currentInstruction}"
-                </h1>
+          <div className="w-full max-w-3xl flex flex-col items-center justify-center animate-in slide-in-from-right-8 duration-300">
+            <div className="w-full bg-slate-800/60 border-2 border-slate-700 rounded-[2.5rem] p-10 md:p-16 flex flex-col items-center justify-center shadow-2xl backdrop-blur-sm min-h-[250px] md:min-h-[350px]">
+              <span className="text-blue-400 font-bold tracking-widest uppercase mb-4 md:mb-6 text-sm md:text-base flex items-center gap-2">
+                <Ear size={18} /> Öğrenciye Söyleyin:
+              </span>
+              <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-center text-white leading-tight tracking-tight">
+                "{currentInstruction}"
+              </h1>
             </div>
           </div>
         )}
@@ -197,7 +174,7 @@ export default function Yonerge1({
         )}
       </div>
 
-      {/* ALT BUTONLAR - GEÇ BUTONU EKLENDİ */}
+      {/* ALT BUTONLAR */}
       {phase === 'playing' && (
         <div className="shrink-0 p-6 pb-10 landscape:py-3 landscape:px-6 landscape:pb-4 bg-slate-900 border-t border-slate-800 flex items-stretch justify-center gap-3 sm:gap-4 relative z-10">
           
