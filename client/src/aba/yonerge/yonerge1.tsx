@@ -77,30 +77,37 @@ export default function Yonerge1({
   const [instructions] = useState<string[]>(generateSmartSequence);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
-  const [validCount, setValidCount] = useState(0); // Sadece Yaptı + Yapamadı sayılıyor
+  const [validCount, setValidCount] = useState(0);
   const [phase, setPhase] = useState<'intro' | 'playing' | 'result'>('intro');
 
   const currentInstruction = instructions[currentIndex];
 
+  // === DÜZELTİLMİŞ handleAssess ===
   const handleAssess = (correct: boolean) => {
-    if (correct) setScore(prev => prev + 1);
-
-    const newValidCount = validCount + 1;
-    setValidCount(newValidCount);
-
-    if (newValidCount >= 10) {
-      setPhase('result');
-      if (score + (correct ? 1 : 0) >= 8) {
-        confetti({ particleCount: 250, spread: 90, origin: { y: 0.6 } });
-      }
-    } else {
-      setCurrentIndex(prev => prev + 1);
-    }
+    setScore(prev => {
+      const newScore = correct ? prev + 1 : prev;
+      
+      setValidCount(prevValid => {
+        const newValid = prevValid + 1;
+        
+        if (newValid >= 10) {
+          setPhase('result');
+          if (newScore >= 8) {
+            confetti({ particleCount: 250, spread: 90, origin: { y: 0.6 } });
+          }
+        } else {
+          setCurrentIndex(prevIndex => prevIndex + 1);
+        }
+        
+        return newValid;
+      });
+      
+      return newScore;
+    });
   };
 
-  // === YENİ: GEÇ BUTONU ===
+  // === DÜZELTİLMİŞ GEÇ BUTONU ===
   const handlePass = () => {
-    // Geç basıldığında hiçbir şey saymıyoruz, sadece yeni soru
     if (validCount < 10) {
       setCurrentIndex(prev => prev + 1);
     } else {
@@ -109,7 +116,7 @@ export default function Yonerge1({
   };
 
   const completeSession = () => {
-    const isSuccess = score >= 8; 
+    const isSuccess = score >= 8;
     onComplete(isSuccess);
   };
 
@@ -221,4 +228,4 @@ export default function Yonerge1({
       )}
     </div>
   );
-               }
+}
