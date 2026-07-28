@@ -94,7 +94,6 @@ import penguenVid from '@/animals/penguen.mp4';
 import yilanVid from '@/animals/yilan.mp4';
 import tavukVid from '@/animals/tavuk.mp4';
 import maymunVid from '@/animals/maymun.mp4';
-// Hayvan MP3'leri (Flashcard için)
 import aslanMp3 from '@/animals/aslan.mp3';
 import atMp3 from '@/animals/at.mp3';
 import ayiMp3 from '@/animals/ayi.mp3';
@@ -113,7 +112,7 @@ import atTavukKopekVid from '@/animals/attavukkopek.mp4';
 import kaplanPenguenAyiVid from '@/animals/kaplanpenguenayi.mp4';
 import yilanTavukKediVid from '@/animals/yilantavukkedi.mp4';
 
-// --- HAYVAN SES YÖNERGELERİ (Ayırt Etme Oyunu İçin) ---
+// --- HAYVAN SES YÖNERGELERİ ---
 import aslanInstruction from '@/animals/aslanigoster.mp3';
 import atInstruction from '@/animals/atigoster.mp3';
 import ayiInstruction from '@/animals/ayiyigoster.mp3';
@@ -137,7 +136,6 @@ import itfaiyeVid from '@/jobs/itfaiye.mp4';
 import ogretmenVid from '@/jobs/ogretmen.mp4';
 import polisVid from '@/jobs/polis.mp4';
 import terziVid from '@/jobs/terzi.mp4';
-// Meslek MP3'leri
 import asciMp3 from '@/jobs/asci.mp3';
 import askerMp3 from '@/jobs/asker.mp3';
 import astronotMp3 from '@/jobs/astronot.mp3';
@@ -160,7 +158,6 @@ import motosikletVid from '@/vehicles/motosiklet.mp4';
 import otobusVid from '@/vehicles/otobus.mp4';
 import trenVid from '@/vehicles/tren.mp4';
 import ucakVid from '@/vehicles/ucak.mp4';
-// Taşıt MP3'leri
 import arabaMp3 from '@/vehicles/araba.mp3';
 import bisikletMp3 from '@/vehicles/bisiklet.mp3';
 import gemiMp3 from '@/vehicles/gemi.mp3';
@@ -178,14 +175,13 @@ import korkmusVid from '@/emotions/korkmus.mp4';
 import mutluVid from '@/emotions/mutlu.mp4';
 import sinirliVid from '@/emotions/sinirli.mp4';
 import uzgunVid from '@/emotions/uzgun.mp4';
-// Duygu MP3'leri
 import sasirmisMp3 from '@/emotions/Sasirmis.mp3';
 import korkmusMp3 from '@/emotions/korkmus.mp3';
 import mutluMp3 from '@/emotions/mutlu.mp3';
 import sinirliMp3 from '@/emotions/sinirli.mp3';
 import uzgunMp3 from '@/emotions/uzgun.mp3';
 
-// --- 5. VÜCUDUMUZ (SESSİZ) ---
+// --- 5. VÜCUDUMUZ ---
 import agizVid from '@/limbs/agiz.mp4';
 import ayakVid from '@/limbs/ayak.mp4';
 import burunVid from '@/limbs/burun.mp4';
@@ -198,7 +194,7 @@ import kulakVid from '@/limbs/kulak.mp4';
 import parmakVid from '@/limbs/parmak.mp4';
 import sacVid from '@/limbs/sac.mp4';
 
-// --- DİĞER GÖRSELLER (SESSİZ) ---
+// --- DİĞER GÖRSELLER ---
 import ananasImg from '@/fruits/ananas.jpg';
 import armutImg from '@/fruits/armut.jpg';
 import cilekImg from '@/fruits/cilek.jpg';
@@ -245,8 +241,6 @@ import kareImg from '@/shapes/kare.jpg';
 import ucgenImg from '@/shapes/ucgen.jpg';
 
 // --- VERİ LİSTELERİ ---
-// Not: `audio` alanı olanlar sesli, olmayanlar sessiz çalışır.
-
 const ANIMALS_WITH_VIDEO = [ 
   { name: "Aslan", src: aslanVid, audio: aslanMp3 }, 
   { name: "At", src: atVid, audio: atMp3 }, 
@@ -295,7 +289,6 @@ const EMOTIONS_WITH_VIDEO = [
   { name: "Şaşırmış", src: sasirmisVid, audio: sasirmisMp3 } 
 ];
 
-// SESSİZ KATEGORİ (MP3 YOK)
 const LIMBS_WITH_VIDEO = [ 
   { name: "Ağız", src: agizVid }, 
   { name: "Ayak", src: ayakVid }, 
@@ -316,24 +309,17 @@ const CLOTHES_WITH_IMAGE = [ { name: "Atlet", src: atletImg }, { name: "Ayakkab�
 const COLOURS_WITH_IMAGE = [ { name: "Beyaz", src: beyazImg }, { name: "Kırmızı", src: kirmiziImg }, { name: "Mavi", src: maviImg }, { name: "Mor", src: morImg }, { name: "Sarı", src: sariImg }, { name: "Siyah", src: siyahImg }, { name: "Turuncu", src: turuncuImg }, { name: "Yeşil", src: yesilImg } ];
 const SHAPES_WITH_IMAGE = [ { name: "Beşgen", src: besgenImg }, { name: "Daire", src: daireImg }, { name: "Dikdörtgen", src: dikdortgenImg }, { name: "Kare", src: kareImg }, { name: "Üçgen", src: ucgenImg } ];
 
-// --- AYIRT ETME SENARYOLARI (MANUEL LİSTE) ---
+// --- AYIRT ETME SENARYOLARI ---
 const ANIMAL_DISCRIMINATION_SCENARIOS = [
-  // VİDEO 1: ASLAN - MAYMUN - FİL
   { id: 'sec_aslan', targetName: 'Aslan', src: aslanMaymunFilVid, correctPosition: 'left', audioSrc: aslanInstruction },
   { id: 'sec_maymun', targetName: 'Maymun', src: aslanMaymunFilVid, correctPosition: 'center', audioSrc: maymunInstruction },
   { id: 'sec_fil', targetName: 'Fil', src: aslanMaymunFilVid, correctPosition: 'right', audioSrc: filInstruction },
-
-  // VİDEO 2: AT - TAVUK - KÖPEK
   { id: 'sec_at', targetName: 'At', src: atTavukKopekVid, correctPosition: 'left', audioSrc: atInstruction },
   { id: 'sec_tavuk', targetName: 'Tavuk', src: atTavukKopekVid, correctPosition: 'center', audioSrc: tavukInstruction },
   { id: 'sec_kopek', targetName: 'Köpek', src: atTavukKopekVid, correctPosition: 'right', audioSrc: kopekInstruction },
-
-  // VİDEO 3: KAPLAN - PENGUEN - AYI
   { id: 'sec_kaplan', targetName: 'Kaplan', src: kaplanPenguenAyiVid, correctPosition: 'left', audioSrc: kaplanInstruction },
   { id: 'sec_penguen', targetName: 'Penguen', src: kaplanPenguenAyiVid, correctPosition: 'center', audioSrc: penguenInstruction },
   { id: 'sec_ayi', targetName: 'Ayı', src: kaplanPenguenAyiVid, correctPosition: 'right', audioSrc: ayiInstruction },
-
-  // VİDEO 4: YILAN - TAVUK - KEDİ
   { id: 'sec_yilan', targetName: 'Yılan', src: yilanTavukKediVid, correctPosition: 'left', audioSrc: yilanInstruction },
   { id: 'sec_kedi', targetName: 'Kedi', src: yilanTavukKediVid, correctPosition: 'right', audioSrc: kediInstruction }
 ];
@@ -348,7 +334,6 @@ const SCENARIO_POOLS: Record<string, any[]> = {
   'Sıcak-Soğuk': [ { id: 'ss1', src: sicaksoguk1, fullSide: 'left' }, { id: 'ss2', src: sicaksoguk2, fullSide: 'left' }, { id: 'ss3', src: sicaksoguk3, fullSide: 'left' }, { id: 'ss4', src: sicaksoguk4, fullSide: 'left' }, { id: 'so1', src: soguksicak1, fullSide: 'right' }, { id: 'so2', src: soguksicak2, fullSide: 'right' }, { id: 'so3', src: soguksicak3, fullSide: 'right' }, { id: 'so4', src: soguksicak4, fullSide: 'right' } ]
 };
 
-// --- KATEGORİ YAPILANDIRMASI ---
 const CATEGORY_MAP = [
   { id: 'animals', title: 'Hayvanlar', icon: <PlayCircle />, data: ANIMALS_WITH_VIDEO, type: 'video' },
   { id: 'jobs', title: 'Meslekler', icon: <Briefcase />, data: JOBS_WITH_VIDEO, type: 'video' },
@@ -361,7 +346,6 @@ const CATEGORY_MAP = [
   { id: 'shapes', title: 'Şekiller', icon: <Shapes />, data: SHAPES_WITH_IMAGE, type: 'image' },
   { id: 'emotions', title: 'Duygular', icon: <Smile />, data: EMOTIONS_WITH_VIDEO, type: 'video' },
   
-  // OYUNLU OLANLAR
   { id: 'Boş-Dolu', title: 'Boş-Dolu', icon: <Scale />, isGame: true },
   { id: 'Az-Çok', title: 'Az-Çok', icon: <Scale />, isGame: true },
   { id: 'Ağır-Hafif', title: 'Ağır-Hafif', icon: <Scale />, isGame: true },
@@ -371,15 +355,14 @@ const CATEGORY_MAP = [
   { id: 'Sıcak-Soğuk', title: 'Sıcak-Soğuk', icon: <ThermometerSun />, isGame: true },
 ];
 
-// DİZİYİ KARIŞTIRMA FONKSİYONU (Shuffle)
 const shuffleArray = (array: any[]) => {
-    let currentIndex = array.length, randomIndex;
-    while (currentIndex !== 0) {
-      randomIndex = Math.floor(Math.random() * currentIndex);
-      currentIndex--;
-      [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
-    }
-    return array;
+  let currentIndex = array.length, randomIndex;
+  while (currentIndex !== 0) {
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+  }
+  return array;
 };
 
 export default function KavramAssessmentPage() {
@@ -390,7 +373,7 @@ export default function KavramAssessmentPage() {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
   
-  // OYUN STATE'LERİ
+  // Oyun state'leri
   const [activeGame, setActiveGame] = useState<string | null>(null); 
   const [currentGameScenario, setCurrentGameScenario] = useState<any>(null);
   const [targetQuestion, setTargetQuestion] = useState<'full' | 'empty'>('full');
@@ -398,26 +381,29 @@ export default function KavramAssessmentPage() {
   const [correctCount, setCorrectCount] = useState(0); 
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // FLASHCARD DEĞERLENDİRME STATE'LERİ
+  // Flashcard
   const [activeEvaluation, setActiveEvaluation] = useState<any | null>(null);
   const [evalIndex, setEvalIndex] = useState(0);
 
-  // AYIRT ETME MODU STATE'LERİ
+  // Ayırt etme
   const [isDiscriminationMode, setIsDiscriminationMode] = useState(false);
   const [discrimIndex, setDiscrimIndex] = useState(0);
   const [shuffledScenarios, setShuffledScenarios] = useState<any[]>([]);
 
-  // DOKUNMA EFEKTİ STATE'İ
+  // Yeni state'ler
+  const [selectedCategory, setSelectedCategory] = useState<any | null>(null);
+  const [showComingSoon, setShowComingSoon] = useState(false);
+
+  // Dokunma efekti
   const [touchEffect, setTouchEffect] = useState<{x: number, y: number, id: number} | null>(null);
 
-  // SES REFERANSLARI
+  // Ses referansları
   const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
   const questionAudioRef = useRef<HTMLAudioElement | null>(null);
   const flashcardAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const student = students.find(s => s.id === studentId);
 
-  // Dokunma Efekti Tetikleyici
   const handleTouchEffect = (e: React.MouseEvent | React.TouchEvent) => {
     let clientX, clientY;
     if ('touches' in e) {
@@ -432,7 +418,6 @@ export default function KavramAssessmentPage() {
   };
 
   useEffect(() => {
-    // Sesleri Yükle
     audioRefs.current = {
       dolu: new Audio(doluSes), bos: new Audio(bosSes), az: new Audio(azSes), cok: new Audio(cokSes),
       agir: new Audio(agirSes), hafif: new Audio(hafifSes), acik: new Audio(acikSes), kapali: new Audio(kapaliSes),
@@ -451,37 +436,29 @@ export default function KavramAssessmentPage() {
     loadData();
   }, [studentId]);
 
-  // FLASHCARD MODUNDA SES MANTIĞI (VARSA ÇAL, YOKSA SESSİZ)
   useEffect(() => {
     if (activeEvaluation) {
-        // Önceki sesi durdur
-        if (flashcardAudioRef.current) {
-             flashcardAudioRef.current.pause();
-             flashcardAudioRef.current.currentTime = 0;
-        }
-
-        const item = activeEvaluation.data[evalIndex];
-        
-        // Eğer bu item'ın bir 'audio' özelliği varsa (Hayvan, Taşıt vb.) onu çal
-        if (item.audio) {
-            const audio = new Audio(item.audio); 
-            flashcardAudioRef.current = audio;
-            audio.play().catch(e => console.log("Flashcard ses hatası:", e));
-        }
-        // Eğer audio yoksa (Limbs, Fruits vb.) hiçbir şey yapma (Sessiz kal)
+      if (flashcardAudioRef.current) {
+        flashcardAudioRef.current.pause();
+        flashcardAudioRef.current.currentTime = 0;
+      }
+      const item = activeEvaluation.data[evalIndex];
+      if (item.audio) {
+        const audio = new Audio(item.audio); 
+        flashcardAudioRef.current = audio;
+        audio.play().catch(e => console.log("Flashcard ses hatası:", e));
+      }
     }
   }, [evalIndex, activeEvaluation]);
 
-  // AYIRT ETME MODU BAŞLADIĞINDA LİSTEYİ KARIŞTIR (SHUFFLE)
   useEffect(() => {
-      if (isDiscriminationMode) {
-          const mixed = shuffleArray([...ANIMAL_DISCRIMINATION_SCENARIOS]);
-          setShuffledScenarios(mixed);
-          setDiscrimIndex(0); 
-      }
+    if (isDiscriminationMode) {
+      const mixed = shuffleArray([...ANIMAL_DISCRIMINATION_SCENARIOS]);
+      setShuffledScenarios(mixed);
+      setDiscrimIndex(0); 
+    }
   }, [isDiscriminationMode]);
 
-  // AYIRT ETME MODUNDA OTOMATİK SES ÇALMA
   useEffect(() => {
     if (isDiscriminationMode && shuffledScenarios.length > 0) {
       const scenario = shuffledScenarios[discrimIndex];
@@ -497,13 +474,12 @@ export default function KavramAssessmentPage() {
     }
   }, [isDiscriminationMode, discrimIndex, shuffledScenarios]);
 
-  // YÖNERGE TEKRARI (SES ÇALMA)
   const replayInstruction = () => {
-      if (questionAudioRef.current) {
-          questionAudioRef.current.currentTime = 0;
-          questionAudioRef.current.play().catch(e => console.log("Tekrar çalma hatası:", e));
-          toast.info("Ses tekrar çalınıyor...");
-      }
+    if (questionAudioRef.current) {
+      questionAudioRef.current.currentTime = 0;
+      questionAudioRef.current.play().catch(e => console.log("Tekrar çalma hatası:", e));
+      toast.info("Ses tekrar çalınıyor...");
+    }
   };
 
   const handleSave = async () => {
@@ -517,7 +493,7 @@ export default function KavramAssessmentPage() {
     if (audio) { audio.currentTime = 0; audio.play().catch(e => console.error(e)); }
   };
 
-  // --- 1. OYUN MOTORU ---
+  // --- OYUN MOTORU ---
   const initGame = (concept: string) => {
     setQuestionCount(0); setCorrectCount(0); setActiveGame(concept); loadNextQuestion(0, concept);
   };
@@ -533,13 +509,13 @@ export default function KavramAssessmentPage() {
     setIsTransitioning(false);
 
     setTimeout(() => {
-        if (gameType === 'Boş-Dolu') isAskingFull ? playSound('dolu') : playSound('bos');
-        else if (gameType === 'Az-Çok') isAskingFull ? playSound('cok') : playSound('az');
-        else if (gameType === 'Ağır-Hafif') isAskingFull ? playSound('agir') : playSound('hafif');
-        else if (gameType === 'Açık-Kapalı') isAskingFull ? playSound('acik') : playSound('kapali');
-        else if (gameType === 'Uzun-Kısa') isAskingFull ? playSound('uzun') : playSound('kisa');
-        else if (gameType === 'Büyük-Küçük') isAskingFull ? playSound('buyuk') : playSound('kucuk');
-        else if (gameType === 'Sıcak-Soğuk') isAskingFull ? playSound('sicak') : playSound('soguk');
+      if (gameType === 'Boş-Dolu') isAskingFull ? playSound('dolu') : playSound('bos');
+      else if (gameType === 'Az-Çok') isAskingFull ? playSound('cok') : playSound('az');
+      else if (gameType === 'Ağır-Hafif') isAskingFull ? playSound('agir') : playSound('hafif');
+      else if (gameType === 'Açık-Kapalı') isAskingFull ? playSound('acik') : playSound('kapali');
+      else if (gameType === 'Uzun-Kısa') isAskingFull ? playSound('uzun') : playSound('kisa');
+      else if (gameType === 'Büyük-Küçük') isAskingFull ? playSound('buyuk') : playSound('kucuk');
+      else if (gameType === 'Sıcak-Soğuk') isAskingFull ? playSound('sicak') : playSound('soguk');
     }, 500);
   };
 
@@ -561,13 +537,12 @@ export default function KavramAssessmentPage() {
     }
   };
 
-  // --- 2. DEĞERLENDİRME MOTORU (FLASHCARD) ---
+  // --- DEĞERLENDİRME MOTORU ---
   const startEvaluation = (category: any) => {
     if (category.isGame) {
       initGame(category.id);
     } else {
-      setActiveEvaluation(category);
-      setEvalIndex(0);
+      setSelectedCategory(category);
     }
   };
 
@@ -578,17 +553,12 @@ export default function KavramAssessmentPage() {
     if (evalIndex < activeEvaluation.data.length - 1) {
       setEvalIndex(prev => prev + 1);
     } else {
-      if (activeEvaluation.id === 'animals') {
-        toast.success("Harika! Şimdi karışık bulmaca zamanı 🎯");
-        setIsDiscriminationMode(true);
-      } else {
-        toast.success(`${activeEvaluation.title} değerlendirmesi tamamlandı!`);
-        setActiveEvaluation(null);
-      }
+      toast.success(`${activeEvaluation.title} - İsimlendirme tamamlandı!`);
+      setActiveEvaluation(null);
     }
   };
 
-  // --- 3. AYIRT ETME MOTORU ---
+  // --- AYIRT ETME MOTORU ---
   const handleDiscriminationChoice = (selectedSide: 'left' | 'center' | 'right', e: any) => {
     handleTouchEffect(e);
     const currentScenario = shuffledScenarios[discrimIndex];
@@ -606,34 +576,59 @@ export default function KavramAssessmentPage() {
       setTimeout(() => setDiscrimIndex(prev => prev + 1), 600); 
     } else {
       setTimeout(() => {
-        toast.success("Tüm hayvan değerlendirmesi bitti!");
+        toast.success("Gösterme değerlendirmesi bitti!");
         setIsDiscriminationMode(false);
-        setActiveEvaluation(null);
       }, 1000);
     }
   };
 
-  // --- SCORE HESAPLAMA ---
-  const calculateScore = (category: any) => {
-    if (category.isGame) {
-       const val = formData[category.id];
-       if (val === true) return 100;
-       if (val === false) return 0;
-       return null; 
-    }
+  // --- SKOR HESAPLAMA ---
+  const calculateNamingScore = (category: any) => {
     const items = category.data;
     if (!items || items.length === 0) return null;
     let correct = 0;
     let attempted = 0;
     items.forEach((item: any) => {
-        const val = formData[item.name];
-        if (val !== undefined && val !== null) {
-            attempted++;
-            if (val === true) correct++;
-        }
+      const val = formData[item.name];
+      if (val !== undefined && val !== null) {
+        attempted++;
+        if (val === true) correct++;
+      }
     });
     if (attempted === 0) return null;
     return Math.round((correct / items.length) * 100);
+  };
+
+  const calculateShowingScore = (category: any) => {
+    if (category.id !== 'animals') return null;
+    const items = category.data;
+    if (!items || items.length === 0) return null;
+    let correct = 0;
+    let attempted = 0;
+    items.forEach((item: any) => {
+      const val = formData[`${item.name}_Ayirt_Etme`];
+      if (val !== undefined && val !== null) {
+        attempted++;
+        if (val === true) correct++;
+      }
+    });
+    if (attempted === 0) return null;
+    return Math.round((correct / items.length) * 100);
+  };
+
+  const calculateScore = (category: any) => {
+    if (category.isGame) {
+      const val = formData[category.id];
+      if (val === true) return 100;
+      if (val === false) return 0;
+      return null; 
+    }
+    const naming = calculateNamingScore(category);
+    const showing = calculateShowingScore(category);
+    if (naming === null && showing === null) return null;
+    if (naming === null) return showing;
+    if (showing === null) return naming;
+    return Math.round((naming + showing) / 2);
   };
 
   const getScoreColor = (score: number | null) => {
@@ -652,7 +647,7 @@ export default function KavramAssessmentPage() {
     return "bg-red-500";
   };
 
-  // --- RENDER 1: OYUN MODU ---
+  // --- RENDER'LAR ---
   const renderGame = () => {
     if (!currentGameScenario) return null;
     const isVideo = currentGameScenario.src && currentGameScenario.src.endsWith('.mp4');
@@ -661,17 +656,16 @@ export default function KavramAssessmentPage() {
         <button onClick={() => setActiveGame(null)} className="absolute top-8 right-8 z-[110] bg-white/20 text-white p-3 rounded-full hover:bg-white/30 backdrop-blur-md"><X size={32} /></button>
         <div className="absolute top-4 left-4 z-[110] bg-black/50 px-4 py-2 rounded-full text-white font-bold text-sm border border-white/20">Soru: {questionCount} / 5</div>
         <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden animate-in fade-in zoom-in duration-300" key={questionCount}>
-            {isVideo ? <video src={currentGameScenario.src} autoPlay loop muted playsInline className="h-full w-auto max-w-none object-contain pointer-events-none select-none" /> : <img src={currentGameScenario.src} className="h-full w-auto max-w-none object-contain pointer-events-none select-none" />}
-            <div className="absolute inset-0 z-20 flex">
-                <div onClick={(e) => handleGameSelection('left', e)} className="w-1/2 h-full cursor-pointer active:bg-white/5 transition-colors"></div>
-                <div onClick={(e) => handleGameSelection('right', e)} className="w-1/2 h-full cursor-pointer active:bg-white/5 transition-colors"></div>
-            </div>
+          {isVideo ? <video src={currentGameScenario.src} autoPlay loop muted playsInline className="h-full w-auto max-w-none object-contain pointer-events-none select-none" /> : <img src={currentGameScenario.src} className="h-full w-auto max-w-none object-contain pointer-events-none select-none" />}
+          <div className="absolute inset-0 z-20 flex">
+            <div onClick={(e) => handleGameSelection('left', e)} className="w-1/2 h-full cursor-pointer active:bg-white/5 transition-colors"></div>
+            <div onClick={(e) => handleGameSelection('right', e)} className="w-1/2 h-full cursor-pointer active:bg-white/5 transition-colors"></div>
+          </div>
         </div>
       </div>
     );
   };
 
-  // --- RENDER 2: FLASHCARD MODU (POP-IN CSS EFEKTİ İLE) ---
   const renderEvaluationMode = () => {
     if (!activeEvaluation) return null;
     const item = activeEvaluation.data[evalIndex];
@@ -681,51 +675,45 @@ export default function KavramAssessmentPage() {
     return (
       <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-4xl flex items-center justify-between mb-4 z-50">
-           <div className="flex items-center gap-3">
-               <span className="text-white/70 text-sm font-medium">{activeEvaluation.title}</span>
-               <div className="h-1.5 w-32 bg-white/10 rounded-full overflow-hidden">
-                   <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${progress}%` }}></div>
-               </div>
-               <span className="text-xs text-white/50">{evalIndex + 1} / {activeEvaluation.data.length}</span>
-           </div>
-           <button onClick={() => setActiveEvaluation(null)} className="bg-white/10 hover:bg-white/20 p-2 rounded-full text-white transition-colors"><X size={24} /></button>
+          <div className="flex items-center gap-3">
+            <span className="text-white/70 text-sm font-medium">{activeEvaluation.title} - İsimlendirme</span>
+            <div className="h-1.5 w-32 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${progress}%` }}></div>
+            </div>
+            <span className="text-xs text-white/50">{evalIndex + 1} / {activeEvaluation.data.length}</span>
+          </div>
+          <button onClick={() => setActiveEvaluation(null)} className="bg-white/10 hover:bg-white/20 p-2 rounded-full text-white transition-colors"><X size={24} /></button>
         </div>
 
-        {/* ANİMASYON BURADA: CSS CLASS 'animate-pop-in' KULLANILDI */}
-        <div 
-           className="relative flex-1 w-full max-w-4xl bg-black rounded-3xl overflow-hidden border border-white/10 mb-6 flex items-center justify-center animate-pop-in" 
-           key={evalIndex}
-        >
-            {isVideo ? (
-                // MUTED = TRUE (SES ARKA PLANDA playSound İLE ÇALIYOR)
-                <video src={item.src} autoPlay loop playsInline muted={true} className="w-full h-full object-contain" />
-            ) : (
-                <img src={item.src} alt={item.name} className="w-full h-full object-contain" />
-            )}
-            <div className="absolute top-4 left-4 bg-black/60 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 animate-in fade-in duration-700 delay-300">
-                <h2 className="text-2xl font-bold text-white tracking-wide">{item.name}</h2>
-            </div>
+        <div className="relative flex-1 w-full max-w-4xl bg-black rounded-3xl overflow-hidden border border-white/10 mb-6 flex items-center justify-center animate-pop-in" key={evalIndex}>
+          {isVideo ? (
+            <video src={item.src} autoPlay loop playsInline muted={true} className="w-full h-full object-contain" />
+          ) : (
+            <img src={item.src} alt={item.name} className="w-full h-full object-contain" />
+          )}
+          <div className="absolute top-4 left-4 bg-black/60 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 animate-in fade-in duration-700 delay-300">
+            <h2 className="text-2xl font-bold text-white tracking-wide">{item.name}</h2>
+          </div>
         </div>
 
         <div className="flex items-center gap-8 z-50">
-            <button onClick={() => handleEvalResponse(false)} className="group flex flex-col items-center gap-2">
-                <div className="w-20 h-20 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center group-active:scale-95 transition-all hover:bg-red-500/30">
-                    <X size={40} className="text-red-500" />
-                </div>
-                <span className="text-sm font-medium text-red-400">Bilmiyor</span>
-            </button>
-            <button onClick={() => handleEvalResponse(true)} className="group flex flex-col items-center gap-2">
-                <div className="w-20 h-20 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center group-active:scale-95 transition-all hover:bg-green-500/30">
-                    <Check size={40} className="text-green-500" />
-                </div>
-                <span className="text-sm font-medium text-green-400">Biliyor</span>
-            </button>
+          <button onClick={() => handleEvalResponse(false)} className="group flex flex-col items-center gap-2">
+            <div className="w-20 h-20 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center group-active:scale-95 transition-all hover:bg-red-500/30">
+              <X size={40} className="text-red-500" />
+            </div>
+            <span className="text-sm font-medium text-red-400">Bilmiyor</span>
+          </button>
+          <button onClick={() => handleEvalResponse(true)} className="group flex flex-col items-center gap-2">
+            <div className="w-20 h-20 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center group-active:scale-95 transition-all hover:bg-green-500/30">
+              <Check size={40} className="text-green-500" />
+            </div>
+            <span className="text-sm font-medium text-green-400">Biliyor</span>
+          </button>
         </div>
       </div>
     );
   };
 
-  // --- RENDER 3: AYIRT ETME MODU (POP-IN CSS EFEKTİ İLE) ---
   const renderDiscriminationGame = () => {
     if (!isDiscriminationMode || shuffledScenarios.length === 0) return null;
     const scenario = shuffledScenarios[discrimIndex];
@@ -733,73 +721,147 @@ export default function KavramAssessmentPage() {
     return (
       <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center">
         <button 
-          onClick={() => { setIsDiscriminationMode(false); setActiveEvaluation(null); }} 
+          onClick={() => setIsDiscriminationMode(false)} 
           className="absolute top-8 right-8 z-[120] bg-white/20 p-3 rounded-full text-white hover:bg-white/30"
         >
           <X size={32} />
         </button>
 
         <div 
-           className="absolute top-8 left-8 z-[110] animate-in slide-in-from-top duration-500 cursor-pointer active:scale-95 transition-transform" 
-           key={scenario.id + 'text'}
-           onClick={replayInstruction}
+          className="absolute top-8 left-8 z-[110] animate-in slide-in-from-top duration-500 cursor-pointer active:scale-95 transition-transform" 
+          key={scenario.id + 'text'}
+          onClick={replayInstruction}
         >
-           <div className="bg-blue-600/80 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20 shadow-xl flex items-center gap-3">
-              <div className="bg-white/20 p-2 rounded-full animate-pulse">
-                 <Volume2 size={24} />
-              </div>
-              <span className="text-xl font-bold text-white tracking-wide">
-                "{scenario.targetName}" hangisi?
-              </span>
-           </div>
+          <div className="bg-blue-600/80 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20 shadow-xl flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-full animate-pulse">
+              <Volume2 size={24} />
+            </div>
+            <span className="text-xl font-bold text-white tracking-wide">
+              "{scenario.targetName}" hangisi?
+            </span>
+          </div>
         </div>
 
-        {/* ANİMASYON BURADA: CSS CLASS 'animate-pop-in' KULLANILDI */}
-        <div 
-           className="relative w-full h-full flex items-center justify-center bg-black animate-pop-in" 
-           key={scenario.id}
+        <div className="relative w-full h-full flex items-center justify-center bg-black animate-pop-in" key={scenario.id}>
+          <video 
+            src={scenario.src}
+            autoPlay 
+            loop 
+            muted 
+            playsInline
+            className="h-full w-auto max-w-none object-contain pointer-events-none select-none"
+          />
+          
+          <div className="absolute inset-0 flex z-50 w-full h-full">
+            <div onClick={(e) => handleDiscriminationChoice('left', e)} className="flex-[2] h-full active:bg-white/5 transition-colors cursor-pointer border-r border-white/5"></div>
+            <div onClick={(e) => handleDiscriminationChoice('center', e)} className="flex-[1] h-full active:bg-white/5 transition-colors cursor-pointer border-r border-white/5"></div>
+            <div onClick={(e) => handleDiscriminationChoice('right', e)} className="flex-[2] h-full active:bg-white/5 transition-colors cursor-pointer"></div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+ // --- POPUP ---
+  const renderCategoryPopup = () => {
+    if (!selectedCategory) return null;
+
+    const namingScore = calculateNamingScore(selectedCategory);
+    const showingScore = calculateShowingScore(selectedCategory);
+
+    const handleNaming = () => {
+      setSelectedCategory(null);
+      setActiveEvaluation(selectedCategory);
+      setEvalIndex(0);
+    };
+
+    const handleShowing = () => {
+      setSelectedCategory(null);
+      if (selectedCategory.id === 'animals') {
+        setIsDiscriminationMode(true);
+      } else {
+        setShowComingSoon(true);
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold">{selectedCategory.title}</h2>
+            <button onClick={() => setSelectedCategory(null)} className="p-2 hover:bg-slate-800 rounded-full">
+              <X size={22} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            <button
+              onClick={handleNaming}
+              className="flex items-center justify-between p-5 rounded-2xl border border-slate-700 bg-slate-800/50 hover:bg-slate-800 transition-all active:scale-[0.98]"
+            >
+              <div className="text-left">
+                <div className="font-bold text-lg">İsimlendirme</div>
+                <div className="text-sm text-slate-400 mt-1">“Bu ne?” — adını söyler</div>
+              </div>
+              <div className="text-2xl font-black">
+                {namingScore !== null ? `${namingScore}%` : '—'}
+              </div>
+            </button>
+
+            <button
+              onClick={handleShowing}
+              className="flex items-center justify-between p-5 rounded-2xl border border-slate-700 bg-slate-800/50 hover:bg-slate-800 transition-all active:scale-[0.98]"
+            >
+              <div className="text-left">
+                <div className="font-bold text-lg">Gösterme</div>
+                <div className="text-sm text-slate-400 mt-1">“...yi göster” — resmi işaret eder</div>
+              </div>
+              <div className="text-2xl font-black">
+                {showingScore !== null ? `${showingScore}%` : '—'}
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // --- YAKINDA EKLENECEK ---
+  const renderComingSoon = () => {
+    if (!showComingSoon) return null;
+    return (
+      <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-6">
+        <button
+          onClick={() => setShowComingSoon(false)}
+          className="absolute top-8 right-8 bg-white/20 p-3 rounded-full text-white"
         >
-           <video 
-             src={scenario.src}
-             autoPlay 
-             loop 
-             muted 
-             playsInline
-             className="h-full w-auto max-w-none object-contain pointer-events-none select-none"
-           />
-           
-           <div className="absolute inset-0 flex z-50 w-full h-full">
-              <div 
-                onClick={(e) => handleDiscriminationChoice('left', e)} 
-                className="flex-[2] h-full active:bg-white/5 transition-colors cursor-pointer border-r border-white/5"
-              ></div>
-              <div 
-                onClick={(e) => handleDiscriminationChoice('center', e)} 
-                className="flex-[1] h-full active:bg-white/5 transition-colors cursor-pointer border-r border-white/5"
-              ></div>
-              <div 
-                onClick={(e) => handleDiscriminationChoice('right', e)} 
-                className="flex-[2] h-full active:bg-white/5 transition-colors cursor-pointer"
-              ></div>
-           </div>
+          <X size={28} />
+        </button>
+        <div className="text-center max-w-sm">
+          <div className="text-6xl mb-6">🚧</div>
+          <h2 className="text-2xl font-bold mb-3">Yakında Eklenecek</h2>
+          <p className="text-slate-400 text-base leading-relaxed">
+            Bu kategori için <strong>Gösterme</strong> değerlendirmesi henüz hazır değil.
+            Videolar eklendikten sonra buradan kullanabileceksin.
+          </p>
         </div>
       </div>
     );
   };
 
   const renderTouchEffect = () => {
-      if (!touchEffect) return null;
-      return (
-          <div 
-            key={touchEffect.id}
-            className="fixed w-20 h-20 rounded-full border-4 border-white/50 bg-white/20 pointer-events-none z-[200] animate-out fade-out zoom-out duration-500"
-            style={{ 
-                left: touchEffect.x - 40, 
-                top: touchEffect.y - 40,
-                boxShadow: '0 0 30px rgba(255,255,255,0.5)'
-            }}
-          />
-      );
+    if (!touchEffect) return null;
+    return (
+      <div 
+        key={touchEffect.id}
+        className="fixed w-20 h-20 rounded-full border-4 border-white/50 bg-white/20 pointer-events-none z-[200] animate-out fade-out zoom-out duration-500"
+        style={{ 
+          left: touchEffect.x - 40, 
+          top: touchEffect.y - 40,
+          boxShadow: '0 0 30px rgba(255,255,255,0.5)'
+        }}
+      />
+    );
   };
 
   if (!student) return null;
@@ -807,17 +869,10 @@ export default function KavramAssessmentPage() {
   return (
     <div className="min-h-screen bg-[#020617] text-white p-4 pb-20 font-sans">
       
-      {/* --- ÖZEL ANİMASYON STİLİ (BURADA TANIMLANDI) --- */}
       <style>{`
         @keyframes popInFromBottomRight {
-          0% { 
-            transform: translate(20%, 20%) scale(0.8); 
-            opacity: 0; 
-          }
-          100% { 
-            transform: translate(0, 0) scale(1); 
-            opacity: 1; 
-          }
+          0% { transform: translate(20%, 20%) scale(0.8); opacity: 0; }
+          100% { transform: translate(0, 0) scale(1); opacity: 1; }
         }
         .animate-pop-in {
           animation: popInFromBottomRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -825,70 +880,69 @@ export default function KavramAssessmentPage() {
       `}</style>
 
       {renderTouchEffect()}
+      {renderCategoryPopup()}
+      {renderComingSoon()}
 
-      {/* AKTİF MODLAR */}
       {activeGame && renderGame()}
       {activeEvaluation && !isDiscriminationMode && renderEvaluationMode()}
       {isDiscriminationMode && renderDiscriminationGame()}
 
-      {/* HEADER */}
       <header className="flex items-center justify-between mb-6 sticky top-0 bg-[#020617]/95 backdrop-blur z-20 py-2 border-b border-white/5">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => setLocation(`/assessment/${studentId}`)} className="text-slate-400 hover:bg-slate-800"><ArrowLeft /></Button>
           <div>
-              <h1 className="text-lg font-bold">Kavram Değerlendirme</h1>
-              <p className="text-xs text-slate-400">{student.name}</p>
+            <h1 className="text-lg font-bold">Kavram Değerlendirme</h1>
+            <p className="text-xs text-slate-400">{student.name}</p>
           </div>
         </div>
         <Button onClick={handleSave} className="bg-green-600 h-9 px-4 text-xs shadow-lg shadow-green-900/20"><Save className="mr-2 h-4 w-4" /> Kaydet</Button>
       </header>
 
-      {/* ANA GRID MENU */}
       <main className="max-w-4xl mx-auto">
         {loading ? <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" size={40}/></div> : (
           <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
-             {CATEGORY_MAP.map((cat) => {
-                 const score = calculateScore(cat);
-                 const colorClass = getScoreColor(score);
-                 const barColor = getProgressBarColor(score);
+            {CATEGORY_MAP.map((cat) => {
+              const score = calculateScore(cat);
+              const colorClass = getScoreColor(score);
+              const barColor = getProgressBarColor(score);
 
-                 return (
-                    <button 
-                        key={cat.id} 
-                        onClick={() => startEvaluation(cat)}
-                        className={twMerge(
-                            "relative group flex flex-col items-start p-4 rounded-xl border transition-all duration-300 overflow-hidden h-32",
-                            colorClass
-                        )}
-                    >
-                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity transform group-hover:scale-110 duration-500">
-                             <div className="scale-[2.5]">{cat.icon}</div>
-                        </div>
+              return (
+                <button 
+                  key={cat.id} 
+                  onClick={() => startEvaluation(cat)}
+                  className={twMerge(
+                    "relative group flex flex-col items-start p-4 rounded-xl border transition-all duration-300 overflow-hidden h-32",
+                    colorClass
+                  )}
+                >
+                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity transform group-hover:scale-110 duration-500">
+                    <div className="scale-[2.5]">{cat.icon}</div>
+                  </div>
 
-                        <div className="relative z-10 w-full flex flex-col h-full justify-between">
-                            <div className="flex items-start justify-between w-full">
-                                <div className={twMerge("p-2 rounded-lg bg-black/20 backdrop-blur-sm border border-white/10", score === 100 ? "text-emerald-400" : "text-white/70")}>
-                                    {cat.icon}
-                                </div>
-                                {score !== null && (
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-2xl font-black tracking-tighter">{score}%</span>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="w-full">
-                                <h3 className="text-sm font-bold leading-tight mb-2">{cat.title}</h3>
-                                <div className="h-1.5 w-full bg-black/20 rounded-full overflow-hidden">
-                                    <div className={`h-full ${barColor} transition-all duration-500`} style={{ width: `${score || 0}%` }}></div>
-                                </div>
-                            </div>
+                  <div className="relative z-10 w-full flex flex-col h-full justify-between">
+                    <div className="flex items-start justify-between w-full">
+                      <div className={twMerge("p-2 rounded-lg bg-black/20 backdrop-blur-sm border border-white/10", score === 100 ? "text-emerald-400" : "text-white/70")}>
+                        {cat.icon}
+                      </div>
+                      {score !== null && (
+                        <div className="flex flex-col items-end">
+                          <span className="text-2xl font-black tracking-tighter">{score}%</span>
                         </div>
-                    </button>
-                 );
-             })}
+                      )}
+                    </div>
+                    <div className="w-full">
+                      <h3 className="text-sm font-bold leading-tight mb-2">{cat.title}</h3>
+                      <div className="h-1.5 w-full bg-black/20 rounded-full overflow-hidden">
+                        <div className={`h-full \( {barColor} transition-all duration-500`} style={{ width: ` \){score || 0}%` }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </main>
     </div>
   );
-}
+        }
