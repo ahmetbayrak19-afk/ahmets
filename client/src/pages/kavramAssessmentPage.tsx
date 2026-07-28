@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
+import { ScreenOrientation } from '@capacitor/screen-orientation';
 
 // --- KAVRAM OYUN SESLERİ ---
 import bosSes from '@/kavram/bos.mp3';
@@ -82,7 +83,7 @@ import soguksicak2 from '@/kavram/soguksicak2.png';
 import soguksicak3 from '@/kavram/soguksicak3.png';
 import soguksicak4 from '@/kavram/soguksicak4.jpg';
 
-// --- 1. HAYVANLAR ---
+// --- HAYVANLAR ---
 import aslanVid from '@/animals/aslan.mp4';
 import atVid from '@/animals/at.mp4';
 import ayiVid from '@/animals/ayi.mp4';
@@ -106,13 +107,11 @@ import yilanMp3 from '@/animals/yilan.mp3';
 import tavukMp3 from '@/animals/tavuk.mp3';
 import maymunMp3 from '@/animals/maymun.mp3';
 
-// --- HAYVANLAR 3'LÜ GRUP VİDEOLARI ---
 import aslanMaymunFilVid from '@/animals/aslanmaymunfil.mp4';
 import atTavukKopekVid from '@/animals/attavukkopek.mp4';
 import kaplanPenguenAyiVid from '@/animals/kaplanpenguenayi.mp4';
 import yilanTavukKediVid from '@/animals/yilantavukkedi.mp4';
 
-// --- HAYVAN SES YÖNERGELERİ ---
 import aslanInstruction from '@/animals/aslanigoster.mp3';
 import atInstruction from '@/animals/atigoster.mp3';
 import ayiInstruction from '@/animals/ayiyigoster.mp3';
@@ -125,7 +124,7 @@ import penguenInstruction from '@/animals/penguengoster.mp3';
 import tavukInstruction from '@/animals/tavukgoster.mp3';
 import yilanInstruction from '@/animals/yilanigoster.mp3';
 
-// --- 2. MESLEKLER ---
+// --- MESLEKLER ---
 import asciVid from '@/jobs/asci.mp4';
 import askerVid from '@/jobs/asker.mp4';
 import astronotVid from '@/jobs/astronot.mp4';
@@ -147,7 +146,7 @@ import ogretmenMp3 from '@/jobs/ogretmen.mp3';
 import polisMp3 from '@/jobs/polis.mp3';
 import terziMp3 from '@/jobs/terzi.mp3';
 
-// --- 3. TAŞITLAR ---
+// --- TAŞITLAR ---
 import arabaVid from '@/vehicles/araba.mp4';
 import bisikletVid from '@/vehicles/bisiklet.mp4';
 import gemiVid from '@/vehicles/gemi.mp4';
@@ -169,7 +168,7 @@ import otobusMp3 from '@/vehicles/otobus.mp3';
 import trenMp3 from '@/vehicles/tren.mp3';
 import ucakMp3 from '@/vehicles/ucak.mp3';
 
-// --- 4. DUYGULAR ---
+// --- DUYGULAR ---
 import sasirmisVid from '@/emotions/Sasirmis.mp4';
 import korkmusVid from '@/emotions/korkmus.mp4';
 import mutluVid from '@/emotions/mutlu.mp4';
@@ -181,7 +180,7 @@ import mutluMp3 from '@/emotions/mutlu.mp3';
 import sinirliMp3 from '@/emotions/sinirli.mp3';
 import uzgunMp3 from '@/emotions/uzgun.mp3';
 
-// --- 5. VÜCUDUMUZ ---
+// --- VÜCUDUMUZ ---
 import agizVid from '@/limbs/agiz.mp4';
 import ayakVid from '@/limbs/ayak.mp4';
 import burunVid from '@/limbs/burun.mp4';
@@ -309,7 +308,6 @@ const CLOTHES_WITH_IMAGE = [ { name: "Atlet", src: atletImg }, { name: "Ayakkab�
 const COLOURS_WITH_IMAGE = [ { name: "Beyaz", src: beyazImg }, { name: "Kırmızı", src: kirmiziImg }, { name: "Mavi", src: maviImg }, { name: "Mor", src: morImg }, { name: "Sarı", src: sariImg }, { name: "Siyah", src: siyahImg }, { name: "Turuncu", src: turuncuImg }, { name: "Yeşil", src: yesilImg } ];
 const SHAPES_WITH_IMAGE = [ { name: "Beşgen", src: besgenImg }, { name: "Daire", src: daireImg }, { name: "Dikdörtgen", src: dikdortgenImg }, { name: "Kare", src: kareImg }, { name: "Üçgen", src: ucgenImg } ];
 
-// --- AYIRT ETME SENARYOLARI ---
 const ANIMAL_DISCRIMINATION_SCENARIOS = [
   { id: 'sec_aslan', targetName: 'Aslan', src: aslanMaymunFilVid, correctPosition: 'left', audioSrc: aslanInstruction },
   { id: 'sec_maymun', targetName: 'Maymun', src: aslanMaymunFilVid, correctPosition: 'center', audioSrc: maymunInstruction },
@@ -345,7 +343,6 @@ const CATEGORY_MAP = [
   { id: 'colors', title: 'Renkler', icon: <Palette />, data: COLOURS_WITH_IMAGE, type: 'image' },
   { id: 'shapes', title: 'Şekiller', icon: <Shapes />, data: SHAPES_WITH_IMAGE, type: 'image' },
   { id: 'emotions', title: 'Duygular', icon: <Smile />, data: EMOTIONS_WITH_VIDEO, type: 'video' },
-  
   { id: 'Boş-Dolu', title: 'Boş-Dolu', icon: <Scale />, isGame: true },
   { id: 'Az-Çok', title: 'Az-Çok', icon: <Scale />, isGame: true },
   { id: 'Ağır-Hafif', title: 'Ağır-Hafif', icon: <Scale />, isGame: true },
@@ -364,7 +361,6 @@ const shuffleArray = (array: any[]) => {
   }
   return array;
 };
-
 export default function KavramAssessmentPage() {
   const [match, params] = useRoute('/kavram-assessment/:id');
   const studentId = params?.id;
@@ -403,6 +399,31 @@ export default function KavramAssessmentPage() {
   const flashcardAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const student = students.find(s => s.id === studentId);
+
+  // Ekran yönü kilitleme
+  const lockPortrait = async () => {
+    try {
+      await ScreenOrientation.lock({ orientation: 'portrait' });
+    } catch (e) {
+      console.log('Portrait lock hatası:', e);
+    }
+  };
+
+  const lockLandscape = async () => {
+    try {
+      await ScreenOrientation.lock({ orientation: 'landscape' });
+    } catch (e) {
+      console.log('Landscape lock hatası:', e);
+    }
+  };
+
+  const unlockOrientation = async () => {
+    try {
+      await ScreenOrientation.unlock();
+    } catch (e) {
+      console.log('Unlock hatası:', e);
+    }
+  };
 
   const handleTouchEffect = (e: React.MouseEvent | React.TouchEvent) => {
     let clientX, clientY;
@@ -555,6 +576,7 @@ export default function KavramAssessmentPage() {
     } else {
       toast.success(`${activeEvaluation.title} - İsimlendirme tamamlandı!`);
       setActiveEvaluation(null);
+      unlockOrientation();
     }
   };
 
@@ -578,6 +600,7 @@ export default function KavramAssessmentPage() {
       setTimeout(() => {
         toast.success("Gösterme değerlendirmesi bitti!");
         setIsDiscriminationMode(false);
+        unlockOrientation();
       }, 1000);
     }
   };
@@ -646,7 +669,6 @@ export default function KavramAssessmentPage() {
     if (score >= 50) return "bg-yellow-500";
     return "bg-red-500";
   };
-
   // --- RENDER'LAR ---
   const renderGame = () => {
     if (!currentGameScenario) return null;
@@ -682,7 +704,7 @@ export default function KavramAssessmentPage() {
             </div>
             <span className="text-xs text-white/50">{evalIndex + 1} / {activeEvaluation.data.length}</span>
           </div>
-          <button onClick={() => setActiveEvaluation(null)} className="bg-white/10 hover:bg-white/20 p-2 rounded-full text-white transition-colors"><X size={24} /></button>
+          <button onClick={() => { setActiveEvaluation(null); unlockOrientation(); }} className="bg-white/10 hover:bg-white/20 p-2 rounded-full text-white transition-colors"><X size={24} /></button>
         </div>
 
         <div className="relative flex-1 w-full max-w-4xl bg-black rounded-3xl overflow-hidden border border-white/10 mb-6 flex items-center justify-center animate-pop-in" key={evalIndex}>
@@ -721,7 +743,7 @@ export default function KavramAssessmentPage() {
     return (
       <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center">
         <button 
-          onClick={() => setIsDiscriminationMode(false)} 
+          onClick={() => { setIsDiscriminationMode(false); unlockOrientation(); }} 
           className="absolute top-8 right-8 z-[120] bg-white/20 p-3 rounded-full text-white hover:bg-white/30"
         >
           <X size={32} />
@@ -762,7 +784,7 @@ export default function KavramAssessmentPage() {
     );
   };
 
- // --- POPUP ---
+  // --- POPUP ---
   const renderCategoryPopup = () => {
     if (!selectedCategory) return null;
 
@@ -773,12 +795,14 @@ export default function KavramAssessmentPage() {
       setSelectedCategory(null);
       setActiveEvaluation(selectedCategory);
       setEvalIndex(0);
+      lockPortrait();
     };
 
     const handleShowing = () => {
       setSelectedCategory(null);
       if (selectedCategory.id === 'animals') {
         setIsDiscriminationMode(true);
+        lockLandscape();
       } else {
         setShowComingSoon(true);
       }
@@ -945,4 +969,4 @@ export default function KavramAssessmentPage() {
       </main>
     </div>
   );
-        }
+    }
