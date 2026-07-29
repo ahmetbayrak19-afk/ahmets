@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.nfc.NfcAdapter;
@@ -19,7 +20,6 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
-import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -50,7 +50,6 @@ public class MainActivity extends AppCompatActivity {
 
         checkAndRequestPermissions();
 
-        // NFC
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
         Intent intent = new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ?
@@ -64,7 +63,6 @@ public class MainActivity extends AppCompatActivity {
                 new IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED)
         };
 
-        // TTS
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
                 tts.setLanguage(new Locale("tr", "TR"));
@@ -79,11 +77,9 @@ public class MainActivity extends AppCompatActivity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
-
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
 
-        // 🔥 RESMİ LOCAL SERVER
         final WebViewAssetLoader assetLoader =
                 new WebViewAssetLoader.Builder()
                         .addPathHandler("/assets/",
@@ -100,7 +96,6 @@ public class MainActivity extends AppCompatActivity {
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
-
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
                 request.grant(request.getResources());
@@ -110,7 +105,6 @@ public class MainActivity extends AppCompatActivity {
             public boolean onShowFileChooser(WebView webView,
                                              ValueCallback<Uri[]> filePathCallback,
                                              FileChooserParams fileChooserParams) {
-
                 if (mUploadMessage != null) mUploadMessage.onReceiveValue(null);
                 mUploadMessage = filePathCallback;
 
@@ -121,12 +115,10 @@ public class MainActivity extends AppCompatActivity {
                 startActivityForResult(
                         Intent.createChooser(intent, "Resim Seç"),
                         FILECHOOSER_RESULTCODE);
-
                 return true;
             }
         });
 
-        // TTS JS bridge
         webView.addJavascriptInterface(new Object() {
             @JavascriptInterface
             public void speak(String text) {
@@ -137,7 +129,21 @@ public class MainActivity extends AppCompatActivity {
             }
         }, "AndroidTTS");
 
-        // 🔥 Artık file:// değil
+        webView.addJavascriptInterface(new Object() {
+            @JavascriptInterface
+            public void lock(String mode) {
+                runOnUiThread(() -> {
+                    if ("landscape".equals(mode)) {
+                        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+                    } else if ("portrait".equals(mode)) {
+                        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                    } else {
+                        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+                    }
+                });
+            }
+        }, "AndroidOrientation");
+
         webView.loadUrl(
                 "https://appassets.androidplatform.net/assets/public/index.html"
         );
@@ -212,4 +218,4 @@ public class MainActivity extends AppCompatActivity {
         }
         super.onDestroy();
     }
-                    }
+            }
