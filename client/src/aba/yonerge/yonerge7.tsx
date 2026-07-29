@@ -27,6 +27,26 @@ import atletImg from '@/clothes/atlet.jpg';
 // --- GİRİŞ SESİ ---
 import girisSes from './sesgorsel/yonerge31giris.mp3';
 
+// --- ÇALIŞMA MODU İÇİN SESLER (esle/ses) ---
+// Değerlendirmede ÇALINMAZ. Çalışma modunda olumlu/olumsuz geri bildirim için kullanılır.
+import aferin1 from '@/aba/esle/ses/aferin1.mp3';
+import aferin2 from '@/aba/esle/ses/aferin2.mp3';
+import bravo from '@/aba/esle/ses/bravo.mp3';
+import esledinbravo from '@/aba/esle/ses/esledinbravo.mp3';
+import harika1 from '@/aba/esle/ses/harika1.mp3';
+import harika2 from '@/aba/esle/ses/harika2.mp3';
+import tekrardene1 from '@/aba/esle/ses/tekrardene1.mp3';
+import tekrardene2 from '@/aba/esle/ses/tekrardene2.mp3';
+
+/** Çalışma (instruction) modu için olumlu ses havuzu */
+const POSITIVE_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
+/** Çalışma (instruction) modu için olumsuz ses havuzu */
+const NEGATIVE_SOUNDS = [tekrardene1, tekrardene2];
+
+// TODO: "devam et" ve benzeri nötr geçiş sesleri yüklendiğinde buraya ekle.
+// Değerlendirme modunda deneme geçişlerinde bu sesler kullanılacak (aferin/tekrar dene YOK).
+// const DEVAM_SOUNDS: string[] = [];
+
 export interface NesneDef {
   id: string;
   name: string;
@@ -81,24 +101,49 @@ function instructionText(name: string, action: 'ver' | 'göster') {
   return `${name} ${action}`;
 }
 
+/** Çalışma modu için rastgele olumlu/olumsuz ses çal */
+function playPracticeFeedback(correct: boolean) {
+  const pool = correct ? POSITIVE_SOUNDS : NEGATIVE_SOUNDS;
+  const src = pool[Math.floor(Math.random() * pool.length)];
+  const a = new Audio(src);
+  a.volume = 1;
+  a.play().catch(() => {});
+}
+
+/**
+ * Değerlendirme modu: aferin / tekrar dene ASLA çalınmaz.
+ * İleride "devam et" sesleri yüklendiğinde sadece nötr geçiş sesi kullanılabilir.
+ */
+function playAssessmentTransition() {
+  // Şimdilik sessiz. DEVAM_SOUNDS eklendiğinde buradan rastgele çal.
+}
+
 function NesneCard({
   item,
   onClick,
   selected,
   large,
+  feedback,
 }: {
   item: NesneDef;
   onClick?: () => void;
   selected?: boolean;
   large?: boolean;
+  feedback?: 'correct' | 'wrong' | null;
 }) {
+  let borderCls = selected
+    ? 'border-blue-400 ring-2 ring-blue-500/40 '
+    : 'border-slate-700 hover:border-slate-500 ';
+  if (feedback === 'correct') borderCls = 'border-green-400 ring-2 ring-green-500/50 bg-green-900/30 ';
+  if (feedback === 'wrong') borderCls = 'border-red-400 ring-2 ring-red-500/50 bg-red-900/30 ';
+
   return (
     <button
       type="button"
       onClick={onClick}
       className={
         `flex flex-col items-center justify-center rounded-2xl border-2 bg-slate-800/80 transition-all active:scale-95 overflow-hidden ` +
-        (selected ? 'border-blue-400 ring-2 ring-blue-500/40 ' : 'border-slate-700 hover:border-slate-500 ') +
+        borderCls +
         (large ? 'p-3 min-h-[110px]' : 'p-2 min-h-[90px]') +
         (onClick ? 'cursor-pointer' : 'cursor-default')
       }
@@ -131,6 +176,7 @@ export default function Yonerge7({
   const [score, setScore] = useState(0);
   const [digitalOptions, setDigitalOptions] = useState<NesneDef[]>([]);
   const [locked, setLocked] = useState(false);
+  const [tapFeedback, setTapFeedback] = useState<{ id: string; type: 'correct' | 'wrong' } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Giriş sesi (hazırlık ekranında)
@@ -178,6 +224,7 @@ export default function Yonerge7({
     setCurrentIndex(0);
     setScore(0);
     setLocked(false);
+    setTapFeedback(null);
     if (mode === 'digital') {
       prepareDigitalOptions(trials[0], trials);
     }
@@ -195,15 +242,19 @@ export default function Yonerge7({
     return false;
   }, []);
 
+  /** Öğretmen değerlendirmesi — ses yok (aferin/tekrar dene çalınmaz) */
   const handleAssess = (correct: boolean) => {
     if (locked) return;
     const newScore = score + (correct ? 1 : 0);
     const next = currentIndex + 1;
     setScore(newScore);
+    // Değerlendirme: olumlu/olumsuz ses YOK
+    playAssessmentTransition();
     if (finishIfNeeded(newScore, next)) return;
     setCurrentIndex(next);
   };
 
+  /** Dijital değerlendirme — ses yok, sadece kısa görsel geri bildirim */
   const handleDigitalTap = (item: NesneDef) => {
     if (locked || phase !== 'digital') return;
     setLocked(true);
@@ -213,13 +264,18 @@ export default function Yonerge7({
     const next = currentIndex + 1;
     setScore(newScore);
 
+    // Görsel geri bildirim (ses yok)
+    setTapFeedback({ id: item.id, type: correct ? 'correct' : 'wrong' });
     // Değerlendirme: aferin / tekrar dene YOK
+    playAssessmentTransition();
+
     setTimeout(() => {
+      setTapFeedback(null);
       if (finishIfNeeded(newScore, next)) return;
       setCurrentIndex(next);
       prepareDigitalOptions(trialTargets[next], trialTargets);
       setLocked(false);
-    }, 600);
+    }, 700);
   };
 
   const currentTarget = trialTargets[currentIndex];
@@ -330,6 +386,7 @@ export default function Yonerge7({
                   key={item.id}
                   item={item}
                   large
+                  feedback={tapFeedback?.id === item.id ? tapFeedback.type : null}
                   onClick={() => handleDigitalTap(item)}
                 />
               ))}
