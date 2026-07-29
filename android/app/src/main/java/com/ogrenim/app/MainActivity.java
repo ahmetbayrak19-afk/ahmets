@@ -1,6 +1,7 @@
 package com.ogrenim.app;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -12,6 +13,7 @@ import android.nfc.Tag;
 import android.os.Build;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
+import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
@@ -20,7 +22,6 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
-import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -33,6 +34,8 @@ import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
+
+    private static final String TAG = "MainActivity";
 
     private WebView webView;
     private NfcAdapter nfcAdapter;
@@ -80,7 +83,6 @@ public class MainActivity extends AppCompatActivity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
-
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
 
@@ -138,18 +140,23 @@ public class MainActivity extends AppCompatActivity {
             }
         }, "AndroidTTS");
 
-        // 🔒 Orientation lock bridge (sayfa özel – sadece kavram gösterme/söyleme için)
+        // 🔒 Orientation lock bridge – güçlü kilit
         webView.addJavascriptInterface(new Object() {
             @JavascriptInterface
+            @SuppressLint("SourceLockedOrientationActivity")
             public void lockOrientation(String orientation) {
                 runOnUiThread(() -> {
                     if (orientation == null) return;
-                    switch (orientation.toLowerCase()) {
+                    String o = orientation.toLowerCase().trim();
+                    Log.d(TAG, "lockOrientation called: " + o);
+                    switch (o) {
                         case "portrait":
-                            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                            // Sensor portrait = dikey sabit, 180 derece ters çevrilmez
+                            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
                             break;
                         case "landscape":
-                            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+                            // Sensor landscape = yatay sabit
+                            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
                             break;
                         case "unlock":
                         case "any":
