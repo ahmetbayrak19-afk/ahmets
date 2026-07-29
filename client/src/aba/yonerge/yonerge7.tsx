@@ -27,8 +27,49 @@ import atletImg from '@/clothes/atlet.jpg';
 // --- GİRİŞ SESİ ---
 import girisSes from './sesgorsel/yonerge31giris.mp3';
 
-// --- ÇALIŞMA MODU İÇİN SESLER (esle/ses) ---
-// Değerlendirmede ÇALINMAZ. Çalışma modunda olumlu/olumsuz geri bildirim için kullanılır.
+// --- DİJİTAL YÖNERGE SESLERİ ("X'i göster") ---
+import topugoster from './sesgorsel/topugoster.mp3';
+import kalemigoster from './sesgorsel/kalemigoster.mp3';
+import kitabıgoster from './sesgorsel/kitabıgoster.mp3';
+import anahtarigoster from './sesgorsel/anahtarigoster.mp3';
+import arabayigoster from './sesgorsel/arabayigoster.mp3';
+import elmayigoster from './sesgorsel/elmayigoster.mp3';
+import cicegigoster from './sesgorsel/cicegigoster.mp3';
+import corabigoster from './sesgorsel/corabigoster.mp3';
+import saatigoster from './sesgorsel/saatigoster.mp3';
+import silgiyigoster from './sesgorsel/silgiyigoster.mp3';
+import defterigoster from './sesgorsel/defterigoster.mp3';
+import cantayigoster from './sesgorsel/cantayigoster.mp3';
+import taragigoster from './sesgorsel/taragigoster.mp3';
+import bebegigoster from './sesgorsel/bebegigoster.mp3';
+import bardagigoster from './sesgorsel/bardagigoster.mp3';
+import kasigigoster from './sesgorsel/kasigigoster.mp3';
+import makasigoster from './sesgorsel/makasigoster.mp3';
+import cetveligoster from './sesgorsel/cetveligoster.mp3';
+
+/** Nesne id → dijital "göster" sesi */
+const INSTRUCTION_SOUNDS: Record<string, string> = {
+  top: topugoster,
+  kalem: kalemigoster,
+  kitap: kitabıgoster,
+  anahtar: anahtarigoster,
+  araba: arabayigoster,
+  elma: elmayigoster,
+  cicek: cicegigoster,
+  corap: corabigoster,
+  saat: saatigoster,
+  silgi: silgiyigoster,
+  defter: defterigoster,
+  canta: cantayigoster,
+  tarak: taragigoster,
+  bebek: bebegigoster,
+  bardak: bardagigoster,
+  kasik: kasigigoster,
+  makas: makasigoster,
+  cetvel: cetveligoster,
+};
+
+// --- ÇALIŞMA MODU SESLERİ (esle/ses) — değerlendirmede ÇALINMAZ ---
 import aferin1 from '@/aba/esle/ses/aferin1.mp3';
 import aferin2 from '@/aba/esle/ses/aferin2.mp3';
 import bravo from '@/aba/esle/ses/bravo.mp3';
@@ -38,14 +79,18 @@ import harika2 from '@/aba/esle/ses/harika2.mp3';
 import tekrardene1 from '@/aba/esle/ses/tekrardene1.mp3';
 import tekrardene2 from '@/aba/esle/ses/tekrardene2.mp3';
 
-/** Çalışma (instruction) modu için olumlu ses havuzu */
 const POSITIVE_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
-/** Çalışma (instruction) modu için olumsuz ses havuzu */
 const NEGATIVE_SOUNDS = [tekrardene1, tekrardene2];
 
-// TODO: "devam et" ve benzeri nötr geçiş sesleri yüklendiğinde buraya ekle.
-// Değerlendirme modunda deneme geçişlerinde bu sesler kullanılacak (aferin/tekrar dene YOK).
-// const DEVAM_SOUNDS: string[] = [];
+// --- DEĞERLENDİRME NÖTR GEÇİŞ SESLERİ (arada bir, rastgele) ---
+import devametNotr from '@/aba/esle/ses/devamet notr.mp3';
+import devamet2Notr from '@/aba/esle/ses/devamet2 notr.mp3';
+import simdisiradakiNotr from '@/aba/esle/ses/simdisiradaki notr.mp3';
+
+const NEUTRAL_SOUNDS = [devametNotr, devamet2Notr, simdisiradakiNotr];
+
+/** Nötr ses çalma olasılığı (~%30 — her seferinde değil, arada bir güdüleme) */
+const NEUTRAL_CHANCE = 0.3;
 
 export interface NesneDef {
   id: string;
@@ -96,12 +141,12 @@ function shuffle<T>(arr: T[]): T[] {
   return [...arr].sort(() => 0.5 - Math.random());
 }
 
-/** "Elma ver" / "Top ver" — basit yönerge metni */
+/** "Elma ver" / "Top göster" — basit yönerge metni */
 function instructionText(name: string, action: 'ver' | 'göster') {
   return `${name} ${action}`;
 }
 
-/** Çalışma modu için rastgele olumlu/olumsuz ses çal */
+/** Çalışma modu için rastgele olumlu/olumsuz ses (değerlendirmede kullanılmaz) */
 function playPracticeFeedback(correct: boolean) {
   const pool = correct ? POSITIVE_SOUNDS : NEGATIVE_SOUNDS;
   const src = pool[Math.floor(Math.random() * pool.length)];
@@ -111,11 +156,15 @@ function playPracticeFeedback(correct: boolean) {
 }
 
 /**
- * Değerlendirme modu: aferin / tekrar dene ASLA çalınmaz.
- * İleride "devam et" sesleri yüklendiğinde sadece nötr geçiş sesi kullanılabilir.
+ * Değerlendirme geçiş sesi: aferin / tekrar dene YOK.
+ * ~%30 ihtimalle nötr ses (devam et / şimdi sıradaki); çoğu zaman sessiz.
  */
 function playAssessmentTransition() {
-  // Şimdilik sessiz. DEVAM_SOUNDS eklendiğinde buradan rastgele çal.
+  if (Math.random() > NEUTRAL_CHANCE) return; // sessiz geç
+  const src = NEUTRAL_SOUNDS[Math.floor(Math.random() * NEUTRAL_SOUNDS.length)];
+  const a = new Audio(src);
+  a.volume = 1;
+  a.play().catch(() => {});
 }
 
 function NesneCard({
@@ -178,6 +227,7 @@ export default function Yonerge7({
   const [locked, setLocked] = useState(false);
   const [tapFeedback, setTapFeedback] = useState<{ id: string; type: 'correct' | 'wrong' } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const instructionAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Giriş sesi (hazırlık ekranında)
   useEffect(() => {
@@ -192,10 +242,43 @@ export default function Yonerge7({
     };
   }, [phase]);
 
+  // Dijital mod: her yeni hedefte yönerge sesi çal ("Topu göster" vb.)
+  useEffect(() => {
+    if (phase !== 'digital') return;
+    const target = trialTargets[currentIndex];
+    if (!target) return;
+
+    // Önceki yönerge sesini durdur
+    if (instructionAudioRef.current) {
+      instructionAudioRef.current.pause();
+      instructionAudioRef.current.currentTime = 0;
+    }
+
+    const src = INSTRUCTION_SOUNDS[target.id];
+    if (!src) return; // sesi olmayan nesne (terlik, şapka vb.) — sessiz
+
+    const a = new Audio(src);
+    instructionAudioRef.current = a;
+    a.volume = 1;
+    a.play().catch(() => {});
+
+    return () => {
+      a.pause();
+      a.currentTime = 0;
+    };
+  }, [phase, currentIndex, trialTargets]);
+
   const stopIntro = () => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+    }
+  };
+
+  const stopInstruction = () => {
+    if (instructionAudioRef.current) {
+      instructionAudioRef.current.pause();
+      instructionAudioRef.current.currentTime = 0;
     }
   };
 
@@ -242,31 +325,29 @@ export default function Yonerge7({
     return false;
   }, []);
 
-  /** Öğretmen değerlendirmesi — ses yok (aferin/tekrar dene çalınmaz) */
+  /** Öğretmen değerlendirmesi — aferin/tekrar dene yok; arada bir nötr ses */
   const handleAssess = (correct: boolean) => {
     if (locked) return;
     const newScore = score + (correct ? 1 : 0);
     const next = currentIndex + 1;
     setScore(newScore);
-    // Değerlendirme: olumlu/olumsuz ses YOK
     playAssessmentTransition();
     if (finishIfNeeded(newScore, next)) return;
     setCurrentIndex(next);
   };
 
-  /** Dijital değerlendirme — ses yok, sadece kısa görsel geri bildirim */
+  /** Dijital değerlendirme — yönerge sesi var, övgü yok; arada bir nötr + görsel feedback */
   const handleDigitalTap = (item: NesneDef) => {
     if (locked || phase !== 'digital') return;
     setLocked(true);
+    stopInstruction();
     const target = trialTargets[currentIndex];
     const correct = item.id === target.id;
     const newScore = score + (correct ? 1 : 0);
     const next = currentIndex + 1;
     setScore(newScore);
 
-    // Görsel geri bildirim (ses yok)
     setTapFeedback({ id: item.id, type: correct ? 'correct' : 'wrong' });
-    // Değerlendirme: aferin / tekrar dene YOK
     playAssessmentTransition();
 
     setTimeout(() => {
@@ -287,6 +368,7 @@ export default function Yonerge7({
         <button
           onClick={() => {
             stopIntro();
+            stopInstruction();
             onClose();
           }}
           className="p-2 landscape:p-1.5 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
@@ -392,7 +474,7 @@ export default function Yonerge7({
               ))}
             </div>
             <p className="text-slate-500 text-xs mt-4 text-center">
-              Değerlendirme modu — sesli övgü yok. Doğru nesneye dokunun.
+              Değerlendirme — övgü sesi yok. Doğru nesneye dokunun.
             </p>
           </div>
         )}
@@ -431,7 +513,7 @@ export default function Yonerge7({
         )}
       </div>
 
-      {/* ALT — sadece öğretmen modu (Geç yok) */}
+      {/* ALT — sadece öğretmen modu */}
       {phase === 'teacher' && (
         <div className="shrink-0 p-5 pb-8 landscape:py-3 landscape:pb-4 bg-slate-900 border-t border-slate-800 flex items-stretch justify-center gap-3 relative z-10">
           <button
