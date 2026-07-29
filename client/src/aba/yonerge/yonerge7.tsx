@@ -16,18 +16,11 @@ import defterImg from '@/aba/Alici/dedektif/defter.png';
 import cantaImg from '@/aba/Alici/dedektif/canta.png';
 import tarakImg from '@/aba/esle/grup/evesya/tarak.png';
 import corapImg from '@/clothes/corap.jpg';
-import terlikImg from '@/clothes/terlik.png';
-import eldivenImg from '@/clothes/eldiven.png';
-import ayakkabiImg from '@/clothes/ayakkabi.jpg';
-import sapkaImg from '@/clothes/sapka.jpg';
-import kemerImg from '@/clothes/kemer.png';
-import tshirtImg from '@/clothes/tshirt.jpg';
-import atletImg from '@/clothes/atlet.jpg';
 
 // --- GİRİŞ SESİ ---
 import girisSes from './sesgorsel/yonerge31giris.mp3';
 
-// --- DİJİTAL YÖNERGE SESLERİ ("X'i göster") ---
+// --- DİJİTAL YÖNERGE SESLERİ ("X'i göster") — hepsi mevcut ---
 import topugoster from './sesgorsel/topugoster.mp3';
 import kalemigoster from './sesgorsel/kalemigoster.mp3';
 import kitabıgoster from './sesgorsel/kitabıgoster.mp3';
@@ -46,8 +39,15 @@ import bardagigoster from './sesgorsel/bardagigoster.mp3';
 import kasigigoster from './sesgorsel/kasigigoster.mp3';
 import makasigoster from './sesgorsel/makasigoster.mp3';
 import cetveligoster from './sesgorsel/cetveligoster.mp3';
+import boyayigoster from './sesgorsel/boyayigoster.mp3';
+import fircayigoster from './sesgorsel/fircayigoster.mp3';
+import kalemtrasigoster from './sesgorsel/kalemtrasigoster.mp3';
+import mendiligoster from './sesgorsel/mendiligoster.mp3';
+import sungerigoster from './sesgorsel/sungerigoster.mp3';
+import yapistiriciyigoster from './sesgorsel/yapistiriciyigoster.mp3';
+import ziligoster from './sesgorsel/ziligoster.mp3';
 
-/** Nesne id → dijital "göster" sesi */
+/** Nesne id → dijital "göster" sesi (havuzdaki her nesnenin sesi var) */
 const INSTRUCTION_SOUNDS: Record<string, string> = {
   top: topugoster,
   kalem: kalemigoster,
@@ -67,6 +67,13 @@ const INSTRUCTION_SOUNDS: Record<string, string> = {
   kasik: kasigigoster,
   makas: makasigoster,
   cetvel: cetveligoster,
+  boya: boyayigoster,
+  firca: fircayigoster,
+  kalemtras: kalemtrasigoster,
+  mendil: mendiligoster,
+  sunger: sungerigoster,
+  yapistirici: yapistiriciyigoster,
+  zil: ziligoster,
 };
 
 // --- ÇALIŞMA MODU SESLERİ (esle/ses) — değerlendirmede ÇALINMAZ ---
@@ -89,7 +96,7 @@ import simdisiradakiNotr from '@/aba/esle/ses/simdisiradaki notr.mp3';
 
 const NEUTRAL_SOUNDS = [devametNotr, devamet2Notr, simdisiradakiNotr];
 
-/** Nötr ses çalma olasılığı (~%30 — her seferinde değil, arada bir güdüleme) */
+/** Nötr ses çalma olasılığı (~%30) */
 const NEUTRAL_CHANCE = 0.3;
 
 export interface NesneDef {
@@ -99,7 +106,11 @@ export interface NesneDef {
   emoji?: string;
 }
 
-/** 25 farklı, sınıfta bulunabilir nesne */
+/**
+ * 25 nesne — hepsinin "göster" sesi var.
+ * Sesi olmayan nesneler havuza alınmaz (metinde de geçmez).
+ * Görseli olmayanlar emoji ile gösterilir; dijitalde yine bu 25 arasından sorulur.
+ */
 const OBJECT_POOL: NesneDef[] = [
   { id: 'top', name: 'Top', img: topImg },
   { id: 'kalem', name: 'Kalem', img: kalemImg },
@@ -114,18 +125,18 @@ const OBJECT_POOL: NesneDef[] = [
   { id: 'defter', name: 'Defter', img: defterImg },
   { id: 'canta', name: 'Çanta', img: cantaImg },
   { id: 'tarak', name: 'Tarak', img: tarakImg },
-  { id: 'terlik', name: 'Terlik', img: terlikImg },
-  { id: 'eldiven', name: 'Eldiven', img: eldivenImg },
-  { id: 'ayakkabi', name: 'Ayakkabı', img: ayakkabiImg },
-  { id: 'sapka', name: 'Şapka', img: sapkaImg },
-  { id: 'kemer', name: 'Kemer', img: kemerImg },
-  { id: 'tshirt', name: 'Tişört', img: tshirtImg },
-  { id: 'atlet', name: 'Atlet', img: atletImg },
   { id: 'bebek', name: 'Bebek', emoji: '🧸' },
   { id: 'bardak', name: 'Bardak', emoji: '🥛' },
   { id: 'kasik', name: 'Kaşık', emoji: '🥄' },
   { id: 'makas', name: 'Makas', emoji: '✂️' },
   { id: 'cetvel', name: 'Cetvel', emoji: '📏' },
+  { id: 'boya', name: 'Boya', emoji: '🎨' },
+  { id: 'firca', name: 'Fırça', emoji: '🖌️' },
+  { id: 'kalemtras', name: 'Kalemtraş', emoji: '✏️' },
+  { id: 'mendil', name: 'Mendil', emoji: '🧻' },
+  { id: 'sunger', name: 'Sünger', emoji: '🧽' },
+  { id: 'yapistirici', name: 'Yapıştırıcı', emoji: '🧴' },
+  { id: 'zil', name: 'Zil', emoji: '🔔' },
 ];
 
 interface Yonerge7Props {
@@ -141,12 +152,12 @@ function shuffle<T>(arr: T[]): T[] {
   return [...arr].sort(() => 0.5 - Math.random());
 }
 
-/** "Elma ver" / "Top göster" — basit yönerge metni */
+/** Öğretmen: "Elma ver" | Dijital: "Top göster" */
 function instructionText(name: string, action: 'ver' | 'göster') {
   return `${name} ${action}`;
 }
 
-/** Çalışma modu için rastgele olumlu/olumsuz ses (değerlendirmede kullanılmaz) */
+/** Çalışma modu için (değerlendirmede kullanılmaz) */
 function playPracticeFeedback(correct: boolean) {
   const pool = correct ? POSITIVE_SOUNDS : NEGATIVE_SOUNDS;
   const src = pool[Math.floor(Math.random() * pool.length)];
@@ -155,12 +166,9 @@ function playPracticeFeedback(correct: boolean) {
   a.play().catch(() => {});
 }
 
-/**
- * Değerlendirme geçiş sesi: aferin / tekrar dene YOK.
- * ~%30 ihtimalle nötr ses (devam et / şimdi sıradaki); çoğu zaman sessiz.
- */
+/** Değerlendirme: ~%30 nötr ses, aksi halde sessiz. Aferin/tekrar dene YOK. */
 function playAssessmentTransition() {
-  if (Math.random() > NEUTRAL_CHANCE) return; // sessiz geç
+  if (Math.random() > NEUTRAL_CHANCE) return;
   const src = NEUTRAL_SOUNDS[Math.floor(Math.random() * NEUTRAL_SOUNDS.length)];
   const a = new Audio(src);
   a.volume = 1;
@@ -229,7 +237,7 @@ export default function Yonerge7({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const instructionAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Giriş sesi (hazırlık ekranında)
+  // Giriş sesi (hazırlık)
   useEffect(() => {
     if (phase !== 'prep') return;
     const a = new Audio(girisSes);
@@ -242,20 +250,19 @@ export default function Yonerge7({
     };
   }, [phase]);
 
-  // Dijital mod: her yeni hedefte yönerge sesi çal ("Topu göster" vb.)
+  // Dijital: her hedefte yönerge sesi (havuzdaki her id için ses garantili)
   useEffect(() => {
     if (phase !== 'digital') return;
     const target = trialTargets[currentIndex];
     if (!target) return;
 
-    // Önceki yönerge sesini durdur
     if (instructionAudioRef.current) {
       instructionAudioRef.current.pause();
       instructionAudioRef.current.currentTime = 0;
     }
 
     const src = INSTRUCTION_SOUNDS[target.id];
-    if (!src) return; // sesi olmayan nesne (terlik, şapka vb.) — sessiz
+    if (!src) return;
 
     const a = new Audio(src);
     instructionAudioRef.current = a;
@@ -282,7 +289,6 @@ export default function Yonerge7({
     }
   };
 
-  /** Nesneyi havuzdan listede olmayan başka biriyle değiştir */
   const replaceObject = (index: number) => {
     const currentIds = new Set(selected.map((s) => s.id));
     const alternatives = OBJECT_POOL.filter((o) => !currentIds.has(o.id));
@@ -325,7 +331,6 @@ export default function Yonerge7({
     return false;
   }, []);
 
-  /** Öğretmen değerlendirmesi — aferin/tekrar dene yok; arada bir nötr ses */
   const handleAssess = (correct: boolean) => {
     if (locked) return;
     const newScore = score + (correct ? 1 : 0);
@@ -336,7 +341,6 @@ export default function Yonerge7({
     setCurrentIndex(next);
   };
 
-  /** Dijital değerlendirme — yönerge sesi var, övgü yok; arada bir nötr + görsel feedback */
   const handleDigitalTap = (item: NesneDef) => {
     if (locked || phase !== 'digital') return;
     setLocked(true);
@@ -363,7 +367,6 @@ export default function Yonerge7({
 
   return (
     <div className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none">
-      {/* ÜST BAR */}
       <div className="shrink-0 p-4 landscape:py-2 landscape:px-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md relative z-10">
         <button
           onClick={() => {
@@ -389,9 +392,7 @@ export default function Yonerge7({
         <div className="w-10 landscape:w-8" />
       </div>
 
-      {/* ORTA */}
       <div className="flex-1 relative flex flex-col items-center justify-center p-3 sm:p-4 overflow-y-auto bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-slate-950">
-        {/* ===== HAZIRLIK ===== */}
         {phase === 'prep' && (
           <div className="w-full max-w-2xl animate-in zoom-in-95 duration-300 pb-6">
             <div className="text-center mb-4">
@@ -435,7 +436,7 @@ export default function Yonerge7({
           </div>
         )}
 
-        {/* ===== ÖĞRETMEN MODU ===== */}
+        {/* Öğretmen: sadece yazı — öğretmen soruyu söyler */}
         {phase === 'teacher' && currentTarget && (
           <div className="w-full max-w-3xl flex flex-col items-center animate-in slide-in-from-right-8 duration-300">
             <div className="w-full bg-slate-800/60 border-2 border-slate-700 rounded-[2rem] p-8 md:p-12 flex flex-col items-center shadow-2xl min-h-[220px]">
@@ -456,7 +457,7 @@ export default function Yonerge7({
           </div>
         )}
 
-        {/* ===== DİJİTAL MOD ===== */}
+        {/* Dijital: ses + yazı; seçenekler yine bu 25 arasından */}
         {phase === 'digital' && currentTarget && (
           <div className="w-full max-w-lg flex flex-col items-center animate-in fade-in duration-300">
             <p className="text-blue-300 font-bold text-lg mb-4 text-center">
@@ -479,7 +480,6 @@ export default function Yonerge7({
           </div>
         )}
 
-        {/* ===== SONUÇ ===== */}
         {phase === 'result' && (
           <div className="flex flex-col items-center text-center p-8 bg-slate-900/90 rounded-3xl border border-slate-700 shadow-2xl max-w-xl animate-in zoom-in-95 duration-500">
             <Trophy
@@ -513,7 +513,6 @@ export default function Yonerge7({
         )}
       </div>
 
-      {/* ALT — sadece öğretmen modu */}
       {phase === 'teacher' && (
         <div className="shrink-0 p-5 pb-8 landscape:py-3 landscape:pb-4 bg-slate-900 border-t border-slate-800 flex items-stretch justify-center gap-3 relative z-10">
           <button
