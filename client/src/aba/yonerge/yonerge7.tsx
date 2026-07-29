@@ -180,28 +180,30 @@ function NesneCard({
   onClick,
   selected,
   large,
-  feedback,
+  highlight,
 }: {
   item: NesneDef;
   onClick?: () => void;
   selected?: boolean;
   large?: boolean;
-  feedback?: 'correct' | 'wrong' | null;
+  /** Değerlendirme: sarı vurgu — doğru/yanlış belli olmaz */
+  highlight?: boolean;
 }) {
   let borderCls = selected
     ? 'border-blue-400 ring-2 ring-blue-500/40 '
     : 'border-slate-700 hover:border-slate-500 ';
-  if (feedback === 'correct') borderCls = 'border-green-400 ring-2 ring-green-500/50 bg-green-900/30 ';
-  if (feedback === 'wrong') borderCls = 'border-red-400 ring-2 ring-red-500/50 bg-red-900/30 ';
+  if (highlight) {
+    borderCls = 'border-yellow-400 ring-2 ring-yellow-500/50 bg-yellow-900/25 ';
+  }
 
   return (
     <button
       type="button"
       onClick={onClick}
       className={
-        `flex flex-col items-center justify-center rounded-2xl border-2 bg-slate-800/80 transition-all active:scale-95 overflow-hidden ` +
+        `flex flex-col items-center justify-center rounded-2xl border-2 bg-slate-800/80 transition-all active:scale-95 overflow-hidden w-full h-full ` +
         borderCls +
-        (large ? 'p-3 min-h-[110px]' : 'p-2 min-h-[90px]') +
+        (large ? 'p-3 sm:p-4' : 'p-2') +
         (onClick ? 'cursor-pointer' : 'cursor-default')
       }
     >
@@ -209,13 +211,33 @@ function NesneCard({
         <img
           src={item.img}
           alt={item.name}
-          className={large ? 'w-16 h-16 object-contain mb-1' : 'w-12 h-12 object-contain mb-1'}
+          className={
+            large
+              ? 'w-20 h-20 sm:w-24 sm:h-24 landscape:w-16 landscape:h-16 object-contain mb-1.5'
+              : 'w-12 h-12 object-contain mb-1'
+          }
           draggable={false}
         />
       ) : (
-        <span className={large ? 'text-4xl mb-1' : 'text-3xl mb-1'}>{item.emoji || '📦'}</span>
+        <span
+          className={
+            large
+              ? 'text-5xl sm:text-6xl landscape:text-4xl mb-1.5'
+              : 'text-3xl mb-1'
+          }
+        >
+          {item.emoji || '📦'}
+        </span>
       )}
-      <span className="text-[11px] font-bold text-slate-200 text-center leading-tight">{item.name}</span>
+      <span
+        className={
+          large
+            ? 'text-sm sm:text-base landscape:text-xs font-bold text-slate-200 text-center leading-tight'
+            : 'text-[11px] font-bold text-slate-200 text-center leading-tight'
+        }
+      >
+        {item.name}
+      </span>
     </button>
   );
 }
@@ -233,7 +255,8 @@ export default function Yonerge7({
   const [score, setScore] = useState(0);
   const [digitalOptions, setDigitalOptions] = useState<NesneDef[]>([]);
   const [locked, setLocked] = useState(false);
-  const [tapFeedback, setTapFeedback] = useState<{ id: string; type: 'correct' | 'wrong' } | null>(null);
+  /** Sadece dokunulan kart id — sarı vurgu, doğru/yanlış yok */
+  const [tappedId, setTappedId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const instructionAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -250,7 +273,7 @@ export default function Yonerge7({
     };
   }, [phase]);
 
-  // Dijital: her hedefte yönerge sesi (havuzdaki her id için ses garantili)
+  // Dijital: her hedefte yönerge sesi
   useEffect(() => {
     if (phase !== 'digital') return;
     const target = trialTargets[currentIndex];
@@ -313,7 +336,7 @@ export default function Yonerge7({
     setCurrentIndex(0);
     setScore(0);
     setLocked(false);
-    setTapFeedback(null);
+    setTappedId(null);
     if (mode === 'digital') {
       prepareDigitalOptions(trials[0], trials);
     }
@@ -351,11 +374,12 @@ export default function Yonerge7({
     const next = currentIndex + 1;
     setScore(newScore);
 
-    setTapFeedback({ id: item.id, type: correct ? 'correct' : 'wrong' });
+    // Sarı vurgu — doğru/yanlış belli olmaz
+    setTappedId(item.id);
     playAssessmentTransition();
 
     setTimeout(() => {
-      setTapFeedback(null);
+      setTappedId(null);
       if (finishIfNeeded(newScore, next)) return;
       setCurrentIndex(next);
       prepareDigitalOptions(trialTargets[next], trialTargets);
@@ -457,24 +481,29 @@ export default function Yonerge7({
           </div>
         )}
 
-        {/* Dijital: ses + yazı; seçenekler yine bu 25 arasından */}
+        {/* Dijital: dikey 2x3, yatay 3x2 — büyük kartlar; sarı vurgu */}
         {phase === 'digital' && currentTarget && (
-          <div className="w-full max-w-lg flex flex-col items-center animate-in fade-in duration-300">
-            <p className="text-blue-300 font-bold text-lg mb-4 text-center">
+          <div className="w-full max-w-md landscape:max-w-2xl flex-1 flex flex-col items-center justify-center animate-in fade-in duration-300 min-h-0 py-2">
+            <p className="text-blue-300 font-bold text-xl sm:text-2xl landscape:text-lg mb-3 landscape:mb-2 text-center shrink-0">
               {instructionText(currentTarget.name, 'göster')}
             </p>
-            <div className="grid grid-cols-3 gap-3 w-full">
+            {/*
+              Portrait: 2 kolon × 3 satır
+              Landscape: 3 kolon × 2 satır
+            */}
+            <div className="grid grid-cols-2 landscape:grid-cols-3 gap-3 landscape:gap-4 w-full flex-1 max-h-[70dvh] landscape:max-h-[60dvh] content-stretch">
               {digitalOptions.map((item) => (
-                <NesneCard
-                  key={item.id}
-                  item={item}
-                  large
-                  feedback={tapFeedback?.id === item.id ? tapFeedback.type : null}
-                  onClick={() => handleDigitalTap(item)}
-                />
+                <div key={item.id} className="min-h-[120px] landscape:min-h-[100px]">
+                  <NesneCard
+                    item={item}
+                    large
+                    highlight={tappedId === item.id}
+                    onClick={() => handleDigitalTap(item)}
+                  />
+                </div>
               ))}
             </div>
-            <p className="text-slate-500 text-xs mt-4 text-center">
+            <p className="text-slate-500 text-xs mt-3 landscape:mt-2 text-center shrink-0">
               Değerlendirme — övgü sesi yok. Doğru nesneye dokunun.
             </p>
           </div>
