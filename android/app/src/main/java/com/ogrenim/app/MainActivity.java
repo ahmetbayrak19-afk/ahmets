@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.nfc.NfcAdapter;
@@ -137,6 +138,32 @@ public class MainActivity extends AppCompatActivity {
             }
         }, "AndroidTTS");
 
+        // 🔒 Orientation lock bridge (sayfa özel – sadece kavram gösterme/söyleme için)
+        webView.addJavascriptInterface(new Object() {
+            @JavascriptInterface
+            public void lockOrientation(String orientation) {
+                runOnUiThread(() -> {
+                    if (orientation == null) return;
+                    switch (orientation.toLowerCase()) {
+                        case "portrait":
+                            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                            break;
+                        case "landscape":
+                            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+                            break;
+                        case "unlock":
+                        case "any":
+                        case "unspecified":
+                            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+                            break;
+                        default:
+                            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+                            break;
+                    }
+                });
+            }
+        }, "AndroidOrientation");
+
         // 🔥 Artık file:// değil
         webView.loadUrl(
                 "https://appassets.androidplatform.net/assets/public/index.html"
@@ -212,4 +239,4 @@ public class MainActivity extends AppCompatActivity {
         }
         super.onDestroy();
     }
-                                                  }
+}
