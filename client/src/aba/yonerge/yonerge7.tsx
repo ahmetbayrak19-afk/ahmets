@@ -88,7 +88,7 @@ import tekrardene2 from '@/aba/esle/ses/tekrardene2.mp3';
 const POSITIVE_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
 const NEGATIVE_SOUNDS = [tekrardene1, tekrardene2];
 
-// --- DEĞERLENDİRME NÖTR GEÇİŞ ---
+// --- DEĞERLENDİRME NÖTR GEÇİŞ (sadece dijital) ---
 import devametNotr from '@/aba/esle/ses/devamet notr.mp3';
 import devamet2Notr from '@/aba/esle/ses/devamet2 notr.mp3';
 import simdisiradakiNotr from '@/aba/esle/ses/simdisiradaki notr.mp3';
@@ -138,12 +138,6 @@ interface Yonerge7Props {
   onComplete: (success: boolean) => void;
 }
 
-/**
- * phase:
- *  - prep / teacher / digital / result → değerlendirme
- *  - practice → çalışma (eşleme 1.1 benzeri iskele)
- * sessionKind: assessment | practice (buton sonra eklenecek)
- */
 type Phase = 'prep' | 'teacher' | 'digital' | 'practice' | 'result';
 type SessionKind = 'assessment' | 'practice';
 
@@ -155,7 +149,6 @@ function instructionText(name: string, action: 'ver' | 'göster') {
   return `${name} ${action}`;
 }
 
-/** Çalışma: olumlu / olumsuz ses */
 function playPracticeFeedback(correct: boolean) {
   const pool = correct ? POSITIVE_SOUNDS : NEGATIVE_SOUNDS;
   const src = pool[Math.floor(Math.random() * pool.length)];
@@ -164,13 +157,25 @@ function playPracticeFeedback(correct: boolean) {
   a.play().catch(() => {});
 }
 
-/** Değerlendirme: ~%30 nötr, aksi sessiz */
-function playAssessmentTransition() {
-  if (Math.random() > NEUTRAL_CHANCE) return;
-  const src = NEUTRAL_SOUNDS[Math.floor(Math.random() * NEUTRAL_SOUNDS.length)];
-  const a = new Audio(src);
-  a.volume = 1;
-  a.play().catch(() => {});
+/**
+ * Nötr geçiş sesi — Promise bitince resolve.
+ * ~%30 ses çalar ve bitmesini bekler; aksi halde hemen resolve (sessiz).
+ * Böylece sonraki "topu göster" üst üste binmez.
+ */
+function playAssessmentTransition(): Promise<void> {
+  return new Promise((resolve) => {
+    if (Math.random() > NEUTRAL_CHANCE) {
+      resolve();
+      return;
+    }
+    const src = NEUTRAL_SOUNDS[Math.floor(Math.random() * NEUTRAL_SOUNDS.length)];
+    const a = new Audio(src);
+    a.volume = 1;
+    const done = () => resolve();
+    a.addEventListener('ended', done, { once: true });
+    a.addEventListener('error', done, { once: true });
+    a.play().catch(done);
+  });
 }
 
 function NesneCard({
@@ -188,13 +193,9 @@ function NesneCard({
   onClick?: () => void;
   selected?: boolean;
   large?: boolean;
-  /** Değerlendirme: sarı (doğru/yanlış belli değil) */
   highlight?: boolean;
-  /** Çalışma 2. yanlış: yanlışlar silik + basılamaz */
   dimmed?: boolean;
-  /** Çalışma 1. yanlış: doğru nesneyi büyüt-küçült */
   pulse?: boolean;
-  /** Çalışma doğru: yeşil flash */
   successFlash?: boolean;
   disabled?: boolean;
 }) {
@@ -210,31 +211,29 @@ function NesneCard({
       type="button"
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
+      aria-label={item.name}
       className={
         `flex flex-col items-center justify-center rounded-2xl border-2 bg-slate-800/80 overflow-hidden w-full h-full ` +
         borderCls +
-        (large ? 'p-3 sm:p-4' : 'p-2') +
+        (large ? 'p-2 sm:p-3' : 'p-2') +
         (disabled || dimmed ? 'cursor-not-allowed ' : onClick ? 'cursor-pointer active:scale-95 ' : 'cursor-default ') +
         (dimmed ? 'opacity-30 ' : '') +
-        (pulse ? 'animate-[pulse-scale_1.2s_ease-in-out_2] ' : '') +
         'transition-all duration-300'
       }
       style={
         pulse
-          ? {
-              animation: 'yonerge-pulse-scale 1.2s ease-in-out 2',
-            }
+          ? { animation: 'yonerge-pulse-scale 1.2s ease-in-out 2' }
           : undefined
       }
     >
       {item.img ? (
         <img
           src={item.img}
-          alt={item.name}
+          alt=""
           className={
             large
-              ? 'w-20 h-20 sm:w-24 sm:h-24 landscape:w-16 landscape:h-16 object-contain mb-1.5'
-              : 'w-12 h-12 object-contain mb-1'
+              ? 'w-[85%] h-[85%] max-w-[140px] max-h-[140px] landscape:max-w-[100px] landscape:max-h-[100px] object-contain'
+              : 'w-14 h-14 object-contain'
           }
           draggable={false}
         />
@@ -242,22 +241,14 @@ function NesneCard({
         <span
           className={
             large
-              ? 'text-5xl sm:text-6xl landscape:text-4xl mb-1.5'
-              : 'text-3xl mb-1'
+              ? 'text-6xl sm:text-7xl landscape:text-5xl'
+              : 'text-4xl'
           }
         >
           {item.emoji || '📦'}
         </span>
       )}
-      <span
-        className={
-          large
-            ? 'text-sm sm:text-base landscape:text-xs font-bold text-slate-200 text-center leading-tight'
-            : 'text-[11px] font-bold text-slate-200 text-center leading-tight'
-        }
-      >
-        {item.name}
-      </span>
+      {/* İsim yazılmaz — sadece görsel/emoji */}
     </button>
   );
 }
@@ -278,15 +269,16 @@ export default function Yonerge7({
   const [locked, setLocked] = useState(false);
   const [tappedId, setTappedId] = useState<string | null>(null);
 
-  // Çalışma iskelesi (eşleme 1.1)
   const [practiceMistakeCount, setPracticeMistakeCount] = useState(0);
   const [pulseCorrect, setPulseCorrect] = useState(false);
   const [successId, setSuccessId] = useState<string | null>(null);
 
+  /** Yönerge sesinin çalmasını engelle (nötr ses bitene kadar) */
+  const skipInstructionRef = useRef(false);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const instructionAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Pulse animasyonu için keyframes (bir kez inject)
   useEffect(() => {
     const id = 'yonerge7-pulse-style';
     if (document.getElementById(id)) return;
@@ -314,9 +306,11 @@ export default function Yonerge7({
     };
   }, [phase]);
 
-  // Dijital + çalışma: yönerge sesi
+  // Dijital + çalışma: yönerge sesi (nötr ses bitmeden çalmaz)
   useEffect(() => {
     if (phase !== 'digital' && phase !== 'practice') return;
+    if (skipInstructionRef.current) return;
+
     const target = trialTargets[currentIndex];
     if (!target) return;
 
@@ -376,13 +370,9 @@ export default function Yonerge7({
     setSuccessId(null);
   };
 
-  /**
-   * mode:
-   *  - teacher | digital → değerlendirme
-   *  - practice → çalışma (buton sonra eklenecek; startSession('practice') hazır)
-   */
   const startSession = (mode: 'teacher' | 'digital' | 'practice') => {
     stopIntro();
+    skipInstructionRef.current = false;
     const trials = shuffle(selected);
     setTrialTargets(trials);
     setCurrentIndex(0);
@@ -415,50 +405,56 @@ export default function Yonerge7({
     return false;
   }, []);
 
+  /** Öğretmen — nötr ses YOK; öğretmen kendisi söyler */
   const handleAssess = (correct: boolean) => {
     if (locked) return;
     const newScore = score + (correct ? 1 : 0);
     const next = currentIndex + 1;
     setScore(newScore);
-    playAssessmentTransition();
     if (finishIfNeeded(newScore, next)) return;
     setCurrentIndex(next);
   };
 
-  /** Değerlendirme dijital — sarı, sessiz övgü yok */
-  const handleDigitalTap = (item: NesneDef) => {
+  /**
+   * Dijital değerlendirme:
+   * 1) yönerge sesini kes
+   * 2) sarı vurgu
+   * 3) arada nötr ses (bitene kadar bekle) — üst üste binmesin
+   * 4) sonraki ekran + yeni yönerge sesi
+   */
+  const handleDigitalTap = async (item: NesneDef) => {
     if (locked || phase !== 'digital') return;
     setLocked(true);
     stopInstruction();
+    skipInstructionRef.current = true; // nötr bitene kadar yeni yönerge çalma
+
     const target = trialTargets[currentIndex];
     const correct = item.id === target.id;
     const newScore = score + (correct ? 1 : 0);
     const next = currentIndex + 1;
     setScore(newScore);
     setTappedId(item.id);
-    playAssessmentTransition();
 
-    setTimeout(() => {
-      setTappedId(null);
-      if (finishIfNeeded(newScore, next)) return;
-      setCurrentIndex(next);
-      prepareDigitalOptions(trialTargets[next], trialTargets);
-      setLocked(false);
-    }, 700);
+    await playAssessmentTransition();
+
+    setTappedId(null);
+    if (finishIfNeeded(newScore, next)) {
+      skipInstructionRef.current = false;
+      return;
+    }
+
+    // Önce seçenekleri hazırla, sonra index — useEffect yönergeyi çalsın
+    prepareDigitalOptions(trialTargets[next], trialTargets);
+    skipInstructionRef.current = false;
+    setCurrentIndex(next);
+    setLocked(false);
   };
 
-  /**
-   * Çalışma dijital — eşleme 1.1 iskelesi:
-   *  doğru → yeşil + olumlu ses → sonraki
-   *  1. yanlış → olumsuz ses + doğru nesneyi pulse (büyüt-küçült)
-   *  2. yanlış → yanlışları silikleştir + kilitle; sadece doğru basılır
-   */
   const handlePracticeTap = (item: NesneDef) => {
     if (locked || phase !== 'practice') return;
     const target = trialTargets[currentIndex];
     const isCorrect = item.id === target.id;
 
-    // 2+ yanlış sonrası yanlışlara basılamaz
     if (practiceMistakeCount >= 2 && !isCorrect) return;
 
     if (isCorrect) {
@@ -481,7 +477,6 @@ export default function Yonerge7({
       return;
     }
 
-    // Yanlış
     playPracticeFeedback(false);
     const newMistake = practiceMistakeCount + 1;
     setPracticeMistakeCount(newMistake);
@@ -490,7 +485,6 @@ export default function Yonerge7({
       setPulseCorrect(true);
       setTimeout(() => setPulseCorrect(false), 2400);
     }
-    // newMistake >= 2 → dimmed + disabled yanlışlar (render'da)
   };
 
   const currentTarget = trialTargets[currentIndex];
@@ -543,7 +537,7 @@ export default function Yonerge7({
 
             <div className="grid grid-cols-5 gap-2 sm:gap-3 mb-6">
               {selected.map((item, i) => (
-                <div key={`${item.id}-${i}`} className="relative">
+                <div key={`${item.id}-${i}`} className="relative aspect-square">
                   <NesneCard item={item} onClick={() => replaceObject(i)} />
                   <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-slate-700 border border-slate-500 text-[9px] flex items-center justify-center text-slate-300">
                     <RefreshCw size={10} />
@@ -552,7 +546,6 @@ export default function Yonerge7({
               ))}
             </div>
 
-            {/* Değerlendirme butonları — Çalışma butonu sonra eklenecek (startSession('practice') hazır) */}
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => startSession('teacher')}
@@ -579,26 +572,25 @@ export default function Yonerge7({
               <h1 className="text-3xl md:text-5xl font-black text-center text-white mb-6">
                 "{instructionText(currentTarget.name, 'ver')}"
               </h1>
-              <div className="w-28 h-28 rounded-2xl bg-slate-900/80 border border-slate-600 flex items-center justify-center">
+              <div className="w-36 h-36 rounded-2xl bg-slate-900/80 border border-slate-600 flex items-center justify-center">
                 {currentTarget.img ? (
-                  <img src={currentTarget.img} alt={currentTarget.name} className="w-20 h-20 object-contain" />
+                  <img src={currentTarget.img} alt="" className="w-28 h-28 object-contain" />
                 ) : (
-                  <span className="text-5xl">{currentTarget.emoji}</span>
+                  <span className="text-6xl">{currentTarget.emoji}</span>
                 )}
               </div>
             </div>
           </div>
         )}
 
-        {/* Değerlendirme dijital */}
         {phase === 'digital' && currentTarget && (
           <div className="w-full max-w-md landscape:max-w-2xl flex-1 flex flex-col items-center justify-center animate-in fade-in duration-300 min-h-0 py-2">
             <p className="text-blue-300 font-bold text-xl sm:text-2xl landscape:text-lg mb-3 landscape:mb-2 text-center shrink-0">
               {instructionText(currentTarget.name, 'göster')}
             </p>
-            <div className="grid grid-cols-2 landscape:grid-cols-3 gap-3 landscape:gap-4 w-full flex-1 max-h-[70dvh] landscape:max-h-[60dvh] content-stretch">
+            <div className="grid grid-cols-2 landscape:grid-cols-3 gap-3 landscape:gap-4 w-full flex-1 max-h-[72dvh] landscape:max-h-[62dvh] content-stretch">
               {digitalOptions.map((item) => (
-                <div key={item.id} className="min-h-[120px] landscape:min-h-[100px]">
+                <div key={item.id} className="min-h-[130px] landscape:min-h-[110px]">
                   <NesneCard
                     item={item}
                     large
@@ -614,18 +606,17 @@ export default function Yonerge7({
           </div>
         )}
 
-        {/* Çalışma modu — iskele + sesler */}
         {phase === 'practice' && currentTarget && (
           <div className="w-full max-w-md landscape:max-w-2xl flex-1 flex flex-col items-center justify-center animate-in fade-in duration-300 min-h-0 py-2">
             <p className="text-purple-300 font-bold text-xl sm:text-2xl landscape:text-lg mb-3 landscape:mb-2 text-center shrink-0">
               {instructionText(currentTarget.name, 'göster')}
             </p>
-            <div className="grid grid-cols-2 landscape:grid-cols-3 gap-3 landscape:gap-4 w-full flex-1 max-h-[70dvh] landscape:max-h-[60dvh] content-stretch">
+            <div className="grid grid-cols-2 landscape:grid-cols-3 gap-3 landscape:gap-4 w-full flex-1 max-h-[72dvh] landscape:max-h-[62dvh] content-stretch">
               {digitalOptions.map((item) => {
                 const isTarget = item.id === currentTarget.id;
                 const dimmed = lockWrongOptions && !isTarget;
                 return (
-                  <div key={item.id} className="min-h-[120px] landscape:min-h-[100px]">
+                  <div key={item.id} className="min-h-[130px] landscape:min-h-[110px]">
                     <NesneCard
                       item={item}
                       large
