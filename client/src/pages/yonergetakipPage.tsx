@@ -7,13 +7,13 @@ import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 
-// 🔥 TÜM YÖNERGE BİLEŞENLERİ
 import Yonerge1 from '@/aba/yonerge/yonerge1';
 import Yonerge2 from '@/aba/yonerge/yonerge2';
 import Yonerge3 from '@/aba/yonerge/yonerge3';
 import Yonerge4 from '@/aba/yonerge/yonerge4';
 import Yonerge5 from '@/aba/yonerge/yonerge5';
 import Yonerge6 from '@/aba/yonerge/yonerge6';
+import Yonerge7 from '@/aba/yonerge/yonerge7';
 
 interface YonergeTakipPageProps {
   studentId: string;
@@ -58,9 +58,9 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
   };
 
   const setStatus = (itemCode: string, status: boolean) => {
-    setFormData(prev => ({ 
-        ...prev, 
-        [itemCode]: prev[itemCode] === status ? null : status 
+    setFormData(prev => ({
+        ...prev,
+        [itemCode]: prev[itemCode] === status ? null : status
     }));
   };
 
@@ -88,7 +88,6 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
 
-  // === YÖNERGE BİLEŞENİ SEÇİMİ ===
   if (activeItem) {
     const firstSpaceIndex = activeItem.indexOf(' ');
     const code = activeItem.substring(0, firstSpaceIndex);
@@ -111,6 +110,9 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
     }
     if (activeItem.includes("2.4")) {
         return <Yonerge6 itemCode={code} itemText={text} onClose={() => setActiveItem(null)} onComplete={handleSessionSave} />;
+    }
+    if (activeItem.includes("3.1")) {
+        return <Yonerge7 itemCode={code} itemText={text} onClose={() => setActiveItem(null)} onComplete={handleSessionSave} />;
     }
   }
 
@@ -143,22 +145,22 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
             const code = item.substring(0, firstSpaceIndex);
             const text = item.substring(firstSpaceIndex + 1);
             const isCompleted = status === true;
-            
-            // Hangi maddelerde DEĞERLENDİR butonu çıkacak
-            const hasTest = 
-                item.includes("1.1") || 
-                item.includes("1.2") || 
-                item.includes("2.1") || 
-                item.includes("2.2") || 
-                item.includes("2.3") || 
-                item.includes("2.4");
+
+            const hasTest =
+                item.includes("1.1") ||
+                item.includes("1.2") ||
+                item.includes("2.1") ||
+                item.includes("2.2") ||
+                item.includes("2.3") ||
+                item.includes("2.4") ||
+                item.includes("3.1");
 
             return (
-                <div key={item} className={twMerge("group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4", 
+                <div key={item} className={twMerge("group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4",
                     isCompleted ? "bg-green-950/10 border-green-500/20" : "bg-slate-900/40 border-slate-800 hover:bg-slate-800 hover:border-slate-700")}>
-                    
+
                     <div className="flex items-start gap-4 flex-1">
-                        <div className={twMerge("min-w-[48px] h-10 rounded-lg flex items-center justify-center text-[10px] font-bold font-mono border mt-0.5 px-1 text-center", 
+                        <div className={twMerge("min-w-[48px] h-10 rounded-lg flex items-center justify-center text-[10px] font-bold font-mono border mt-0.5 px-1 text-center",
                             isCompleted ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-700 text-slate-500")}>
                             {isCompleted ? <Trophy size={18} /> : code}
                         </div>
@@ -169,20 +171,20 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
 
                     <div className="flex items-center gap-2 self-end sm:self-center">
                         {hasTest && (
-                            <button 
-                                onClick={() => setActiveItem(item)} 
+                            <button
+                                onClick={() => setActiveItem(item)}
                                 className="h-9 px-3 mr-2 rounded-lg bg-blue-600/90 text-white text-[10px] font-bold flex items-center gap-1.5 hover:bg-blue-500 border border-blue-400 shadow-sm transition-transform active:scale-95"
                             >
                                 <ClipboardCheck size={16} /> <span className="hidden sm:inline">DEĞERLENDİR</span>
                             </button>
                         )}
 
-                        <button onClick={() => setStatus(item, false)} className={twMerge("flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95", 
+                        <button onClick={() => setStatus(item, false)} className={twMerge("flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
                             status === false ? "bg-red-500/20 border-red-500 text-red-400" : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-red-400")}>
                             <XCircle size={18} />
                         </button>
 
-                        <button onClick={() => setStatus(item, true)} className={twMerge("flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95", 
+                        <button onClick={() => setStatus(item, true)} className={twMerge("flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
                             status === true ? "bg-green-500/20 border-green-500 text-green-400 shadow-[0_0_10px_rgba(34,197,94,0.1)]" : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-green-400 hover:border-green-500/50")}>
                             <CheckCircle2 size={18} />
                         </button>
@@ -193,4 +195,4 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
       </div>
     </div>
   );
-      }
+}
