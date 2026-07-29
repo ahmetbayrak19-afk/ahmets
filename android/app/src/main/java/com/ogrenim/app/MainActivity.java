@@ -44,6 +44,27 @@ public class MainActivity extends AppCompatActivity {
     private static final int FILECHOOSER_RESULTCODE = 1;
     private static final int PERMISSION_REQUEST_CODE = 1001;
 
+    public static class OrientationBridge {
+        private final AppCompatActivity activity;
+
+        OrientationBridge(AppCompatActivity activity) {
+            this.activity = activity;
+        }
+
+        @JavascriptInterface
+        public void lock(String mode) {
+            activity.runOnUiThread(() -> {
+                if ("landscape".equals(mode)) {
+                    activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+                } else if ("portrait".equals(mode)) {
+                    activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                } else {
+                    activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+                }
+            });
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -129,24 +150,35 @@ public class MainActivity extends AppCompatActivity {
             }
         }, "AndroidTTS");
 
-        webView.addJavascriptInterface(new Object() {
-            @JavascriptInterface
-            public void lock(String mode) {
-                runOnUiThread(() -> {
-                    if ("landscape".equals(mode)) {
-                        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-                    } else if ("portrait".equals(mode)) {
-                        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-                    } else {
-                        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
-                    }
-                });
-            }
-        }, "AndroidOrientation");
+        webView.addJavascriptInterface(new OrientationBridge(this), "AndroidOrientation");
 
         webView.loadUrl(
                 "https://appassets.androidplatform.net/assets/public/index.html"
         );
+    }
+
+    public static class OrientationBridge {
+        private final AppCompatActivity activity;
+
+        OrientationBridge(AppCompatActivity activity) {
+            this.activity = activity;
+        }
+
+        @JavascriptInterface
+        public void lock(String mode) {
+            activity.runOnUiThread(() -> {
+                if ("landscape".equals(mode)) {
+                    activity.setRequestedOrientation(
+                            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+                } else if ("portrait".equals(mode)) {
+                    activity.setRequestedOrientation(
+                            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                } else {
+                    activity.setRequestedOrientation(
+                            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+                }
+            });
+        }
     }
 
     private void checkAndRequestPermissions() {
@@ -218,4 +250,4 @@ public class MainActivity extends AppCompatActivity {
         }
         super.onDestroy();
     }
-            }
+                                        }
