@@ -400,10 +400,14 @@ export default function KavramAssessmentPage() {
 
   const student = students.find(s => s.id === studentId);
 
-  // Ekran yönü kilitleme
+  // Ekran yönü kilitleme - native bridge öncelikli (MainActivity AndroidOrientation)
   const lockPortrait = async () => {
     try {
-      await ScreenOrientation.lock({ orientation: 'portrait' });
+      if ((window as any).AndroidOrientation) {
+        (window as any).AndroidOrientation.lockOrientation('portrait');
+      } else {
+        await ScreenOrientation.lock({ orientation: 'portrait' });
+      }
     } catch (e) {
       console.log('Portrait lock hatası:', e);
     }
@@ -411,7 +415,11 @@ export default function KavramAssessmentPage() {
 
   const lockLandscape = async () => {
     try {
-      await ScreenOrientation.lock({ orientation: 'landscape' });
+      if ((window as any).AndroidOrientation) {
+        (window as any).AndroidOrientation.lockOrientation('landscape');
+      } else {
+        await ScreenOrientation.lock({ orientation: 'landscape' });
+      }
     } catch (e) {
       console.log('Landscape lock hatası:', e);
     }
@@ -419,7 +427,11 @@ export default function KavramAssessmentPage() {
 
   const unlockOrientation = async () => {
     try {
-      await ScreenOrientation.unlock();
+      if ((window as any).AndroidOrientation) {
+        (window as any).AndroidOrientation.lockOrientation('unlock');
+      } else {
+        await ScreenOrientation.unlock();
+      }
     } catch (e) {
       console.log('Unlock hatası:', e);
     }
@@ -456,6 +468,13 @@ export default function KavramAssessmentPage() {
     };
     loadData();
   }, [studentId]);
+
+  // Sayfadan çıkınca yönü serbest bırak
+  useEffect(() => {
+    return () => {
+      unlockOrientation();
+    };
+  }, []);
 
   useEffect(() => {
     if (activeEvaluation) {
@@ -516,7 +535,11 @@ export default function KavramAssessmentPage() {
 
   // --- OYUN MOTORU ---
   const initGame = (concept: string) => {
-    setQuestionCount(0); setCorrectCount(0); setActiveGame(concept); loadNextQuestion(0, concept);
+    lockLandscape();
+    setQuestionCount(0);
+    setCorrectCount(0);
+    setActiveGame(concept);
+    loadNextQuestion(0, concept);
   };
 
   const loadNextQuestion = (currentStep: number, gameType: string | null = activeGame) => {
@@ -552,6 +575,7 @@ export default function KavramAssessmentPage() {
       setTimeout(() => {
         setFormData(p => ({ ...p, [activeGame!]: newCorrect === 5 }));
         setActiveGame(null);
+        unlockOrientation();
       }, 500);
     } else {
       setTimeout(() => loadNextQuestion(questionCount), 1000);
@@ -675,7 +699,7 @@ export default function KavramAssessmentPage() {
     const isVideo = currentGameScenario.src && currentGameScenario.src.endsWith('.mp4');
     return (
       <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center overflow-hidden">
-        <button onClick={() => setActiveGame(null)} className="absolute top-8 right-8 z-[110] bg-white/20 text-white p-3 rounded-full hover:bg-white/30 backdrop-blur-md"><X size={32} /></button>
+        <button onClick={() => { setActiveGame(null); unlockOrientation(); }} className="absolute top-8 right-8 z-[110] bg-white/20 text-white p-3 rounded-full hover:bg-white/30 backdrop-blur-md"><X size={32} /></button>
         <div className="absolute top-4 left-4 z-[110] bg-black/50 px-4 py-2 rounded-full text-white font-bold text-sm border border-white/20">Soru: {questionCount} / 5</div>
         <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden animate-in fade-in zoom-in duration-300" key={questionCount}>
           {isVideo ? <video src={currentGameScenario.src} autoPlay loop muted playsInline className="h-full w-auto max-w-none object-contain pointer-events-none select-none" /> : <img src={currentGameScenario.src} className="h-full w-auto max-w-none object-contain pointer-events-none select-none" />}
@@ -957,7 +981,7 @@ export default function KavramAssessmentPage() {
                     <div className="w-full">
                       <h3 className="text-sm font-bold leading-tight mb-2">{cat.title}</h3>
                       <div className="h-1.5 w-full bg-black/20 rounded-full overflow-hidden">
-                        <div className={`h-full \( {barColor} transition-all duration-500`} style={{ width: ` \){score || 0}%` }}></div>
+                        <div className={`h-full ${barColor} transition-all duration-500`} style={{ width: `${score || 0}%` }}></div>
                       </div>
                     </div>
                   </div>
@@ -969,4 +993,4 @@ export default function KavramAssessmentPage() {
       </main>
     </div>
   );
-    }
+}
