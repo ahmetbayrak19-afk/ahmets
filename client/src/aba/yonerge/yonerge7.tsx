@@ -76,6 +76,11 @@ function shuffle<T>(arr: T[]): T[] {
   return [...arr].sort(() => 0.5 - Math.random());
 }
 
+/** "Elma ver" / "Top ver" — basit yönerge metni */
+function instructionText(name: string, action: 'ver' | 'göster') {
+  return `${name} ${action}`;
+}
+
 function NesneCard({
   item,
   onClick,
@@ -120,7 +125,6 @@ export default function Yonerge7({
   onComplete,
 }: Yonerge7Props) {
   const [selected, setSelected] = useState<NesneDef[]>(() => shuffle(OBJECT_POOL).slice(0, 10));
-  const [targets] = useState<NesneDef[]>(() => []); // filled when starting
   const [trialTargets, setTrialTargets] = useState<NesneDef[]>([]);
   const [phase, setPhase] = useState<Phase>('prep');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -129,7 +133,7 @@ export default function Yonerge7({
   const [locked, setLocked] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Giriş sesi
+  // Giriş sesi (hazırlık ekranında)
   useEffect(() => {
     if (phase !== 'prep') return;
     const a = new Audio(girisSes);
@@ -162,6 +166,11 @@ export default function Yonerge7({
     });
   };
 
+  const prepareDigitalOptions = (target: NesneDef, pool: NesneDef[]) => {
+    const distractors = shuffle(pool.filter((o) => o.id !== target.id)).slice(0, 5);
+    setDigitalOptions(shuffle([target, ...distractors]));
+  };
+
   const startSession = (mode: 'teacher' | 'digital') => {
     stopIntro();
     const trials = shuffle(selected);
@@ -175,24 +184,16 @@ export default function Yonerge7({
     setPhase(mode);
   };
 
-  const prepareDigitalOptions = (target: NesneDef, pool: NesneDef[]) => {
-    const distractors = shuffle(pool.filter((o) => o.id !== target.id)).slice(0, 5);
-    setDigitalOptions(shuffle([target, ...distractors]));
-  };
-
-  const finishIfNeeded = useCallback(
-    (newScore: number, newIndex: number) => {
-      if (newIndex >= 10) {
-        setPhase('result');
-        if (newScore >= 8) {
-          confetti({ particleCount: 250, spread: 90, origin: { y: 0.6 } });
-        }
-        return true;
+  const finishIfNeeded = useCallback((newScore: number, newIndex: number) => {
+    if (newIndex >= 10) {
+      setPhase('result');
+      if (newScore >= 8) {
+        confetti({ particleCount: 250, spread: 90, origin: { y: 0.6 } });
       }
-      return false;
-    },
-    []
-  );
+      return true;
+    }
+    return false;
+  }, []);
 
   const handleAssess = (correct: boolean) => {
     if (locked) return;
@@ -212,7 +213,7 @@ export default function Yonerge7({
     const next = currentIndex + 1;
     setScore(newScore);
 
-    // Değerlendirme: aferin / tekrar dene YOK — kısa görsel geri bildirim yeterli
+    // Değerlendirme: aferin / tekrar dene YOK
     setTimeout(() => {
       if (finishIfNeeded(newScore, next)) return;
       setCurrentIndex(next);
@@ -304,7 +305,7 @@ export default function Yonerge7({
                 Öğrenciye söyleyin
               </span>
               <h1 className="text-3xl md:text-5xl font-black text-center text-white mb-6">
-                "{currentTarget.name}i ver"
+                "{instructionText(currentTarget.name, 'ver')}"
               </h1>
               <div className="w-28 h-28 rounded-2xl bg-slate-900/80 border border-slate-600 flex items-center justify-center">
                 {currentTarget.img ? (
@@ -321,7 +322,7 @@ export default function Yonerge7({
         {phase === 'digital' && currentTarget && (
           <div className="w-full max-w-lg flex flex-col items-center animate-in fade-in duration-300">
             <p className="text-blue-300 font-bold text-lg mb-4 text-center">
-              {currentTarget.name}i göster
+              {instructionText(currentTarget.name, 'göster')}
             </p>
             <div className="grid grid-cols-3 gap-3 w-full">
               {digitalOptions.map((item) => (
@@ -373,7 +374,7 @@ export default function Yonerge7({
         )}
       </div>
 
-      {/* ALT — sadece öğretmen modu */}
+      {/* ALT — sadece öğretmen modu (Geç yok) */}
       {phase === 'teacher' && (
         <div className="shrink-0 p-5 pb-8 landscape:py-3 landscape:pb-4 bg-slate-900 border-t border-slate-800 flex items-stretch justify-center gap-3 relative z-10">
           <button
