@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, RefreshCcw, Smartphone, Star } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
+import { ScreenOrientation } from '@capacitor/screen-orientation';
 
 // ---------------------------------------------------------------------------
 // 🔥 VARLIKLAR (Assets)
@@ -76,11 +77,38 @@ interface DraggableBox {
 
 interface GameProps {
   onClose: () => void;
+  mode?: 'assessment' | 'instruction';
+  onComplete?: (success: boolean) => void;
 }
 
 type ThemeType = 'chest' | 'space';
 
-export default function NesneEslemeGame14({ onClose }: GameProps) {
+// Native orientation helpers
+const lockLandscape = async () => {
+  try {
+    if ((window as any).AndroidOrientation) {
+      (window as any).AndroidOrientation.lockOrientation('landscape');
+    } else {
+      await ScreenOrientation.lock({ orientation: 'landscape' });
+    }
+  } catch (e) {
+    console.log('Landscape lock hatası:', e);
+  }
+};
+
+const unlockOrientation = async () => {
+  try {
+    if ((window as any).AndroidOrientation) {
+      (window as any).AndroidOrientation.lockOrientation('unlock');
+    } else {
+      await ScreenOrientation.unlock();
+    }
+  } catch (e) {
+    console.log('Unlock hatası:', e);
+  }
+};
+
+export default function NesneEslemeGame14({ onClose, mode, onComplete }: GameProps) {
   const [screenSize, setScreenSize] = useState({ w: window.innerWidth, h: window.innerHeight });
 
   // OYUN DURUMLARI
@@ -108,7 +136,15 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
   // 🔥 EKRAN YÖNÜ KONTROLÜ
   const isPortrait = screenSize.h > screenSize.w;
 
+  const handleClose = () => {
+    unlockOrientation();
+    onClose();
+  };
+
   useEffect(() => {
+    // Zorunlu yatay kilit
+    lockLandscape();
+
     const handleResize = () => {
       setScreenSize({ w: window.innerWidth, h: window.innerHeight });
     };
@@ -127,6 +163,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
         window.removeEventListener('resize', handleResize);
         document.body.style.overflow = ''; 
         document.body.style.touchAction = '';
+        unlockOrientation();
         
         if (introAudioRef.current) {
             introAudioRef.current.pause();
@@ -369,7 +406,10 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
           setTimeout(() => {
               setStage(6); 
               new Audio(assets.sndWin).play().catch(()=>{}); 
-              setTimeout(() => setIsGameWon(true), 2500);
+              setTimeout(() => {
+                setIsGameWon(true);
+                if (onComplete) onComplete(true);
+              }, 2500);
           }, 1500);
 
       }, 1500);
@@ -405,7 +445,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
     return assets.boxMid;
   };
 
-  // 🔥 DİK TUTUŞ UYARISI (TAM EKRAN VE GÜÇLÜ Z-INDEX)
+  // 🔥 DİK TUTUŞ UYARISI (kilitleme çalışana kadar yedek)
   if (isPortrait) {
     return (
       <div className="fixed inset-0 z-[10000] bg-black h-[100dvh] w-screen flex flex-col items-center justify-center text-white p-6 text-center touch-none">
@@ -414,7 +454,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
          </div>
          <h2 className="text-2xl font-bold mb-2">Lütfen Telefonu Yan Çevirin</h2>
          <p className="text-gray-400">Oyunu oynamak için cihazınızı yatay konuma getirin.</p>
-         <button onClick={onClose} className="mt-12 p-3 bg-slate-800 rounded-full border border-slate-600 text-white pointer-events-auto">
+         <button onClick={handleClose} className="mt-12 p-3 bg-slate-800 rounded-full border border-slate-600 text-white pointer-events-auto">
             <ArrowLeft size={24} />
          </button>
       </div>
@@ -588,7 +628,7 @@ export default function NesneEslemeGame14({ onClose }: GameProps) {
             </div>
         )}
 
-        <button onClick={onClose} className="absolute top-4 left-4 z-50 p-3 bg-slate-900/80 rounded-full border border-slate-600 text-white hover:bg-slate-700 pointer-events-auto">
+        <button onClick={handleClose} className="absolute top-4 left-4 z-50 p-3 bg-slate-900/80 rounded-full border border-slate-600 text-white hover:bg-slate-700 pointer-events-auto">
            <ArrowLeft size={24} />
         </button>
 
