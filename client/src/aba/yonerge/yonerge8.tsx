@@ -1,30 +1,117 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  XCircle, Check, X, Trophy, Package, PlayCircle,
-  RefreshCw, ListOrdered, Box
+  XCircle, Check, X, Trophy, PlayCircle, RefreshCw, ListOrdered, Box,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-// --- Mevcut görseller ---
-import topImg from '@/aba/esle/top.png';
-import kalemImg from '@/aba/esle/kalem.png';
-import kitapImg from '@/aba/esle/kitap.png';
-import anahtarImg from '@/aba/esle/anahtar.png';
-import arabaImg from '@/aba/esle/araba.png';
-import elmaImg from '@/aba/esle/elma.png';
-import cicekImg from '@/aba/esle/cicek.png';
-import saatImg from '@/aba/esle/saat.png';
-import silgiImg from '@/aba/Alici/dedektif/silgi.png';
-import defterImg from '@/aba/Alici/dedektif/defter.png';
-import cantaImg from '@/aba/Alici/dedektif/canta.png';
-import tarakImg from '@/aba/esle/grup/evesya/tarak.png';
-import corapImg from '@/clothes/corap.jpg';
+// ——— GÖRSELLER (sesgorsel) ———
+import topImg from './sesgorsel/top.png';
+import kalemImg from './sesgorsel/kalem.png';
+import kitapImg from './sesgorsel/kitap.png';
+import anahtarImg from './sesgorsel/anahtar.png';
+import arabaImg from './sesgorsel/araba.png';
+import elmaImg from './sesgorsel/elma.png';
+import cicekImg from './sesgorsel/cicek.png';
+import saatImg from './sesgorsel/saat.png';
+import silgiImg from './sesgorsel/silgi.png';
+import defterImg from './sesgorsel/defter.png';
+import cantaImg from './sesgorsel/canta.png';
+import tarakImg from './sesgorsel/tarak.png';
+import bebekImg from './sesgorsel/bebek.png';
+import sepetImg from './sesgorsel/sepet.png';
+import havucImg from './sesgorsel/havuc.png';
+import tavsanImg from './sesgorsel/tavsan.png';
+import tavsanhavucImg from './sesgorsel/tavsanhavuc.png';
+import kilitImg from './sesgorsel/kilit.png';
+import kilitanahtarImg from './sesgorsel/kilitanahtar.png';
+import vazoImg from './sesgorsel/vazo.png';
+import vazocicekImg from './sesgorsel/vazocicek.png';
+import marakasImg from './sesgorsel/Marakas.png';
+import zilkapaliImg from './sesgorsel/zilkapali.png';
+import zilacikImg from './sesgorsel/zilacik.png';
+import yumurta1 from './sesgorsel/yumurta1.png';
+import yumurta2 from './sesgorsel/yumurta2.png';
+import yumurta3 from './sesgorsel/yumurta3.png';
+import yumurta4 from './sesgorsel/yumurta4.png';
+import hamur1 from './sesgorsel/hamur1.png';
+import hamur2 from './sesgorsel/hamur2.png';
+import hamur3 from './sesgorsel/hamur3.png';
+import hamur4 from './sesgorsel/hamur4.png';
+import hediye1 from './sesgorsel/hediye1.png';
+import hediye2 from './sesgorsel/hediye2.png';
+import hediye3 from './sesgorsel/hediye3.png';
+import hediye4 from './sesgorsel/hediye4.png';
+
+// ——— SİSTEM SES ———
+import girisSes from './sesgorsel/yonerge33giris.mp3';
+
+// ——— EFEKT SES ———
+import yumurtacatlama1 from './sesgorsel/yumurtacatlama1.mp3';
+import yumurtacatlama2 from './sesgorsel/yumurtacatlama2.mp3';
+import yumurtacatlama3 from './sesgorsel/yumurtacatlama3.mp3';
+import hamurvurmasesi from './sesgorsel/hamurvurmasesi.mp3';
+import kutuacSes from './sesgorsel/kutuac.mp3';
+import marakasSes from './sesgorsel/marakas.mp3';
+import zilsesi from './sesgorsel/zilsesi.mp3';
+import topsepetSes from './sesgorsel/topsepet.mp3';
+
+// ——— SIRALI YÖNERGE SESLERİ ———
+import s_ziplaelcirp from './sesgorsel/ziplaelcirp.mp3';
+import s_elcirpzipla from './sesgorsel/elcirpzipla.mp3';
+import s_kalkotur from './sesgorsel/kalkotur.mp3';
+import s_oturkalk from './sesgorsel/oturkalk.mp3';
+import s_elkaldirindir from './sesgorsel/elkaldirindir.mp3';
+import s_omuzsilkzipla from './sesgorsel/omuzsilkzipla.mp3';
+import s_ziplatopavur from './sesgorsel/ziplatopavur.mp3';
+import s_topavurelcirp from './sesgorsel/topavurelcirp.mp3';
+import s_sandalyeyeoturonecek from './sesgorsel/sandalyeyeoturonecek.mp3';
+import s_ayakkabinadokuncorabinadokun from './sesgorsel/ayakkabinadokuncorabinadokun.mp3';
+import s_burundokunkulakdokun from './sesgorsel/burundokunkulakdokun.mp3';
+import s_yereoturkalk from './sesgorsel/yereoturkalk.mp3';
+import s_ayaklavurelcirp from './sesgorsel/ayaklavurelcirp.mp3';
+import s_basegelcirp from './sesgorsel/basegelcirp.mp3';
+import s_basinisagasolacevir from './sesgorsel/basinisagasolacevir.mp3';
+import s_dizbukelcirp from './sesgorsel/dizbukelcirp.mp3';
+import s_elbaglazipla from './sesgorsel/elbaglazipla.mp3';
+import s_elcirpburnunadokun from './sesgorsel/elcirpburnunadokun.mp3';
+import s_kulakdokunelcirp from './sesgorsel/kulakdokunelcirp.mp3';
+import s_kolacindir from './sesgorsel/kolacindir.mp3';
+import s_topualbirak from './sesgorsel/topualbirak.mp3';
+import s_ziplaburnunadokun from './sesgorsel/ziplaburnunadokun.mp3';
+import s_marakassallazipla from './sesgorsel/marakassallazipla.mp3';
+import s_elcirpmarakassalla from './sesgorsel/elcirpmarakassalla.mp3';
+import s_marakassallatopavur from './sesgorsel/marakassallatopavur.mp3';
+
+import s_topadokunkalemedokun from './sesgorsel/topadokunkalemedokun.mp3';
+import s_kalemedokuntopadokun from './sesgorsel/kalemedokuntopadokun.mp3';
+import s_elmadokunkitapdokun from './sesgorsel/elmadokunkitapdokun.mp3';
+import s_anahtardokunsaatdokun from './sesgorsel/anahtardokunsaatdokun.mp3';
+import s_cicekdokunarabadokun from './sesgorsel/cicekdokunarabadokun.mp3';
+import s_silgidokundefterdokun from './sesgorsel/silgidokundefterdokun.mp3';
+import s_cantadokuntarakdokun from './sesgorsel/cantadokuntarakdokun.mp3';
+import s_bebekdokuntopdokun from './sesgorsel/bebekdokuntopdokun.mp3';
+import s_kitapkalemtopdokun from './sesgorsel/kitapkalemtopdokun.mp3';
+import s_arabasaatcicekdokun from './sesgorsel/arabasaatcicekdokun.mp3';
+import s_yumurtakirarabadokun from './sesgorsel/yumurtakirarabadokun.mp3';
+import s_yumurtakircicekdokunsaatdokun from './sesgorsel/yumurtakircicekdokunsaatdokun.mp3';
+import s_hamurezbebekdokun from './sesgorsel/hamurezbebekdokun.mp3';
+import s_kutuactopdokun from './sesgorsel/kutuactopdokun.mp3';
+import s_havucvertopdokun from './sesgorsel/havucvertopdokun.mp3';
+import s_havuctavsanvertopusepeteat from './sesgorsel/havuctavsanvertopusepeteat.mp3';
+import s_topsepeteatkalemdokun from './sesgorsel/topsepeteatkalemdokun.mp3';
+import s_marakassallakalemdokun from './sesgorsel/marakassallakalemdokun.mp3';
+import s_marakassallatopadokun from './sesgorsel/marakassallatopadokun.mp3';
+import s_marakassallatopdokunkalemdokun from './sesgorsel/marakassallatopdokunkalemdokun.mp3';
+import s_zilbaselmadokun from './sesgorsel/zilbaselmadokun.mp3';
+import s_zilbaskalemdokun from './sesgorsel/zilbaskalemdokun.mp3';
+import s_zilbasmarakassalla from './sesgorsel/zilbasmarakassalla.mp3';
+import s_anahtartakbebekdokun from './sesgorsel/anahtartakbebekdokun.mp3';
+import s_cicekvazokoyelmadokun from './sesgorsel/cicekvazokoyelmadokun.mp3';
 
 export interface NesneDef {
   id: string;
   name: string;
   img?: string;
-  emoji?: string;
 }
 
 const OBJECTS: Record<string, NesneDef> = {
@@ -35,184 +122,305 @@ const OBJECTS: Record<string, NesneDef> = {
   araba: { id: 'araba', name: 'Araba', img: arabaImg },
   elma: { id: 'elma', name: 'Elma', img: elmaImg },
   cicek: { id: 'cicek', name: 'Çiçek', img: cicekImg },
-  corap: { id: 'corap', name: 'Çorap', img: corapImg },
   saat: { id: 'saat', name: 'Saat', img: saatImg },
   silgi: { id: 'silgi', name: 'Silgi', img: silgiImg },
   defter: { id: 'defter', name: 'Defter', img: defterImg },
   canta: { id: 'canta', name: 'Çanta', img: cantaImg },
   tarak: { id: 'tarak', name: 'Tarak', img: tarakImg },
-  bebek: { id: 'bebek', name: 'Bebek', emoji: '🧸' },
-  bardak: { id: 'bardak', name: 'Bardak', emoji: '🥛' },
-  kasik: { id: 'kasik', name: 'Kaşık', emoji: '🥄' },
-  makas: { id: 'makas', name: 'Makas', emoji: '✂️' },
-  cetvel: { id: 'cetvel', name: 'Cetvel', emoji: '📏' },
-  boya: { id: 'boya', name: 'Boya', emoji: '🎨' },
-  firca: { id: 'firca', name: 'Fırça', emoji: '🖌️' },
-  mendil: { id: 'mendil', name: 'Mendil', emoji: '🧻' },
-  sunger: { id: 'sunger', name: 'Sünger', emoji: '🧽' },
-  zil: { id: 'zil', name: 'Zil', emoji: '🔔' },
-  marakas: { id: 'marakas', name: 'Marakas', emoji: '🪇' },
-  top_futbol: { id: 'top_futbol', name: 'Futbol topu', emoji: '⚽' },
+  bebek: { id: 'bebek', name: 'Bebek', img: bebekImg },
+  sepet: { id: 'sepet', name: 'Sepet', img: sepetImg },
+  havuc: { id: 'havuc', name: 'Havuç', img: havucImg },
+  tavsan: { id: 'tavsan', name: 'Tavşan', img: tavsanImg },
+  kilit: { id: 'kilit', name: 'Kilit', img: kilitImg },
+  vazo: { id: 'vazo', name: 'Vazo', img: vazoImg },
+  marakas: { id: 'marakas', name: 'Marakas', img: marakasImg },
+  zil: { id: 'zil', name: 'Zil', img: zilkapaliImg },
+  yumurta: { id: 'yumurta', name: 'Yumurta', img: yumurta1 },
+  hamur: { id: 'hamur', name: 'Hamur', img: hamur1 },
+  hediye: { id: 'hediye', name: 'Hediye', img: hediye1 },
 };
+
+/** Adım türleri */
+export type StepKind =
+  | 'tap' // sırayla dokun
+  | 'multi' // 3 dokunuşla aşamalı (yumurta/hamur/hediye)
+  | 'drag' // sürükle-bırak (dokun yanlış sayılmaz)
+  | 'shake' // basılı tut + hareket
+  | 'hold'; // 1.5 sn basılı tut (zil)
+
+export interface TaskStep {
+  kind: StepKind;
+  targetId: string;
+  /** drag için hedef id */
+  dropId?: string;
+  /** multi: görsel aşamaları (4 kare → 3 dokunuş) */
+  stages?: string[];
+  /** multi: her dokunuşta ses (1-2-3 veya tek ses tekrarı) */
+  stageSounds?: string[];
+  /** drag tamamlanınca birleşik görsel */
+  mergeImg?: string;
+  /** drag/hold başarı sesi */
+  successSound?: string;
+}
 
 export type TaskType = 'physical' | 'digital';
 
 export interface SequentialTask {
   id: string;
-  text: string;           // Öğretmenin söylediği / ekranda görünen yönerge
+  text: string;
   type: TaskType;
-  materials: string[];    // Malzeme listesi için
-  /** Dijital: sırayla dokunulması gereken nesne id'leri */
-  sequence?: string[];
-  /** Dijital: grid'de gösterilecek ekstra distraktör id'leri (otomatik de doldurulur) */
+  materials: string[];
+  sound?: string;
+  steps?: TaskStep[];
+  /** dijital grid için ekstra gösterilecek id'ler */
   distractors?: string[];
 }
 
-/**
- * ≥30 bağımsız sıralı görev.
- * Kurallar:
- * - Her adım kendi içinde tamamlanmış / bağımsız
- * - "Al sonra tak" gibi zorunlu bağımlılık yok
- * - Dijital olanlarda sıra + ayırt etme (distraktör) var
- */
-const TASK_POOL: SequentialTask[] = [
-  // ——— FİZİKSEL (öğretmen gözlemler) ———
-  { id: 'p01', text: 'Zıpla, sonra ellerini çırp', type: 'physical', materials: [] },
-  { id: 'p02', text: 'Ellerini çırp, sonra zıpla', type: 'physical', materials: [] },
-  { id: 'p03', text: 'Ayağa kalk, sonra otur', type: 'physical', materials: ['Sandalye'] },
-  { id: 'p04', text: 'Otur, sonra ayağa kalk', type: 'physical', materials: ['Sandalye'] },
-  { id: 'p05', text: 'Başını öne eğ, sonra doğrul', type: 'physical', materials: [] },
-  { id: 'p06', text: 'Ellerini yukarı kaldır, sonra indir', type: 'physical', materials: [] },
-  { id: 'p07', text: 'Gözlerini kapat, sonra aç', type: 'physical', materials: [] },
-  { id: 'p08', text: 'Omuzlarını silk, sonra ellerini çırp', type: 'physical', materials: [] },
-  { id: 'p09', text: 'Marakası salla', type: 'physical', materials: ['Marakas'] },
-  { id: 'p10', text: 'Topa ayağınla vur', type: 'physical', materials: ['Top'] },
-  { id: 'p11', text: 'Zıpla, sonra topa ayağınla vur', type: 'physical', materials: ['Top'] },
-  { id: 'p12', text: 'Ellerini çırp, sonra marakası salla', type: 'physical', materials: ['Marakas'] },
-  { id: 'p13', text: 'Sandalyeye otur, sandalyeyi öne çek', type: 'physical', materials: ['Sandalye'] },
-  { id: 'p14', text: 'Ayakkabına dokun, sonra çorabına dokun', type: 'physical', materials: ['Ayakkabı', 'Çorap'] },
-  { id: 'p15', text: 'Kapıyı aç, sonra kapat', type: 'physical', materials: ['Kapı'] },
-  { id: 'p16', text: 'Burnuna dokun, sonra kulağına dokun', type: 'physical', materials: [] },
-  { id: 'p17', text: 'Ellerini bağla, sonra çöz', type: 'physical', materials: [] },
-  { id: 'p18', text: 'Yere otur, sonra ayağa kalk', type: 'physical', materials: [] },
+const YUMURTA_STAGES = [yumurta1, yumurta2, yumurta3, yumurta4];
+const HAMUR_STAGES = [hamur1, hamur2, hamur3, hamur4];
+const HEDIYE_STAGES = [hediye1, hediye2, hediye3, hediye4];
+const YUMURTA_SOUNDS = [yumurtacatlama1, yumurtacatlama2, yumurtacatlama3];
+const HAMUR_SOUNDS = [hamurvurmasesi, hamurvurmasesi, hamurvurmasesi];
+const HEDIYE_SOUNDS = [kutuacSes, kutuacSes, kutuacSes];
 
-  // ——— DİJİTAL (ekranda sıra + distraktör) ———
+const TASK_POOL: SequentialTask[] = [
+  // ——— FİZİKSEL ———
+  { id: 'p01', text: 'Zıpla, sonra ellerini çırp', type: 'physical', materials: [], sound: s_ziplaelcirp },
+  { id: 'p02', text: 'Ellerini çırp, sonra zıpla', type: 'physical', materials: [], sound: s_elcirpzipla },
+  { id: 'p03', text: 'Kalk, sonra otur', type: 'physical', materials: ['Sandalye'], sound: s_kalkotur },
+  { id: 'p04', text: 'Otur, sonra kalk', type: 'physical', materials: ['Sandalye'], sound: s_oturkalk },
+  { id: 'p05', text: 'Ellerini kaldır, sonra indir', type: 'physical', materials: [], sound: s_elkaldirindir },
+  { id: 'p06', text: 'Omuzlarını silk, sonra zıpla', type: 'physical', materials: [], sound: s_omuzsilkzipla },
+  { id: 'p07', text: 'Zıpla, sonra topa vur', type: 'physical', materials: ['Top'], sound: s_ziplatopavur },
+  { id: 'p08', text: 'Topa vur, sonra ellerini çırp', type: 'physical', materials: ['Top'], sound: s_topavurelcirp },
+  { id: 'p09', text: 'Sandalyeye otur, sonra öne çek', type: 'physical', materials: ['Sandalye'], sound: s_sandalyeyeoturonecek },
+  { id: 'p10', text: 'Ayakkabına dokun, sonra çorabına dokun', type: 'physical', materials: ['Ayakkabı', 'Çorap'], sound: s_ayakkabinadokuncorabinadokun },
+  { id: 'p11', text: 'Burnuna dokun, sonra kulağına dokun', type: 'physical', materials: [], sound: s_burundokunkulakdokun },
+  { id: 'p12', text: 'Yere otur, sonra kalk', type: 'physical', materials: [], sound: s_yereoturkalk },
+  { id: 'p13', text: 'Ayağını kaldır, sonra ellerini çırp', type: 'physical', materials: [], sound: s_ayaklavurelcirp },
+  { id: 'p14', text: 'Başına gel, sonra ellerini çırp', type: 'physical', materials: [], sound: s_basegelcirp },
+  { id: 'p15', text: 'Başını sağa sola çevir', type: 'physical', materials: [], sound: s_basinisagasolacevir },
+  { id: 'p16', text: 'Dizini bük, sonra ellerini çırp', type: 'physical', materials: [], sound: s_dizbukelcirp },
+  { id: 'p17', text: 'Ellerini bağla, sonra zıpla', type: 'physical', materials: [], sound: s_elbaglazipla },
+  { id: 'p18', text: 'Ellerini çırp, sonra burnuna dokun', type: 'physical', materials: [], sound: s_elcirpburnunadokun },
+  { id: 'p19', text: 'Kulağına dokun, sonra ellerini çırp', type: 'physical', materials: [], sound: s_kulakdokunelcirp },
+  { id: 'p20', text: 'Kollarını aç, sonra indir', type: 'physical', materials: [], sound: s_kolacindir },
+  { id: 'p21', text: 'Topu al, sonra bırak', type: 'physical', materials: ['Top'], sound: s_topualbirak },
+  { id: 'p22', text: 'Zıpla, sonra burnuna dokun', type: 'physical', materials: [], sound: s_ziplaburnunadokun },
+  { id: 'p23', text: 'Marakası salla, sonra zıpla', type: 'physical', materials: ['Marakas'], sound: s_marakassallazipla },
+  { id: 'p24', text: 'Ellerini çırp, sonra marakası salla', type: 'physical', materials: ['Marakas'], sound: s_elcirpmarakassalla },
+  { id: 'p25', text: 'Marakası salla, sonra topa vur', type: 'physical', materials: ['Marakas', 'Top'], sound: s_marakassallatopavur },
+
+  // ——— DİJİTAL: sırayla dokun ———
   {
-    id: 'd01',
-    text: 'Önce topa dokun, sonra kaleme dokun',
-    type: 'digital',
-    materials: [],
-    sequence: ['top', 'kalem'],
+    id: 'd01', text: 'Topa dokun, sonra kaleme dokun', type: 'digital', materials: [],
+    sound: s_topadokunkalemedokun,
+    steps: [{ kind: 'tap', targetId: 'top' }, { kind: 'tap', targetId: 'kalem' }],
   },
   {
-    id: 'd02',
-    text: 'Önce kaleme dokun, sonra topa dokun',
-    type: 'digital',
-    materials: [],
-    sequence: ['kalem', 'top'],
+    id: 'd02', text: 'Kaleme dokun, sonra topa dokun', type: 'digital', materials: [],
+    sound: s_kalemedokuntopadokun,
+    steps: [{ kind: 'tap', targetId: 'kalem' }, { kind: 'tap', targetId: 'top' }],
   },
   {
-    id: 'd03',
-    text: 'Önce elmaya dokun, sonra kitaba dokun',
-    type: 'digital',
-    materials: [],
-    sequence: ['elma', 'kitap'],
+    id: 'd03', text: 'Elmaya dokun, sonra kitaba dokun', type: 'digital', materials: [],
+    sound: s_elmadokunkitapdokun,
+    steps: [{ kind: 'tap', targetId: 'elma' }, { kind: 'tap', targetId: 'kitap' }],
   },
   {
-    id: 'd04',
-    text: 'Önce anahtara dokun, sonra saate dokun',
-    type: 'digital',
-    materials: [],
-    sequence: ['anahtar', 'saat'],
+    id: 'd04', text: 'Anahtara dokun, sonra saate dokun', type: 'digital', materials: [],
+    sound: s_anahtardokunsaatdokun,
+    steps: [{ kind: 'tap', targetId: 'anahtar' }, { kind: 'tap', targetId: 'saat' }],
   },
   {
-    id: 'd05',
-    text: 'Önce çiçeğe dokun, sonra arabaya dokun',
-    type: 'digital',
-    materials: [],
-    sequence: ['cicek', 'araba'],
+    id: 'd05', text: 'Çiçeğe dokun, sonra arabaya dokun', type: 'digital', materials: [],
+    sound: s_cicekdokunarabadokun,
+    steps: [{ kind: 'tap', targetId: 'cicek' }, { kind: 'tap', targetId: 'araba' }],
   },
   {
-    id: 'd06',
-    text: 'Önce silgiye dokun, sonra deftere dokun',
-    type: 'digital',
-    materials: [],
-    sequence: ['silgi', 'defter'],
+    id: 'd06', text: 'Silgiye dokun, sonra deftere dokun', type: 'digital', materials: [],
+    sound: s_silgidokundefterdokun,
+    steps: [{ kind: 'tap', targetId: 'silgi' }, { kind: 'tap', targetId: 'defter' }],
   },
   {
-    id: 'd07',
-    text: 'Önce çantaya dokun, sonra tarağa dokun',
-    type: 'digital',
-    materials: [],
-    sequence: ['canta', 'tarak'],
+    id: 'd07', text: 'Çantaya dokun, sonra tarağa dokun', type: 'digital', materials: [],
+    sound: s_cantadokuntarakdokun,
+    steps: [{ kind: 'tap', targetId: 'canta' }, { kind: 'tap', targetId: 'tarak' }],
   },
   {
-    id: 'd08',
-    text: 'Önce bebeğe dokun, sonra topa dokun',
-    type: 'digital',
-    materials: [],
-    sequence: ['bebek', 'top'],
+    id: 'd08', text: 'Bebeğe dokun, sonra topa dokun', type: 'digital', materials: [],
+    sound: s_bebekdokuntopdokun,
+    steps: [{ kind: 'tap', targetId: 'bebek' }, { kind: 'tap', targetId: 'top' }],
   },
   {
-    id: 'd09',
-    text: 'Önce bardağa dokun, sonra kaşığa dokun',
-    type: 'digital',
-    materials: [],
-    sequence: ['bardak', 'kasik'],
+    id: 'd09', text: 'Kitaba, kaleme ve topa sırayla dokun', type: 'digital', materials: [],
+    sound: s_kitapkalemtopdokun,
+    steps: [
+      { kind: 'tap', targetId: 'kitap' },
+      { kind: 'tap', targetId: 'kalem' },
+      { kind: 'tap', targetId: 'top' },
+    ],
   },
   {
-    id: 'd10',
-    text: 'Önce makasa dokun, sonra cetvele dokun',
-    type: 'digital',
-    materials: [],
-    sequence: ['makas', 'cetvel'],
+    id: 'd10', text: 'Arabaya, saate ve çiçeğe sırayla dokun', type: 'digital', materials: [],
+    sound: s_arabasaatcicekdokun,
+    steps: [
+      { kind: 'tap', targetId: 'araba' },
+      { kind: 'tap', targetId: 'saat' },
+      { kind: 'tap', targetId: 'cicek' },
+    ],
+  },
+
+  // ——— DİJİTAL: 3 dokunuş + dokun ———
+  {
+    id: 'd11', text: 'Yumurtayı kır, sonra arabaya dokun', type: 'digital', materials: [],
+    sound: s_yumurtakirarabadokun,
+    steps: [
+      { kind: 'multi', targetId: 'yumurta', stages: YUMURTA_STAGES, stageSounds: YUMURTA_SOUNDS },
+      { kind: 'tap', targetId: 'araba' },
+    ],
+    distractors: ['kalem', 'elma'],
   },
   {
-    id: 'd11',
-    text: 'Önce boyaya dokun, sonra fırçaya dokun',
-    type: 'digital',
-    materials: [],
-    sequence: ['boya', 'firca'],
+    id: 'd12', text: 'Yumurtayı kır, çiçeğe dokun, saate dokun', type: 'digital', materials: [],
+    sound: s_yumurtakircicekdokunsaatdokun,
+    steps: [
+      { kind: 'multi', targetId: 'yumurta', stages: YUMURTA_STAGES, stageSounds: YUMURTA_SOUNDS },
+      { kind: 'tap', targetId: 'cicek' },
+      { kind: 'tap', targetId: 'saat' },
+    ],
   },
   {
-    id: 'd12',
-    text: 'Önce çoraba dokun, sonra anahtara dokun',
-    type: 'digital',
-    materials: [],
-    sequence: ['corap', 'anahtar'],
+    id: 'd13', text: 'Hamuru ez, sonra bebeğe dokun', type: 'digital', materials: [],
+    sound: s_hamurezbebekdokun,
+    steps: [
+      { kind: 'multi', targetId: 'hamur', stages: HAMUR_STAGES, stageSounds: HAMUR_SOUNDS },
+      { kind: 'tap', targetId: 'bebek' },
+    ],
+    distractors: ['top', 'kalem'],
   },
   {
-    id: 'd13',
-    text: 'Önce zile dokun, sonra mendile dokun',
-    type: 'digital',
-    materials: [],
-    sequence: ['zil', 'mendil'],
+    id: 'd14', text: 'Kutuyu aç, sonra topa dokun', type: 'digital', materials: [],
+    sound: s_kutuactopdokun,
+    steps: [
+      { kind: 'multi', targetId: 'hediye', stages: HEDIYE_STAGES, stageSounds: HEDIYE_SOUNDS },
+      { kind: 'tap', targetId: 'top' },
+    ],
+    distractors: ['elma', 'kalem'],
+  },
+
+  // ——— DİJİTAL: sürükle ———
+  {
+    id: 'd15', text: 'Havucu tavşana ver, sonra topa dokun', type: 'digital', materials: [],
+    sound: s_havucvertopdokun,
+    steps: [
+      { kind: 'drag', targetId: 'havuc', dropId: 'tavsan', mergeImg: tavsanhavucImg },
+      { kind: 'tap', targetId: 'top' },
+    ],
+    distractors: ['kalem', 'elma'],
   },
   {
-    id: 'd14',
-    text: 'Önce süngere dokun, sonra elmaya dokun',
-    type: 'digital',
-    materials: [],
-    sequence: ['sunger', 'elma'],
+    id: 'd16', text: 'Havucu tavşana ver, topu sepete at', type: 'digital', materials: [],
+    sound: s_havuctavsanvertopusepeteat,
+    steps: [
+      { kind: 'drag', targetId: 'havuc', dropId: 'tavsan', mergeImg: tavsanhavucImg },
+      { kind: 'drag', targetId: 'top', dropId: 'sepet', successSound: topsepetSes },
+    ],
   },
   {
-    id: 'd15',
-    text: 'Önce kitaba dokun, sonra kaleme dokun, sonra topa dokun',
-    type: 'digital',
-    materials: [],
-    sequence: ['kitap', 'kalem', 'top'],
+    id: 'd17', text: 'Topu sepete at, sonra kaleme dokun', type: 'digital', materials: [],
+    sound: s_topsepeteatkalemdokun,
+    steps: [
+      { kind: 'drag', targetId: 'top', dropId: 'sepet', successSound: topsepetSes },
+      { kind: 'tap', targetId: 'kalem' },
+    ],
+    distractors: ['elma', 'araba'],
   },
   {
-    id: 'd16',
-    text: 'Önce arabaya dokun, sonra saate dokun, sonra çiçeğe dokun',
-    type: 'digital',
-    materials: [],
-    sequence: ['araba', 'saat', 'cicek'],
+    id: 'd18', text: 'Anahtarı kilide tak, sonra bebeğe dokun', type: 'digital', materials: [],
+    sound: s_anahtartakbebekdokun,
+    steps: [
+      { kind: 'drag', targetId: 'anahtar', dropId: 'kilit', mergeImg: kilitanahtarImg },
+      { kind: 'tap', targetId: 'bebek' },
+    ],
+    distractors: ['top', 'kalem'],
+  },
+  {
+    id: 'd19', text: 'Çiçeği vazoya koy, sonra elmaya dokun', type: 'digital', materials: [],
+    sound: s_cicekvazokoyelmadokun,
+    steps: [
+      { kind: 'drag', targetId: 'cicek', dropId: 'vazo', mergeImg: vazocicekImg },
+      { kind: 'tap', targetId: 'elma' },
+    ],
+    distractors: ['top', 'saat'],
+  },
+
+  // ——— DİJİTAL: salla / bas ———
+  {
+    id: 'd20', text: 'Marakası salla, sonra kaleme dokun', type: 'digital', materials: [],
+    sound: s_marakassallakalemdokun,
+    steps: [
+      { kind: 'shake', targetId: 'marakas', successSound: marakasSes },
+      { kind: 'tap', targetId: 'kalem' },
+    ],
+    distractors: ['top', 'elma'],
+  },
+  {
+    id: 'd21', text: 'Marakası salla, sonra topa dokun', type: 'digital', materials: [],
+    sound: s_marakassallatopadokun,
+    steps: [
+      { kind: 'shake', targetId: 'marakas', successSound: marakasSes },
+      { kind: 'tap', targetId: 'top' },
+    ],
+    distractors: ['kalem', 'elma'],
+  },
+  {
+    id: 'd22', text: 'Marakası salla, topa dokun, kaleme dokun', type: 'digital', materials: [],
+    sound: s_marakassallatopdokunkalemdokun,
+    steps: [
+      { kind: 'shake', targetId: 'marakas', successSound: marakasSes },
+      { kind: 'tap', targetId: 'top' },
+      { kind: 'tap', targetId: 'kalem' },
+    ],
+  },
+  {
+    id: 'd23', text: 'Zile bas, sonra elmaya dokun', type: 'digital', materials: [],
+    sound: s_zilbaselmadokun,
+    steps: [
+      { kind: 'hold', targetId: 'zil', successSound: zilsesi },
+      { kind: 'tap', targetId: 'elma' },
+    ],
+    distractors: ['top', 'kalem'],
+  },
+  {
+    id: 'd24', text: 'Zile bas, sonra kaleme dokun', type: 'digital', materials: [],
+    sound: s_zilbaskalemdokun,
+    steps: [
+      { kind: 'hold', targetId: 'zil', successSound: zilsesi },
+      { kind: 'tap', targetId: 'kalem' },
+    ],
+    distractors: ['top', 'elma'],
+  },
+  {
+    id: 'd25', text: 'Zile bas, sonra marakası salla', type: 'digital', materials: [],
+    sound: s_zilbasmarakassalla,
+    steps: [
+      { kind: 'hold', targetId: 'zil', successSound: zilsesi },
+      { kind: 'shake', targetId: 'marakas', successSound: marakasSes },
+    ],
+    distractors: ['top', 'kalem'],
   },
 ];
 
 function shuffle<T>(arr: T[]): T[] {
   return [...arr].sort(() => 0.5 - Math.random());
+}
+
+function playFx(src?: string) {
+  if (!src) return;
+  const a = new Audio(src);
+  a.volume = 1;
+  a.play().catch(() => {});
 }
 
 interface Yonerge8Props {
@@ -224,54 +432,9 @@ interface Yonerge8Props {
 
 type Phase = 'prep' | 'running' | 'result';
 
-function NesneCard({
-  item,
-  onClick,
-  highlight,
-  done,
-  dimmed,
-  disabled,
-  stepNum,
-}: {
-  item: NesneDef;
-  onClick?: () => void;
-  highlight?: boolean;
-  done?: boolean;
-  dimmed?: boolean;
-  disabled?: boolean;
-  stepNum?: number;
-}) {
-  let border =
-    'border-slate-700 hover:border-slate-500 ';
-  if (highlight) border = 'border-yellow-400 ring-2 ring-yellow-500/50 bg-yellow-900/20 ';
-  if (done) border = 'border-green-400 ring-2 ring-green-500/40 bg-green-900/25 ';
-
-  return (
-    <button
-      type="button"
-      onClick={disabled ? undefined : onClick}
-      disabled={disabled}
-      aria-label={item.name}
-      className={
-        `relative flex flex-col items-center justify-center rounded-2xl border-2 bg-slate-800/80 overflow-hidden w-full h-full p-2 ` +
-        border +
-        (disabled || dimmed ? 'cursor-not-allowed opacity-40 ' : 'cursor-pointer active:scale-95 ') +
-        'transition-all duration-200'
-      }
-    >
-      {stepNum != null && done && (
-        <span className="absolute top-1 left-1 w-6 h-6 rounded-full bg-green-500 text-white text-xs font-black flex items-center justify-center">
-          {stepNum}
-        </span>
-      )}
-      {item.img ? (
-        <img src={item.img} alt="" className="w-[80%] h-[80%] max-w-[120px] max-h-[120px] object-contain" draggable={false} />
-      ) : (
-        <span className="text-5xl sm:text-6xl">{item.emoji || '📦'}</span>
-      )}
-    </button>
-  );
-}
+const HOLD_MS = 1500;
+const SHAKE_THRESHOLD = 18;
+const SHAKE_NEEDED = 4;
 
 export default function Yonerge8({
   itemCode = 'YTB 3.3',
@@ -285,19 +448,91 @@ export default function Yonerge8({
   const [score, setScore] = useState(0);
   const [locked, setLocked] = useState(false);
 
-  // Dijital sıra takibi
-  const [seqProgress, setSeqProgress] = useState(0); // kaçıncı adım tamamlandı
-  const [gridItems, setGridItems] = useState<NesneDef[]>([]);
-  const [doneIds, setDoneIds] = useState<string[]>([]);
-  const [wrongFlash, setWrongFlash] = useState<string | null>(null);
+  // Adım takibi
+  const [stepIdx, setStepIdx] = useState(0);
+  const [multiCount, setMultiCount] = useState(0);
+  const [doneTargets, setDoneTargets] = useState<string[]>([]);
+  const [mergeMap, setMergeMap] = useState<Record<string, string>>({});
+  const [zilPressed, setZilPressed] = useState(false);
+  const [wrongId, setWrongId] = useState<string | null>(null);
+
+  // Drag
+  const [dragId, setDragId] = useState<string | null>(null);
+  const dragPos = useRef({ x: 0, y: 0 });
+  const [dragStyle, setDragStyle] = useState<{ x: number; y: number } | null>(null);
+
+  // Hold / shake
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shakeCount = useRef(0);
+  const lastShakePos = useRef<{ x: number; y: number } | null>(null);
+
+  const introRef = useRef<HTMLAudioElement | null>(null);
+  const instrRef = useRef<HTMLAudioElement | null>(null);
 
   const currentTask = selected[currentIndex];
+  const currentStep = currentTask?.steps?.[stepIdx];
 
   const materialsList = (() => {
     const set = new Set<string>();
     selected.forEach((t) => t.materials.forEach((m) => set.add(m)));
     return Array.from(set).sort();
   })();
+
+  const stopIntro = () => {
+    if (introRef.current) {
+      introRef.current.pause();
+      introRef.current.currentTime = 0;
+    }
+  };
+  const stopInstr = () => {
+    if (instrRef.current) {
+      instrRef.current.pause();
+      instrRef.current.currentTime = 0;
+    }
+  };
+
+  // Giriş sesi
+  useEffect(() => {
+    if (phase !== 'prep') return;
+    const a = new Audio(girisSes);
+    introRef.current = a;
+    a.volume = 1;
+    a.play().catch(() => {});
+    return () => {
+      a.pause();
+      a.currentTime = 0;
+    };
+  }, [phase]);
+
+  // Yönerge sesi
+  useEffect(() => {
+    if (phase !== 'running') return;
+    const task = selected[currentIndex];
+    if (!task?.sound) return;
+    stopInstr();
+    const a = new Audio(task.sound);
+    instrRef.current = a;
+    a.volume = 1;
+    a.play().catch(() => {});
+    return () => {
+      a.pause();
+      a.currentTime = 0;
+    };
+  }, [phase, currentIndex]); // eslint-disable-line
+
+  const resetStepState = () => {
+    setStepIdx(0);
+    setMultiCount(0);
+    setDoneTargets([]);
+    setMergeMap({});
+    setZilPressed(false);
+    setWrongId(null);
+    setDragId(null);
+    setDragStyle(null);
+    shakeCount.current = 0;
+    lastShakePos.current = null;
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+  };
 
   const replaceTask = (index: number) => {
     const used = new Set(selected.map((t) => t.id));
@@ -311,43 +546,212 @@ export default function Yonerge8({
     });
   };
 
-  const prepareDigitalGrid = useCallback((task: SequentialTask) => {
-    if (task.type !== 'digital' || !task.sequence) return;
-    const needed = task.sequence.map((id) => OBJECTS[id]).filter(Boolean);
-    const allIds = Object.keys(OBJECTS);
-    const extra = shuffle(allIds.filter((id) => !task.sequence!.includes(id)))
-      .slice(0, Math.max(4, 6 - needed.length))
-      .map((id) => OBJECTS[id]);
-    setGridItems(shuffle([...needed, ...extra]));
-    setSeqProgress(0);
-    setDoneIds([]);
-    setWrongFlash(null);
-  }, []);
-
   const startAssessment = () => {
+    stopIntro();
     setCurrentIndex(0);
     setScore(0);
     setLocked(false);
+    resetStepState();
     setPhase('running');
-    const first = selected[0];
-    if (first?.type === 'digital') prepareDigitalGrid(first);
   };
 
   const goNext = (correct: boolean) => {
     const newScore = score + (correct ? 1 : 0);
     const next = currentIndex + 1;
     setScore(newScore);
-
     if (next >= 10) {
       setPhase('result');
       if (newScore >= 8) confetti({ particleCount: 250, spread: 90, origin: { y: 0.6 } });
       return;
     }
-
     setCurrentIndex(next);
     setLocked(false);
-    const nextTask = selected[next];
-    if (nextTask?.type === 'digital') prepareDigitalGrid(nextTask);
+    resetStepState();
+  };
+
+  const completeStep = useCallback(() => {
+    const task = selected[currentIndex];
+    if (!task?.steps) return;
+    const step = task.steps[stepIdx];
+    if (step) {
+      setDoneTargets((d) => [...d, step.targetId + (step.dropId || '')]);
+    }
+    const nextStep = stepIdx + 1;
+    if (nextStep >= task.steps.length) {
+      setLocked(true);
+      setTimeout(() => goNext(true), 500);
+    } else {
+      setStepIdx(nextStep);
+      setMultiCount(0);
+      setZilPressed(false);
+      shakeCount.current = 0;
+      lastShakePos.current = null;
+    }
+  }, [selected, currentIndex, stepIdx, score]); // eslint-disable-line
+
+  const failTrial = (id?: string) => {
+    if (locked) return;
+    setLocked(true);
+    if (id) setWrongId(id);
+    setTimeout(() => {
+      setWrongId(null);
+      goNext(false);
+    }, 600);
+  };
+
+  // ——— Grid öğeleri ———
+  const gridItems = (() => {
+    if (!currentTask?.steps) return [] as NesneDef[];
+    const ids = new Set<string>();
+    currentTask.steps.forEach((s) => {
+      ids.add(s.targetId);
+      if (s.dropId) ids.add(s.dropId);
+    });
+    (currentTask.distractors || []).forEach((d) => ids.add(d));
+    // en az 4–6 hücre
+    const all = Object.keys(OBJECTS);
+    const extra = shuffle(all.filter((id) => !ids.has(id))).slice(0, Math.max(0, 5 - ids.size));
+    extra.forEach((e) => ids.add(e));
+    return shuffle(Array.from(ids).map((id) => OBJECTS[id]).filter(Boolean));
+  })();
+
+  const displayImg = (id: string): string | undefined => {
+    if (mergeMap[id]) return mergeMap[id];
+    if (id === 'zil') return zilPressed ? zilacikImg : zilkapaliImg;
+    const step = currentStep;
+    if (step?.kind === 'multi' && step.targetId === id && step.stages) {
+      return step.stages[Math.min(multiCount, step.stages.length - 1)];
+    }
+    return OBJECTS[id]?.img;
+  };
+
+  // ——— TAP ———
+  const handleTap = (id: string) => {
+    if (locked || !currentStep) return;
+    if (currentStep.kind === 'drag') return; // sürükle bekleniyor, dokun yanlış değil
+    if (currentStep.kind === 'shake' || currentStep.kind === 'hold') return;
+
+    if (currentStep.kind === 'multi') {
+      if (id !== currentStep.targetId) {
+        failTrial(id);
+        return;
+      }
+      const next = multiCount + 1;
+      const soundIdx = Math.min(multiCount, (currentStep.stageSounds?.length || 1) - 1);
+      playFx(currentStep.stageSounds?.[soundIdx]);
+      setMultiCount(next);
+      // 3 dokunuş → tamam (4. kare gösterilir)
+      if (next >= 3) {
+        setTimeout(() => completeStep(), 350);
+      }
+      return;
+    }
+
+    if (currentStep.kind === 'tap') {
+      if (id === currentStep.targetId) {
+        completeStep();
+      } else {
+        failTrial(id);
+      }
+    }
+  };
+
+  // ——— DRAG ———
+  const onPointerDownDrag = (e: React.PointerEvent, id: string) => {
+    if (locked || currentStep?.kind !== 'drag') return;
+    if (id !== currentStep.targetId) return;
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    setDragId(id);
+    dragPos.current = { x: e.clientX, y: e.clientY };
+    setDragStyle({ x: e.clientX, y: e.clientY });
+  };
+
+  const onPointerMoveDrag = (e: React.PointerEvent) => {
+    if (!dragId) return;
+    setDragStyle({ x: e.clientX, y: e.clientY });
+  };
+
+  const onPointerUpDrag = (e: React.PointerEvent) => {
+    if (!dragId || currentStep?.kind !== 'drag') {
+      setDragId(null);
+      setDragStyle(null);
+      return;
+    }
+    const dropEl = document.elementFromPoint(e.clientX, e.clientY);
+    const dropId = dropEl?.closest('[data-obj-id]')?.getAttribute('data-obj-id');
+    if (dropId === currentStep.dropId) {
+      if (currentStep.mergeImg) {
+        setMergeMap((m) => ({ ...m, [currentStep.dropId!]: currentStep.mergeImg! }));
+      }
+      playFx(currentStep.successSound);
+      setDragId(null);
+      setDragStyle(null);
+      completeStep();
+    } else {
+      // yanlış yere bırakma → başarısız; boşluğa bırakma → sadece geri dön
+      setDragId(null);
+      setDragStyle(null);
+      if (dropId && dropId !== currentStep.targetId) {
+        failTrial(dropId);
+      }
+    }
+  };
+
+  // ——— HOLD (zil 1.5s) ———
+  const onHoldStart = (id: string) => {
+    if (locked || currentStep?.kind !== 'hold') return;
+    if (id !== currentStep.targetId) {
+      failTrial(id);
+      return;
+    }
+    setZilPressed(true);
+    holdTimer.current = setTimeout(() => {
+      playFx(currentStep.successSound);
+      completeStep();
+    }, HOLD_MS);
+  };
+
+  const onHoldEnd = () => {
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+    if (currentStep?.kind === 'hold' && !locked) {
+      setZilPressed(false);
+    }
+  };
+
+  // ——— SHAKE ———
+  const onShakeStart = (e: React.PointerEvent, id: string) => {
+    if (locked || currentStep?.kind !== 'shake') return;
+    if (id !== currentStep.targetId) {
+      failTrial(id);
+      return;
+    }
+    shakeCount.current = 0;
+    lastShakePos.current = { x: e.clientX, y: e.clientY };
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+
+  const onShakeMove = (e: React.PointerEvent) => {
+    if (locked || currentStep?.kind !== 'shake' || !lastShakePos.current) return;
+    const dx = e.clientX - lastShakePos.current.x;
+    const dy = e.clientY - lastShakePos.current.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > SHAKE_THRESHOLD) {
+      shakeCount.current += 1;
+      lastShakePos.current = { x: e.clientX, y: e.clientY };
+      if (shakeCount.current >= SHAKE_NEEDED) {
+        playFx(currentStep.successSound);
+        lastShakePos.current = null;
+        completeStep();
+      }
+    }
+  };
+
+  const onShakeEnd = () => {
+    lastShakePos.current = null;
+    shakeCount.current = 0;
   };
 
   const handlePhysical = (correct: boolean) => {
@@ -356,46 +760,36 @@ export default function Yonerge8({
     goNext(correct);
   };
 
-  const handleDigitalTap = (item: NesneDef) => {
-    if (locked || currentTask?.type !== 'digital' || !currentTask.sequence) return;
-
-    const expectedId = currentTask.sequence[seqProgress];
-    if (item.id === expectedId) {
-      // Doğru adım
-      const newDone = [...doneIds, item.id];
-      setDoneIds(newDone);
-      const nextStep = seqProgress + 1;
-      setSeqProgress(nextStep);
-
-      if (nextStep >= currentTask.sequence.length) {
-        // Tüm sıra doğru
-        setLocked(true);
-        setTimeout(() => goNext(true), 600);
-      }
-    } else {
-      // Yanlış — deneme başarısız
-      setWrongFlash(item.id);
-      setLocked(true);
-      setTimeout(() => {
-        setWrongFlash(null);
-        goNext(false);
-      }, 700);
-    }
-  };
-
-  // currentTask değişince dijital grid hazırla
-  useEffect(() => {
-    if (phase === 'running' && currentTask?.type === 'digital') {
-      prepareDigitalGrid(currentTask);
-    }
-  }, [phase, currentIndex]); // eslint-disable-line
+  const isDoneVisual = (id: string) =>
+    doneTargets.some((d) => d === id || d.startsWith(id));
 
   return (
-    <div className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none">
+    <div
+      className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none"
+      onPointerMove={(e) => {
+        onPointerMoveDrag(e);
+        onShakeMove(e);
+      }}
+      onPointerUp={(e) => {
+        onPointerUpDrag(e);
+        onShakeEnd();
+        onHoldEnd();
+      }}
+      onPointerCancel={() => {
+        setDragId(null);
+        setDragStyle(null);
+        onShakeEnd();
+        onHoldEnd();
+      }}
+    >
       {/* HEADER */}
       <div className="shrink-0 p-4 landscape:py-2 landscape:px-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md relative z-10">
         <button
-          onClick={onClose}
+          onClick={() => {
+            stopIntro();
+            stopInstr();
+            onClose();
+          }}
           className="p-2 landscape:p-1.5 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
         >
           <XCircle className="w-7 h-7 landscape:w-6 landscape:h-6" />
@@ -423,11 +817,10 @@ export default function Yonerge8({
               <h1 className="text-2xl font-black mb-2">Sıralı Görev Hazırlığı</h1>
               <p className="text-slate-400 text-sm leading-relaxed px-2">
                 Bu oturumda <span className="text-blue-300 font-semibold">10 sıralı yönerge</span> sorulacak.
-                İstemediğin göreve dokunarak değiştirebilirsin.
+                İstemediğin göreve dokunarak değiştirebilirsin. Uygulama yönergeyi sesli okur.
               </p>
             </div>
 
-            {/* Görev listesi */}
             <div className="space-y-2 max-h-[42dvh] overflow-y-auto pr-1">
               {selected.map((task, i) => (
                 <button
@@ -453,9 +846,7 @@ export default function Yonerge8({
                         {task.type === 'physical' ? 'Fiziksel' : 'Dijital'}
                       </span>
                       {task.materials.length > 0 && (
-                        <span className="text-[10px] text-slate-500 truncate">
-                          {task.materials.join(', ')}
-                        </span>
+                        <span className="text-[10px] text-slate-500 truncate">{task.materials.join(', ')}</span>
                       )}
                     </div>
                   </div>
@@ -464,21 +855,17 @@ export default function Yonerge8({
               ))}
             </div>
 
-            {/* Malzeme listesi */}
             <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-4">
               <div className="flex items-center gap-2 mb-2 text-slate-300">
                 <Box size={16} className="text-amber-400" />
                 <span className="text-xs font-bold uppercase tracking-wider">Hazır bulundurulacak malzemeler</span>
               </div>
               {materialsList.length === 0 ? (
-                <p className="text-sm text-slate-500">Ekstra malzeme gerekmiyor (sadece beden hareketleri).</p>
+                <p className="text-sm text-slate-500">Ekstra malzeme gerekmiyor (sadece beden hareketleri / ekran).</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {materialsList.map((m) => (
-                    <span
-                      key={m}
-                      className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-200 text-xs font-medium"
-                    >
+                    <span key={m} className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-200 text-xs font-medium">
                       {m}
                     </span>
                   ))}
@@ -498,45 +885,76 @@ export default function Yonerge8({
         {/* ========== RUNNING ========== */}
         {phase === 'running' && currentTask && (
           <div className="w-full max-w-3xl flex flex-col items-center animate-in slide-in-from-right-6 duration-300">
-            {/* Tip rozeti + yönerge metni */}
-            <div className="w-full bg-slate-800/60 border-2 border-slate-700 rounded-[2rem] p-6 md:p-10 flex flex-col items-center shadow-2xl mb-4">
+            <div className="w-full bg-slate-800/60 border-2 border-slate-700 rounded-[2rem] p-5 md:p-8 flex flex-col items-center shadow-2xl mb-4">
               <span
                 className={
-                  'text-xs font-bold tracking-widest uppercase mb-3 px-3 py-1 rounded-full ' +
+                  'text-xs font-bold tracking-widest uppercase mb-2 px-3 py-1 rounded-full ' +
                   (currentTask.type === 'physical'
                     ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30'
                     : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30')
                 }
               >
-                {currentTask.type === 'physical' ? 'Fiziksel — Öğrenciye söyleyin' : 'Dijital — Sırayla dokunsun'}
+                {currentTask.type === 'physical' ? 'Fiziksel' : 'Dijital'}
               </span>
-              <h1 className="text-2xl md:text-4xl font-black text-center text-white leading-tight">
+              <h1 className="text-xl md:text-3xl font-black text-center text-white leading-tight">
                 "{currentTask.text}"
               </h1>
-              {currentTask.type === 'digital' && currentTask.sequence && (
-                <p className="text-slate-400 text-xs mt-3">
-                  Adım {Math.min(seqProgress + 1, currentTask.sequence.length)} / {currentTask.sequence.length}
+              {currentTask.type === 'digital' && currentTask.steps && (
+                <p className="text-slate-400 text-xs mt-2">
+                  Adım {Math.min(stepIdx + 1, currentTask.steps.length)} / {currentTask.steps.length}
+                  {currentStep?.kind === 'multi' && ` · dokunuş ${multiCount}/3`}
+                  {currentStep?.kind === 'hold' && ' · 1,5 sn basılı tut'}
+                  {currentStep?.kind === 'shake' && ' · salla'}
+                  {currentStep?.kind === 'drag' && ' · sürükle'}
                 </p>
               )}
             </div>
 
-            {/* Dijital grid */}
             {currentTask.type === 'digital' && (
               <div className="grid grid-cols-2 landscape:grid-cols-3 gap-3 landscape:gap-4 w-full max-w-md landscape:max-w-2xl">
                 {gridItems.map((item) => {
-                  const doneIdx = doneIds.indexOf(item.id);
-                  const isDone = doneIdx >= 0;
+                  const done = isDoneVisual(item.id);
+                  const img = displayImg(item.id);
+                  const isDragSource = currentStep?.kind === 'drag' && currentStep.targetId === item.id;
+                  const isHoldTarget = currentStep?.kind === 'hold' && currentStep.targetId === item.id;
+                  const isShakeTarget = currentStep?.kind === 'shake' && currentStep.targetId === item.id;
+                  const hiding = dragId === item.id;
+
                   return (
-                    <div key={item.id} className="min-h-[120px] landscape:min-h-[100px]">
-                      <NesneCard
-                        item={item}
-                        done={isDone}
-                        stepNum={isDone ? doneIdx + 1 : undefined}
-                        highlight={wrongFlash === item.id}
-                        disabled={locked || isDone}
-                        dimmed={isDone}
-                        onClick={() => handleDigitalTap(item)}
-                      />
+                    <div
+                      key={item.id}
+                      data-obj-id={item.id}
+                      className="min-h-[120px] landscape:min-h-[100px] relative"
+                    >
+                      <button
+                        type="button"
+                        disabled={locked || done}
+                        onClick={() => handleTap(item.id)}
+                        onPointerDown={(e) => {
+                          if (isDragSource) onPointerDownDrag(e, item.id);
+                          if (isHoldTarget) onHoldStart(item.id);
+                          if (isShakeTarget) onShakeStart(e, item.id);
+                        }}
+                        onPointerUp={() => {
+                          if (isHoldTarget) onHoldEnd();
+                        }}
+                        className={
+                          `relative flex flex-col items-center justify-center rounded-2xl border-2 bg-slate-800/80 overflow-hidden w-full h-full p-2 transition-all duration-200 ` +
+                          (wrongId === item.id
+                            ? 'border-red-400 ring-2 ring-red-500/50 '
+                            : done
+                              ? 'border-green-400 ring-2 ring-green-500/40 bg-green-900/25 opacity-50 '
+                              : 'border-slate-700 hover:border-slate-500 ') +
+                          (locked || done ? 'cursor-not-allowed ' : 'cursor-pointer active:scale-95 ') +
+                          (hiding ? 'opacity-20 ' : '')
+                        }
+                      >
+                        {img ? (
+                          <img src={img} alt="" className="w-[80%] h-[80%] max-w-[120px] max-h-[120px] object-contain pointer-events-none" draggable={false} />
+                        ) : (
+                          <span className="text-5xl">📦</span>
+                        )}
+                      </button>
                     </div>
                   );
                 })}
@@ -545,7 +963,7 @@ export default function Yonerge8({
 
             {currentTask.type === 'physical' && (
               <p className="text-slate-500 text-sm text-center max-w-md">
-                Öğrenci 3–5 saniye içinde istenen sırada yaparsa <span className="text-green-400">Yaptı</span>,
+                Öğrenci istenen sırada yaparsa <span className="text-green-400">Yaptı</span>,
                 aksi halde <span className="text-red-400">Yapamadı</span>.
               </p>
             )}
@@ -585,6 +1003,16 @@ export default function Yonerge8({
           </div>
         )}
       </div>
+
+      {/* Sürüklenen hayalet */}
+      {dragId && dragStyle && OBJECTS[dragId]?.img && (
+        <img
+          src={OBJECTS[dragId].img}
+          alt=""
+          className="fixed pointer-events-none z-[200] w-24 h-24 object-contain opacity-90 drop-shadow-2xl"
+          style={{ left: dragStyle.x - 48, top: dragStyle.y - 48 }}
+        />
+      )}
 
       {/* Fiziksel alt butonlar */}
       {phase === 'running' && currentTask?.type === 'physical' && (
