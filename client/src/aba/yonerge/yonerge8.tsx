@@ -42,10 +42,8 @@ import hediye2 from './sesgorsel/hediye2.png';
 import hediye3 from './sesgorsel/hediye3.png';
 import hediye4 from './sesgorsel/hediye4.png';
 
-// ——— SİSTEM SES ———
 import girisSes from './sesgorsel/yonerge33giris.mp3';
 
-// ——— EFEKT SES ———
 import yumurtacatlama1 from './sesgorsel/yumurtacatlama1.mp3';
 import yumurtacatlama2 from './sesgorsel/yumurtacatlama2.mp3';
 import yumurtacatlama3 from './sesgorsel/yumurtacatlama3.mp3';
@@ -55,7 +53,6 @@ import marakasSes from './sesgorsel/marakas.mp3';
 import zilsesi from './sesgorsel/zilsesi.mp3';
 import topsepetSes from './sesgorsel/topsepet.mp3';
 
-// ——— SIRALI YÖNERGE SESLERİ ———
 import s_ziplaelcirp from './sesgorsel/ziplaelcirp.mp3';
 import s_elcirpzipla from './sesgorsel/elcirpzipla.mp3';
 import s_kalkotur from './sesgorsel/kalkotur.mp3';
@@ -140,26 +137,15 @@ const OBJECTS: Record<string, NesneDef> = {
   hediye: { id: 'hediye', name: 'Hediye', img: hediye1 },
 };
 
-/** Adım türleri */
-export type StepKind =
-  | 'tap' // sırayla dokun
-  | 'multi' // 3 dokunuşla aşamalı (yumurta/hamur/hediye)
-  | 'drag' // sürükle-bırak (dokun yanlış sayılmaz)
-  | 'shake' // basılı tut + hareket
-  | 'hold'; // 1.5 sn basılı tut (zil)
+export type StepKind = 'tap' | 'multi' | 'drag' | 'shake' | 'hold';
 
 export interface TaskStep {
   kind: StepKind;
   targetId: string;
-  /** drag için hedef id */
   dropId?: string;
-  /** multi: görsel aşamaları (4 kare → 3 dokunuş) */
   stages?: string[];
-  /** multi: her dokunuşta ses (1-2-3 veya tek ses tekrarı) */
   stageSounds?: string[];
-  /** drag tamamlanınca birleşik görsel */
   mergeImg?: string;
-  /** drag/hold başarı sesi */
   successSound?: string;
 }
 
@@ -172,7 +158,6 @@ export interface SequentialTask {
   materials: string[];
   sound?: string;
   steps?: TaskStep[];
-  /** dijital grid için ekstra gösterilecek id'ler */
   distractors?: string[];
 }
 
@@ -184,7 +169,6 @@ const HAMUR_SOUNDS = [hamurvurmasesi, hamurvurmasesi, hamurvurmasesi];
 const HEDIYE_SOUNDS = [kutuacSes, kutuacSes, kutuacSes];
 
 const TASK_POOL: SequentialTask[] = [
-  // ——— FİZİKSEL ———
   { id: 'p01', text: 'Zıpla, sonra ellerini çırp', type: 'physical', materials: [], sound: s_ziplaelcirp },
   { id: 'p02', text: 'Ellerini çırp, sonra zıpla', type: 'physical', materials: [], sound: s_elcirpzipla },
   { id: 'p03', text: 'Kalk, sonra otur', type: 'physical', materials: ['Sandalye'], sound: s_kalkotur },
@@ -211,7 +195,6 @@ const TASK_POOL: SequentialTask[] = [
   { id: 'p24', text: 'Ellerini çırp, sonra marakası salla', type: 'physical', materials: ['Marakas'], sound: s_elcirpmarakassalla },
   { id: 'p25', text: 'Marakası salla, sonra topa vur', type: 'physical', materials: ['Marakas', 'Top'], sound: s_marakassallatopavur },
 
-  // ——— DİJİTAL: sırayla dokun ———
   {
     id: 'd01', text: 'Topa dokun, sonra kaleme dokun', type: 'digital', materials: [],
     sound: s_topadokunkalemedokun,
@@ -270,8 +253,6 @@ const TASK_POOL: SequentialTask[] = [
       { kind: 'tap', targetId: 'cicek' },
     ],
   },
-
-  // ——— DİJİTAL: 3 dokunuş + dokun ———
   {
     id: 'd11', text: 'Yumurtayı kır, sonra arabaya dokun', type: 'digital', materials: [],
     sound: s_yumurtakirarabadokun,
@@ -308,8 +289,6 @@ const TASK_POOL: SequentialTask[] = [
     ],
     distractors: ['elma', 'kalem'],
   },
-
-  // ——— DİJİTAL: sürükle ———
   {
     id: 'd15', text: 'Havucu tavşana ver, sonra topa dokun', type: 'digital', materials: [],
     sound: s_havucvertopdokun,
@@ -354,8 +333,6 @@ const TASK_POOL: SequentialTask[] = [
     ],
     distractors: ['top', 'saat'],
   },
-
-  // ——— DİJİTAL: salla / bas ———
   {
     id: 'd20', text: 'Marakası salla, sonra kaleme dokun', type: 'digital', materials: [],
     sound: s_marakassallakalemdokun,
@@ -413,7 +390,12 @@ const TASK_POOL: SequentialTask[] = [
 ];
 
 function shuffle<T>(arr: T[]): T[] {
-  return [...arr].sort(() => 0.5 - Math.random());
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
 function playFx(src?: string) {
@@ -421,6 +403,20 @@ function playFx(src?: string) {
   const a = new Audio(src);
   a.volume = 1;
   a.play().catch(() => {});
+}
+
+function buildGrid(task: SequentialTask): NesneDef[] {
+  if (!task.steps) return [];
+  const ids = new Set<string>();
+  task.steps.forEach((s) => {
+    ids.add(s.targetId);
+    if (s.dropId) ids.add(s.dropId);
+  });
+  (task.distractors || []).forEach((d) => ids.add(d));
+  const all = Object.keys(OBJECTS);
+  const extra = shuffle(all.filter((id) => !ids.has(id))).slice(0, Math.max(0, 5 - ids.size));
+  extra.forEach((e) => ids.add(e));
+  return shuffle(Array.from(ids).map((id) => OBJECTS[id]).filter(Boolean));
 }
 
 interface Yonerge8Props {
@@ -433,8 +429,10 @@ interface Yonerge8Props {
 type Phase = 'prep' | 'running' | 'result';
 
 const HOLD_MS = 1500;
-const SHAKE_THRESHOLD = 18;
-const SHAKE_NEEDED = 4;
+const MOVE_THRESHOLD = 12;
+const SHAKE_THRESHOLD = 14;
+const SHAKE_NEEDED = 3;
+const TAP_MAX_MOVE = 14;
 
 export default function Yonerge8({
   itemCode = 'YTB 3.3',
@@ -448,26 +446,46 @@ export default function Yonerge8({
   const [score, setScore] = useState(0);
   const [locked, setLocked] = useState(false);
 
-  // Adım takibi
   const [stepIdx, setStepIdx] = useState(0);
   const [multiCount, setMultiCount] = useState(0);
-  const [doneTargets, setDoneTargets] = useState<string[]>([]);
+  const [doneIds, setDoneIds] = useState<string[]>([]);
   const [mergeMap, setMergeMap] = useState<Record<string, string>>({});
   const [zilPressed, setZilPressed] = useState(false);
   const [wrongId, setWrongId] = useState<string | null>(null);
+  const [gridItems, setGridItems] = useState<NesneDef[]>([]);
 
-  // Drag
+  // Serbest etkileşim pointer state
   const [dragId, setDragId] = useState<string | null>(null);
-  const dragPos = useRef({ x: 0, y: 0 });
   const [dragStyle, setDragStyle] = useState<{ x: number; y: number } | null>(null);
+  const [shakeActiveId, setShakeActiveId] = useState<string | null>(null);
 
-  // Hold / shake
+  const ptr = useRef<{
+    id: string;
+    startX: number;
+    startY: number;
+    lastX: number;
+    lastY: number;
+    moved: boolean;
+    shakeCount: number;
+    holding: boolean;
+  } | null>(null);
+
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const shakeCount = useRef(0);
-  const lastShakePos = useRef<{ x: number; y: number } | null>(null);
-
   const introRef = useRef<HTMLAudioElement | null>(null);
   const instrRef = useRef<HTMLAudioElement | null>(null);
+  const lockedRef = useRef(false);
+  const stepIdxRef = useRef(0);
+  const multiCountRef = useRef(0);
+  const currentIndexRef = useRef(0);
+  const selectedRef = useRef(selected);
+  const scoreRef = useRef(0);
+
+  useEffect(() => { lockedRef.current = locked; }, [locked]);
+  useEffect(() => { stepIdxRef.current = stepIdx; }, [stepIdx]);
+  useEffect(() => { multiCountRef.current = multiCount; }, [multiCount]);
+  useEffect(() => { currentIndexRef.current = currentIndex; }, [currentIndex]);
+  useEffect(() => { selectedRef.current = selected; }, [selected]);
+  useEffect(() => { scoreRef.current = score; }, [score]);
 
   const currentTask = selected[currentIndex];
   const currentStep = currentTask?.steps?.[stepIdx];
@@ -491,7 +509,6 @@ export default function Yonerge8({
     }
   };
 
-  // Giriş sesi
   useEffect(() => {
     if (phase !== 'prep') return;
     const a = new Audio(girisSes);
@@ -504,7 +521,6 @@ export default function Yonerge8({
     };
   }, [phase]);
 
-  // Yönerge sesi
   useEffect(() => {
     if (phase !== 'running') return;
     const task = selected[currentIndex];
@@ -520,19 +536,28 @@ export default function Yonerge8({
     };
   }, [phase, currentIndex]); // eslint-disable-line
 
-  const resetStepState = () => {
+  const clearHold = () => {
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+  };
+
+  const resetStepState = useCallback(() => {
     setStepIdx(0);
+    stepIdxRef.current = 0;
     setMultiCount(0);
-    setDoneTargets([]);
+    multiCountRef.current = 0;
+    setDoneIds([]);
     setMergeMap({});
     setZilPressed(false);
     setWrongId(null);
     setDragId(null);
     setDragStyle(null);
-    shakeCount.current = 0;
-    lastShakePos.current = null;
-    if (holdTimer.current) clearTimeout(holdTimer.current);
-  };
+    setShakeActiveId(null);
+    ptr.current = null;
+    clearHold();
+  }, []);
 
   const replaceTask = (index: number) => {
     const used = new Set(selected.map((t) => t.id));
@@ -549,240 +574,340 @@ export default function Yonerge8({
   const startAssessment = () => {
     stopIntro();
     setCurrentIndex(0);
+    currentIndexRef.current = 0;
     setScore(0);
+    scoreRef.current = 0;
     setLocked(false);
+    lockedRef.current = false;
     resetStepState();
+    const first = selected[0];
+    if (first?.type === 'digital') setGridItems(buildGrid(first));
+    else setGridItems([]);
     setPhase('running');
   };
 
-  const goNext = (correct: boolean) => {
-    const newScore = score + (correct ? 1 : 0);
-    const next = currentIndex + 1;
+  const goNext = useCallback((correct: boolean) => {
+    const newScore = scoreRef.current + (correct ? 1 : 0);
+    scoreRef.current = newScore;
     setScore(newScore);
+    const next = currentIndexRef.current + 1;
+
     if (next >= 10) {
       setPhase('result');
       if (newScore >= 8) confetti({ particleCount: 250, spread: 90, origin: { y: 0.6 } });
       return;
     }
+
+    currentIndexRef.current = next;
     setCurrentIndex(next);
     setLocked(false);
+    lockedRef.current = false;
     resetStepState();
-  };
 
-  const completeStep = useCallback(() => {
-    const task = selected[currentIndex];
-    if (!task?.steps) return;
-    const step = task.steps[stepIdx];
-    if (step) {
-      setDoneTargets((d) => [...d, step.targetId + (step.dropId || '')]);
-    }
-    const nextStep = stepIdx + 1;
-    if (nextStep >= task.steps.length) {
-      setLocked(true);
-      setTimeout(() => goNext(true), 500);
-    } else {
-      setStepIdx(nextStep);
-      setMultiCount(0);
-      setZilPressed(false);
-      shakeCount.current = 0;
-      lastShakePos.current = null;
-    }
-  }, [selected, currentIndex, stepIdx, score]); // eslint-disable-line
+    const nextTask = selectedRef.current[next];
+    if (nextTask?.type === 'digital') setGridItems(buildGrid(nextTask));
+    else setGridItems([]);
+  }, [resetStepState]);
 
-  const failTrial = (id?: string) => {
-    if (locked) return;
+  const failTrial = useCallback((id?: string) => {
+    if (lockedRef.current) return;
+    lockedRef.current = true;
     setLocked(true);
+    clearHold();
+    ptr.current = null;
+    setDragId(null);
+    setDragStyle(null);
+    setShakeActiveId(null);
     if (id) setWrongId(id);
     setTimeout(() => {
       setWrongId(null);
       goNext(false);
-    }, 600);
+    }, 550);
+  }, [goNext]);
+
+  const completeStep = useCallback(() => {
+    if (lockedRef.current) return;
+    const task = selectedRef.current[currentIndexRef.current];
+    if (!task?.steps) return;
+    const si = stepIdxRef.current;
+    const step = task.steps[si];
+    if (step) {
+      setDoneIds((d) => (d.includes(step.targetId) ? d : [...d, step.targetId]));
+    }
+    const nextStep = si + 1;
+    if (nextStep >= task.steps.length) {
+      lockedRef.current = true;
+      setLocked(true);
+      setTimeout(() => goNext(true), 450);
+    } else {
+      stepIdxRef.current = nextStep;
+      setStepIdx(nextStep);
+      multiCountRef.current = 0;
+      setMultiCount(0);
+      setZilPressed(false);
+      setShakeActiveId(null);
+      ptr.current = null;
+      clearHold();
+    }
+  }, [goNext]);
+
+  const getStep = () => {
+    const task = selectedRef.current[currentIndexRef.current];
+    return task?.steps?.[stepIdxRef.current];
   };
 
-  // ——— Grid öğeleri ———
-  const gridItems = (() => {
-    if (!currentTask?.steps) return [] as NesneDef[];
-    const ids = new Set<string>();
-    currentTask.steps.forEach((s) => {
-      ids.add(s.targetId);
-      if (s.dropId) ids.add(s.dropId);
-    });
-    (currentTask.distractors || []).forEach((d) => ids.add(d));
-    // en az 4–6 hücre
-    const all = Object.keys(OBJECTS);
-    const extra = shuffle(all.filter((id) => !ids.has(id))).slice(0, Math.max(0, 5 - ids.size));
-    extra.forEach((e) => ids.add(e));
-    return shuffle(Array.from(ids).map((id) => OBJECTS[id]).filter(Boolean));
-  })();
+  // ——— Serbest pointer: her nesnede dokun / sürükle / salla / bas ———
+  const onItemPointerDown = (e: React.PointerEvent, id: string) => {
+    if (lockedRef.current) return;
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+
+    ptr.current = {
+      id,
+      startX: e.clientX,
+      startY: e.clientY,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      moved: false,
+      shakeCount: 0,
+      holding: true,
+    };
+
+    const step = getStep();
+    // Hold hedefi: basılı tutmaya başla
+    if (step?.kind === 'hold' && step.targetId === id) {
+      setZilPressed(true);
+      clearHold();
+      holdTimer.current = setTimeout(() => {
+        if (lockedRef.current) return;
+        playFx(step.successSound);
+        setZilPressed(false);
+        completeStep();
+      }, HOLD_MS);
+    } else if (step?.kind === 'hold' && step.targetId !== id) {
+      // yanlış nesneye basma → hata (kısa basışta da sayılır; move ile drag'e dönerse iptal edilmez)
+      // hemen fail etme: kullanıcı sürükleyebilir; pointer up'ta karar ver
+    }
+
+    if (step?.kind === 'shake' && step.targetId === id) {
+      setShakeActiveId(id);
+    }
+  };
+
+  const onRootPointerMove = (e: React.PointerEvent) => {
+    const p = ptr.current;
+    if (!p || lockedRef.current) return;
+
+    const dx = e.clientX - p.startX;
+    const dy = e.clientY - p.startY;
+    const distFromStart = Math.sqrt(dx * dx + dy * dy);
+    if (distFromStart > MOVE_THRESHOLD) p.moved = true;
+
+    // Hold iptal (hareket ettiyse basılı tut değil)
+    if (p.moved && p.holding) {
+      clearHold();
+      setZilPressed(false);
+    }
+
+    // Sürükleme görseli
+    if (p.moved) {
+      setDragId(p.id);
+      setDragStyle({ x: e.clientX, y: e.clientY });
+    }
+
+    // Sallama sayacı
+    const sdx = e.clientX - p.lastX;
+    const sdy = e.clientY - p.lastY;
+    const stepDist = Math.sqrt(sdx * sdx + sdy * sdy);
+    if (stepDist > SHAKE_THRESHOLD) {
+      p.shakeCount += 1;
+      p.lastX = e.clientX;
+      p.lastY = e.clientY;
+
+      const step = getStep();
+      if (step?.kind === 'shake' && step.targetId === p.id && p.shakeCount >= SHAKE_NEEDED) {
+        playFx(step.successSound);
+        setShakeActiveId(null);
+        setDragId(null);
+        setDragStyle(null);
+        ptr.current = null;
+        completeStep();
+      }
+    }
+  };
+
+  const onRootPointerUp = (e: React.PointerEvent) => {
+    const p = ptr.current;
+    clearHold();
+    setZilPressed(false);
+    setShakeActiveId(null);
+
+    if (!p || lockedRef.current) {
+      ptr.current = null;
+      setDragId(null);
+      setDragStyle(null);
+      return;
+    }
+
+    const step = getStep();
+    const totalMove = Math.sqrt(
+      (e.clientX - p.startX) ** 2 + (e.clientY - p.startY) ** 2
+    );
+    const wasTap = !p.moved && totalMove < TAP_MAX_MOVE;
+
+    // ——— Sürükle bırak ———
+    if (p.moved && step) {
+      const dropEl = document.elementFromPoint(e.clientX, e.clientY);
+      const dropId = dropEl?.closest('[data-obj-id]')?.getAttribute('data-obj-id');
+
+      if (step.kind === 'drag' && p.id === step.targetId) {
+        if (dropId === step.dropId) {
+          if (step.mergeImg) {
+            setMergeMap((m) => ({ ...m, [step.dropId!]: step.mergeImg! }));
+          }
+          playFx(step.successSound);
+          setDragId(null);
+          setDragStyle(null);
+          ptr.current = null;
+          completeStep();
+          return;
+        }
+        // yanlış hedefe bırakma
+        if (dropId && dropId !== p.id) {
+          setDragId(null);
+          setDragStyle(null);
+          ptr.current = null;
+          failTrial(dropId);
+          return;
+        }
+        // boşluğa bırak → geri dön, hata değil
+        setDragId(null);
+        setDragStyle(null);
+        ptr.current = null;
+        return;
+      }
+
+      // Beklenen drag değilken başka nesneyi sürükleyip bıraktı
+      if (step.kind === 'drag' && p.id !== step.targetId && dropId) {
+        setDragId(null);
+        setDragStyle(null);
+        ptr.current = null;
+        failTrial(p.id);
+        return;
+      }
+
+      // Sallama yetersiz kaldıysa sadece bırak
+      if (step.kind === 'shake' && p.id === step.targetId) {
+        setDragId(null);
+        setDragStyle(null);
+        ptr.current = null;
+        return;
+      }
+    }
+
+    // ——— Basit dokunuş ———
+    if (wasTap && step) {
+      // multi
+      if (step.kind === 'multi') {
+        if (p.id === step.targetId) {
+          const next = multiCountRef.current + 1;
+          const soundIdx = Math.min(multiCountRef.current, (step.stageSounds?.length || 1) - 1);
+          playFx(step.stageSounds?.[soundIdx]);
+          multiCountRef.current = next;
+          setMultiCount(next);
+          // 3. dokunuşta son kare (index 3) göster, sonra geç
+          if (next >= 3) {
+            setTimeout(() => completeStep(), 700);
+          }
+        } else {
+          failTrial(p.id);
+        }
+        ptr.current = null;
+        setDragId(null);
+        setDragStyle(null);
+        return;
+      }
+
+      // sırayla dokun
+      if (step.kind === 'tap') {
+        if (p.id === step.targetId) completeStep();
+        else failTrial(p.id);
+        ptr.current = null;
+        setDragId(null);
+        setDragStyle(null);
+        return;
+      }
+
+      // drag beklenirken sadece dokunma → hata değil
+      if (step.kind === 'drag') {
+        // yanlış nesneye dokunmak da hata sayılmaz (sürüklemesi gerekir)
+        ptr.current = null;
+        setDragId(null);
+        setDragStyle(null);
+        return;
+      }
+
+      // shake beklenirken sadece dokunma → tamamlanmaz; yanlış nesne → hata
+      if (step.kind === 'shake') {
+        if (p.id !== step.targetId) failTrial(p.id);
+        ptr.current = null;
+        setDragId(null);
+        setDragStyle(null);
+        return;
+      }
+
+      // hold: kısa basış yetersiz; yanlış nesneye kısa basış → hata
+      if (step.kind === 'hold') {
+        if (p.id !== step.targetId) failTrial(p.id);
+        ptr.current = null;
+        setDragId(null);
+        setDragStyle(null);
+        return;
+      }
+    }
+
+    ptr.current = null;
+    setDragId(null);
+    setDragStyle(null);
+  };
+
+  const handlePhysical = (correct: boolean) => {
+    if (lockedRef.current) return;
+    lockedRef.current = true;
+    setLocked(true);
+    goNext(correct);
+  };
 
   const displayImg = (id: string): string | undefined => {
     if (mergeMap[id]) return mergeMap[id];
     if (id === 'zil') return zilPressed ? zilacikImg : zilkapaliImg;
     const step = currentStep;
     if (step?.kind === 'multi' && step.targetId === id && step.stages) {
+      // multiCount 0→1.kare, 1→2, 2→3, 3→4 (son)
       return step.stages[Math.min(multiCount, step.stages.length - 1)];
+    }
+    // multi tamamlandıysa son kare kalsın
+    if (doneIds.includes(id)) {
+      const st = currentTask?.steps?.find((s) => s.targetId === id && s.kind === 'multi');
+      if (st?.stages) return st.stages[st.stages.length - 1];
     }
     return OBJECTS[id]?.img;
   };
 
-  // ——— TAP ———
-  const handleTap = (id: string) => {
-    if (locked || !currentStep) return;
-    if (currentStep.kind === 'drag') return; // sürükle bekleniyor, dokun yanlış değil
-    if (currentStep.kind === 'shake' || currentStep.kind === 'hold') return;
-
-    if (currentStep.kind === 'multi') {
-      if (id !== currentStep.targetId) {
-        failTrial(id);
-        return;
-      }
-      const next = multiCount + 1;
-      const soundIdx = Math.min(multiCount, (currentStep.stageSounds?.length || 1) - 1);
-      playFx(currentStep.stageSounds?.[soundIdx]);
-      setMultiCount(next);
-      // 3 dokunuş → tamam (4. kare gösterilir)
-      if (next >= 3) {
-        setTimeout(() => completeStep(), 350);
-      }
-      return;
-    }
-
-    if (currentStep.kind === 'tap') {
-      if (id === currentStep.targetId) {
-        completeStep();
-      } else {
-        failTrial(id);
-      }
-    }
-  };
-
-  // ——— DRAG ———
-  const onPointerDownDrag = (e: React.PointerEvent, id: string) => {
-    if (locked || currentStep?.kind !== 'drag') return;
-    if (id !== currentStep.targetId) return;
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    setDragId(id);
-    dragPos.current = { x: e.clientX, y: e.clientY };
-    setDragStyle({ x: e.clientX, y: e.clientY });
-  };
-
-  const onPointerMoveDrag = (e: React.PointerEvent) => {
-    if (!dragId) return;
-    setDragStyle({ x: e.clientX, y: e.clientY });
-  };
-
-  const onPointerUpDrag = (e: React.PointerEvent) => {
-    if (!dragId || currentStep?.kind !== 'drag') {
-      setDragId(null);
-      setDragStyle(null);
-      return;
-    }
-    const dropEl = document.elementFromPoint(e.clientX, e.clientY);
-    const dropId = dropEl?.closest('[data-obj-id]')?.getAttribute('data-obj-id');
-    if (dropId === currentStep.dropId) {
-      if (currentStep.mergeImg) {
-        setMergeMap((m) => ({ ...m, [currentStep.dropId!]: currentStep.mergeImg! }));
-      }
-      playFx(currentStep.successSound);
-      setDragId(null);
-      setDragStyle(null);
-      completeStep();
-    } else {
-      // yanlış yere bırakma → başarısız; boşluğa bırakma → sadece geri dön
-      setDragId(null);
-      setDragStyle(null);
-      if (dropId && dropId !== currentStep.targetId) {
-        failTrial(dropId);
-      }
-    }
-  };
-
-  // ——— HOLD (zil 1.5s) ———
-  const onHoldStart = (id: string) => {
-    if (locked || currentStep?.kind !== 'hold') return;
-    if (id !== currentStep.targetId) {
-      failTrial(id);
-      return;
-    }
-    setZilPressed(true);
-    holdTimer.current = setTimeout(() => {
-      playFx(currentStep.successSound);
-      completeStep();
-    }, HOLD_MS);
-  };
-
-  const onHoldEnd = () => {
-    if (holdTimer.current) {
-      clearTimeout(holdTimer.current);
-      holdTimer.current = null;
-    }
-    if (currentStep?.kind === 'hold' && !locked) {
-      setZilPressed(false);
-    }
-  };
-
-  // ——— SHAKE ———
-  const onShakeStart = (e: React.PointerEvent, id: string) => {
-    if (locked || currentStep?.kind !== 'shake') return;
-    if (id !== currentStep.targetId) {
-      failTrial(id);
-      return;
-    }
-    shakeCount.current = 0;
-    lastShakePos.current = { x: e.clientX, y: e.clientY };
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-  };
-
-  const onShakeMove = (e: React.PointerEvent) => {
-    if (locked || currentStep?.kind !== 'shake' || !lastShakePos.current) return;
-    const dx = e.clientX - lastShakePos.current.x;
-    const dy = e.clientY - lastShakePos.current.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > SHAKE_THRESHOLD) {
-      shakeCount.current += 1;
-      lastShakePos.current = { x: e.clientX, y: e.clientY };
-      if (shakeCount.current >= SHAKE_NEEDED) {
-        playFx(currentStep.successSound);
-        lastShakePos.current = null;
-        completeStep();
-      }
-    }
-  };
-
-  const onShakeEnd = () => {
-    lastShakePos.current = null;
-    shakeCount.current = 0;
-  };
-
-  const handlePhysical = (correct: boolean) => {
-    if (locked) return;
-    setLocked(true);
-    goNext(correct);
-  };
-
-  const isDoneVisual = (id: string) =>
-    doneTargets.some((d) => d === id || d.startsWith(id));
-
   return (
     <div
-      className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none"
-      onPointerMove={(e) => {
-        onPointerMoveDrag(e);
-        onShakeMove(e);
-      }}
-      onPointerUp={(e) => {
-        onPointerUpDrag(e);
-        onShakeEnd();
-        onHoldEnd();
-      }}
+      className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none touch-none"
+      onPointerMove={onRootPointerMove}
+      onPointerUp={onRootPointerUp}
       onPointerCancel={() => {
+        clearHold();
+        setZilPressed(false);
+        setShakeActiveId(null);
+        ptr.current = null;
         setDragId(null);
         setDragStyle(null);
-        onShakeEnd();
-        onHoldEnd();
       }}
     >
-      {/* HEADER */}
       <div className="shrink-0 p-4 landscape:py-2 landscape:px-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md relative z-10">
         <button
           onClick={() => {
@@ -809,7 +934,6 @@ export default function Yonerge8({
 
       <div className="flex-1 relative flex flex-col items-center justify-center p-3 sm:p-4 overflow-y-auto bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-slate-950">
 
-        {/* ========== PREP ========== */}
         {phase === 'prep' && (
           <div className="w-full max-w-2xl animate-in zoom-in-95 duration-300 pb-6 space-y-5">
             <div className="text-center">
@@ -882,7 +1006,6 @@ export default function Yonerge8({
           </div>
         )}
 
-        {/* ========== RUNNING ========== */}
         {phase === 'running' && currentTask && (
           <div className="w-full max-w-3xl flex flex-col items-center animate-in slide-in-from-right-6 duration-300">
             <div className="w-full bg-slate-800/60 border-2 border-slate-700 rounded-[2rem] p-5 md:p-8 flex flex-col items-center shadow-2xl mb-4">
@@ -902,10 +1025,7 @@ export default function Yonerge8({
               {currentTask.type === 'digital' && currentTask.steps && (
                 <p className="text-slate-400 text-xs mt-2">
                   Adım {Math.min(stepIdx + 1, currentTask.steps.length)} / {currentTask.steps.length}
-                  {currentStep?.kind === 'multi' && ` · dokunuş ${multiCount}/3`}
-                  {currentStep?.kind === 'hold' && ' · 1,5 sn basılı tut'}
-                  {currentStep?.kind === 'shake' && ' · salla'}
-                  {currentStep?.kind === 'drag' && ' · sürükle'}
+                  {currentStep?.kind === 'multi' && multiCount > 0 && ` · ${multiCount}/3`}
                 </p>
               )}
             </div>
@@ -913,12 +1033,10 @@ export default function Yonerge8({
             {currentTask.type === 'digital' && (
               <div className="grid grid-cols-2 landscape:grid-cols-3 gap-3 landscape:gap-4 w-full max-w-md landscape:max-w-2xl">
                 {gridItems.map((item) => {
-                  const done = isDoneVisual(item.id);
+                  const done = doneIds.includes(item.id);
                   const img = displayImg(item.id);
-                  const isDragSource = currentStep?.kind === 'drag' && currentStep.targetId === item.id;
-                  const isHoldTarget = currentStep?.kind === 'hold' && currentStep.targetId === item.id;
-                  const isShakeTarget = currentStep?.kind === 'shake' && currentStep.targetId === item.id;
                   const hiding = dragId === item.id;
+                  const shaking = shakeActiveId === item.id;
 
                   return (
                     <div
@@ -926,35 +1044,36 @@ export default function Yonerge8({
                       data-obj-id={item.id}
                       className="min-h-[120px] landscape:min-h-[100px] relative"
                     >
-                      <button
-                        type="button"
-                        disabled={locked || done}
-                        onClick={() => handleTap(item.id)}
-                        onPointerDown={(e) => {
-                          if (isDragSource) onPointerDownDrag(e, item.id);
-                          if (isHoldTarget) onHoldStart(item.id);
-                          if (isShakeTarget) onShakeStart(e, item.id);
-                        }}
-                        onPointerUp={() => {
-                          if (isHoldTarget) onHoldEnd();
-                        }}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        data-obj-id={item.id}
+                        onPointerDown={(e) => onItemPointerDown(e, item.id)}
                         className={
-                          `relative flex flex-col items-center justify-center rounded-2xl border-2 bg-slate-800/80 overflow-hidden w-full h-full p-2 transition-all duration-200 ` +
+                          `relative flex flex-col items-center justify-center rounded-2xl border-2 bg-slate-800/80 overflow-hidden w-full h-full p-2 transition-colors duration-150 ` +
                           (wrongId === item.id
                             ? 'border-red-400 ring-2 ring-red-500/50 '
                             : done
-                              ? 'border-green-400 ring-2 ring-green-500/40 bg-green-900/25 opacity-50 '
-                              : 'border-slate-700 hover:border-slate-500 ') +
-                          (locked || done ? 'cursor-not-allowed ' : 'cursor-pointer active:scale-95 ') +
-                          (hiding ? 'opacity-20 ' : '')
+                              ? 'border-green-400 ring-2 ring-green-500/40 bg-green-900/25 opacity-55 '
+                              : shaking
+                                ? 'border-amber-400 ring-2 ring-amber-500/40 '
+                                : 'border-slate-700 ') +
+                          (locked || done ? 'pointer-events-none ' : 'cursor-pointer ') +
+                          (hiding ? 'opacity-15 ' : '')
                         }
+                        style={shaking ? { transform: 'rotate(-6deg)' } : undefined}
                       >
                         {img ? (
-                          <img src={img} alt="" className="w-[80%] h-[80%] max-w-[120px] max-h-[120px] object-contain pointer-events-none" draggable={false} />
+                          <img
+                            src={img}
+                            alt=""
+                            className="w-[80%] h-[80%] max-w-[120px] max-h-[120px] object-contain pointer-events-none"
+                            draggable={false}
+                          />
                         ) : (
-                          <span className="text-5xl">📦</span>
+                          <span className="text-5xl pointer-events-none">📦</span>
                         )}
-                      </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -970,7 +1089,6 @@ export default function Yonerge8({
           </div>
         )}
 
-        {/* ========== RESULT ========== */}
         {phase === 'result' && (
           <div className="flex flex-col items-center text-center p-8 bg-slate-900/90 rounded-3xl border border-slate-700 shadow-2xl max-w-xl animate-in zoom-in-95 duration-500">
             <Trophy
@@ -1004,7 +1122,6 @@ export default function Yonerge8({
         )}
       </div>
 
-      {/* Sürüklenen hayalet */}
       {dragId && dragStyle && OBJECTS[dragId]?.img && (
         <img
           src={OBJECTS[dragId].img}
@@ -1014,7 +1131,6 @@ export default function Yonerge8({
         />
       )}
 
-      {/* Fiziksel alt butonlar */}
       {phase === 'running' && currentTask?.type === 'physical' && (
         <div className="shrink-0 p-5 pb-8 landscape:py-3 landscape:pb-4 bg-slate-900 border-t border-slate-800 flex items-stretch justify-center gap-3 relative z-10">
           <button
