@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Gamepad2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
+import Talk from './talk';
 
 interface SozelTaklitPageProps {
   studentId: string;
@@ -15,6 +16,7 @@ interface SozelTaklitPageProps {
 export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPageProps) {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
+  const [showTolkido, setShowTolkido] = useState(false);
   
   // BURASI DÜZELTİLDİ: Artık "SÖZEL TAKLİT" modülünü arıyor.
   const moduleData = ABA_MODULES.find(m => m.name.includes("SÖZEL TAKLİT"));
@@ -60,6 +62,16 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
 
+  // TOLKİDO MODU
+  if (showTolkido) {
+    return (
+      <Talk
+        onBack={() => setShowTolkido(false)}
+        studentId={studentId}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6 relative">
       
@@ -96,6 +108,8 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
             const codePart = item.substring(0, secondSpaceIndex > -1 ? secondSpaceIndex : firstSpaceIndex);
             // Metin kısmı
             const textPart = item.substring(secondSpaceIndex > -1 ? secondSpaceIndex + 1 : firstSpaceIndex + 1);
+
+            const isTolkidoItem = item.includes("TOLKİDO");
             
             return (
                 <div key={item} className={twMerge("group p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4", isCompleted ? "bg-green-950/10 border-green-500/20" : "bg-slate-900/40 border-slate-800 hover:bg-slate-800")}>
@@ -112,6 +126,16 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
                     
                     {/* BUTON GRUBU */}
                     <div className="flex items-center gap-1">
+                         {/* TOLKİDO ÖZEL BUTONU */}
+                         {isTolkidoItem && (
+                           <button
+                             onClick={() => setShowTolkido(true)}
+                             className="flex items-center justify-center w-8 h-8 rounded-md border bg-orange-500/20 border-orange-500 text-orange-400 hover:bg-orange-500/40 transition-all mr-1"
+                             title="Tolkido"
+                           >
+                             <Gamepad2 size={16} />
+                           </button>
+                         )}
                          <button onClick={() => setStatus(item, false)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center transition-all", status === false ? "bg-red-500/20 border-red-500 text-red-400" : "bg-slate-950 border-slate-800 text-slate-500 hover:border-red-500/50")}><XCircle size={16} /></button>
                          <button onClick={() => setStatus(item, true)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center transition-all", status === true ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-800 text-slate-500 hover:border-green-500/50")}><CheckCircle2 size={16} /></button>
                     </div>
