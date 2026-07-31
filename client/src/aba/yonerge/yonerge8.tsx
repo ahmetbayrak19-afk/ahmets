@@ -248,7 +248,7 @@ export default function Yonerge8({
   itemText = 'Verilen Yönergeleri İstenen Sıra ile Yerine Getirme',
   onClose, onComplete,
 }: Yonerge8Props) {
-  const [showTut, setShowTut] = useState(true);
+  const [showTut, setShowTut] = useState(false);
   const [selected, setSelected] = useState<SequentialTask[]>(() => shuffle(TASK_POOL).slice(0, 10));
   const [phase, setPhase] = useState<Phase>('prep');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -386,11 +386,11 @@ export default function Yonerge8({
   }, [dragId]);
 
   useEffect(() => {
-    if (phase !== 'prep') return;
+    if (phase !== 'prep' || showTut) return;
     const a = new Audio(girisSes);
     introRef.current = a; a.volume = 1; a.play().catch(() => {});
     return () => { a.pause(); a.currentTime = 0; };
-  }, [phase]);
+  }, [phase, showTut]);
 
   useEffect(() => {
     if (phase !== 'running') return;
@@ -419,8 +419,15 @@ export default function Yonerge8({
     setSelected((prev) => { const copy = [...prev]; copy[index] = next; return copy; });
   };
 
+  /** Öğretmen "Değerlendirmeyi Başlat" → önce öğrenci etkileşim denemesi */
   const startAssessment = () => {
     stopIntro();
+    setShowTut(true);
+  };
+
+  /** Deneme bitince (veya Tümünü Atla) → gerçek değerlendirmeye geç */
+  const beginRunning = () => {
+    setShowTut(false);
     setCurrentIndex(0); currentIndexRef.current = 0;
     setScore(0); scoreRef.current = 0;
     setLocked(false); lockedRef.current = false;
@@ -699,7 +706,7 @@ export default function Yonerge8({
   if (showTut) {
     return (
       <Yonerge8Tutorial
-        onDone={() => setShowTut(false)}
+        onDone={beginRunning}
         onClose={onClose}
       />
     );
