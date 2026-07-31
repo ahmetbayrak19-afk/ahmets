@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import {
   XCircle, Check, X, Trophy, PlayCircle, RefreshCw, ListOrdered, Box,
 } from 'lucide-react';
@@ -346,29 +346,42 @@ export default function Yonerge8({
     }
   };
 
+  /** Ghost src + konum — React re-render'da (0,0)/boş src flaşı olmasın diye ref ile yönetilir */
+  const applyGhostDom = (id: string | null, x: number, y: number, angle = 0) => {
+    const el = ghostRef.current;
+    if (!el) return;
+    if (id && OBJECTS[id]?.img) {
+      const src = OBJECTS[id].img!;
+      if (el.getAttribute('src') !== src) el.setAttribute('src', src);
+    }
+    el.style.left = `${x - 56}px`;
+    el.style.top = `${y - 56}px`;
+    el.style.transform = `rotate(${angle}deg)`;
+    el.style.display = id ? 'block' : 'none';
+    el.style.opacity = id ? '0.95' : '0';
+  };
+
   const updateGhostPos = (x: number, y: number, angle = 0) => {
     dragPosRef.current = { x, y };
     if (rafRef.current != null) return;
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = null;
-      const el = ghostRef.current;
-      if (el) {
-        el.style.left = `${dragPosRef.current.x - 56}px`;
-        el.style.top = `${dragPosRef.current.y - 56}px`;
-        el.style.transform = `rotate(${angle}deg)`;
-        el.style.display = 'block';
-      }
+      const id = ptr.current?.id ?? null;
+      applyGhostDom(id, dragPosRef.current.x, dragPosRef.current.y, angle);
     });
   };
 
   const hideGhost = () => {
     if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     setDragId(null);
-    if (ghostRef.current) {
-      ghostRef.current.style.display = 'none';
-      ghostRef.current.style.transform = 'none';
-    }
+    applyGhostDom(null, 0, 0, 0);
   };
+
+  // dragId değişince React style'ı sıfırlayabilir — layoutEffect ile anında geri koy
+  useLayoutEffect(() => {
+    if (!dragId) return;
+    applyGhostDom(dragId, dragPosRef.current.x, dragPosRef.current.y, 0);
+  }, [dragId]);
 
   useEffect(() => {
     if (phase !== 'prep') return;
@@ -487,6 +500,10 @@ export default function Yonerge8({
       }
 
       if (p.isShakeTarget || p.moved) {
+        // Önce DOM'da ghost src+konum, sonra state (flash önleme)
+        applyGhostDom(p.id, e.clientX, e.clientY, p.isShakeTarget
+          ? Math.max(-28, Math.min(28, dx * 0.35 + Math.sin(Date.now() / 60) * 8))
+          : 0);
         setDragId((prev) => (prev === p.id ? prev : p.id));
         const angle = p.isShakeTarget
           ? Math.max(-28, Math.min(28, dx * 0.35 + Math.sin(Date.now() / 60) * 8))
@@ -507,7 +524,6 @@ export default function Yonerge8({
           startMarakasSound();
         } else {
           const gap = now - p.lastShakeMoveAt;
-          // Aralıksız sallama say (0.4 sn'den uzun duraklama birikimi sıfırlamaz ama eklemez)
           if (gap < 400) p.shakeAccumMs += gap;
           p.lastShakeMoveAt = now;
         }
@@ -538,7 +554,6 @@ export default function Yonerge8({
       stopZilSound(); stopMarakasSound(); setZilPressed(false); setShakeActiveId(null);
       if (lockedRef.current) { ptr.current = null; hideGhost(); return; }
 
-      // multi animasyon penceresinde tüm dokunuşları yoksay
       if (multiFinishingRef.current) {
         ptr.current = null; hideGhost(); return;
       }
@@ -548,7 +563,7 @@ export default function Yonerge8({
       const wasTap = !p.moved && totalMove < TAP_MAX_MOVE;
 
       if (p.moved && step) {
-        if (ghostRef.current) ghostRef.current.style.display = 'none';
+        applyGhostDom(null, 0, 0, 0);
         const dropEl = document.elementFromPoint(e.clientX, e.clientY);
         const dropId =
           dropEl?.closest?.('[data-obj-id]')?.getAttribute('data-obj-id') ||
@@ -556,7 +571,6 @@ export default function Yonerge8({
 
         if (step.kind === 'drag') {
           if (p.id === step.targetId && dropId === step.dropId) {
-            // Hedef birleşik görsel + kaynak kaybolur
             if (step.mergeImg) {
               setMergeMap((m) => ({ ...m, [step.dropId!]: step.mergeImg! }));
             }
@@ -583,7 +597,6 @@ export default function Yonerge8({
       if (wasTap && step) {
         if (step.kind === 'multi') {
           if (p.id === step.targetId) {
-            // 3'e ulaştıysa ekstra basışları yoksay (sonraki adıma sızmasın)
             if (multiCountRef.current >= 3) {
               // ignore
             } else {
@@ -591,7 +604,6 @@ export default function Yonerge8({
               const soundIdx = Math.min(multiCountRef.current, (step.stageSounds?.length || 1) - 1);
               playFx(step.stageSounds?.[soundIdx]);
               multiCountRef.current = next; setMultiCount(next);
-              // Sadece 3. basışta BİR KEZ completeStep planla
               if (next === 3) {
                 multiFinishingRef.current = true;
                 setTimeout(() => {
@@ -654,8 +666,10 @@ export default function Yonerge8({
     }
     if (isShakeTarget) {
       setShakeActiveId(id);
+      // Önce src+konum, sonra state
+      applyGhostDom(id, e.clientX, e.clientY, 0);
+      dragPosRef.current = { x: e.clientX, y: e.clientY };
       setDragId(id);
-      updateGhostPos(e.clientX, e.clientY, 0);
     }
   };
 
@@ -781,12 +795,15 @@ export default function Yonerge8({
                             shaking ? 'border-amber-400 ring-2 ring-amber-500/40 ' :
                             zilPressed && item.id === 'zil' ? 'border-yellow-400 ring-2 ring-yellow-500/40 ' :
                             'border-slate-700 ') +
-                          (locked || done || consumed ? 'pointer-events-none ' : 'cursor-grab active:cursor-grabbing ') +
-                          (hiding ? 'opacity-0 ' : '')
+                          (locked || done || consumed ? 'pointer-events-none ' : 'cursor-grab active:cursor-grabbing ')
                         }
-                        style={{ touchAction: 'none' }}
+                        style={{
+                          touchAction: 'none',
+                          // Sürüklenirken görünmez ama 📦 flaşı yok — img DOM'da kalır
+                          visibility: hiding ? 'hidden' : 'visible',
+                        }}
                       >
-                        {!consumed && img ? (
+                        {img ? (
                           <img src={img} alt="" className="w-[80%] h-[80%] max-w-[120px] max-h-[120px] object-contain pointer-events-none" draggable={false} />
                         ) : !consumed ? (
                           <span className="text-5xl pointer-events-none">📦</span>
@@ -821,12 +838,12 @@ export default function Yonerge8({
         )}
       </div>
 
+      {/* Ghost: src/position yalnızca ref ile — React src={{dragId}} flaşı yok */}
       <img
         ref={ghostRef}
-        src={dragId && OBJECTS[dragId]?.img ? OBJECTS[dragId].img : ''}
         alt=""
-        className="fixed pointer-events-none z-[200] w-28 h-28 object-contain opacity-95 drop-shadow-2xl"
-        style={{ display: 'none', left: 0, top: 0, transformOrigin: 'center center' }}
+        className="fixed pointer-events-none z-[200] w-28 h-28 object-contain drop-shadow-2xl"
+        style={{ display: 'none', left: 0, top: 0, transformOrigin: 'center center', opacity: 0 }}
         draggable={false}
       />
 
