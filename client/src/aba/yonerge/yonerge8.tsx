@@ -191,190 +191,31 @@ const TASK_POOL: SequentialTask[] = [
   { id: 'p23', text: 'Marakası salla, sonra zıpla', type: 'physical', materials: ['Marakas'], sound: s_marakassallazipla },
   { id: 'p24', text: 'Ellerini çırp, sonra marakası salla', type: 'physical', materials: ['Marakas'], sound: s_elcirpmarakassalla },
   { id: 'p25', text: 'Marakası salla, sonra topa vur', type: 'physical', materials: ['Marakas', 'Top'], sound: s_marakassallatopavur },
-  {
-    id: 'd01', text: 'Topa dokun, sonra kaleme dokun', type: 'digital', materials: [],
-    sound: s_topadokunkalemedokun,
-    steps: [{ kind: 'tap', targetId: 'top' }, { kind: 'tap', targetId: 'kalem' }],
-  },
-  {
-    id: 'd02', text: 'Kaleme dokun, sonra topa dokun', type: 'digital', materials: [],
-    sound: s_kalemedokuntopadokun,
-    steps: [{ kind: 'tap', targetId: 'kalem' }, { kind: 'tap', targetId: 'top' }],
-  },
-  {
-    id: 'd03', text: 'Elmaya dokun, sonra kitaba dokun', type: 'digital', materials: [],
-    sound: s_elmadokunkitapdokun,
-    steps: [{ kind: 'tap', targetId: 'elma' }, { kind: 'tap', targetId: 'kitap' }],
-  },
-  {
-    id: 'd04', text: 'Anahtara dokun, sonra saate dokun', type: 'digital', materials: [],
-    sound: s_anahtardokunsaatdokun,
-    steps: [{ kind: 'tap', targetId: 'anahtar' }, { kind: 'tap', targetId: 'saat' }],
-  },
-  {
-    id: 'd05', text: 'Çiçeğe dokun, sonra arabaya dokun', type: 'digital', materials: [],
-    sound: s_cicekdokunarabadokun,
-    steps: [{ kind: 'tap', targetId: 'cicek' }, { kind: 'tap', targetId: 'araba' }],
-  },
-  {
-    id: 'd06', text: 'Silgiye dokun, sonra deftere dokun', type: 'digital', materials: [],
-    sound: s_silgidokundefterdokun,
-    steps: [{ kind: 'tap', targetId: 'silgi' }, { kind: 'tap', targetId: 'defter' }],
-  },
-  {
-    id: 'd07', text: 'Çantaya dokun, sonra tarağa dokun', type: 'digital', materials: [],
-    sound: s_cantadokuntarakdokun,
-    steps: [{ kind: 'tap', targetId: 'canta' }, { kind: 'tap', targetId: 'tarak' }],
-  },
-  {
-    id: 'd08', text: 'Bebeğe dokun, sonra topa dokun', type: 'digital', materials: [],
-    sound: s_bebekdokuntopdokun,
-    steps: [{ kind: 'tap', targetId: 'bebek' }, { kind: 'tap', targetId: 'top' }],
-  },
-  {
-    id: 'd09', text: 'Kitaba, kaleme ve topa sırayla dokun', type: 'digital', materials: [],
-    sound: s_kitapkalemtopdokun,
-    steps: [{ kind: 'tap', targetId: 'kitap' }, { kind: 'tap', targetId: 'kalem' }, { kind: 'tap', targetId: 'top' }],
-  },
-  {
-    id: 'd10', text: 'Arabaya, saate ve çiçeğe sırayla dokun', type: 'digital', materials: [],
-    sound: s_arabasaatcicekdokun,
-    steps: [{ kind: 'tap', targetId: 'araba' }, { kind: 'tap', targetId: 'saat' }, { kind: 'tap', targetId: 'cicek' }],
-  },
-  {
-    id: 'd11', text: 'Yumurtayı kır, sonra arabaya dokun', type: 'digital', materials: [],
-    sound: s_yumurtakirarabadokun,
-    steps: [
-      { kind: 'multi', targetId: 'yumurta', stages: YUMURTA_STAGES, stageSounds: YUMURTA_SOUNDS },
-      { kind: 'tap', targetId: 'araba' },
-    ],
-    distractors: ['kalem', 'elma'],
-  },
-  {
-    id: 'd12', text: 'Yumurtayı kır, çiçeğe dokun, saate dokun', type: 'digital', materials: [],
-    sound: s_yumurtakircicekdokunsaatdokun,
-    steps: [
-      { kind: 'multi', targetId: 'yumurta', stages: YUMURTA_STAGES, stageSounds: YUMURTA_SOUNDS },
-      { kind: 'tap', targetId: 'cicek' },
-      { kind: 'tap', targetId: 'saat' },
-    ],
-  },
-  {
-    id: 'd13', text: 'Hamuru ez, sonra bebeğe dokun', type: 'digital', materials: [],
-    sound: s_hamurezbebekdokun,
-    steps: [
-      { kind: 'multi', targetId: 'hamur', stages: HAMUR_STAGES, stageSounds: HAMUR_SOUNDS },
-      { kind: 'tap', targetId: 'bebek' },
-    ],
-    distractors: ['top', 'kalem'],
-  },
-  {
-    id: 'd14', text: 'Kutuyu aç, sonra topa dokun', type: 'digital', materials: [],
-    sound: s_kutuactopdokun,
-    steps: [
-      { kind: 'multi', targetId: 'hediye', stages: HEDIYE_STAGES, stageSounds: HEDIYE_SOUNDS },
-      { kind: 'tap', targetId: 'top' },
-    ],
-    distractors: ['elma', 'kalem'],
-  },
-  {
-    id: 'd15', text: 'Havucu tavşana ver, sonra topa dokun', type: 'digital', materials: [],
-    sound: s_havucvertopdokun,
-    steps: [
-      { kind: 'drag', targetId: 'havuc', dropId: 'tavsan', mergeImg: tavsanhavucImg },
-      { kind: 'tap', targetId: 'top' },
-    ],
-    distractors: ['kalem', 'elma'],
-  },
-  {
-    id: 'd16', text: 'Havucu tavşana ver, topu sepete at', type: 'digital', materials: [],
-    sound: s_havuctavsanvertopusepeteat,
-    steps: [
-      { kind: 'drag', targetId: 'havuc', dropId: 'tavsan', mergeImg: tavsanhavucImg },
-      { kind: 'drag', targetId: 'top', dropId: 'sepet', successSound: topsepetSes },
-    ],
-  },
-  {
-    id: 'd17', text: 'Topu sepete at, sonra kaleme dokun', type: 'digital', materials: [],
-    sound: s_topsepeteatkalemdokun,
-    steps: [
-      { kind: 'drag', targetId: 'top', dropId: 'sepet', successSound: topsepetSes },
-      { kind: 'tap', targetId: 'kalem' },
-    ],
-    distractors: ['elma', 'araba'],
-  },
-  {
-    id: 'd18', text: 'Anahtarı kilide tak, sonra bebeğe dokun', type: 'digital', materials: [],
-    sound: s_anahtartakbebekdokun,
-    steps: [
-      { kind: 'drag', targetId: 'anahtar', dropId: 'kilit', mergeImg: kilitanahtarImg },
-      { kind: 'tap', targetId: 'bebek' },
-    ],
-    distractors: ['top', 'kalem'],
-  },
-  {
-    id: 'd19', text: 'Çiçeği vazoya koy, sonra elmaya dokun', type: 'digital', materials: [],
-    sound: s_cicekvazokoyelmadokun,
-    steps: [
-      { kind: 'drag', targetId: 'cicek', dropId: 'vazo', mergeImg: vazocicekImg },
-      { kind: 'tap', targetId: 'elma' },
-    ],
-    distractors: ['top', 'saat'],
-  },
-  {
-    id: 'd20', text: 'Marakası salla, sonra kaleme dokun', type: 'digital', materials: [],
-    sound: s_marakassallakalemdokun,
-    steps: [
-      { kind: 'shake', targetId: 'marakas', successSound: marakasSes },
-      { kind: 'tap', targetId: 'kalem' },
-    ],
-    distractors: ['top', 'elma'],
-  },
-  {
-    id: 'd21', text: 'Marakası salla, sonra topa dokun', type: 'digital', materials: [],
-    sound: s_marakassallatopadokun,
-    steps: [
-      { kind: 'shake', targetId: 'marakas', successSound: marakasSes },
-      { kind: 'tap', targetId: 'top' },
-    ],
-    distractors: ['kalem', 'elma'],
-  },
-  {
-    id: 'd22', text: 'Marakası salla, topa dokun, kaleme dokun', type: 'digital', materials: [],
-    sound: s_marakassallatopdokunkalemdokun,
-    steps: [
-      { kind: 'shake', targetId: 'marakas', successSound: marakasSes },
-      { kind: 'tap', targetId: 'top' },
-      { kind: 'tap', targetId: 'kalem' },
-    ],
-  },
-  {
-    id: 'd23', text: 'Zile bas, sonra elmaya dokun', type: 'digital', materials: [],
-    sound: s_zilbaselmadokun,
-    steps: [
-      { kind: 'hold', targetId: 'zil', successSound: zilsesi },
-      { kind: 'tap', targetId: 'elma' },
-    ],
-    distractors: ['top', 'kalem'],
-  },
-  {
-    id: 'd24', text: 'Zile bas, sonra kaleme dokun', type: 'digital', materials: [],
-    sound: s_zilbaskalemdokun,
-    steps: [
-      { kind: 'hold', targetId: 'zil', successSound: zilsesi },
-      { kind: 'tap', targetId: 'kalem' },
-    ],
-    distractors: ['top', 'elma'],
-  },
-  {
-    id: 'd25', text: 'Zile bas, sonra marakası salla', type: 'digital', materials: [],
-    sound: s_zilbasmarakassalla,
-    steps: [
-      { kind: 'hold', targetId: 'zil', successSound: zilsesi },
-      { kind: 'shake', targetId: 'marakas', successSound: marakasSes },
-    ],
-    distractors: ['top', 'kalem'],
-  },
+  { id: 'd01', text: 'Topa dokun, sonra kaleme dokun', type: 'digital', materials: [], sound: s_topadokunkalemedokun, steps: [{ kind: 'tap', targetId: 'top' }, { kind: 'tap', targetId: 'kalem' }] },
+  { id: 'd02', text: 'Kaleme dokun, sonra topa dokun', type: 'digital', materials: [], sound: s_kalemedokuntopadokun, steps: [{ kind: 'tap', targetId: 'kalem' }, { kind: 'tap', targetId: 'top' }] },
+  { id: 'd03', text: 'Elmaya dokun, sonra kitaba dokun', type: 'digital', materials: [], sound: s_elmadokunkitapdokun, steps: [{ kind: 'tap', targetId: 'elma' }, { kind: 'tap', targetId: 'kitap' }] },
+  { id: 'd04', text: 'Anahtara dokun, sonra saate dokun', type: 'digital', materials: [], sound: s_anahtardokunsaatdokun, steps: [{ kind: 'tap', targetId: 'anahtar' }, { kind: 'tap', targetId: 'saat' }] },
+  { id: 'd05', text: 'Çiçeğe dokun, sonra arabaya dokun', type: 'digital', materials: [], sound: s_cicekdokunarabadokun, steps: [{ kind: 'tap', targetId: 'cicek' }, { kind: 'tap', targetId: 'araba' }] },
+  { id: 'd06', text: 'Silgiye dokun, sonra deftere dokun', type: 'digital', materials: [], sound: s_silgidokundefterdokun, steps: [{ kind: 'tap', targetId: 'silgi' }, { kind: 'tap', targetId: 'defter' }] },
+  { id: 'd07', text: 'Çantaya dokun, sonra tarağa dokun', type: 'digital', materials: [], sound: s_cantadokuntarakdokun, steps: [{ kind: 'tap', targetId: 'canta' }, { kind: 'tap', targetId: 'tarak' }] },
+  { id: 'd08', text: 'Bebeğe dokun, sonra topa dokun', type: 'digital', materials: [], sound: s_bebekdokuntopdokun, steps: [{ kind: 'tap', targetId: 'bebek' }, { kind: 'tap', targetId: 'top' }] },
+  { id: 'd09', text: 'Kitaba, kaleme ve topa sırayla dokun', type: 'digital', materials: [], sound: s_kitapkalemtopdokun, steps: [{ kind: 'tap', targetId: 'kitap' }, { kind: 'tap', targetId: 'kalem' }, { kind: 'tap', targetId: 'top' }] },
+  { id: 'd10', text: 'Arabaya, saate ve çiçeğe sırayla dokun', type: 'digital', materials: [], sound: s_arabasaatcicekdokun, steps: [{ kind: 'tap', targetId: 'araba' }, { kind: 'tap', targetId: 'saat' }, { kind: 'tap', targetId: 'cicek' }] },
+  { id: 'd11', text: 'Yumurtayı kır, sonra arabaya dokun', type: 'digital', materials: [], sound: s_yumurtakirarabadokun, steps: [{ kind: 'multi', targetId: 'yumurta', stages: YUMURTA_STAGES, stageSounds: YUMURTA_SOUNDS }, { kind: 'tap', targetId: 'araba' }], distractors: ['kalem', 'elma'] },
+  { id: 'd12', text: 'Yumurtayı kır, çiçeğe dokun, saate dokun', type: 'digital', materials: [], sound: s_yumurtakircicekdokunsaatdokun, steps: [{ kind: 'multi', targetId: 'yumurta', stages: YUMURTA_STAGES, stageSounds: YUMURTA_SOUNDS }, { kind: 'tap', targetId: 'cicek' }, { kind: 'tap', targetId: 'saat' }] },
+  { id: 'd13', text: 'Hamuru ez, sonra bebeğe dokun', type: 'digital', materials: [], sound: s_hamurezbebekdokun, steps: [{ kind: 'multi', targetId: 'hamur', stages: HAMUR_STAGES, stageSounds: HAMUR_SOUNDS }, { kind: 'tap', targetId: 'bebek' }], distractors: ['top', 'kalem'] },
+  { id: 'd14', text: 'Kutuyu aç, sonra topa dokun', type: 'digital', materials: [], sound: s_kutuactopdokun, steps: [{ kind: 'multi', targetId: 'hediye', stages: HEDIYE_STAGES, stageSounds: HEDIYE_SOUNDS }, { kind: 'tap', targetId: 'top' }], distractors: ['elma', 'kalem'] },
+  { id: 'd15', text: 'Havucu tavşana ver, sonra topa dokun', type: 'digital', materials: [], sound: s_havucvertopdokun, steps: [{ kind: 'drag', targetId: 'havuc', dropId: 'tavsan', mergeImg: tavsanhavucImg }, { kind: 'tap', targetId: 'top' }], distractors: ['kalem', 'elma'] },
+  { id: 'd16', text: 'Havucu tavşana ver, topu sepete at', type: 'digital', materials: [], sound: s_havuctavsanvertopusepeteat, steps: [{ kind: 'drag', targetId: 'havuc', dropId: 'tavsan', mergeImg: tavsanhavucImg }, { kind: 'drag', targetId: 'top', dropId: 'sepet', successSound: topsepetSes }] },
+  { id: 'd17', text: 'Topu sepete at, sonra kaleme dokun', type: 'digital', materials: [], sound: s_topsepeteatkalemdokun, steps: [{ kind: 'drag', targetId: 'top', dropId: 'sepet', successSound: topsepetSes }, { kind: 'tap', targetId: 'kalem' }], distractors: ['elma', 'araba'] },
+  { id: 'd18', text: 'Anahtarı kilide tak, sonra bebeğe dokun', type: 'digital', materials: [], sound: s_anahtartakbebekdokun, steps: [{ kind: 'drag', targetId: 'anahtar', dropId: 'kilit', mergeImg: kilitanahtarImg }, { kind: 'tap', targetId: 'bebek' }], distractors: ['top', 'kalem'] },
+  { id: 'd19', text: 'Çiçeği vazoya koy, sonra elmaya dokun', type: 'digital', materials: [], sound: s_cicekvazokoyelmadokun, steps: [{ kind: 'drag', targetId: 'cicek', dropId: 'vazo', mergeImg: vazocicekImg }, { kind: 'tap', targetId: 'elma' }], distractors: ['top', 'saat'] },
+  { id: 'd20', text: 'Marakası salla, sonra kaleme dokun', type: 'digital', materials: [], sound: s_marakassallakalemdokun, steps: [{ kind: 'shake', targetId: 'marakas', successSound: marakasSes }, { kind: 'tap', targetId: 'kalem' }], distractors: ['top', 'elma'] },
+  { id: 'd21', text: 'Marakası salla, sonra topa dokun', type: 'digital', materials: [], sound: s_marakassallatopadokun, steps: [{ kind: 'shake', targetId: 'marakas', successSound: marakasSes }, { kind: 'tap', targetId: 'top' }], distractors: ['kalem', 'elma'] },
+  { id: 'd22', text: 'Marakası salla, topa dokun, kaleme dokun', type: 'digital', materials: [], sound: s_marakassallatopdokunkalemdokun, steps: [{ kind: 'shake', targetId: 'marakas', successSound: marakasSes }, { kind: 'tap', targetId: 'top' }, { kind: 'tap', targetId: 'kalem' }] },
+  { id: 'd23', text: 'Zile bas, sonra elmaya dokun', type: 'digital', materials: [], sound: s_zilbaselmadokun, steps: [{ kind: 'hold', targetId: 'zil', successSound: zilsesi }, { kind: 'tap', targetId: 'elma' }], distractors: ['top', 'kalem'] },
+  { id: 'd24', text: 'Zile bas, sonra kaleme dokun', type: 'digital', materials: [], sound: s_zilbaskalemdokun, steps: [{ kind: 'hold', targetId: 'zil', successSound: zilsesi }, { kind: 'tap', targetId: 'kalem' }], distractors: ['top', 'elma'] },
+  { id: 'd25', text: 'Zile bas, sonra marakası salla', type: 'digital', materials: [], sound: s_zilbasmarakassalla, steps: [{ kind: 'hold', targetId: 'zil', successSound: zilsesi }, { kind: 'shake', targetId: 'marakas', successSound: marakasSes }], distractors: ['top', 'kalem'] },
 ];
 
 function shuffle<T>(arr: T[]): T[] {
@@ -416,14 +257,13 @@ interface Yonerge8Props {
 
 type Phase = 'prep' | 'running' | 'result';
 
-/** Zil: basılı tutarken ~0.7 sn yeter (gecikmeli his olmasın) */
-const HOLD_MS = 700;
+/** Zile yeterli süre basılı tutma eşiği (ms) — bırakınca değerlendirilir */
+const HOLD_OK_MS = 500;
 const MOVE_FOR_DRAG = 10;
 const SHAKE_THRESHOLD = 12;
 const SHAKE_NEEDED = 3;
 const TAP_MAX_MOVE = 16;
-/** Hold sırasında titreme toleransı — küçük hareket hold'u iptal etmesin */
-const HOLD_CANCEL_MOVE = 40;
+const HOLD_CANCEL_MOVE = 50;
 
 export default function Yonerge8({
   itemCode = 'YTB 3.3',
@@ -457,10 +297,10 @@ export default function Yonerge8({
     moved: boolean;
     shakeCount: number;
     isHoldTarget: boolean;
-    holdDone: boolean;
+    holdStart: number;
   } | null>(null);
 
-  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const zilAudioRef = useRef<HTMLAudioElement | null>(null);
   const introRef = useRef<HTMLAudioElement | null>(null);
   const instrRef = useRef<HTMLAudioElement | null>(null);
   const lockedRef = useRef(false);
@@ -488,15 +328,26 @@ export default function Yonerge8({
   })();
 
   const stopIntro = () => {
-    if (introRef.current) {
-      introRef.current.pause();
-      introRef.current.currentTime = 0;
-    }
+    if (introRef.current) { introRef.current.pause(); introRef.current.currentTime = 0; }
   };
   const stopInstr = () => {
-    if (instrRef.current) {
-      instrRef.current.pause();
-      instrRef.current.currentTime = 0;
+    if (instrRef.current) { instrRef.current.pause(); instrRef.current.currentTime = 0; }
+  };
+
+  const startZilSound = () => {
+    stopZilSound();
+    const a = new Audio(zilsesi);
+    a.volume = 1;
+    a.loop = true;
+    zilAudioRef.current = a;
+    a.play().catch(() => {});
+  };
+
+  const stopZilSound = () => {
+    if (zilAudioRef.current) {
+      zilAudioRef.current.pause();
+      zilAudioRef.current.currentTime = 0;
+      zilAudioRef.current = null;
     }
   };
 
@@ -506,10 +357,7 @@ export default function Yonerge8({
     introRef.current = a;
     a.volume = 1;
     a.play().catch(() => {});
-    return () => {
-      a.pause();
-      a.currentTime = 0;
-    };
+    return () => { a.pause(); a.currentTime = 0; };
   }, [phase]);
 
   useEffect(() => {
@@ -521,26 +369,9 @@ export default function Yonerge8({
     instrRef.current = a;
     a.volume = 1;
     a.play().catch(() => {});
-    return () => {
-      a.pause();
-      a.currentTime = 0;
-    };
+    return () => { a.pause(); a.currentTime = 0; };
   }, [phase, currentIndex]); // eslint-disable-line
 
-  const clearHold = () => {
-    if (holdTimer.current) {
-      clearTimeout(holdTimer.current);
-      holdTimer.current = null;
-    }
-  };
-
-  const detachDocListeners = useCallback(() => {
-    if (!listenersAttached.current) return;
-    listenersAttached.current = false;
-    // handlers are closed over in start — stored on window via named refs below
-  }, []);
-
-  // Stable handler refs so we can add/remove document listeners
   const onDocMoveRef = useRef<(e: PointerEvent) => void>(() => {});
   const onDocUpRef = useRef<(e: PointerEvent) => void>(() => {});
 
@@ -565,7 +396,7 @@ export default function Yonerge8({
     setDragStyle(null);
     setShakeActiveId(null);
     ptr.current = null;
-    clearHold();
+    stopZilSound();
     removeDocListeners();
   }, []); // eslint-disable-line
 
@@ -601,19 +432,16 @@ export default function Yonerge8({
     scoreRef.current = newScore;
     setScore(newScore);
     const next = currentIndexRef.current + 1;
-
     if (next >= 10) {
       setPhase('result');
       if (newScore >= 8) confetti({ particleCount: 250, spread: 90, origin: { y: 0.6 } });
       return;
     }
-
     currentIndexRef.current = next;
     setCurrentIndex(next);
     setLocked(false);
     lockedRef.current = false;
     resetStepState();
-
     const nextTask = selectedRef.current[next];
     if (nextTask?.type === 'digital') setGridItems(buildGrid(nextTask));
     else setGridItems([]);
@@ -623,7 +451,7 @@ export default function Yonerge8({
     if (lockedRef.current) return;
     lockedRef.current = true;
     setLocked(true);
-    clearHold();
+    stopZilSound();
     removeDocListeners();
     ptr.current = null;
     setDragId(null);
@@ -659,16 +487,12 @@ export default function Yonerge8({
       setZilPressed(false);
       setShakeActiveId(null);
       ptr.current = null;
-      clearHold();
+      stopZilSound();
     }
   }, [goNext]);
 
-  const getStep = () => {
-    const task = selectedRef.current[currentIndexRef.current];
-    return task?.steps?.[stepIdxRef.current];
-  };
+  const getStep = () => selectedRef.current[currentIndexRef.current]?.steps?.[stepIdxRef.current];
 
-  // Document-level move/up — capture sorunu yok, sürükleme çalışır
   onDocMoveRef.current = (e: PointerEvent) => {
     const p = ptr.current;
     if (!p || lockedRef.current) return;
@@ -677,12 +501,13 @@ export default function Yonerge8({
     const dy = e.clientY - p.startY;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Hold: sadece büyük hareket iptal etsin
-    if (p.isHoldTarget && !p.holdDone) {
+    // Zil basılıyken büyük kayma → ses kes, hold iptal
+    if (p.isHoldTarget) {
       if (dist > HOLD_CANCEL_MOVE) {
-        clearHold();
+        stopZilSound();
         setZilPressed(false);
         p.isHoldTarget = false;
+        p.moved = true;
       }
     } else if (dist > MOVE_FOR_DRAG) {
       p.moved = true;
@@ -694,7 +519,6 @@ export default function Yonerge8({
       setDragStyle({ x: e.clientX, y: e.clientY });
     }
 
-    // Shake
     const sdx = e.clientX - p.lastX;
     const sdy = e.clientY - p.lastY;
     const stepDist = Math.sqrt(sdx * sdx + sdy * sdy);
@@ -719,17 +543,27 @@ export default function Yonerge8({
     const p = ptr.current;
     removeDocListeners();
 
-    // Hold başarıyla tamamlandıysa zaten completeStep çağrıldı
-    if (p?.holdDone) {
-      ptr.current = null;
+    // ——— ZİL: bırakınca sus, süre yeterse doğru ———
+    if (p?.isHoldTarget) {
+      const heldMs = Date.now() - p.holdStart;
+      stopZilSound();
+      setZilPressed(false);
       setDragId(null);
       setDragStyle(null);
       setShakeActiveId(null);
+      ptr.current = null;
+
+      if (lockedRef.current) return;
+
+      if (heldMs >= HOLD_OK_MS) {
+        completeStep();
+      }
+      // kısa basış: ses zaten sustu, hata değil — tekrar basabilir
       return;
     }
 
-    clearHold();
-    if (!p?.holdDone) setZilPressed(false);
+    stopZilSound();
+    setZilPressed(false);
     setShakeActiveId(null);
 
     if (!p || lockedRef.current) {
@@ -743,7 +577,6 @@ export default function Yonerge8({
     const totalMove = Math.sqrt((e.clientX - p.startX) ** 2 + (e.clientY - p.startY) ** 2);
     const wasTap = !p.moved && totalMove < TAP_MAX_MOVE;
 
-    // ——— Sürükle bırak ———
     if (p.moved && step) {
       const dropEl = document.elementFromPoint(e.clientX, e.clientY);
       const dropId =
@@ -752,9 +585,7 @@ export default function Yonerge8({
 
       if (step.kind === 'drag') {
         if (p.id === step.targetId && dropId === step.dropId) {
-          if (step.mergeImg) {
-            setMergeMap((m) => ({ ...m, [step.dropId!]: step.mergeImg! }));
-          }
+          if (step.mergeImg) setMergeMap((m) => ({ ...m, [step.dropId!]: step.mergeImg! }));
           playFx(step.successSound);
           setDragId(null);
           setDragStyle(null);
@@ -762,7 +593,6 @@ export default function Yonerge8({
           completeStep();
           return;
         }
-        // Yanlış hedefe veya yanlış nesneyi bırakma
         if (dropId && dropId !== p.id) {
           setDragId(null);
           setDragStyle(null);
@@ -770,14 +600,12 @@ export default function Yonerge8({
           failTrial(p.id === step.targetId ? dropId : p.id);
           return;
         }
-        // Boşluğa bırak → geri dön
         setDragId(null);
         setDragStyle(null);
         ptr.current = null;
         return;
       }
 
-      // Drag dışı adımda sürükleyip bıraktı — yanlış nesne say
       if (step.kind !== 'shake' || p.id !== step.targetId) {
         if (p.id !== step.targetId) {
           setDragId(null);
@@ -789,7 +617,6 @@ export default function Yonerge8({
       }
     }
 
-    // ——— Basit dokunuş ———
     if (wasTap && step) {
       if (step.kind === 'multi') {
         if (p.id === step.targetId) {
@@ -799,21 +626,15 @@ export default function Yonerge8({
           multiCountRef.current = next;
           setMultiCount(next);
           if (next >= 3) setTimeout(() => completeStep(), 700);
-        } else {
-          failTrial(p.id);
-        }
+        } else failTrial(p.id);
       } else if (step.kind === 'tap') {
         if (p.id === step.targetId) completeStep();
         else failTrial(p.id);
       } else if (step.kind === 'drag') {
-        // Doğru nesneye sadece dokunmak hata değil; YANLIŞ nesneye dokunmak → fail
-        if (p.id !== step.targetId && p.id !== step.dropId) {
-          failTrial(p.id);
-        }
+        if (p.id !== step.targetId && p.id !== step.dropId) failTrial(p.id);
       } else if (step.kind === 'shake') {
         if (p.id !== step.targetId) failTrial(p.id);
       } else if (step.kind === 'hold') {
-        // Kısa basış yetmez; yanlış nesne → fail
         if (p.id !== step.targetId) failTrial(p.id);
       }
     }
@@ -842,26 +663,18 @@ export default function Yonerge8({
       moved: false,
       shakeCount: 0,
       isHoldTarget,
-      holdDone: false,
+      holdStart: Date.now(),
     };
 
-    // Document listener — sürükleme her yerde takip edilir
     document.addEventListener('pointermove', onDocMoveRef.current);
     document.addEventListener('pointerup', onDocUpRef.current);
     document.addEventListener('pointercancel', onDocUpRef.current);
     listenersAttached.current = true;
 
-    if (isHoldTarget && step) {
+    // ZİL: basınca HEMEN çalar + açık görsel
+    if (isHoldTarget) {
       setZilPressed(true);
-      clearHold();
-      holdTimer.current = setTimeout(() => {
-        if (lockedRef.current || !ptr.current || ptr.current.id !== id) return;
-        ptr.current.holdDone = true;
-        playFx(step.successSound);
-        // Ses basılıyken çalsın; görsel basılı kalsın kısa süre
-        completeStep();
-        // bırakınca zil kapalıya döner (up handler)
-      }, HOLD_MS);
+      startZilSound();
     }
 
     if (step?.kind === 'shake' && step.targetId === id) {
@@ -869,10 +682,9 @@ export default function Yonerge8({
     }
   };
 
-  // Cleanup on unmount
   useEffect(() => () => {
     removeDocListeners();
-    clearHold();
+    stopZilSound();
   }, []); // eslint-disable-line
 
   const handlePhysical = (correct: boolean) => {
@@ -900,12 +712,7 @@ export default function Yonerge8({
     <div className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none touch-none">
       <div className="shrink-0 p-4 landscape:py-2 landscape:px-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md relative z-10">
         <button
-          onClick={() => {
-            stopIntro();
-            stopInstr();
-            removeDocListeners();
-            onClose();
-          }}
+          onClick={() => { stopIntro(); stopInstr(); stopZilSound(); removeDocListeners(); onClose(); }}
           className="p-2 landscape:p-1.5 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
         >
           <XCircle className="w-7 h-7 landscape:w-6 landscape:h-6" />
@@ -934,41 +741,24 @@ export default function Yonerge8({
                 İstemediğin göreve dokunarak değiştirebilirsin. Uygulama yönergeyi sesli okur.
               </p>
             </div>
-
             <div className="space-y-2 max-h-[42dvh] overflow-y-auto pr-1">
               {selected.map((task, i) => (
-                <button
-                  key={`${task.id}-${i}`}
-                  type="button"
-                  onClick={() => replaceTask(i)}
-                  className="w-full flex items-start gap-3 p-3 rounded-xl border border-slate-700 bg-slate-900/70 hover:border-blue-500/50 hover:bg-slate-800/80 text-left transition-all group"
-                >
-                  <span className="min-w-[28px] h-7 rounded-lg bg-slate-800 border border-slate-600 flex items-center justify-center text-xs font-bold text-slate-400">
-                    {i + 1}
-                  </span>
+                <button key={`${task.id}-${i}`} type="button" onClick={() => replaceTask(i)}
+                  className="w-full flex items-start gap-3 p-3 rounded-xl border border-slate-700 bg-slate-900/70 hover:border-blue-500/50 hover:bg-slate-800/80 text-left transition-all group">
+                  <span className="min-w-[28px] h-7 rounded-lg bg-slate-800 border border-slate-600 flex items-center justify-center text-xs font-bold text-slate-400">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-100 leading-snug">{task.text}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span
-                        className={
-                          'text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ' +
-                          (task.type === 'physical'
-                            ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
-                            : 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30')
-                        }
-                      >
+                      <span className={'text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ' + (task.type === 'physical' ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30' : 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30')}>
                         {task.type === 'physical' ? 'Fiziksel' : 'Dijital'}
                       </span>
-                      {task.materials.length > 0 && (
-                        <span className="text-[10px] text-slate-500 truncate">{task.materials.join(', ')}</span>
-                      )}
+                      {task.materials.length > 0 && <span className="text-[10px] text-slate-500 truncate">{task.materials.join(', ')}</span>}
                     </div>
                   </div>
                   <RefreshCw size={14} className="text-slate-600 group-hover:text-blue-400 shrink-0 mt-1" />
                 </button>
               ))}
             </div>
-
             <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-4">
               <div className="flex items-center gap-2 mb-2 text-slate-300">
                 <Box size={16} className="text-amber-400" />
@@ -979,18 +769,12 @@ export default function Yonerge8({
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {materialsList.map((m) => (
-                    <span key={m} className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-200 text-xs font-medium">
-                      {m}
-                    </span>
+                    <span key={m} className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-200 text-xs font-medium">{m}</span>
                   ))}
                 </div>
               )}
             </div>
-
-            <button
-              onClick={startAssessment}
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white px-6 py-4 rounded-2xl font-bold text-base flex items-center justify-center gap-2 shadow-xl shadow-blue-900/40 active:scale-95 transition-all"
-            >
+            <button onClick={startAssessment} className="w-full bg-blue-600 hover:bg-blue-500 text-white px-6 py-4 rounded-2xl font-bold text-base flex items-center justify-center gap-2 shadow-xl shadow-blue-900/40 active:scale-95 transition-all">
               <PlayCircle size={22} /> Değerlendirmeyi Başlat
             </button>
           </div>
@@ -999,19 +783,10 @@ export default function Yonerge8({
         {phase === 'running' && currentTask && (
           <div className="w-full max-w-3xl flex flex-col items-center animate-in slide-in-from-right-6 duration-300">
             <div className="w-full bg-slate-800/60 border-2 border-slate-700 rounded-[2rem] p-5 md:p-8 flex flex-col items-center shadow-2xl mb-4">
-              <span
-                className={
-                  'text-xs font-bold tracking-widest uppercase mb-2 px-3 py-1 rounded-full ' +
-                  (currentTask.type === 'physical'
-                    ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30'
-                    : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30')
-                }
-              >
+              <span className={'text-xs font-bold tracking-widest uppercase mb-2 px-3 py-1 rounded-full ' + (currentTask.type === 'physical' ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30' : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30')}>
                 {currentTask.type === 'physical' ? 'Fiziksel' : 'Dijital'}
               </span>
-              <h1 className="text-xl md:text-3xl font-black text-center text-white leading-tight">
-                "{currentTask.text}"
-              </h1>
+              <h1 className="text-xl md:text-3xl font-black text-center text-white leading-tight">"{currentTask.text}"</h1>
               {currentTask.type === 'digital' && currentTask.steps && (
                 <p className="text-slate-400 text-xs mt-2">
                   Adım {Math.min(stepIdx + 1, currentTask.steps.length)} / {currentTask.steps.length}
@@ -1027,13 +802,8 @@ export default function Yonerge8({
                   const img = displayImg(item.id);
                   const hiding = dragId === item.id;
                   const shaking = shakeActiveId === item.id;
-
                   return (
-                    <div
-                      key={item.id}
-                      data-obj-id={item.id}
-                      className="min-h-[120px] landscape:min-h-[100px] relative"
-                    >
+                    <div key={item.id} data-obj-id={item.id} className="min-h-[120px] landscape:min-h-[100px] relative">
                       <div
                         role="button"
                         tabIndex={0}
@@ -1041,27 +811,18 @@ export default function Yonerge8({
                         onPointerDown={(e) => onItemPointerDown(e, item.id)}
                         className={
                           `relative flex flex-col items-center justify-center rounded-2xl border-2 bg-slate-800/80 overflow-hidden w-full h-full p-2 transition-colors duration-150 ` +
-                          (wrongId === item.id
-                            ? 'border-red-400 ring-2 ring-red-500/50 '
-                            : done
-                              ? 'border-green-400 ring-2 ring-green-500/40 bg-green-900/25 opacity-55 '
-                              : shaking
-                                ? 'border-amber-400 ring-2 ring-amber-500/40 '
-                                : zilPressed && item.id === 'zil'
-                                  ? 'border-yellow-400 ring-2 ring-yellow-500/40 '
-                                  : 'border-slate-700 ') +
+                          (wrongId === item.id ? 'border-red-400 ring-2 ring-red-500/50 ' :
+                            done ? 'border-green-400 ring-2 ring-green-500/40 bg-green-900/25 opacity-55 ' :
+                            shaking ? 'border-amber-400 ring-2 ring-amber-500/40 ' :
+                            zilPressed && item.id === 'zil' ? 'border-yellow-400 ring-2 ring-yellow-500/40 ' :
+                            'border-slate-700 ') +
                           (locked || done ? 'pointer-events-none ' : 'cursor-grab active:cursor-grabbing ') +
                           (hiding ? 'opacity-15 ' : '')
                         }
                         style={shaking ? { transform: 'rotate(-6deg)' } : undefined}
                       >
                         {img ? (
-                          <img
-                            src={img}
-                            alt=""
-                            className="w-[80%] h-[80%] max-w-[120px] max-h-[120px] object-contain pointer-events-none"
-                            draggable={false}
-                          />
+                          <img src={img} alt="" className="w-[80%] h-[80%] max-w-[120px] max-h-[120px] object-contain pointer-events-none" draggable={false} />
                         ) : (
                           <span className="text-5xl pointer-events-none">📦</span>
                         )}
@@ -1074,8 +835,7 @@ export default function Yonerge8({
 
             {currentTask.type === 'physical' && (
               <p className="text-slate-500 text-sm text-center max-w-md">
-                Öğrenci istenen sırada yaparsa <span className="text-green-400">Yaptı</span>,
-                aksi halde <span className="text-red-400">Yapamadı</span>.
+                Öğrenci istenen sırada yaparsa <span className="text-green-400">Yaptı</span>, aksi halde <span className="text-red-400">Yapamadı</span>.
               </p>
             )}
           </div>
@@ -1083,63 +843,30 @@ export default function Yonerge8({
 
         {phase === 'result' && (
           <div className="flex flex-col items-center text-center p-8 bg-slate-900/90 rounded-3xl border border-slate-700 shadow-2xl max-w-xl animate-in zoom-in-95 duration-500">
-            <Trophy
-              size={72}
-              className={
-                score >= 8
-                  ? 'text-yellow-500 mb-5 animate-bounce drop-shadow-[0_0_20px_rgba(234,179,8,0.4)]'
-                  : 'text-slate-500 mb-5'
-              }
-            />
+            <Trophy size={72} className={score >= 8 ? 'text-yellow-500 mb-5 animate-bounce drop-shadow-[0_0_20px_rgba(234,179,8,0.4)]' : 'text-slate-500 mb-5'} />
             <h1 className="text-3xl font-black mb-2">Değerlendirme Bitti!</h1>
-            <p className="text-slate-400 mb-6 text-lg">
-              Doğru: <span className="text-white font-black text-3xl mx-2">{score}</span> / 10
-            </p>
+            <p className="text-slate-400 mb-6 text-lg">Doğru: <span className="text-white font-black text-3xl mx-2">{score}</span> / 10</p>
             {score >= 8 ? (
-              <div className="bg-green-500/10 text-green-400 border border-green-500/20 px-6 py-3 rounded-xl mb-8 font-bold flex items-center gap-2">
-                <Check size={22} /> Kazanım başarıyla sağlandı!
-              </div>
+              <div className="bg-green-500/10 text-green-400 border border-green-500/20 px-6 py-3 rounded-xl mb-8 font-bold flex items-center gap-2"><Check size={22} /> Kazanım başarıyla sağlandı!</div>
             ) : (
-              <div className="bg-orange-500/10 text-orange-400 border border-orange-500/20 px-6 py-3 rounded-xl mb-8 font-bold flex items-center gap-2">
-                <X size={22} /> Henüz yeterli bağımsızlık düzeyinde değil.
-              </div>
+              <div className="bg-orange-500/10 text-orange-400 border border-orange-500/20 px-6 py-3 rounded-xl mb-8 font-bold flex items-center gap-2"><X size={22} /> Henüz yeterli bağımsızlık düzeyinde değil.</div>
             )}
-            <button
-              onClick={() => onComplete(score >= 8)}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-12 py-4 rounded-xl font-bold text-xl active:scale-95 shadow-xl shadow-blue-900/50 w-full sm:w-auto"
-            >
-              KAYDET VE ÇIK
-            </button>
+            <button onClick={() => onComplete(score >= 8)} className="bg-blue-600 hover:bg-blue-500 text-white px-12 py-4 rounded-xl font-bold text-xl active:scale-95 shadow-xl shadow-blue-900/50 w-full sm:w-auto">KAYDET VE ÇIK</button>
           </div>
         )}
       </div>
 
       {dragId && dragStyle && OBJECTS[dragId]?.img && (
-        <img
-          src={OBJECTS[dragId].img}
-          alt=""
-          className="fixed pointer-events-none z-[200] w-28 h-28 object-contain opacity-95 drop-shadow-2xl"
-          style={{ left: dragStyle.x - 56, top: dragStyle.y - 56 }}
-        />
+        <img src={OBJECTS[dragId].img} alt="" className="fixed pointer-events-none z-[200] w-28 h-28 object-contain opacity-95 drop-shadow-2xl" style={{ left: dragStyle.x - 56, top: dragStyle.y - 56 }} />
       )}
 
       {phase === 'running' && currentTask?.type === 'physical' && (
         <div className="shrink-0 p-5 pb-8 landscape:py-3 landscape:pb-4 bg-slate-900 border-t border-slate-800 flex items-stretch justify-center gap-3 relative z-10">
-          <button
-            onClick={() => handlePhysical(false)}
-            disabled={locked}
-            className="flex-1 max-w-[260px] flex flex-col landscape:flex-row items-center justify-center gap-2 p-4 landscape:p-3 bg-red-500/10 border border-red-500/30 rounded-2xl active:scale-95 transition-all text-red-500 hover:bg-red-500/20 disabled:opacity-40"
-          >
-            <X className="w-9 h-9 landscape:w-6 landscape:h-6" />
-            <span className="text-sm font-bold uppercase tracking-wider">Yapamadı</span>
+          <button onClick={() => handlePhysical(false)} disabled={locked} className="flex-1 max-w-[260px] flex flex-col landscape:flex-row items-center justify-center gap-2 p-4 landscape:p-3 bg-red-500/10 border border-red-500/30 rounded-2xl active:scale-95 transition-all text-red-500 hover:bg-red-500/20 disabled:opacity-40">
+            <X className="w-9 h-9 landscape:w-6 landscape:h-6" /><span className="text-sm font-bold uppercase tracking-wider">Yapamadı</span>
           </button>
-          <button
-            onClick={() => handlePhysical(true)}
-            disabled={locked}
-            className="flex-1 max-w-[260px] flex flex-col landscape:flex-row items-center justify-center gap-2 p-4 landscape:p-3 bg-green-500/10 border border-green-500/30 rounded-2xl active:scale-95 transition-all text-green-500 hover:bg-green-500/20 shadow-[0_0_20px_rgba(34,197,94,0.1)] disabled:opacity-40"
-          >
-            <Check className="w-9 h-9 landscape:w-6 landscape:h-6" />
-            <span className="text-sm font-bold uppercase tracking-wider">Yaptı</span>
+          <button onClick={() => handlePhysical(true)} disabled={locked} className="flex-1 max-w-[260px] flex flex-col landscape:flex-row items-center justify-center gap-2 p-4 landscape:p-3 bg-green-500/10 border border-green-500/30 rounded-2xl active:scale-95 transition-all text-green-500 hover:bg-green-500/20 shadow-[0_0_20px_rgba(34,197,94,0.1)] disabled:opacity-40">
+            <Check className="w-9 h-9 landscape:w-6 landscape:h-6" /><span className="text-sm font-bold uppercase tracking-wider">Yaptı</span>
           </button>
         </div>
       )}
