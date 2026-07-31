@@ -18,6 +18,7 @@ import cantaImg from './sesgorsel/canta.png';
 import tarakImg from './sesgorsel/tarak.png';
 import bebekImg from './sesgorsel/bebek.png';
 import sepetImg from './sesgorsel/sepet.png';
+import sepetTopImg from './sesgorsel/Sepeticindetop.png';
 import havucImg from './sesgorsel/havuc.png';
 import tavsanImg from './sesgorsel/tavsan.png';
 import tavsanhavucImg from './sesgorsel/tavsanhavuc.png';
@@ -189,8 +190,8 @@ const TASK_POOL: SequentialTask[] = [
   { id: 'd13', text: 'Hamuru ez, sonra bebeğe dokun', type: 'digital', materials: [], sound: s_hamurezbebekdokun, steps: [{ kind: 'multi', targetId: 'hamur', stages: HAMUR_STAGES, stageSounds: HAMUR_SOUNDS }, { kind: 'tap', targetId: 'bebek' }], distractors: ['top', 'kalem'] },
   { id: 'd14', text: 'Kutuyu aç, sonra topa dokun', type: 'digital', materials: [], sound: s_kutuactopdokun, steps: [{ kind: 'multi', targetId: 'hediye', stages: HEDIYE_STAGES, stageSounds: HEDIYE_SOUNDS }, { kind: 'tap', targetId: 'top' }], distractors: ['elma', 'kalem'] },
   { id: 'd15', text: 'Havucu tavşana ver, sonra topa dokun', type: 'digital', materials: [], sound: s_havucvertopdokun, steps: [{ kind: 'drag', targetId: 'havuc', dropId: 'tavsan', mergeImg: tavsanhavucImg }, { kind: 'tap', targetId: 'top' }], distractors: ['kalem', 'elma'] },
-  { id: 'd16', text: 'Havucu tavşana ver, topu sepete at', type: 'digital', materials: [], sound: s_havuctavsanvertopusepeteat, steps: [{ kind: 'drag', targetId: 'havuc', dropId: 'tavsan', mergeImg: tavsanhavucImg }, { kind: 'drag', targetId: 'top', dropId: 'sepet', successSound: topsepetSes }] },
-  { id: 'd17', text: 'Topu sepete at, sonra kaleme dokun', type: 'digital', materials: [], sound: s_topsepeteatkalemdokun, steps: [{ kind: 'drag', targetId: 'top', dropId: 'sepet', successSound: topsepetSes }, { kind: 'tap', targetId: 'kalem' }], distractors: ['elma', 'araba'] },
+  { id: 'd16', text: 'Havucu tavşana ver, topu sepete at', type: 'digital', materials: [], sound: s_havuctavsanvertopusepeteat, steps: [{ kind: 'drag', targetId: 'havuc', dropId: 'tavsan', mergeImg: tavsanhavucImg }, { kind: 'drag', targetId: 'top', dropId: 'sepet', mergeImg: sepetTopImg, successSound: topsepetSes }] },
+  { id: 'd17', text: 'Topu sepete at, sonra kaleme dokun', type: 'digital', materials: [], sound: s_topsepeteatkalemdokun, steps: [{ kind: 'drag', targetId: 'top', dropId: 'sepet', mergeImg: sepetTopImg, successSound: topsepetSes }, { kind: 'tap', targetId: 'kalem' }], distractors: ['elma', 'araba'] },
   { id: 'd18', text: 'Anahtarı kilide tak, sonra bebeğe dokun', type: 'digital', materials: [], sound: s_anahtartakbebekdokun, steps: [{ kind: 'drag', targetId: 'anahtar', dropId: 'kilit', mergeImg: kilitanahtarImg }, { kind: 'tap', targetId: 'bebek' }], distractors: ['top', 'kalem'] },
   { id: 'd19', text: 'Çiçeği vazoya koy, sonra elmaya dokun', type: 'digital', materials: [], sound: s_cicekvazokoyelmadokun, steps: [{ kind: 'drag', targetId: 'cicek', dropId: 'vazo', mergeImg: vazocicekImg }, { kind: 'tap', targetId: 'elma' }], distractors: ['top', 'saat'] },
   { id: 'd20', text: 'Marakası salla, sonra kaleme dokun', type: 'digital', materials: [], sound: s_marakassallakalemdokun, steps: [{ kind: 'shake', targetId: 'marakas', successSound: marakasSes }, { kind: 'tap', targetId: 'kalem' }], distractors: ['top', 'elma'] },
@@ -224,7 +225,7 @@ function buildGrid(task: SequentialTask): NesneDef[] {
   return shuffle(Array.from(ids).map((id) => OBJECTS[id]).filter(Boolean));
 }
 function vibrate(pattern: number | number[] = 40) {
-  try { navigator.vibrate?.(pattern); } catch { /* desteklenmiyor */ }
+  try { navigator.vibrate?.(pattern); } catch { /* */ }
 }
 
 interface Yonerge8Props {
@@ -236,7 +237,8 @@ type Phase = 'prep' | 'running' | 'result';
 const HOLD_OK_MS = 500;
 const MOVE_FOR_DRAG = 8;
 const SHAKE_THRESHOLD = 6;
-const SHAKE_NEEDED = 2;
+/** En az 1.5 sn aktif sallama */
+const SHAKE_MIN_MS = 1500;
 const TAP_MAX_MOVE = 18;
 const HOLD_CANCEL_MOVE = 55;
 
@@ -253,6 +255,8 @@ export default function Yonerge8({
   const [stepIdx, setStepIdx] = useState(0);
   const [multiCount, setMultiCount] = useState(0);
   const [doneIds, setDoneIds] = useState<string[]>([]);
+  /** Sürükleme kaynağı — verildi/atıldı, artık görünmez */
+  const [consumedIds, setConsumedIds] = useState<string[]>([]);
   const [mergeMap, setMergeMap] = useState<Record<string, string>>({});
   const [zilPressed, setZilPressed] = useState(false);
   const [wrongId, setWrongId] = useState<string | null>(null);
@@ -265,7 +269,8 @@ export default function Yonerge8({
   const rafRef = useRef<number | null>(null);
   const ptr = useRef<{
     id: string; pointerId: number; startX: number; startY: number;
-    lastX: number; lastY: number; moved: boolean; shakeCount: number;
+    lastX: number; lastY: number; moved: boolean;
+    shakeAccumMs: number; lastShakeMoveAt: number; shakeStarted: boolean;
     isHoldTarget: boolean; holdStart: number; isShakeTarget: boolean;
   } | null>(null);
 
@@ -366,7 +371,8 @@ export default function Yonerge8({
   const resetStepState = useCallback(() => {
     setStepIdx(0); stepIdxRef.current = 0;
     setMultiCount(0); multiCountRef.current = 0;
-    setDoneIds([]); setMergeMap({}); setZilPressed(false); setWrongId(null);
+    setDoneIds([]); setConsumedIds([]); setMergeMap({});
+    setZilPressed(false); setWrongId(null);
     hideGhost(); setShakeActiveId(null); ptr.current = null; stopZilSound();
   }, []); // eslint-disable-line
 
@@ -458,23 +464,34 @@ export default function Yonerge8({
         p.moved = true;
       }
 
-      // Marakas / sürükleme: görsel parmağı takip eder
       if (p.isShakeTarget || p.moved) {
         setDragId((prev) => (prev === p.id ? prev : p.id));
         const angle = p.isShakeTarget
-          ? Math.max(-28, Math.min(28, dx * 0.35 + Math.sin(Date.now() / 60) * 6))
+          ? Math.max(-28, Math.min(28, dx * 0.35 + Math.sin(Date.now() / 60) * 8))
           : 0;
         updateGhostPos(e.clientX, e.clientY, angle);
       }
 
+      // Sallama: aktif hareket süresini biriktir, min 1.5 sn
       const sdx = e.clientX - p.lastX;
       const sdy = e.clientY - p.lastY;
       const stepDist = Math.sqrt(sdx * sdx + sdy * sdy);
-      if (stepDist > SHAKE_THRESHOLD) {
-        p.shakeCount += 1;
+      if (p.isShakeTarget && stepDist > SHAKE_THRESHOLD) {
+        const now = Date.now();
+        if (!p.shakeStarted) {
+          p.shakeStarted = true;
+          p.lastShakeMoveAt = now;
+          p.shakeAccumMs = 0;
+        } else {
+          const gap = now - p.lastShakeMoveAt;
+          // Aralıksız sallama say (0.4 sn'den uzun duraklama birikimi sıfırlamaz ama eklemez)
+          if (gap < 400) p.shakeAccumMs += gap;
+          p.lastShakeMoveAt = now;
+        }
         p.lastX = e.clientX; p.lastY = e.clientY;
+
         const step = getStep();
-        if (step?.kind === 'shake' && step.targetId === p.id && p.shakeCount >= SHAKE_NEEDED) {
+        if (step?.kind === 'shake' && step.targetId === p.id && p.shakeAccumMs >= SHAKE_MIN_MS) {
           playFx(step.successSound);
           setShakeActiveId(null); hideGhost(); ptr.current = null;
           completeStepRef.current();
@@ -511,7 +528,11 @@ export default function Yonerge8({
 
         if (step.kind === 'drag') {
           if (p.id === step.targetId && dropId === step.dropId) {
-            if (step.mergeImg) setMergeMap((m) => ({ ...m, [step.dropId!]: step.mergeImg! }));
+            // Hedef birleşik görsel + kaynak kaybolur
+            if (step.mergeImg) {
+              setMergeMap((m) => ({ ...m, [step.dropId!]: step.mergeImg! }));
+            }
+            setConsumedIds((c) => (c.includes(step.targetId) ? c : [...c, step.targetId]));
             playFx(step.successSound);
             hideGhost(); ptr.current = null; completeStepRef.current(); return;
           }
@@ -522,7 +543,6 @@ export default function Yonerge8({
           hideGhost(); ptr.current = null; return;
         }
 
-        // Sallama adımında bırakma (henüz yeterli sallanmadıysa) — hata değil
         if (step.kind === 'shake' && p.id === step.targetId) {
           hideGhost(); ptr.current = null; return;
         }
@@ -568,6 +588,7 @@ export default function Yonerge8({
 
   const onItemPointerDown = (e: React.PointerEvent, id: string) => {
     if (lockedRef.current) return;
+    if (consumedIds.includes(id)) return;
     e.preventDefault(); e.stopPropagation();
     try { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); } catch { /* */ }
 
@@ -579,7 +600,8 @@ export default function Yonerge8({
       id, pointerId: e.pointerId,
       startX: e.clientX, startY: e.clientY,
       lastX: e.clientX, lastY: e.clientY,
-      moved: false, shakeCount: 0,
+      moved: false,
+      shakeAccumMs: 0, lastShakeMoveAt: 0, shakeStarted: false,
       isHoldTarget, holdStart: Date.now(), isShakeTarget,
     };
 
@@ -587,7 +609,6 @@ export default function Yonerge8({
       setZilPressed(true);
       startZilSound();
     }
-    // Marakası tutunca hemen parmağa yapışır
     if (isShakeTarget) {
       setShakeActiveId(id);
       setDragId(id);
@@ -701,9 +722,10 @@ export default function Yonerge8({
             {currentTask.type === 'digital' && (
               <div className="grid grid-cols-2 landscape:grid-cols-3 gap-3 landscape:gap-4 w-full max-w-md landscape:max-w-2xl" style={{ touchAction: 'none' }}>
                 {gridItems.map((item) => {
-                  const done = doneIds.includes(item.id);
+                  const consumed = consumedIds.includes(item.id);
+                  const done = doneIds.includes(item.id) && !consumed;
                   const img = displayImg(item.id);
-                  const hiding = dragId === item.id;
+                  const hiding = dragId === item.id || consumed;
                   const shaking = shakeActiveId === item.id;
                   return (
                     <div key={item.id} data-obj-id={item.id} className="min-h-[120px] landscape:min-h-[100px] relative" style={{ touchAction: 'none' }}>
@@ -716,16 +738,16 @@ export default function Yonerge8({
                             shaking ? 'border-amber-400 ring-2 ring-amber-500/40 ' :
                             zilPressed && item.id === 'zil' ? 'border-yellow-400 ring-2 ring-yellow-500/40 ' :
                             'border-slate-700 ') +
-                          (locked || done ? 'pointer-events-none ' : 'cursor-grab active:cursor-grabbing ') +
-                          (hiding ? 'opacity-15 ' : '')
+                          (locked || done || consumed ? 'pointer-events-none ' : 'cursor-grab active:cursor-grabbing ') +
+                          (hiding ? 'opacity-0 ' : '')
                         }
                         style={{ touchAction: 'none' }}
                       >
-                        {img ? (
+                        {!consumed && img ? (
                           <img src={img} alt="" className="w-[80%] h-[80%] max-w-[120px] max-h-[120px] object-contain pointer-events-none" draggable={false} />
-                        ) : (
+                        ) : !consumed ? (
                           <span className="text-5xl pointer-events-none">📦</span>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   );
