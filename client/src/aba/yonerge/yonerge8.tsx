@@ -3,6 +3,7 @@ import {
   XCircle, Check, X, Trophy, PlayCircle, RefreshCw, ListOrdered, Box,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import Yonerge8Tutorial from './Yonerge8Tutorial';
 
 import topImg from './sesgorsel/top.png';
 import kalemImg from './sesgorsel/kalem.png';
@@ -247,6 +248,7 @@ export default function Yonerge8({
   itemText = 'Verilen Yönergeleri İstenen Sıra ile Yerine Getirme',
   onClose, onComplete,
 }: Yonerge8Props) {
+  const [showTut, setShowTut] = useState(true);
   const [selected, setSelected] = useState<SequentialTask[]>(() => shuffle(TASK_POOL).slice(0, 10));
   const [phase, setPhase] = useState<Phase>('prep');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -693,6 +695,15 @@ export default function Yonerge8({
     }
     return OBJECTS[id]?.img;
   };
+
+  if (showTut) {
+    return (
+      <Yonerge8Tutorial
+        onDone={() => setShowTut(false)}
+        onClose={onClose}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none" style={{ touchAction: 'none' }}>
