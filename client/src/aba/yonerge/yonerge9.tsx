@@ -30,7 +30,7 @@ const TASK_POOL: GroupTask[] = [
   { id: 'g11', text: 'Durun', materials: [] },
   { id: 'g12', text: 'Yürüyün', materials: [] },
   { id: 'g13', text: 'El sallayın', materials: [] },
-  { id: 'g14', text: 'Omuzlarınızı silkın', materials: [] },
+  { id: 'g14', text: 'Omuzlarınızı silkin', materials: [] },
   { id: 'g15', text: 'Dizlerinizi bükün', materials: [] },
   { id: 'g16', text: 'Başınızı sallayın', materials: [] },
   { id: 'g17', text: 'Gözlerinizi kapatın', materials: [] },
