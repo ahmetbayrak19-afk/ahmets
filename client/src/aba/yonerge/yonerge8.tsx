@@ -4,7 +4,6 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-// ——— GÖRSELLER (sesgorsel) ———
 import topImg from './sesgorsel/top.png';
 import kalemImg from './sesgorsel/kalem.png';
 import kitapImg from './sesgorsel/kitap.png';
@@ -43,7 +42,6 @@ import hediye3 from './sesgorsel/hediye3.png';
 import hediye4 from './sesgorsel/hediye4.png';
 
 import girisSes from './sesgorsel/yonerge33giris.mp3';
-
 import yumurtacatlama1 from './sesgorsel/yumurtacatlama1.mp3';
 import yumurtacatlama2 from './sesgorsel/yumurtacatlama2.mp3';
 import yumurtacatlama3 from './sesgorsel/yumurtacatlama3.mp3';
@@ -78,7 +76,6 @@ import s_ziplaburnunadokun from './sesgorsel/ziplaburnunadokun.mp3';
 import s_marakassallazipla from './sesgorsel/marakassallazipla.mp3';
 import s_elcirpmarakassalla from './sesgorsel/elcirpmarakassalla.mp3';
 import s_marakassallatopavur from './sesgorsel/marakassallatopavur.mp3';
-
 import s_topadokunkalemedokun from './sesgorsel/topadokunkalemedokun.mp3';
 import s_kalemedokuntopadokun from './sesgorsel/kalemedokuntopadokun.mp3';
 import s_elmadokunkitapdokun from './sesgorsel/elmadokunkitapdokun.mp3';
@@ -194,7 +191,6 @@ const TASK_POOL: SequentialTask[] = [
   { id: 'p23', text: 'Marakası salla, sonra zıpla', type: 'physical', materials: ['Marakas'], sound: s_marakassallazipla },
   { id: 'p24', text: 'Ellerini çırp, sonra marakası salla', type: 'physical', materials: ['Marakas'], sound: s_elcirpmarakassalla },
   { id: 'p25', text: 'Marakası salla, sonra topa vur', type: 'physical', materials: ['Marakas', 'Top'], sound: s_marakassallatopavur },
-
   {
     id: 'd01', text: 'Topa dokun, sonra kaleme dokun', type: 'digital', materials: [],
     sound: s_topadokunkalemedokun,
@@ -238,20 +234,12 @@ const TASK_POOL: SequentialTask[] = [
   {
     id: 'd09', text: 'Kitaba, kaleme ve topa sırayla dokun', type: 'digital', materials: [],
     sound: s_kitapkalemtopdokun,
-    steps: [
-      { kind: 'tap', targetId: 'kitap' },
-      { kind: 'tap', targetId: 'kalem' },
-      { kind: 'tap', targetId: 'top' },
-    ],
+    steps: [{ kind: 'tap', targetId: 'kitap' }, { kind: 'tap', targetId: 'kalem' }, { kind: 'tap', targetId: 'top' }],
   },
   {
     id: 'd10', text: 'Arabaya, saate ve çiçeğe sırayla dokun', type: 'digital', materials: [],
     sound: s_arabasaatcicekdokun,
-    steps: [
-      { kind: 'tap', targetId: 'araba' },
-      { kind: 'tap', targetId: 'saat' },
-      { kind: 'tap', targetId: 'cicek' },
-    ],
+    steps: [{ kind: 'tap', targetId: 'araba' }, { kind: 'tap', targetId: 'saat' }, { kind: 'tap', targetId: 'cicek' }],
   },
   {
     id: 'd11', text: 'Yumurtayı kır, sonra arabaya dokun', type: 'digital', materials: [],
@@ -428,11 +416,14 @@ interface Yonerge8Props {
 
 type Phase = 'prep' | 'running' | 'result';
 
-const HOLD_MS = 1500;
-const MOVE_THRESHOLD = 12;
-const SHAKE_THRESHOLD = 14;
+/** Zil: basılı tutarken ~0.7 sn yeter (gecikmeli his olmasın) */
+const HOLD_MS = 700;
+const MOVE_FOR_DRAG = 10;
+const SHAKE_THRESHOLD = 12;
 const SHAKE_NEEDED = 3;
-const TAP_MAX_MOVE = 14;
+const TAP_MAX_MOVE = 16;
+/** Hold sırasında titreme toleransı — küçük hareket hold'u iptal etmesin */
+const HOLD_CANCEL_MOVE = 40;
 
 export default function Yonerge8({
   itemCode = 'YTB 3.3',
@@ -453,8 +444,6 @@ export default function Yonerge8({
   const [zilPressed, setZilPressed] = useState(false);
   const [wrongId, setWrongId] = useState<string | null>(null);
   const [gridItems, setGridItems] = useState<NesneDef[]>([]);
-
-  // Serbest etkileşim pointer state
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragStyle, setDragStyle] = useState<{ x: number; y: number } | null>(null);
   const [shakeActiveId, setShakeActiveId] = useState<string | null>(null);
@@ -467,7 +456,8 @@ export default function Yonerge8({
     lastY: number;
     moved: boolean;
     shakeCount: number;
-    holding: boolean;
+    isHoldTarget: boolean;
+    holdDone: boolean;
   } | null>(null);
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -479,6 +469,7 @@ export default function Yonerge8({
   const currentIndexRef = useRef(0);
   const selectedRef = useRef(selected);
   const scoreRef = useRef(0);
+  const listenersAttached = useRef(false);
 
   useEffect(() => { lockedRef.current = locked; }, [locked]);
   useEffect(() => { stepIdxRef.current = stepIdx; }, [stepIdx]);
@@ -543,6 +534,24 @@ export default function Yonerge8({
     }
   };
 
+  const detachDocListeners = useCallback(() => {
+    if (!listenersAttached.current) return;
+    listenersAttached.current = false;
+    // handlers are closed over in start — stored on window via named refs below
+  }, []);
+
+  // Stable handler refs so we can add/remove document listeners
+  const onDocMoveRef = useRef<(e: PointerEvent) => void>(() => {});
+  const onDocUpRef = useRef<(e: PointerEvent) => void>(() => {});
+
+  const removeDocListeners = () => {
+    if (!listenersAttached.current) return;
+    document.removeEventListener('pointermove', onDocMoveRef.current);
+    document.removeEventListener('pointerup', onDocUpRef.current);
+    document.removeEventListener('pointercancel', onDocUpRef.current);
+    listenersAttached.current = false;
+  };
+
   const resetStepState = useCallback(() => {
     setStepIdx(0);
     stepIdxRef.current = 0;
@@ -557,7 +566,8 @@ export default function Yonerge8({
     setShakeActiveId(null);
     ptr.current = null;
     clearHold();
-  }, []);
+    removeDocListeners();
+  }, []); // eslint-disable-line
 
   const replaceTask = (index: number) => {
     const used = new Set(selected.map((t) => t.id));
@@ -614,16 +624,18 @@ export default function Yonerge8({
     lockedRef.current = true;
     setLocked(true);
     clearHold();
+    removeDocListeners();
     ptr.current = null;
     setDragId(null);
     setDragStyle(null);
     setShakeActiveId(null);
+    setZilPressed(false);
     if (id) setWrongId(id);
     setTimeout(() => {
       setWrongId(null);
       goNext(false);
-    }, 550);
-  }, [goNext]);
+    }, 500);
+  }, [goNext]); // eslint-disable-line
 
   const completeStep = useCallback(() => {
     if (lockedRef.current) return;
@@ -638,7 +650,7 @@ export default function Yonerge8({
     if (nextStep >= task.steps.length) {
       lockedRef.current = true;
       setLocked(true);
-      setTimeout(() => goNext(true), 450);
+      setTimeout(() => goNext(true), 400);
     } else {
       stepIdxRef.current = nextStep;
       setStepIdx(nextStep);
@@ -656,66 +668,33 @@ export default function Yonerge8({
     return task?.steps?.[stepIdxRef.current];
   };
 
-  // ——— Serbest pointer: her nesnede dokun / sürükle / salla / bas ———
-  const onItemPointerDown = (e: React.PointerEvent, id: string) => {
-    if (lockedRef.current) return;
-    e.preventDefault();
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-
-    ptr.current = {
-      id,
-      startX: e.clientX,
-      startY: e.clientY,
-      lastX: e.clientX,
-      lastY: e.clientY,
-      moved: false,
-      shakeCount: 0,
-      holding: true,
-    };
-
-    const step = getStep();
-    // Hold hedefi: basılı tutmaya başla
-    if (step?.kind === 'hold' && step.targetId === id) {
-      setZilPressed(true);
-      clearHold();
-      holdTimer.current = setTimeout(() => {
-        if (lockedRef.current) return;
-        playFx(step.successSound);
-        setZilPressed(false);
-        completeStep();
-      }, HOLD_MS);
-    } else if (step?.kind === 'hold' && step.targetId !== id) {
-      // yanlış nesneye basma → hata (kısa basışta da sayılır; move ile drag'e dönerse iptal edilmez)
-      // hemen fail etme: kullanıcı sürükleyebilir; pointer up'ta karar ver
-    }
-
-    if (step?.kind === 'shake' && step.targetId === id) {
-      setShakeActiveId(id);
-    }
-  };
-
-  const onRootPointerMove = (e: React.PointerEvent) => {
+  // Document-level move/up — capture sorunu yok, sürükleme çalışır
+  onDocMoveRef.current = (e: PointerEvent) => {
     const p = ptr.current;
     if (!p || lockedRef.current) return;
 
     const dx = e.clientX - p.startX;
     const dy = e.clientY - p.startY;
-    const distFromStart = Math.sqrt(dx * dx + dy * dy);
-    if (distFromStart > MOVE_THRESHOLD) p.moved = true;
+    const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Hold iptal (hareket ettiyse basılı tut değil)
-    if (p.moved && p.holding) {
-      clearHold();
-      setZilPressed(false);
+    // Hold: sadece büyük hareket iptal etsin
+    if (p.isHoldTarget && !p.holdDone) {
+      if (dist > HOLD_CANCEL_MOVE) {
+        clearHold();
+        setZilPressed(false);
+        p.isHoldTarget = false;
+      }
+    } else if (dist > MOVE_FOR_DRAG) {
+      p.moved = true;
     }
 
-    // Sürükleme görseli
-    if (p.moved) {
+    if (p.moved || (!p.isHoldTarget && dist > MOVE_FOR_DRAG)) {
+      p.moved = true;
       setDragId(p.id);
       setDragStyle({ x: e.clientX, y: e.clientY });
     }
 
-    // Sallama sayacı
+    // Shake
     const sdx = e.clientX - p.lastX;
     const sdy = e.clientY - p.lastY;
     const stepDist = Math.sqrt(sdx * sdx + sdy * sdy);
@@ -723,7 +702,6 @@ export default function Yonerge8({
       p.shakeCount += 1;
       p.lastX = e.clientX;
       p.lastY = e.clientY;
-
       const step = getStep();
       if (step?.kind === 'shake' && step.targetId === p.id && p.shakeCount >= SHAKE_NEEDED) {
         playFx(step.successSound);
@@ -731,15 +709,27 @@ export default function Yonerge8({
         setDragId(null);
         setDragStyle(null);
         ptr.current = null;
+        removeDocListeners();
         completeStep();
       }
     }
   };
 
-  const onRootPointerUp = (e: React.PointerEvent) => {
+  onDocUpRef.current = (e: PointerEvent) => {
     const p = ptr.current;
+    removeDocListeners();
+
+    // Hold başarıyla tamamlandıysa zaten completeStep çağrıldı
+    if (p?.holdDone) {
+      ptr.current = null;
+      setDragId(null);
+      setDragStyle(null);
+      setShakeActiveId(null);
+      return;
+    }
+
     clearHold();
-    setZilPressed(false);
+    if (!p?.holdDone) setZilPressed(false);
     setShakeActiveId(null);
 
     if (!p || lockedRef.current) {
@@ -750,18 +740,18 @@ export default function Yonerge8({
     }
 
     const step = getStep();
-    const totalMove = Math.sqrt(
-      (e.clientX - p.startX) ** 2 + (e.clientY - p.startY) ** 2
-    );
+    const totalMove = Math.sqrt((e.clientX - p.startX) ** 2 + (e.clientY - p.startY) ** 2);
     const wasTap = !p.moved && totalMove < TAP_MAX_MOVE;
 
     // ——— Sürükle bırak ———
     if (p.moved && step) {
       const dropEl = document.elementFromPoint(e.clientX, e.clientY);
-      const dropId = dropEl?.closest('[data-obj-id]')?.getAttribute('data-obj-id');
+      const dropId =
+        dropEl?.closest?.('[data-obj-id]')?.getAttribute('data-obj-id') ||
+        (dropEl as HTMLElement | null)?.getAttribute?.('data-obj-id');
 
-      if (step.kind === 'drag' && p.id === step.targetId) {
-        if (dropId === step.dropId) {
+      if (step.kind === 'drag') {
+        if (p.id === step.targetId && dropId === step.dropId) {
           if (step.mergeImg) {
             setMergeMap((m) => ({ ...m, [step.dropId!]: step.mergeImg! }));
           }
@@ -772,42 +762,35 @@ export default function Yonerge8({
           completeStep();
           return;
         }
-        // yanlış hedefe bırakma
+        // Yanlış hedefe veya yanlış nesneyi bırakma
         if (dropId && dropId !== p.id) {
           setDragId(null);
           setDragStyle(null);
           ptr.current = null;
-          failTrial(dropId);
+          failTrial(p.id === step.targetId ? dropId : p.id);
           return;
         }
-        // boşluğa bırak → geri dön, hata değil
+        // Boşluğa bırak → geri dön
         setDragId(null);
         setDragStyle(null);
         ptr.current = null;
         return;
       }
 
-      // Beklenen drag değilken başka nesneyi sürükleyip bıraktı
-      if (step.kind === 'drag' && p.id !== step.targetId && dropId) {
-        setDragId(null);
-        setDragStyle(null);
-        ptr.current = null;
-        failTrial(p.id);
-        return;
-      }
-
-      // Sallama yetersiz kaldıysa sadece bırak
-      if (step.kind === 'shake' && p.id === step.targetId) {
-        setDragId(null);
-        setDragStyle(null);
-        ptr.current = null;
-        return;
+      // Drag dışı adımda sürükleyip bıraktı — yanlış nesne say
+      if (step.kind !== 'shake' || p.id !== step.targetId) {
+        if (p.id !== step.targetId) {
+          setDragId(null);
+          setDragStyle(null);
+          ptr.current = null;
+          failTrial(p.id);
+          return;
+        }
       }
     }
 
     // ——— Basit dokunuş ———
     if (wasTap && step) {
-      // multi
       if (step.kind === 'multi') {
         if (p.id === step.targetId) {
           const next = multiCountRef.current + 1;
@@ -815,54 +798,23 @@ export default function Yonerge8({
           playFx(step.stageSounds?.[soundIdx]);
           multiCountRef.current = next;
           setMultiCount(next);
-          // 3. dokunuşta son kare (index 3) göster, sonra geç
-          if (next >= 3) {
-            setTimeout(() => completeStep(), 700);
-          }
+          if (next >= 3) setTimeout(() => completeStep(), 700);
         } else {
           failTrial(p.id);
         }
-        ptr.current = null;
-        setDragId(null);
-        setDragStyle(null);
-        return;
-      }
-
-      // sırayla dokun
-      if (step.kind === 'tap') {
+      } else if (step.kind === 'tap') {
         if (p.id === step.targetId) completeStep();
         else failTrial(p.id);
-        ptr.current = null;
-        setDragId(null);
-        setDragStyle(null);
-        return;
-      }
-
-      // drag beklenirken sadece dokunma → hata değil
-      if (step.kind === 'drag') {
-        // yanlış nesneye dokunmak da hata sayılmaz (sürüklemesi gerekir)
-        ptr.current = null;
-        setDragId(null);
-        setDragStyle(null);
-        return;
-      }
-
-      // shake beklenirken sadece dokunma → tamamlanmaz; yanlış nesne → hata
-      if (step.kind === 'shake') {
+      } else if (step.kind === 'drag') {
+        // Doğru nesneye sadece dokunmak hata değil; YANLIŞ nesneye dokunmak → fail
+        if (p.id !== step.targetId && p.id !== step.dropId) {
+          failTrial(p.id);
+        }
+      } else if (step.kind === 'shake') {
         if (p.id !== step.targetId) failTrial(p.id);
-        ptr.current = null;
-        setDragId(null);
-        setDragStyle(null);
-        return;
-      }
-
-      // hold: kısa basış yetersiz; yanlış nesneye kısa basış → hata
-      if (step.kind === 'hold') {
+      } else if (step.kind === 'hold') {
+        // Kısa basış yetmez; yanlış nesne → fail
         if (p.id !== step.targetId) failTrial(p.id);
-        ptr.current = null;
-        setDragId(null);
-        setDragStyle(null);
-        return;
       }
     }
 
@@ -870,6 +822,58 @@ export default function Yonerge8({
     setDragId(null);
     setDragStyle(null);
   };
+
+  const onItemPointerDown = (e: React.PointerEvent, id: string) => {
+    if (lockedRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    removeDocListeners();
+
+    const step = getStep();
+    const isHoldTarget = !!(step?.kind === 'hold' && step.targetId === id);
+
+    ptr.current = {
+      id,
+      startX: e.clientX,
+      startY: e.clientY,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      moved: false,
+      shakeCount: 0,
+      isHoldTarget,
+      holdDone: false,
+    };
+
+    // Document listener — sürükleme her yerde takip edilir
+    document.addEventListener('pointermove', onDocMoveRef.current);
+    document.addEventListener('pointerup', onDocUpRef.current);
+    document.addEventListener('pointercancel', onDocUpRef.current);
+    listenersAttached.current = true;
+
+    if (isHoldTarget && step) {
+      setZilPressed(true);
+      clearHold();
+      holdTimer.current = setTimeout(() => {
+        if (lockedRef.current || !ptr.current || ptr.current.id !== id) return;
+        ptr.current.holdDone = true;
+        playFx(step.successSound);
+        // Ses basılıyken çalsın; görsel basılı kalsın kısa süre
+        completeStep();
+        // bırakınca zil kapalıya döner (up handler)
+      }, HOLD_MS);
+    }
+
+    if (step?.kind === 'shake' && step.targetId === id) {
+      setShakeActiveId(id);
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    removeDocListeners();
+    clearHold();
+  }, []); // eslint-disable-line
 
   const handlePhysical = (correct: boolean) => {
     if (lockedRef.current) return;
@@ -883,10 +887,8 @@ export default function Yonerge8({
     if (id === 'zil') return zilPressed ? zilacikImg : zilkapaliImg;
     const step = currentStep;
     if (step?.kind === 'multi' && step.targetId === id && step.stages) {
-      // multiCount 0→1.kare, 1→2, 2→3, 3→4 (son)
       return step.stages[Math.min(multiCount, step.stages.length - 1)];
     }
-    // multi tamamlandıysa son kare kalsın
     if (doneIds.includes(id)) {
       const st = currentTask?.steps?.find((s) => s.targetId === id && s.kind === 'multi');
       if (st?.stages) return st.stages[st.stages.length - 1];
@@ -895,24 +897,13 @@ export default function Yonerge8({
   };
 
   return (
-    <div
-      className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none touch-none"
-      onPointerMove={onRootPointerMove}
-      onPointerUp={onRootPointerUp}
-      onPointerCancel={() => {
-        clearHold();
-        setZilPressed(false);
-        setShakeActiveId(null);
-        ptr.current = null;
-        setDragId(null);
-        setDragStyle(null);
-      }}
-    >
+    <div className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none touch-none">
       <div className="shrink-0 p-4 landscape:py-2 landscape:px-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md relative z-10">
         <button
           onClick={() => {
             stopIntro();
             stopInstr();
+            removeDocListeners();
             onClose();
           }}
           className="p-2 landscape:p-1.5 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
@@ -933,7 +924,6 @@ export default function Yonerge8({
       </div>
 
       <div className="flex-1 relative flex flex-col items-center justify-center p-3 sm:p-4 overflow-y-auto bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-slate-950">
-
         {phase === 'prep' && (
           <div className="w-full max-w-2xl animate-in zoom-in-95 duration-300 pb-6 space-y-5">
             <div className="text-center">
@@ -1057,8 +1047,10 @@ export default function Yonerge8({
                               ? 'border-green-400 ring-2 ring-green-500/40 bg-green-900/25 opacity-55 '
                               : shaking
                                 ? 'border-amber-400 ring-2 ring-amber-500/40 '
-                                : 'border-slate-700 ') +
-                          (locked || done ? 'pointer-events-none ' : 'cursor-pointer ') +
+                                : zilPressed && item.id === 'zil'
+                                  ? 'border-yellow-400 ring-2 ring-yellow-500/40 '
+                                  : 'border-slate-700 ') +
+                          (locked || done ? 'pointer-events-none ' : 'cursor-grab active:cursor-grabbing ') +
                           (hiding ? 'opacity-15 ' : '')
                         }
                         style={shaking ? { transform: 'rotate(-6deg)' } : undefined}
@@ -1126,8 +1118,8 @@ export default function Yonerge8({
         <img
           src={OBJECTS[dragId].img}
           alt=""
-          className="fixed pointer-events-none z-[200] w-24 h-24 object-contain opacity-90 drop-shadow-2xl"
-          style={{ left: dragStyle.x - 48, top: dragStyle.y - 48 }}
+          className="fixed pointer-events-none z-[200] w-28 h-28 object-contain opacity-95 drop-shadow-2xl"
+          style={{ left: dragStyle.x - 56, top: dragStyle.y - 56 }}
         />
       )}
 
