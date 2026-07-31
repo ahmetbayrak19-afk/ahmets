@@ -6,6 +6,7 @@ import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, ClipboardCheck
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
+import { useStudentData } from '@/hooks/useStudentData';
 
 import Yonerge1 from '@/aba/yonerge/yonerge1';
 import Yonerge2 from '@/aba/yonerge/yonerge2';
@@ -27,6 +28,8 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [activeItem, setActiveItem] = useState<string | null>(null);
+  const { students } = useStudentData();
+  const studentName = students.find((s) => s.id === studentId)?.name || '';
 
   const moduleData = ABA_MODULES.find(m => m.name.includes("YÖNERGE TAKİP"));
   const items = moduleData ? moduleData.achievements : [];
@@ -124,7 +127,7 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
         return <Yonerge9 itemCode={code} itemText={text} onClose={() => setActiveItem(null)} onComplete={handleSessionSave} />;
     }
     if (activeItem.includes("3.5")) {
-        return <Yonerge10 itemCode={code} itemText={text} onClose={() => setActiveItem(null)} onComplete={handleSessionSave} />;
+        return <Yonerge10 itemCode={code} itemText={text} studentName={studentName} onClose={() => setActiveItem(null)} onComplete={handleSessionSave} />;
     }
   }
 
