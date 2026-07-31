@@ -389,10 +389,16 @@ export default function Yonerge8Tutorial({ onDone, onClose }: Props) {
             {idx + 1} / {STEPS.length} · {step.label}
           </p>
         </div>
-        <button onClick={skip}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-600 text-slate-300 text-xs font-bold hover:bg-slate-700 active:scale-95">
-          <SkipForward size={14} /> Atla
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button onClick={skip}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-600 text-slate-300 text-xs font-bold hover:bg-slate-700 active:scale-95">
+            <SkipForward size={14} /> Atla
+          </button>
+          <button type="button" onClick={() => { stopMarakasSound(); hideGhost(); onDone(); }}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-600/20 border border-amber-500/40 text-amber-300 text-xs font-bold hover:bg-amber-600/30 active:scale-95">
+            Tümünü Atla
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 relative flex flex-col items-center justify-center p-4 overflow-hidden" style={{ touchAction: 'none' }}>
