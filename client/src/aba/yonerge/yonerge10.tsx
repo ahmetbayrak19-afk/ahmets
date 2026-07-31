@@ -14,6 +14,7 @@ interface ConditionalTask {
  * Basit koşullu yönergeler — doğal sınıf dili (çoğul gruba hitap).
  * "Kız olan kalksın" değil → "Kızlar ayağa kalksın".
  * Hedef çocuk koşula uyuyorsa ve eylemi yapıyorsa doğru.
+ * İsimli yönergelerde {name} öğrenci adıyla doldurulur.
  */
 const TASK_POOL: ConditionalTask[] = [
   // Cinsiyet
@@ -55,13 +56,13 @@ const TASK_POOL: ConditionalTask[] = [
   { id: 'c34', text: 'Pantolon giyenler zıplasın', materials: [] },
   { id: 'c35', text: 'Ceket giyenler el kaldırsın', materials: ['Ceket'] },
   { id: 'c36', text: 'Atkı takanlar ayağa kalksın', materials: ['Atkı'] },
-  // İsim
-  { id: 'c37', text: 'Adı … olan el kaldırsın', materials: [] },
-  { id: 'c38', text: 'Adı … olan ayağa kalksın', materials: [] },
-  { id: 'c39', text: 'Adı … olan bana baksın', materials: [] },
-  { id: 'c40', text: 'Adı … olan alkışlasın', materials: [] },
-  { id: 'c41', text: 'Adı … olan zıplasın', materials: [] },
-  { id: 'c42', text: 'Adı … olan otursun', materials: ['Sandalye'] },
+  // İsim — {name} çalışma anında öğrenci adıyla doldurulur
+  { id: 'c37', text: 'Adı {name} olan el kaldırsın', materials: [] },
+  { id: 'c38', text: 'Adı {name} olan ayağa kalksın', materials: [] },
+  { id: 'c39', text: 'Adı {name} olan bana baksın', materials: [] },
+  { id: 'c40', text: 'Adı {name} olan alkışlasın', materials: [] },
+  { id: 'c41', text: 'Adı {name} olan zıplasın', materials: [] },
+  { id: 'c42', text: 'Adı {name} olan otursun', materials: ['Sandalye'] },
   // Etkinlik / nesne
   { id: 'c43', text: 'Yapbozunu bitirenler sıraya gelsin', materials: ['Yapboz'] },
   { id: 'c44', text: 'Etkinliğini bitirenler alkışlasın', materials: [] },
@@ -91,9 +92,15 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+function fillName(text: string, name: string) {
+  if (!name) return text.replace(/\{name\}/g, '…');
+  return text.replace(/\{name\}/g, name);
+}
+
 interface Yonerge10Props {
   itemCode?: string;
   itemText?: string;
+  studentName?: string;
   onClose: () => void;
   onComplete: (success: boolean) => void;
 }
@@ -103,6 +110,7 @@ type Phase = 'prep' | 'running' | 'result';
 export default function Yonerge10({
   itemCode = 'YTB 3.5',
   itemText = 'Basit Koşullu Yönergeleri Takip Etme',
+  studentName = '',
   onClose,
   onComplete,
 }: Yonerge10Props) {
@@ -111,6 +119,8 @@ export default function Yonerge10({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [locked, setLocked] = useState(false);
+
+  const displayText = (text: string) => fillName(text, studentName.trim());
 
   const materialsList = (() => {
     const set = new Set<string>();
@@ -157,7 +167,6 @@ export default function Yonerge10({
   };
 
   const currentTask = selected[currentIndex];
-  const isNameTask = currentTask?.text.includes('…');
 
   return (
     <div
@@ -203,8 +212,13 @@ export default function Yonerge10({
                 Bu oturumda <span className="text-teal-300 font-semibold">10 basit koşullu yönerge</span>{' '}
                 sorulacak. Gruba doğal dilde söyleyin (ör.{' '}
                 <span className="text-white font-medium">"Kızlar ayağa kalksın"</span>).{' '}
-                Hedef çocuk koşula uyuyorsa ve 3–5 sn içinde eylemi yapıyorsa doğru sayılır.{' '}
-                İsimli yönergelerde <span className="text-white font-medium">…</span> yerine çocuğun adını söyleyin.
+                Hedef çocuk koşula uyuyorsa ve 3–5 sn içinde eylemi yapıyorsa doğru sayılır.
+                {studentName.trim() ? (
+                  <>
+                    {' '}İsimli yönergelerde öğrenci adı otomatik yazılır:{' '}
+                    <span className="text-teal-300 font-medium">{studentName.trim()}</span>.
+                  </>
+                ) : null}{' '}
                 İstemediğin yönergeye dokunarak değiştirebilirsin.
               </p>
             </div>
@@ -221,7 +235,7 @@ export default function Yonerge10({
                     {i + 1}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-100 leading-snug">{task.text}</p>
+                    <p className="text-sm font-medium text-slate-100 leading-snug">{displayText(task.text)}</p>
                     {task.materials.length > 0 && (
                       <span className="text-[10px] text-slate-500 mt-1 block">
                         {task.materials.join(', ')}
@@ -277,13 +291,8 @@ export default function Yonerge10({
                 Gruba söyleyin
               </span>
               <h1 className="text-2xl md:text-4xl font-black text-center text-white leading-tight">
-                "{currentTask.text}"
+                "{displayText(currentTask.text)}"
               </h1>
-              {isNameTask && (
-                <p className="text-amber-300/90 text-sm mt-3 text-center">
-                  … yerine hedef öğrencinin adını söyleyin
-                </p>
-              )}
               <p className="text-slate-500 text-sm mt-4 text-center max-w-md">
                 Hedef çocuk koşula uyuyorsa ve 3–5 sn içinde eylemi yapıyorsa{' '}
                 <span className="text-green-400">Yaptı</span>, aksi halde{' '}
