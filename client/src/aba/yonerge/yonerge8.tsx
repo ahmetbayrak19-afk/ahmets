@@ -275,6 +275,7 @@ export default function Yonerge8({
   } | null>(null);
 
   const zilAudioRef = useRef<HTMLAudioElement | null>(null);
+  const marakasAudioRef = useRef<HTMLAudioElement | null>(null);
   const vibrateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const introRef = useRef<HTMLAudioElement | null>(null);
   const instrRef = useRef<HTMLAudioElement | null>(null);
@@ -327,6 +328,22 @@ export default function Yonerge8({
     vibrate(0);
   };
 
+  const startMarakasSound = () => {
+    if (marakasAudioRef.current) return;
+    const a = new Audio(marakasSes);
+    a.volume = 1;
+    a.loop = true;
+    marakasAudioRef.current = a;
+    a.play().catch(() => {});
+  };
+  const stopMarakasSound = () => {
+    if (marakasAudioRef.current) {
+      marakasAudioRef.current.pause();
+      marakasAudioRef.current.currentTime = 0;
+      marakasAudioRef.current = null;
+    }
+  };
+
   const updateGhostPos = (x: number, y: number, angle = 0) => {
     dragPosRef.current = { x, y };
     if (rafRef.current != null) return;
@@ -373,7 +390,7 @@ export default function Yonerge8({
     setMultiCount(0); multiCountRef.current = 0;
     setDoneIds([]); setConsumedIds([]); setMergeMap({});
     setZilPressed(false); setWrongId(null);
-    hideGhost(); setShakeActiveId(null); ptr.current = null; stopZilSound();
+    hideGhost(); setShakeActiveId(null); ptr.current = null; stopZilSound(); stopMarakasSound();
   }, []); // eslint-disable-line
 
   const replaceTask = (index: number) => {
@@ -414,7 +431,7 @@ export default function Yonerge8({
   const failTrial = useCallback((id?: string) => {
     if (lockedRef.current) return;
     lockedRef.current = true; setLocked(true);
-    stopZilSound(); ptr.current = null; hideGhost();
+    stopZilSound(); stopMarakasSound(); ptr.current = null; hideGhost();
     setShakeActiveId(null); setZilPressed(false);
     if (id) setWrongId(id);
     setTimeout(() => { setWrongId(null); goNext(false); }, 500);
@@ -435,7 +452,7 @@ export default function Yonerge8({
       stepIdxRef.current = nextStep; setStepIdx(nextStep);
       multiCountRef.current = 0; setMultiCount(0);
       setZilPressed(false); setShakeActiveId(null);
-      ptr.current = null; stopZilSound();
+      ptr.current = null; stopZilSound(); stopMarakasSound();
     }
   }, [goNext]);
 
@@ -482,6 +499,7 @@ export default function Yonerge8({
           p.shakeStarted = true;
           p.lastShakeMoveAt = now;
           p.shakeAccumMs = 0;
+          startMarakasSound();
         } else {
           const gap = now - p.lastShakeMoveAt;
           // Aralıksız sallama say (0.4 sn'den uzun duraklama birikimi sıfırlamaz ama eklemez)
@@ -492,7 +510,7 @@ export default function Yonerge8({
 
         const step = getStep();
         if (step?.kind === 'shake' && step.targetId === p.id && p.shakeAccumMs >= SHAKE_MIN_MS) {
-          playFx(step.successSound);
+          stopMarakasSound();
           setShakeActiveId(null); hideGhost(); ptr.current = null;
           completeStepRef.current();
         }
@@ -512,7 +530,7 @@ export default function Yonerge8({
         return;
       }
 
-      stopZilSound(); setZilPressed(false); setShakeActiveId(null);
+      stopZilSound(); stopMarakasSound(); setZilPressed(false); setShakeActiveId(null);
       if (lockedRef.current) { ptr.current = null; hideGhost(); return; }
 
       const step = getStep();
@@ -616,7 +634,7 @@ export default function Yonerge8({
     }
   };
 
-  useEffect(() => () => { stopZilSound(); }, []);
+  useEffect(() => () => { stopZilSound(); stopMarakasSound(); }, []);
 
   const handlePhysical = (correct: boolean) => {
     if (lockedRef.current) return;
@@ -640,7 +658,7 @@ export default function Yonerge8({
   return (
     <div className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none" style={{ touchAction: 'none' }}>
       <div className="shrink-0 p-4 landscape:py-2 landscape:px-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md relative z-10">
-        <button onClick={() => { stopIntro(); stopInstr(); stopZilSound(); onClose(); }}
+        <button onClick={() => { stopIntro(); stopInstr(); stopZilSound(); stopMarakasSound(); onClose(); }}
           className="p-2 landscape:p-1.5 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
           <XCircle className="w-7 h-7 landscape:w-6 landscape:h-6" />
         </button>
