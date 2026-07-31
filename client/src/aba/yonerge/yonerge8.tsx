@@ -102,11 +102,7 @@ import s_zilbasmarakassalla from './sesgorsel/zilbasmarakassalla.mp3';
 import s_anahtartakbebekdokun from './sesgorsel/anahtartakbebekdokun.mp3';
 import s_cicekvazokoyelmadokun from './sesgorsel/cicekvazokoyelmadokun.mp3';
 
-export interface NesneDef {
-  id: string;
-  name: string;
-  img?: string;
-}
+export interface NesneDef { id: string; name: string; img?: string; }
 
 const OBJECTS: Record<string, NesneDef> = {
   top: { id: 'top', name: 'Top', img: topImg },
@@ -135,27 +131,14 @@ const OBJECTS: Record<string, NesneDef> = {
 };
 
 export type StepKind = 'tap' | 'multi' | 'drag' | 'shake' | 'hold';
-
 export interface TaskStep {
-  kind: StepKind;
-  targetId: string;
-  dropId?: string;
-  stages?: string[];
-  stageSounds?: string[];
-  mergeImg?: string;
-  successSound?: string;
+  kind: StepKind; targetId: string; dropId?: string;
+  stages?: string[]; stageSounds?: string[]; mergeImg?: string; successSound?: string;
 }
-
 export type TaskType = 'physical' | 'digital';
-
 export interface SequentialTask {
-  id: string;
-  text: string;
-  type: TaskType;
-  materials: string[];
-  sound?: string;
-  steps?: TaskStep[];
-  distractors?: string[];
+  id: string; text: string; type: TaskType; materials: string[];
+  sound?: string; steps?: TaskStep[]; distractors?: string[];
 }
 
 const YUMURTA_STAGES = [yumurta1, yumurta2, yumurta3, yumurta4];
@@ -226,35 +209,28 @@ function shuffle<T>(arr: T[]): T[] {
   }
   return a;
 }
-
 function playFx(src?: string) {
   if (!src) return;
-  const a = new Audio(src);
-  a.volume = 1;
-  a.play().catch(() => {});
+  const a = new Audio(src); a.volume = 1; a.play().catch(() => {});
 }
-
 function buildGrid(task: SequentialTask): NesneDef[] {
   if (!task.steps) return [];
   const ids = new Set<string>();
-  task.steps.forEach((s) => {
-    ids.add(s.targetId);
-    if (s.dropId) ids.add(s.dropId);
-  });
+  task.steps.forEach((s) => { ids.add(s.targetId); if (s.dropId) ids.add(s.dropId); });
   (task.distractors || []).forEach((d) => ids.add(d));
   const all = Object.keys(OBJECTS);
   const extra = shuffle(all.filter((id) => !ids.has(id))).slice(0, Math.max(0, 5 - ids.size));
   extra.forEach((e) => ids.add(e));
   return shuffle(Array.from(ids).map((id) => OBJECTS[id]).filter(Boolean));
 }
-
-interface Yonerge8Props {
-  itemCode?: string;
-  itemText?: string;
-  onClose: () => void;
-  onComplete: (success: boolean) => void;
+function vibrate(pattern: number | number[] = 40) {
+  try { navigator.vibrate?.(pattern); } catch { /* desteklenmiyor */ }
 }
 
+interface Yonerge8Props {
+  itemCode?: string; itemText?: string;
+  onClose: () => void; onComplete: (success: boolean) => void;
+}
 type Phase = 'prep' | 'running' | 'result';
 
 const HOLD_OK_MS = 500;
@@ -267,15 +243,13 @@ const HOLD_CANCEL_MOVE = 55;
 export default function Yonerge8({
   itemCode = 'YTB 3.3',
   itemText = 'Verilen Yönergeleri İstenen Sıra ile Yerine Getirme',
-  onClose,
-  onComplete,
+  onClose, onComplete,
 }: Yonerge8Props) {
   const [selected, setSelected] = useState<SequentialTask[]>(() => shuffle(TASK_POOL).slice(0, 10));
   const [phase, setPhase] = useState<Phase>('prep');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [locked, setLocked] = useState(false);
-
   const [stepIdx, setStepIdx] = useState(0);
   const [multiCount, setMultiCount] = useState(0);
   const [doneIds, setDoneIds] = useState<string[]>([]);
@@ -286,25 +260,17 @@ export default function Yonerge8({
   const [dragId, setDragId] = useState<string | null>(null);
   const [shakeActiveId, setShakeActiveId] = useState<string | null>(null);
 
-  // Ghost image DOM ref — position updated without React re-render
   const ghostRef = useRef<HTMLImageElement | null>(null);
   const dragPosRef = useRef({ x: 0, y: 0 });
   const rafRef = useRef<number | null>(null);
-
   const ptr = useRef<{
-    id: string;
-    pointerId: number;
-    startX: number;
-    startY: number;
-    lastX: number;
-    lastY: number;
-    moved: boolean;
-    shakeCount: number;
-    isHoldTarget: boolean;
-    holdStart: number;
+    id: string; pointerId: number; startX: number; startY: number;
+    lastX: number; lastY: number; moved: boolean; shakeCount: number;
+    isHoldTarget: boolean; holdStart: number; isShakeTarget: boolean;
   } | null>(null);
 
   const zilAudioRef = useRef<HTMLAudioElement | null>(null);
+  const vibrateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const introRef = useRef<HTMLAudioElement | null>(null);
   const instrRef = useRef<HTMLAudioElement | null>(null);
   const lockedRef = useRef(false);
@@ -313,8 +279,6 @@ export default function Yonerge8({
   const currentIndexRef = useRef(0);
   const selectedRef = useRef(selected);
   const scoreRef = useRef(0);
-
-  // Stable callbacks via refs so document listeners never go stale
   const completeStepRef = useRef<() => void>(() => {});
   const failTrialRef = useRef<(id?: string) => void>(() => {});
 
@@ -327,27 +291,23 @@ export default function Yonerge8({
 
   const currentTask = selected[currentIndex];
   const currentStep = currentTask?.steps?.[stepIdx];
-
   const materialsList = (() => {
     const set = new Set<string>();
     selected.forEach((t) => t.materials.forEach((m) => set.add(m)));
     return Array.from(set).sort();
   })();
 
-  const stopIntro = () => {
-    if (introRef.current) { introRef.current.pause(); introRef.current.currentTime = 0; }
-  };
-  const stopInstr = () => {
-    if (instrRef.current) { instrRef.current.pause(); instrRef.current.currentTime = 0; }
-  };
+  const stopIntro = () => { if (introRef.current) { introRef.current.pause(); introRef.current.currentTime = 0; } };
+  const stopInstr = () => { if (instrRef.current) { instrRef.current.pause(); instrRef.current.currentTime = 0; } };
 
   const startZilSound = () => {
     stopZilSound();
     const a = new Audio(zilsesi);
-    a.volume = 1;
-    a.loop = true;
+    a.volume = 1; a.loop = true;
     zilAudioRef.current = a;
     a.play().catch(() => {});
+    vibrate(35);
+    vibrateTimerRef.current = setInterval(() => vibrate(20), 160);
   };
   const stopZilSound = () => {
     if (zilAudioRef.current) {
@@ -355,9 +315,14 @@ export default function Yonerge8({
       zilAudioRef.current.currentTime = 0;
       zilAudioRef.current = null;
     }
+    if (vibrateTimerRef.current) {
+      clearInterval(vibrateTimerRef.current);
+      vibrateTimerRef.current = null;
+    }
+    vibrate(0);
   };
 
-  const updateGhostPos = (x: number, y: number) => {
+  const updateGhostPos = (x: number, y: number, angle = 0) => {
     dragPosRef.current = { x, y };
     if (rafRef.current != null) return;
     rafRef.current = requestAnimationFrame(() => {
@@ -366,26 +331,25 @@ export default function Yonerge8({
       if (el) {
         el.style.left = `${dragPosRef.current.x - 56}px`;
         el.style.top = `${dragPosRef.current.y - 56}px`;
+        el.style.transform = `rotate(${angle}deg)`;
         el.style.display = 'block';
       }
     });
   };
 
   const hideGhost = () => {
-    if (rafRef.current != null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
+    if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     setDragId(null);
-    if (ghostRef.current) ghostRef.current.style.display = 'none';
+    if (ghostRef.current) {
+      ghostRef.current.style.display = 'none';
+      ghostRef.current.style.transform = 'none';
+    }
   };
 
   useEffect(() => {
     if (phase !== 'prep') return;
     const a = new Audio(girisSes);
-    introRef.current = a;
-    a.volume = 1;
-    a.play().catch(() => {});
+    introRef.current = a; a.volume = 1; a.play().catch(() => {});
     return () => { a.pause(); a.currentTime = 0; };
   }, [phase]);
 
@@ -395,25 +359,15 @@ export default function Yonerge8({
     if (!task?.sound) return;
     stopInstr();
     const a = new Audio(task.sound);
-    instrRef.current = a;
-    a.volume = 1;
-    a.play().catch(() => {});
+    instrRef.current = a; a.volume = 1; a.play().catch(() => {});
     return () => { a.pause(); a.currentTime = 0; };
   }, [phase, currentIndex]); // eslint-disable-line
 
   const resetStepState = useCallback(() => {
-    setStepIdx(0);
-    stepIdxRef.current = 0;
-    setMultiCount(0);
-    multiCountRef.current = 0;
-    setDoneIds([]);
-    setMergeMap({});
-    setZilPressed(false);
-    setWrongId(null);
-    hideGhost();
-    setShakeActiveId(null);
-    ptr.current = null;
-    stopZilSound();
+    setStepIdx(0); stepIdxRef.current = 0;
+    setMultiCount(0); multiCountRef.current = 0;
+    setDoneIds([]); setMergeMap({}); setZilPressed(false); setWrongId(null);
+    hideGhost(); setShakeActiveId(null); ptr.current = null; stopZilSound();
   }, []); // eslint-disable-line
 
   const replaceTask = (index: number) => {
@@ -421,62 +375,43 @@ export default function Yonerge8({
     const alts = TASK_POOL.filter((t) => !used.has(t.id));
     if (alts.length === 0) return;
     const next = alts[Math.floor(Math.random() * alts.length)];
-    setSelected((prev) => {
-      const copy = [...prev];
-      copy[index] = next;
-      return copy;
-    });
+    setSelected((prev) => { const copy = [...prev]; copy[index] = next; return copy; });
   };
 
   const startAssessment = () => {
     stopIntro();
-    setCurrentIndex(0);
-    currentIndexRef.current = 0;
-    setScore(0);
-    scoreRef.current = 0;
-    setLocked(false);
-    lockedRef.current = false;
+    setCurrentIndex(0); currentIndexRef.current = 0;
+    setScore(0); scoreRef.current = 0;
+    setLocked(false); lockedRef.current = false;
     resetStepState();
     const first = selected[0];
-    if (first?.type === 'digital') setGridItems(buildGrid(first));
-    else setGridItems([]);
+    if (first?.type === 'digital') setGridItems(buildGrid(first)); else setGridItems([]);
     setPhase('running');
   };
 
   const goNext = useCallback((correct: boolean) => {
     const newScore = scoreRef.current + (correct ? 1 : 0);
-    scoreRef.current = newScore;
-    setScore(newScore);
+    scoreRef.current = newScore; setScore(newScore);
     const next = currentIndexRef.current + 1;
     if (next >= 10) {
       setPhase('result');
       if (newScore >= 8) confetti({ particleCount: 250, spread: 90, origin: { y: 0.6 } });
       return;
     }
-    currentIndexRef.current = next;
-    setCurrentIndex(next);
-    setLocked(false);
-    lockedRef.current = false;
+    currentIndexRef.current = next; setCurrentIndex(next);
+    setLocked(false); lockedRef.current = false;
     resetStepState();
     const nextTask = selectedRef.current[next];
-    if (nextTask?.type === 'digital') setGridItems(buildGrid(nextTask));
-    else setGridItems([]);
+    if (nextTask?.type === 'digital') setGridItems(buildGrid(nextTask)); else setGridItems([]);
   }, [resetStepState]);
 
   const failTrial = useCallback((id?: string) => {
     if (lockedRef.current) return;
-    lockedRef.current = true;
-    setLocked(true);
-    stopZilSound();
-    ptr.current = null;
-    hideGhost();
-    setShakeActiveId(null);
-    setZilPressed(false);
+    lockedRef.current = true; setLocked(true);
+    stopZilSound(); ptr.current = null; hideGhost();
+    setShakeActiveId(null); setZilPressed(false);
     if (id) setWrongId(id);
-    setTimeout(() => {
-      setWrongId(null);
-      goNext(false);
-    }, 500);
+    setTimeout(() => { setWrongId(null); goNext(false); }, 500);
   }, [goNext]); // eslint-disable-line
 
   const completeStep = useCallback(() => {
@@ -485,23 +420,16 @@ export default function Yonerge8({
     if (!task?.steps) return;
     const si = stepIdxRef.current;
     const step = task.steps[si];
-    if (step) {
-      setDoneIds((d) => (d.includes(step.targetId) ? d : [...d, step.targetId]));
-    }
+    if (step) setDoneIds((d) => (d.includes(step.targetId) ? d : [...d, step.targetId]));
     const nextStep = si + 1;
     if (nextStep >= task.steps.length) {
-      lockedRef.current = true;
-      setLocked(true);
+      lockedRef.current = true; setLocked(true);
       setTimeout(() => goNext(true), 400);
     } else {
-      stepIdxRef.current = nextStep;
-      setStepIdx(nextStep);
-      multiCountRef.current = 0;
-      setMultiCount(0);
-      setZilPressed(false);
-      setShakeActiveId(null);
-      ptr.current = null;
-      stopZilSound();
+      stepIdxRef.current = nextStep; setStepIdx(nextStep);
+      multiCountRef.current = 0; setMultiCount(0);
+      setZilPressed(false); setShakeActiveId(null);
+      ptr.current = null; stopZilSound();
     }
   }, [goNext]);
 
@@ -512,12 +440,10 @@ export default function Yonerge8({
 
   const getStep = () => selectedRef.current[currentIndexRef.current]?.steps?.[stepIdxRef.current];
 
-  // ——— Stable document listeners (once) ———
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       const p = ptr.current;
-      if (!p || lockedRef.current) return;
-      if (e.pointerId !== p.pointerId) return;
+      if (!p || lockedRef.current || e.pointerId !== p.pointerId) return;
 
       const dx = e.clientX - p.startX;
       const dy = e.clientY - p.startY;
@@ -525,35 +451,32 @@ export default function Yonerge8({
 
       if (p.isHoldTarget) {
         if (dist > HOLD_CANCEL_MOVE) {
-          stopZilSound();
-          setZilPressed(false);
-          p.isHoldTarget = false;
-          p.moved = true;
+          stopZilSound(); setZilPressed(false);
+          p.isHoldTarget = false; p.moved = true;
         }
       } else if (dist > MOVE_FOR_DRAG) {
         p.moved = true;
       }
 
-      if (p.moved) {
-        // show ghost via state once, then DOM updates
-        setDragId((prev) => prev === p.id ? prev : p.id);
-        updateGhostPos(e.clientX, e.clientY);
+      // Marakas / sürükleme: görsel parmağı takip eder
+      if (p.isShakeTarget || p.moved) {
+        setDragId((prev) => (prev === p.id ? prev : p.id));
+        const angle = p.isShakeTarget
+          ? Math.max(-28, Math.min(28, dx * 0.35 + Math.sin(Date.now() / 60) * 6))
+          : 0;
+        updateGhostPos(e.clientX, e.clientY, angle);
       }
 
-      // Shake: count direction changes / significant micro-moves
       const sdx = e.clientX - p.lastX;
       const sdy = e.clientY - p.lastY;
       const stepDist = Math.sqrt(sdx * sdx + sdy * sdy);
       if (stepDist > SHAKE_THRESHOLD) {
         p.shakeCount += 1;
-        p.lastX = e.clientX;
-        p.lastY = e.clientY;
+        p.lastX = e.clientX; p.lastY = e.clientY;
         const step = getStep();
         if (step?.kind === 'shake' && step.targetId === p.id && p.shakeCount >= SHAKE_NEEDED) {
           playFx(step.successSound);
-          setShakeActiveId(null);
-          hideGhost();
-          ptr.current = null;
+          setShakeActiveId(null); hideGhost(); ptr.current = null;
           completeStepRef.current();
         }
       }
@@ -563,35 +486,23 @@ export default function Yonerge8({
       const p = ptr.current;
       if (!p || e.pointerId !== p.pointerId) return;
 
-      // ZİL bırak
       if (p.isHoldTarget) {
         const heldMs = Date.now() - p.holdStart;
-        stopZilSound();
-        setZilPressed(false);
-        hideGhost();
-        setShakeActiveId(null);
+        stopZilSound(); setZilPressed(false); hideGhost(); setShakeActiveId(null);
         ptr.current = null;
         if (lockedRef.current) return;
         if (heldMs >= HOLD_OK_MS) completeStepRef.current();
         return;
       }
 
-      stopZilSound();
-      setZilPressed(false);
-      setShakeActiveId(null);
-
-      if (lockedRef.current) {
-        ptr.current = null;
-        hideGhost();
-        return;
-      }
+      stopZilSound(); setZilPressed(false); setShakeActiveId(null);
+      if (lockedRef.current) { ptr.current = null; hideGhost(); return; }
 
       const step = getStep();
       const totalMove = Math.sqrt((e.clientX - p.startX) ** 2 + (e.clientY - p.startY) ** 2);
       const wasTap = !p.moved && totalMove < TAP_MAX_MOVE;
 
       if (p.moved && step) {
-        // elementFromPoint: briefly hide ghost so we hit the real target
         if (ghostRef.current) ghostRef.current.style.display = 'none';
         const dropEl = document.elementFromPoint(e.clientX, e.clientY);
         const dropId =
@@ -602,27 +513,22 @@ export default function Yonerge8({
           if (p.id === step.targetId && dropId === step.dropId) {
             if (step.mergeImg) setMergeMap((m) => ({ ...m, [step.dropId!]: step.mergeImg! }));
             playFx(step.successSound);
-            hideGhost();
-            ptr.current = null;
-            completeStepRef.current();
-            return;
+            hideGhost(); ptr.current = null; completeStepRef.current(); return;
           }
           if (dropId && dropId !== p.id) {
-            hideGhost();
-            ptr.current = null;
-            failTrialRef.current(p.id === step.targetId ? dropId : p.id);
-            return;
+            hideGhost(); ptr.current = null;
+            failTrialRef.current(p.id === step.targetId ? dropId : p.id); return;
           }
-          hideGhost();
-          ptr.current = null;
-          return;
+          hideGhost(); ptr.current = null; return;
         }
 
-        if ((step.kind !== 'shake' || p.id !== step.targetId) && p.id !== step.targetId) {
-          hideGhost();
-          ptr.current = null;
-          failTrialRef.current(p.id);
-          return;
+        // Sallama adımında bırakma (henüz yeterli sallanmadıysa) — hata değil
+        if (step.kind === 'shake' && p.id === step.targetId) {
+          hideGhost(); ptr.current = null; return;
+        }
+
+        if (p.id !== step.targetId) {
+          hideGhost(); ptr.current = null; failTrialRef.current(p.id); return;
         }
       }
 
@@ -632,8 +538,7 @@ export default function Yonerge8({
             const next = multiCountRef.current + 1;
             const soundIdx = Math.min(multiCountRef.current, (step.stageSounds?.length || 1) - 1);
             playFx(step.stageSounds?.[soundIdx]);
-            multiCountRef.current = next;
-            setMultiCount(next);
+            multiCountRef.current = next; setMultiCount(next);
             if (next >= 3) setTimeout(() => completeStepRef.current(), 700);
           } else failTrialRef.current(p.id);
         } else if (step.kind === 'tap') {
@@ -648,8 +553,7 @@ export default function Yonerge8({
         }
       }
 
-      ptr.current = null;
-      hideGhost();
+      ptr.current = null; hideGhost();
     };
 
     document.addEventListener('pointermove', onMove, { passive: false });
@@ -664,35 +568,30 @@ export default function Yonerge8({
 
   const onItemPointerDown = (e: React.PointerEvent, id: string) => {
     if (lockedRef.current) return;
-    e.preventDefault();
-    e.stopPropagation();
-
-    try {
-      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-    } catch { /* ignore */ }
+    e.preventDefault(); e.stopPropagation();
+    try { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); } catch { /* */ }
 
     const step = getStep();
     const isHoldTarget = !!(step?.kind === 'hold' && step.targetId === id);
+    const isShakeTarget = !!(step?.kind === 'shake' && step.targetId === id);
 
     ptr.current = {
-      id,
-      pointerId: e.pointerId,
-      startX: e.clientX,
-      startY: e.clientY,
-      lastX: e.clientX,
-      lastY: e.clientY,
-      moved: false,
-      shakeCount: 0,
-      isHoldTarget,
-      holdStart: Date.now(),
+      id, pointerId: e.pointerId,
+      startX: e.clientX, startY: e.clientY,
+      lastX: e.clientX, lastY: e.clientY,
+      moved: false, shakeCount: 0,
+      isHoldTarget, holdStart: Date.now(), isShakeTarget,
     };
 
     if (isHoldTarget) {
       setZilPressed(true);
       startZilSound();
     }
-    if (step?.kind === 'shake' && step.targetId === id) {
+    // Marakası tutunca hemen parmağa yapışır
+    if (isShakeTarget) {
       setShakeActiveId(id);
+      setDragId(id);
+      updateGhostPos(e.clientX, e.clientY, 0);
     }
   };
 
@@ -700,9 +599,7 @@ export default function Yonerge8({
 
   const handlePhysical = (correct: boolean) => {
     if (lockedRef.current) return;
-    lockedRef.current = true;
-    setLocked(true);
-    goNext(correct);
+    lockedRef.current = true; setLocked(true); goNext(correct);
   };
 
   const displayImg = (id: string): string | undefined => {
@@ -722,16 +619,12 @@ export default function Yonerge8({
   return (
     <div className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none" style={{ touchAction: 'none' }}>
       <div className="shrink-0 p-4 landscape:py-2 landscape:px-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md relative z-10">
-        <button
-          onClick={() => { stopIntro(); stopInstr(); stopZilSound(); onClose(); }}
-          className="p-2 landscape:p-1.5 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
-        >
+        <button onClick={() => { stopIntro(); stopInstr(); stopZilSound(); onClose(); }}
+          className="p-2 landscape:p-1.5 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white">
           <XCircle className="w-7 h-7 landscape:w-6 landscape:h-6" />
         </button>
         <div className="text-center flex flex-col items-center px-2">
-          <h2 className="text-sm sm:text-lg landscape:text-sm font-bold truncate max-w-[280px] sm:max-w-md text-slate-100">
-            {itemCode} — {itemText}
-          </h2>
+          <h2 className="text-sm sm:text-lg landscape:text-sm font-bold truncate max-w-[280px] sm:max-w-md text-slate-100">{itemCode} — {itemText}</h2>
           <p className="text-[10px] text-slate-400 font-medium tracking-widest uppercase mt-1">
             {phase === 'prep' && 'HAZIRLIK'}
             {phase === 'running' && `DEĞERLENDİRME · ${currentIndex + 1} / 10`}
@@ -772,8 +665,7 @@ export default function Yonerge8({
             </div>
             <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-4">
               <div className="flex items-center gap-2 mb-2 text-slate-300">
-                <Box size={16} className="text-amber-400" />
-                <span className="text-xs font-bold uppercase tracking-wider">Hazır bulundurulacak malzemeler</span>
+                <Box size={16} className="text-amber-400" /><span className="text-xs font-bold uppercase tracking-wider">Hazır bulundurulacak malzemeler</span>
               </div>
               {materialsList.length === 0 ? (
                 <p className="text-sm text-slate-500">Ekstra malzeme gerekmiyor (sadece beden hareketleri / ekran).</p>
@@ -815,10 +707,7 @@ export default function Yonerge8({
                   const shaking = shakeActiveId === item.id;
                   return (
                     <div key={item.id} data-obj-id={item.id} className="min-h-[120px] landscape:min-h-[100px] relative" style={{ touchAction: 'none' }}>
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        data-obj-id={item.id}
+                      <div role="button" tabIndex={0} data-obj-id={item.id}
                         onPointerDown={(e) => onItemPointerDown(e, item.id)}
                         className={
                           `relative flex flex-col items-center justify-center rounded-2xl border-2 bg-slate-800/80 overflow-hidden w-full h-full p-2 transition-colors duration-150 ` +
@@ -830,7 +719,7 @@ export default function Yonerge8({
                           (locked || done ? 'pointer-events-none ' : 'cursor-grab active:cursor-grabbing ') +
                           (hiding ? 'opacity-15 ' : '')
                         }
-                        style={{ touchAction: 'none', transform: shaking ? 'rotate(-8deg)' : undefined }}
+                        style={{ touchAction: 'none' }}
                       >
                         {img ? (
                           <img src={img} alt="" className="w-[80%] h-[80%] max-w-[120px] max-h-[120px] object-contain pointer-events-none" draggable={false} />
@@ -867,13 +756,12 @@ export default function Yonerge8({
         )}
       </div>
 
-      {/* Sürükleme hayaleti — pozisyon DOM ile, re-render yok */}
       <img
         ref={ghostRef}
         src={dragId && OBJECTS[dragId]?.img ? OBJECTS[dragId].img : ''}
         alt=""
         className="fixed pointer-events-none z-[200] w-28 h-28 object-contain opacity-95 drop-shadow-2xl"
-        style={{ display: 'none', left: 0, top: 0 }}
+        style={{ display: 'none', left: 0, top: 0, transformOrigin: 'center center' }}
         draggable={false}
       />
 
