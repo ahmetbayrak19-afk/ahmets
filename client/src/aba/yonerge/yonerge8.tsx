@@ -257,13 +257,12 @@ interface Yonerge8Props {
 
 type Phase = 'prep' | 'running' | 'result';
 
-/** Zile yeterli süre basılı tutma eşiği (ms) — bırakınca değerlendirilir */
 const HOLD_OK_MS = 500;
-const MOVE_FOR_DRAG = 10;
-const SHAKE_THRESHOLD = 12;
-const SHAKE_NEEDED = 3;
-const TAP_MAX_MOVE = 16;
-const HOLD_CANCEL_MOVE = 50;
+const MOVE_FOR_DRAG = 8;
+const SHAKE_THRESHOLD = 6;
+const SHAKE_NEEDED = 2;
+const TAP_MAX_MOVE = 18;
+const HOLD_CANCEL_MOVE = 55;
 
 export default function Yonerge8({
   itemCode = 'YTB 3.3',
@@ -285,11 +284,16 @@ export default function Yonerge8({
   const [wrongId, setWrongId] = useState<string | null>(null);
   const [gridItems, setGridItems] = useState<NesneDef[]>([]);
   const [dragId, setDragId] = useState<string | null>(null);
-  const [dragStyle, setDragStyle] = useState<{ x: number; y: number } | null>(null);
   const [shakeActiveId, setShakeActiveId] = useState<string | null>(null);
+
+  // Ghost image DOM ref — position updated without React re-render
+  const ghostRef = useRef<HTMLImageElement | null>(null);
+  const dragPosRef = useRef({ x: 0, y: 0 });
+  const rafRef = useRef<number | null>(null);
 
   const ptr = useRef<{
     id: string;
+    pointerId: number;
     startX: number;
     startY: number;
     lastX: number;
@@ -309,7 +313,10 @@ export default function Yonerge8({
   const currentIndexRef = useRef(0);
   const selectedRef = useRef(selected);
   const scoreRef = useRef(0);
-  const listenersAttached = useRef(false);
+
+  // Stable callbacks via refs so document listeners never go stale
+  const completeStepRef = useRef<() => void>(() => {});
+  const failTrialRef = useRef<(id?: string) => void>(() => {});
 
   useEffect(() => { lockedRef.current = locked; }, [locked]);
   useEffect(() => { stepIdxRef.current = stepIdx; }, [stepIdx]);
@@ -342,13 +349,35 @@ export default function Yonerge8({
     zilAudioRef.current = a;
     a.play().catch(() => {});
   };
-
   const stopZilSound = () => {
     if (zilAudioRef.current) {
       zilAudioRef.current.pause();
       zilAudioRef.current.currentTime = 0;
       zilAudioRef.current = null;
     }
+  };
+
+  const updateGhostPos = (x: number, y: number) => {
+    dragPosRef.current = { x, y };
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      const el = ghostRef.current;
+      if (el) {
+        el.style.left = `${dragPosRef.current.x - 56}px`;
+        el.style.top = `${dragPosRef.current.y - 56}px`;
+        el.style.display = 'block';
+      }
+    });
+  };
+
+  const hideGhost = () => {
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    setDragId(null);
+    if (ghostRef.current) ghostRef.current.style.display = 'none';
   };
 
   useEffect(() => {
@@ -372,17 +401,6 @@ export default function Yonerge8({
     return () => { a.pause(); a.currentTime = 0; };
   }, [phase, currentIndex]); // eslint-disable-line
 
-  const onDocMoveRef = useRef<(e: PointerEvent) => void>(() => {});
-  const onDocUpRef = useRef<(e: PointerEvent) => void>(() => {});
-
-  const removeDocListeners = () => {
-    if (!listenersAttached.current) return;
-    document.removeEventListener('pointermove', onDocMoveRef.current);
-    document.removeEventListener('pointerup', onDocUpRef.current);
-    document.removeEventListener('pointercancel', onDocUpRef.current);
-    listenersAttached.current = false;
-  };
-
   const resetStepState = useCallback(() => {
     setStepIdx(0);
     stepIdxRef.current = 0;
@@ -392,12 +410,10 @@ export default function Yonerge8({
     setMergeMap({});
     setZilPressed(false);
     setWrongId(null);
-    setDragId(null);
-    setDragStyle(null);
+    hideGhost();
     setShakeActiveId(null);
     ptr.current = null;
     stopZilSound();
-    removeDocListeners();
   }, []); // eslint-disable-line
 
   const replaceTask = (index: number) => {
@@ -452,10 +468,8 @@ export default function Yonerge8({
     lockedRef.current = true;
     setLocked(true);
     stopZilSound();
-    removeDocListeners();
     ptr.current = null;
-    setDragId(null);
-    setDragStyle(null);
+    hideGhost();
     setShakeActiveId(null);
     setZilPressed(false);
     if (id) setWrongId(id);
@@ -491,171 +505,178 @@ export default function Yonerge8({
     }
   }, [goNext]);
 
+  useEffect(() => {
+    completeStepRef.current = completeStep;
+    failTrialRef.current = failTrial;
+  }, [completeStep, failTrial]);
+
   const getStep = () => selectedRef.current[currentIndexRef.current]?.steps?.[stepIdxRef.current];
 
-  onDocMoveRef.current = (e: PointerEvent) => {
-    const p = ptr.current;
-    if (!p || lockedRef.current) return;
+  // ——— Stable document listeners (once) ———
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      const p = ptr.current;
+      if (!p || lockedRef.current) return;
+      if (e.pointerId !== p.pointerId) return;
 
-    const dx = e.clientX - p.startX;
-    const dy = e.clientY - p.startY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+      const dx = e.clientX - p.startX;
+      const dy = e.clientY - p.startY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Zil basılıyken büyük kayma → ses kes, hold iptal
-    if (p.isHoldTarget) {
-      if (dist > HOLD_CANCEL_MOVE) {
-        stopZilSound();
-        setZilPressed(false);
-        p.isHoldTarget = false;
+      if (p.isHoldTarget) {
+        if (dist > HOLD_CANCEL_MOVE) {
+          stopZilSound();
+          setZilPressed(false);
+          p.isHoldTarget = false;
+          p.moved = true;
+        }
+      } else if (dist > MOVE_FOR_DRAG) {
         p.moved = true;
       }
-    } else if (dist > MOVE_FOR_DRAG) {
-      p.moved = true;
-    }
 
-    if (p.moved || (!p.isHoldTarget && dist > MOVE_FOR_DRAG)) {
-      p.moved = true;
-      setDragId(p.id);
-      setDragStyle({ x: e.clientX, y: e.clientY });
-    }
-
-    const sdx = e.clientX - p.lastX;
-    const sdy = e.clientY - p.lastY;
-    const stepDist = Math.sqrt(sdx * sdx + sdy * sdy);
-    if (stepDist > SHAKE_THRESHOLD) {
-      p.shakeCount += 1;
-      p.lastX = e.clientX;
-      p.lastY = e.clientY;
-      const step = getStep();
-      if (step?.kind === 'shake' && step.targetId === p.id && p.shakeCount >= SHAKE_NEEDED) {
-        playFx(step.successSound);
-        setShakeActiveId(null);
-        setDragId(null);
-        setDragStyle(null);
-        ptr.current = null;
-        removeDocListeners();
-        completeStep();
+      if (p.moved) {
+        // show ghost via state once, then DOM updates
+        setDragId((prev) => prev === p.id ? prev : p.id);
+        updateGhostPos(e.clientX, e.clientY);
       }
-    }
-  };
 
-  onDocUpRef.current = (e: PointerEvent) => {
-    const p = ptr.current;
-    removeDocListeners();
-
-    // ——— ZİL: bırakınca sus, süre yeterse doğru ———
-    if (p?.isHoldTarget) {
-      const heldMs = Date.now() - p.holdStart;
-      stopZilSound();
-      setZilPressed(false);
-      setDragId(null);
-      setDragStyle(null);
-      setShakeActiveId(null);
-      ptr.current = null;
-
-      if (lockedRef.current) return;
-
-      if (heldMs >= HOLD_OK_MS) {
-        completeStep();
-      }
-      // kısa basış: ses zaten sustu, hata değil — tekrar basabilir
-      return;
-    }
-
-    stopZilSound();
-    setZilPressed(false);
-    setShakeActiveId(null);
-
-    if (!p || lockedRef.current) {
-      ptr.current = null;
-      setDragId(null);
-      setDragStyle(null);
-      return;
-    }
-
-    const step = getStep();
-    const totalMove = Math.sqrt((e.clientX - p.startX) ** 2 + (e.clientY - p.startY) ** 2);
-    const wasTap = !p.moved && totalMove < TAP_MAX_MOVE;
-
-    if (p.moved && step) {
-      const dropEl = document.elementFromPoint(e.clientX, e.clientY);
-      const dropId =
-        dropEl?.closest?.('[data-obj-id]')?.getAttribute('data-obj-id') ||
-        (dropEl as HTMLElement | null)?.getAttribute?.('data-obj-id');
-
-      if (step.kind === 'drag') {
-        if (p.id === step.targetId && dropId === step.dropId) {
-          if (step.mergeImg) setMergeMap((m) => ({ ...m, [step.dropId!]: step.mergeImg! }));
+      // Shake: count direction changes / significant micro-moves
+      const sdx = e.clientX - p.lastX;
+      const sdy = e.clientY - p.lastY;
+      const stepDist = Math.sqrt(sdx * sdx + sdy * sdy);
+      if (stepDist > SHAKE_THRESHOLD) {
+        p.shakeCount += 1;
+        p.lastX = e.clientX;
+        p.lastY = e.clientY;
+        const step = getStep();
+        if (step?.kind === 'shake' && step.targetId === p.id && p.shakeCount >= SHAKE_NEEDED) {
           playFx(step.successSound);
-          setDragId(null);
-          setDragStyle(null);
+          setShakeActiveId(null);
+          hideGhost();
           ptr.current = null;
-          completeStep();
-          return;
+          completeStepRef.current();
         }
-        if (dropId && dropId !== p.id) {
-          setDragId(null);
-          setDragStyle(null);
-          ptr.current = null;
-          failTrial(p.id === step.targetId ? dropId : p.id);
-          return;
-        }
-        setDragId(null);
-        setDragStyle(null);
+      }
+    };
+
+    const onUp = (e: PointerEvent) => {
+      const p = ptr.current;
+      if (!p || e.pointerId !== p.pointerId) return;
+
+      // ZİL bırak
+      if (p.isHoldTarget) {
+        const heldMs = Date.now() - p.holdStart;
+        stopZilSound();
+        setZilPressed(false);
+        hideGhost();
+        setShakeActiveId(null);
         ptr.current = null;
+        if (lockedRef.current) return;
+        if (heldMs >= HOLD_OK_MS) completeStepRef.current();
         return;
       }
 
-      if (step.kind !== 'shake' || p.id !== step.targetId) {
-        if (p.id !== step.targetId) {
-          setDragId(null);
-          setDragStyle(null);
+      stopZilSound();
+      setZilPressed(false);
+      setShakeActiveId(null);
+
+      if (lockedRef.current) {
+        ptr.current = null;
+        hideGhost();
+        return;
+      }
+
+      const step = getStep();
+      const totalMove = Math.sqrt((e.clientX - p.startX) ** 2 + (e.clientY - p.startY) ** 2);
+      const wasTap = !p.moved && totalMove < TAP_MAX_MOVE;
+
+      if (p.moved && step) {
+        // elementFromPoint: briefly hide ghost so we hit the real target
+        if (ghostRef.current) ghostRef.current.style.display = 'none';
+        const dropEl = document.elementFromPoint(e.clientX, e.clientY);
+        const dropId =
+          dropEl?.closest?.('[data-obj-id]')?.getAttribute('data-obj-id') ||
+          (dropEl as HTMLElement | null)?.getAttribute?.('data-obj-id');
+
+        if (step.kind === 'drag') {
+          if (p.id === step.targetId && dropId === step.dropId) {
+            if (step.mergeImg) setMergeMap((m) => ({ ...m, [step.dropId!]: step.mergeImg! }));
+            playFx(step.successSound);
+            hideGhost();
+            ptr.current = null;
+            completeStepRef.current();
+            return;
+          }
+          if (dropId && dropId !== p.id) {
+            hideGhost();
+            ptr.current = null;
+            failTrialRef.current(p.id === step.targetId ? dropId : p.id);
+            return;
+          }
+          hideGhost();
           ptr.current = null;
-          failTrial(p.id);
+          return;
+        }
+
+        if ((step.kind !== 'shake' || p.id !== step.targetId) && p.id !== step.targetId) {
+          hideGhost();
+          ptr.current = null;
+          failTrialRef.current(p.id);
           return;
         }
       }
-    }
 
-    if (wasTap && step) {
-      if (step.kind === 'multi') {
-        if (p.id === step.targetId) {
-          const next = multiCountRef.current + 1;
-          const soundIdx = Math.min(multiCountRef.current, (step.stageSounds?.length || 1) - 1);
-          playFx(step.stageSounds?.[soundIdx]);
-          multiCountRef.current = next;
-          setMultiCount(next);
-          if (next >= 3) setTimeout(() => completeStep(), 700);
-        } else failTrial(p.id);
-      } else if (step.kind === 'tap') {
-        if (p.id === step.targetId) completeStep();
-        else failTrial(p.id);
-      } else if (step.kind === 'drag') {
-        if (p.id !== step.targetId && p.id !== step.dropId) failTrial(p.id);
-      } else if (step.kind === 'shake') {
-        if (p.id !== step.targetId) failTrial(p.id);
-      } else if (step.kind === 'hold') {
-        if (p.id !== step.targetId) failTrial(p.id);
+      if (wasTap && step) {
+        if (step.kind === 'multi') {
+          if (p.id === step.targetId) {
+            const next = multiCountRef.current + 1;
+            const soundIdx = Math.min(multiCountRef.current, (step.stageSounds?.length || 1) - 1);
+            playFx(step.stageSounds?.[soundIdx]);
+            multiCountRef.current = next;
+            setMultiCount(next);
+            if (next >= 3) setTimeout(() => completeStepRef.current(), 700);
+          } else failTrialRef.current(p.id);
+        } else if (step.kind === 'tap') {
+          if (p.id === step.targetId) completeStepRef.current();
+          else failTrialRef.current(p.id);
+        } else if (step.kind === 'drag') {
+          if (p.id !== step.targetId && p.id !== step.dropId) failTrialRef.current(p.id);
+        } else if (step.kind === 'shake') {
+          if (p.id !== step.targetId) failTrialRef.current(p.id);
+        } else if (step.kind === 'hold') {
+          if (p.id !== step.targetId) failTrialRef.current(p.id);
+        }
       }
-    }
 
-    ptr.current = null;
-    setDragId(null);
-    setDragStyle(null);
-  };
+      ptr.current = null;
+      hideGhost();
+    };
+
+    document.addEventListener('pointermove', onMove, { passive: false });
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
+    return () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+    };
+  }, []); // eslint-disable-line
 
   const onItemPointerDown = (e: React.PointerEvent, id: string) => {
     if (lockedRef.current) return;
     e.preventDefault();
     e.stopPropagation();
 
-    removeDocListeners();
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    } catch { /* ignore */ }
 
     const step = getStep();
     const isHoldTarget = !!(step?.kind === 'hold' && step.targetId === id);
 
     ptr.current = {
       id,
+      pointerId: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
       lastX: e.clientX,
@@ -666,26 +687,16 @@ export default function Yonerge8({
       holdStart: Date.now(),
     };
 
-    document.addEventListener('pointermove', onDocMoveRef.current);
-    document.addEventListener('pointerup', onDocUpRef.current);
-    document.addEventListener('pointercancel', onDocUpRef.current);
-    listenersAttached.current = true;
-
-    // ZİL: basınca HEMEN çalar + açık görsel
     if (isHoldTarget) {
       setZilPressed(true);
       startZilSound();
     }
-
     if (step?.kind === 'shake' && step.targetId === id) {
       setShakeActiveId(id);
     }
   };
 
-  useEffect(() => () => {
-    removeDocListeners();
-    stopZilSound();
-  }, []); // eslint-disable-line
+  useEffect(() => () => { stopZilSound(); }, []);
 
   const handlePhysical = (correct: boolean) => {
     if (lockedRef.current) return;
@@ -709,10 +720,10 @@ export default function Yonerge8({
   };
 
   return (
-    <div className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none touch-none">
+    <div className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none" style={{ touchAction: 'none' }}>
       <div className="shrink-0 p-4 landscape:py-2 landscape:px-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md relative z-10">
         <button
-          onClick={() => { stopIntro(); stopInstr(); stopZilSound(); removeDocListeners(); onClose(); }}
+          onClick={() => { stopIntro(); stopInstr(); stopZilSound(); onClose(); }}
           className="p-2 landscape:p-1.5 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
         >
           <XCircle className="w-7 h-7 landscape:w-6 landscape:h-6" />
@@ -730,9 +741,9 @@ export default function Yonerge8({
         <div className="w-10 landscape:w-8" />
       </div>
 
-      <div className="flex-1 relative flex flex-col items-center justify-center p-3 sm:p-4 overflow-y-auto bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-slate-950">
+      <div className="flex-1 relative flex flex-col items-center justify-center p-3 sm:p-4 overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-slate-950" style={{ touchAction: 'none' }}>
         {phase === 'prep' && (
-          <div className="w-full max-w-2xl animate-in zoom-in-95 duration-300 pb-6 space-y-5">
+          <div className="w-full max-w-2xl animate-in zoom-in-95 duration-300 pb-6 space-y-5 overflow-y-auto max-h-full" style={{ touchAction: 'pan-y' }}>
             <div className="text-center">
               <ListOrdered size={44} className="mx-auto text-blue-500 mb-3 drop-shadow-[0_0_12px_rgba(59,130,246,0.4)]" />
               <h1 className="text-2xl font-black mb-2">Sıralı Görev Hazırlığı</h1>
@@ -796,14 +807,14 @@ export default function Yonerge8({
             </div>
 
             {currentTask.type === 'digital' && (
-              <div className="grid grid-cols-2 landscape:grid-cols-3 gap-3 landscape:gap-4 w-full max-w-md landscape:max-w-2xl">
+              <div className="grid grid-cols-2 landscape:grid-cols-3 gap-3 landscape:gap-4 w-full max-w-md landscape:max-w-2xl" style={{ touchAction: 'none' }}>
                 {gridItems.map((item) => {
                   const done = doneIds.includes(item.id);
                   const img = displayImg(item.id);
                   const hiding = dragId === item.id;
                   const shaking = shakeActiveId === item.id;
                   return (
-                    <div key={item.id} data-obj-id={item.id} className="min-h-[120px] landscape:min-h-[100px] relative">
+                    <div key={item.id} data-obj-id={item.id} className="min-h-[120px] landscape:min-h-[100px] relative" style={{ touchAction: 'none' }}>
                       <div
                         role="button"
                         tabIndex={0}
@@ -819,7 +830,7 @@ export default function Yonerge8({
                           (locked || done ? 'pointer-events-none ' : 'cursor-grab active:cursor-grabbing ') +
                           (hiding ? 'opacity-15 ' : '')
                         }
-                        style={shaking ? { transform: 'rotate(-6deg)' } : undefined}
+                        style={{ touchAction: 'none', transform: shaking ? 'rotate(-8deg)' : undefined }}
                       >
                         {img ? (
                           <img src={img} alt="" className="w-[80%] h-[80%] max-w-[120px] max-h-[120px] object-contain pointer-events-none" draggable={false} />
@@ -856,9 +867,15 @@ export default function Yonerge8({
         )}
       </div>
 
-      {dragId && dragStyle && OBJECTS[dragId]?.img && (
-        <img src={OBJECTS[dragId].img} alt="" className="fixed pointer-events-none z-[200] w-28 h-28 object-contain opacity-95 drop-shadow-2xl" style={{ left: dragStyle.x - 56, top: dragStyle.y - 56 }} />
-      )}
+      {/* Sürükleme hayaleti — pozisyon DOM ile, re-render yok */}
+      <img
+        ref={ghostRef}
+        src={dragId && OBJECTS[dragId]?.img ? OBJECTS[dragId].img : ''}
+        alt=""
+        className="fixed pointer-events-none z-[200] w-28 h-28 object-contain opacity-95 drop-shadow-2xl"
+        style={{ display: 'none', left: 0, top: 0 }}
+        draggable={false}
+      />
 
       {phase === 'running' && currentTask?.type === 'physical' && (
         <div className="shrink-0 p-5 pb-8 landscape:py-3 landscape:pb-4 bg-slate-900 border-t border-slate-800 flex items-stretch justify-center gap-3 relative z-10">
