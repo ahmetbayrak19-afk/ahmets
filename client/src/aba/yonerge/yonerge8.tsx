@@ -277,6 +277,8 @@ export default function Yonerge8({
   const zilAudioRef = useRef<HTMLAudioElement | null>(null);
   const marakasAudioRef = useRef<HTMLAudioElement | null>(null);
   const vibrateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** multi (hamur/yumurta/hediye) 3. dokunuş sonrası animasyon — ekstra basışları yoksay */
+  const multiFinishingRef = useRef(false);
   const introRef = useRef<HTMLAudioElement | null>(null);
   const instrRef = useRef<HTMLAudioElement | null>(null);
   const lockedRef = useRef(false);
@@ -388,6 +390,7 @@ export default function Yonerge8({
   const resetStepState = useCallback(() => {
     setStepIdx(0); stepIdxRef.current = 0;
     setMultiCount(0); multiCountRef.current = 0;
+    multiFinishingRef.current = false;
     setDoneIds([]); setConsumedIds([]); setMergeMap({});
     setZilPressed(false); setWrongId(null);
     hideGhost(); setShakeActiveId(null); ptr.current = null; stopZilSound(); stopMarakasSound();
@@ -431,6 +434,7 @@ export default function Yonerge8({
   const failTrial = useCallback((id?: string) => {
     if (lockedRef.current) return;
     lockedRef.current = true; setLocked(true);
+    multiFinishingRef.current = false;
     stopZilSound(); stopMarakasSound(); ptr.current = null; hideGhost();
     setShakeActiveId(null); setZilPressed(false);
     if (id) setWrongId(id);
@@ -445,6 +449,7 @@ export default function Yonerge8({
     const step = task.steps[si];
     if (step) setDoneIds((d) => (d.includes(step.targetId) ? d : [...d, step.targetId]));
     const nextStep = si + 1;
+    multiFinishingRef.current = false;
     if (nextStep >= task.steps.length) {
       lockedRef.current = true; setLocked(true);
       setTimeout(() => goNext(true), 400);
@@ -533,6 +538,11 @@ export default function Yonerge8({
       stopZilSound(); stopMarakasSound(); setZilPressed(false); setShakeActiveId(null);
       if (lockedRef.current) { ptr.current = null; hideGhost(); return; }
 
+      // multi animasyon penceresinde tüm dokunuşları yoksay
+      if (multiFinishingRef.current) {
+        ptr.current = null; hideGhost(); return;
+      }
+
       const step = getStep();
       const totalMove = Math.sqrt((e.clientX - p.startX) ** 2 + (e.clientY - p.startY) ** 2);
       const wasTap = !p.moved && totalMove < TAP_MAX_MOVE;
@@ -573,12 +583,26 @@ export default function Yonerge8({
       if (wasTap && step) {
         if (step.kind === 'multi') {
           if (p.id === step.targetId) {
-            const next = multiCountRef.current + 1;
-            const soundIdx = Math.min(multiCountRef.current, (step.stageSounds?.length || 1) - 1);
-            playFx(step.stageSounds?.[soundIdx]);
-            multiCountRef.current = next; setMultiCount(next);
-            if (next >= 3) setTimeout(() => completeStepRef.current(), 700);
-          } else failTrialRef.current(p.id);
+            // 3'e ulaştıysa ekstra basışları yoksay (sonraki adıma sızmasın)
+            if (multiCountRef.current >= 3) {
+              // ignore
+            } else {
+              const next = multiCountRef.current + 1;
+              const soundIdx = Math.min(multiCountRef.current, (step.stageSounds?.length || 1) - 1);
+              playFx(step.stageSounds?.[soundIdx]);
+              multiCountRef.current = next; setMultiCount(next);
+              // Sadece 3. basışta BİR KEZ completeStep planla
+              if (next === 3) {
+                multiFinishingRef.current = true;
+                setTimeout(() => {
+                  multiFinishingRef.current = false;
+                  completeStepRef.current();
+                }, 700);
+              }
+            }
+          } else {
+            failTrialRef.current(p.id);
+          }
         } else if (step.kind === 'tap') {
           if (p.id === step.targetId) completeStepRef.current();
           else failTrialRef.current(p.id);
@@ -606,6 +630,7 @@ export default function Yonerge8({
 
   const onItemPointerDown = (e: React.PointerEvent, id: string) => {
     if (lockedRef.current) return;
+    if (multiFinishingRef.current) return;
     if (consumedIds.includes(id)) return;
     e.preventDefault(); e.stopPropagation();
     try { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); } catch { /* */ }
@@ -732,7 +757,7 @@ export default function Yonerge8({
               {currentTask.type === 'digital' && currentTask.steps && (
                 <p className="text-slate-400 text-xs mt-2">
                   Adım {Math.min(stepIdx + 1, currentTask.steps.length)} / {currentTask.steps.length}
-                  {currentStep?.kind === 'multi' && multiCount > 0 && ` · ${multiCount}/3`}
+                  {currentStep?.kind === 'multi' && multiCount > 0 && ` · ${Math.min(multiCount, 3)}/3`}
                 </p>
               )}
             </div>
