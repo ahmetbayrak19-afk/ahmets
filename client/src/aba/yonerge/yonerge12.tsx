@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { XCircle, Check, X, Trophy } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { ScreenOrientation } from '@capacitor/screen-orientation';
+
+import kirmiziBalon from './sesgorsel/kirmizibalon.png';
+import maviBalon from './sesgorsel/mavibalon.png';
 
 /* ═══════════════════════════════════════════════════════════
    YTB 4.1 — Üç bağımsız yönerge
@@ -67,7 +71,7 @@ const TASK_POOL: TripleTask[] = [
       { id: 'bell', kind: 'tap', emoji: '🔔' },
       { id: 'star', kind: 'drag', emoji: '⭐', dropTarget: 'trash' },
       { id: 'trash', kind: 'target', emoji: '🗑️' },
-      { id: 'balloon', kind: 'balloon', emoji: '🪈' },
+      { id: 'balloon', kind: 'balloon', emoji: '🎈' },
       { id: 'heart', kind: 'tap', emoji: '🧡' },
     ],
   },
@@ -88,7 +92,7 @@ const TASK_POOL: TripleTask[] = [
     text: 'Balonu patlat, kalbe basılı tut, çizgi çiz',
     sequence: ['balloon', 'heart', 'draw'],
     items: [
-      { id: 'balloon', kind: 'balloon', emoji: '🪈' },
+      { id: 'balloon', kind: 'balloon', emoji: '🎈' },
       { id: 'heart', kind: 'hold', emoji: '❤️' },
       { id: 'draw', kind: 'draw', emoji: '✏️' },
       { id: 'bell', kind: 'tap', emoji: '🔔' },
@@ -114,7 +118,7 @@ const TASK_POOL: TripleTask[] = [
     items: [
       { id: 'ball', kind: 'drag', emoji: '🏀', dropTarget: 'basket' },
       { id: 'basket', kind: 'target', emoji: '🧺' },
-      { id: 'balloon', kind: 'balloon', emoji: '🪈' },
+      { id: 'balloon', kind: 'balloon', emoji: '🎈' },
       { id: 'bell', kind: 'tap', emoji: '🔔' },
       { id: 'star', kind: 'tap', emoji: '⭐' },
     ],
@@ -149,7 +153,7 @@ const TASK_POOL: TripleTask[] = [
     sequence: ['card', 'balloon', 'heart'],
     items: [
       { id: 'card', kind: 'swipe', emoji: '🃏' },
-      { id: 'balloon', kind: 'balloon', emoji: '🪈' },
+      { id: 'balloon', kind: 'balloon', emoji: '🎈' },
       { id: 'heart', kind: 'hold', emoji: '❤️' },
       { id: 'star', kind: 'tap', emoji: '⭐' },
       { id: 'bell', kind: 'tap', emoji: '🔔' },
@@ -174,7 +178,7 @@ const TASK_POOL: TripleTask[] = [
     items: [
       { id: 'rotate', kind: 'rotate', emoji: '📳' },
       { id: 'star', kind: 'tap', emoji: '⭐' },
-      { id: 'balloon', kind: 'balloon', emoji: '🪈' },
+      { id: 'balloon', kind: 'balloon', emoji: '🎈' },
       { id: 'heart', kind: 'hold', emoji: '❤️' },
       { id: 'bell', kind: 'tap', emoji: '🔔' },
     ],
@@ -276,55 +280,116 @@ function DrawOverlay({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
   );
 }
 
-/* ───────── Floating balloon ───────── */
+/* ───────── Floating balloon (görsel + confetti + sürekli yeniden doğuş) ───────── */
 function FloatingBalloon({
   active,
   onPop,
   onWrongPop,
 }: {
-  active: boolean; // true = sırası bu, patlatmak doğru
+  active: boolean;
   onPop: () => void;
   onWrongPop: () => void;
 }) {
-  const [y, setY] = useState(110); // % from top, starts below
-  const [x] = useState(() => 15 + Math.random() * 60);
+  const [y, setY] = useState(110);
+  const [x, setX] = useState(() => 18 + Math.random() * 64);
+  const [img, setImg] = useState(() => (Math.random() > 0.5 ? kirmiziBalon : maviBalon));
   const [visible, setVisible] = useState(true);
+  const [scale, setScale] = useState(1);
+  const [burst, setBurst] = useState(false);
   const popped = useRef(false);
+  const cycle = useRef(0);
 
-  useEffect(() => {
+  const startRise = useCallback(() => {
     setY(110);
+    setX(18 + Math.random() * 64);
+    setImg(Math.random() > 0.5 ? kirmiziBalon : maviBalon);
     setVisible(true);
+    setScale(1);
+    setBurst(false);
     popped.current = false;
+    cycle.current += 1;
+    const thisCycle = cycle.current;
     let raf = 0;
     let start: number | null = null;
-    const dur = 9000;
+    const dur = 8500 + Math.random() * 1500;
     const tick = (t: number) => {
+      if (cycle.current !== thisCycle) return;
       if (start == null) start = t;
       const p = Math.min(1, (t - start) / dur);
-      setY(110 - p * 130); // rises past top
-      if (p < 1 && !popped.current) raf = requestAnimationFrame(tick);
-      else if (p >= 1) setVisible(false);
+      setY(110 - p * 130);
+      if (p < 1 && !popped.current) {
+        raf = requestAnimationFrame(tick);
+      } else if (p >= 1 && !popped.current) {
+        // Ekranın üstünden çıktı → kısa bekle, yeni balon gelsin
+        setVisible(false);
+        setTimeout(() => {
+          if (cycle.current === thisCycle) startRise();
+        }, 600);
+      }
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
   }, []);
+
+  useEffect(() => {
+    startRise();
+    return () => {
+      cycle.current += 1; // iptal
+    };
+  }, [startRise]);
+
+  const handlePop = (e: React.MouseEvent | React.PointerEvent) => {
+    if (popped.current || burst) return;
+    popped.current = true;
+    setBurst(true);
+    setScale(1.35);
+
+    // Dokunulan noktada confetti
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const ox = (rect.left + rect.width / 2) / window.innerWidth;
+    const oy = (rect.top + rect.height / 2) / window.innerHeight;
+    confetti({
+      particleCount: 90,
+      spread: 70,
+      startVelocity: 28,
+      origin: { x: ox, y: oy },
+      colors: ['#ef4444', '#3b82f6', '#fbbf24', '#f472b6', '#a78bfa'],
+    });
+
+    setTimeout(() => {
+      setVisible(false);
+      if (active) {
+        onPop();
+      } else {
+        onWrongPop();
+        // Yanlış patlatmada da yeni balon gelsin (deneme devam ediyorsa)
+        setTimeout(() => startRise(), 400);
+      }
+    }, 220);
+  };
 
   if (!visible) return null;
 
   return (
     <button
       type="button"
-      className="absolute z-30 text-5xl sm:text-6xl leading-none drop-shadow-lg active:scale-90 transition-transform"
-      style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
-      onClick={() => {
-        if (popped.current) return;
-        popped.current = true;
-        setVisible(false);
-        if (active) onPop();
-        else onWrongPop();
+      className="absolute z-30 leading-none active:scale-90 transition-transform duration-150"
+      style={{
+        left: `${x}%`,
+        top: `${y}%`,
+        transform: `translate(-50%, -50%) scale(${scale})`,
+        width: '5.8rem',
+        height: '7.2rem',
       }}
+      onClick={handlePop}
     >
-      🪈
+      <img
+        src={img}
+        alt=""
+        draggable={false}
+        className={`w-full h-full object-contain drop-shadow-lg pointer-events-none select-none ${
+          burst ? 'opacity-0 transition-opacity duration-150' : ''
+        }`}
+      />
     </button>
   );
 }
@@ -453,14 +518,40 @@ export default function Yonerge12({
   const expected = task?.sequence[seqPos];
   const expectedKind = task?.items.find((i) => i.id === expected)?.kind;
 
-  // Portrait-only layout (app UI); rotate is still a measurable task via orientation API
+  // Portrait kilit — kavram isimlendirme ile aynı yöntem
+  const lockPortrait = useCallback(async () => {
+    try {
+      if ((window as any).AndroidOrientation) {
+        (window as any).AndroidOrientation.lockOrientation('portrait');
+      } else {
+        await ScreenOrientation.lock({ orientation: 'portrait' });
+      }
+    } catch (e) {
+      console.log('Portrait lock hatası:', e);
+    }
+  }, []);
+
+  const unlockOrientation = useCallback(async () => {
+    try {
+      if ((window as any).AndroidOrientation) {
+        (window as any).AndroidOrientation.lockOrientation('unlock');
+      } else {
+        await ScreenOrientation.unlock();
+      }
+    } catch (e) {
+      console.log('Unlock hatası:', e);
+    }
+  }, []);
+
   useEffect(() => {
+    lockPortrait();
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prev;
+      unlockOrientation();
     };
-  }, []);
+  }, [lockPortrait, unlockOrientation]);
 
   useEffect(() => {
     if (!task) return;
@@ -513,7 +604,7 @@ export default function Yonerge12({
     [locked, task, expected, seqPos, finishTrial]
   );
 
-  // Global shake: only correct when expected is shake; otherwise fail
+  // Global shake
   useEffect(() => {
     if (phase !== 'running' || locked) return;
     let last = 0;
@@ -541,7 +632,7 @@ export default function Yonerge12({
     return () => window.removeEventListener('devicemotion', handler);
   }, [phase, locked, expectedKind, expected, advance, finishTrial]);
 
-  // Global rotate: big orientation change
+  // Global rotate
   useEffect(() => {
     if (phase !== 'running' || locked) return;
     let baseBeta: number | null = null;
@@ -641,7 +732,7 @@ export default function Yonerge12({
                         if (it.id === expected && dropId === it.dropTarget) {
                           advance(it.id);
                         } else if (it.id === expected) {
-                          // correct item, wrong place — soft: no advance
+                          // doğru nesne, yanlış yer — soft
                         } else {
                           finishTrial(false);
                         }
@@ -707,7 +798,6 @@ export default function Yonerge12({
                 }
 
                 if (it.kind === 'shake' || it.kind === 'rotate') {
-                  // Passive markers — action comes from sensors
                   return (
                     <TileShell key={it.id} done={isDone} className={!isDone ? 'border-violet-500/30' : ''}>
                       <span className="text-5xl sm:text-6xl leading-none">{it.emoji}</span>
@@ -735,7 +825,7 @@ export default function Yonerge12({
               })}
             </div>
 
-            {/* Rising balloon */}
+            {/* Rising balloon — sürekli yeniden doğar */}
             {hasBalloon && !locked && (
               <FloatingBalloon
                 key={`${task.id}-${balloonKey}`}
