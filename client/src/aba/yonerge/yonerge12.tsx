@@ -15,7 +15,7 @@ import zilAcikImg from './sesgorsel/zilacik.png';
 import marakasSes from './sesgorsel/marakas.mp3';
 import topsepetSes from './sesgorsel/topsepet.mp3';
 import zilSesi from './sesgorsel/zilsesi.mp3';
-import onaySes from '../../esle/ses/devamet notr.mp3';
+import onaySes from './sesgorsel/onay.mp3';
 
 /* ═══════════════════════════════════════════════════════════
    YTB 4.1 — Üç bağımsız yönerge
@@ -372,7 +372,6 @@ function FloatingBalloon({
       const elapsed = t - start;
       const p = Math.min(1, elapsed / dur);
       setY(110 - p * 130);
-      // Hafif sağa-sola salınım (uçuyor gibi)
       const s = Math.sin(elapsed / 450) * 4.5;
       setSway(s);
       setX(baseX.current + s);
@@ -450,7 +449,7 @@ function FloatingBalloon({
   );
 }
 
-/* ───── Free drag — görsel ile, sürüklerken görünür kalır ───── */
+/* ───── Free drag ───── */
 function DragItem({
   item,
   disabled,
@@ -686,7 +685,6 @@ export default function Yonerge12({
         finishTrial(false);
         return;
       }
-      // Adım onay sesi
       playFx(extra?.sound || onaySes);
       if (extra?.merge) {
         setMergedIds((prev) => new Set(prev).add(itemId));
@@ -704,7 +702,6 @@ export default function Yonerge12({
     [locked, task, expected, seqPos, finishTrial]
   );
 
-  // Shake / marakas — sadece sırası gelince dinle; eşik yüksek
   useEffect(() => {
     if (phase !== 'running' || locked) return;
     if (expectedKind !== 'shake' && expectedKind !== 'marakas') return;
@@ -715,7 +712,6 @@ export default function Yonerge12({
       if (!a) return;
       const mag = Math.hypot(a.x || 0, a.y || 0, a.z || 0);
       const now = Date.now();
-      // Daha yüksek eşik + daha uzun soğuma
       if (mag > 26 && now - last > 900) {
         last = now;
         if (expectedKind === 'marakas') {
@@ -739,7 +735,6 @@ export default function Yonerge12({
     return () => window.removeEventListener('devicemotion', handler);
   }, [phase, locked, expectedKind, expected, advance, task]);
 
-  // Rotate — sadece sırası gelince; daha büyük açı
   useEffect(() => {
     if (phase !== 'running' || locked) return;
     if (expectedKind !== 'rotate') return;
@@ -758,7 +753,6 @@ export default function Yonerge12({
       }
       const dB = Math.abs(beta - baseBeta);
       const dG = Math.abs(gamma - (baseGamma || 0));
-      // Önceden 55 → şimdi 80 (kasten çevirmek gerekir)
       if (dB > 80 || dG > 80) {
         fired = true;
         advance(expected!);
@@ -840,7 +834,7 @@ export default function Yonerge12({
                         if (it.id === expected && dropId === it.dropTarget) {
                           advance(it.id, { merge: !!it.mergeImg, sound: it.successSound });
                         } else if (it.id === expected) {
-                          // doğru nesne, yanlış yer — soft
+                          // soft
                         } else {
                           finishTrial(false);
                         }
@@ -850,7 +844,6 @@ export default function Yonerge12({
                 }
 
                 if (it.kind === 'target') {
-                  // Sepet birleştirildiyse merge göster
                   const ballMerged = mergedIds.has('ball') && it.id === 'basket';
                   return (
                     <div key={it.id} data-drop-id={it.id}>
@@ -894,7 +887,6 @@ export default function Yonerge12({
                 }
 
                 if (it.kind === 'draw') {
-                  // Çizim sadece kalem önce dokunulduysa veya sıra doğrudan draw ise açılır
                   const canOpen = expected === it.id && (drawUnlocked || !task.sequence.includes('pencil'));
                   return (
                     <button
@@ -904,7 +896,7 @@ export default function Yonerge12({
                       onClick={() => {
                         if (canOpen) setDrawingId(it.id);
                         else if (expected === it.id && !drawUnlocked) {
-                          // henüz kaleme dokunulmadı — soft, açma
+                          // soft
                         } else {
                           finishTrial(false);
                         }
@@ -925,7 +917,6 @@ export default function Yonerge12({
                   );
                 }
 
-                // tap (yıldız, zil, kalem, ok ...)
                 return (
                   <button
                     key={it.id}
@@ -1036,7 +1027,6 @@ export default function Yonerge12({
   );
 }
 
-/* ───── Hold tile ───── */
 function HoldTile({
   item,
   done,
@@ -1095,7 +1085,6 @@ function HoldTile({
   );
 }
 
-/* ───── Swipe tile — daha uzun mesafe gerekir ───── */
 function SwipeTile({
   item,
   done,
@@ -1127,7 +1116,6 @@ function SwipeTile({
         setDx(e.clientX - sx.current);
       }}
       onPointerUp={() => {
-        // Önceden 42 → şimdi 95 px
         if (Math.abs(dx) > 95) {
           if (isExpected) onSwipe();
           else onWrong();
