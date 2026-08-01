@@ -1,150 +1,167 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  XCircle, Check, X, Trophy, Sparkles, Bell, Star, Trash2,
-  Circle, Square, Heart, Zap, Lock, Key, Hand,
-} from 'lucide-react';
+import { XCircle, Check, X, Trophy } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-/* ───────────────── types ───────────────── */
+type ActKind = 'tap' | 'hold' | 'drag' | 'shake' | 'swipe' | 'toggle';
 
-type StepKind =
-  | 'tap'
-  | 'drag'
-  | 'shake'
-  | 'hold'
-  | 'swipe'
-  | 'slider'
-  | 'multiTap'
-  | 'toggle'
-  | 'draw'
-  | 'cover';
-
-interface StepDef {
-  kind: StepKind;
-  label: string; // short UI hint
-  // kind-specific
-  emoji?: string;
-  targetEmoji?: string;
-  color?: string;
-  count?: number;
-  holdMs?: number;
+interface SceneItem {
+  id: string;
+  kind: ActKind;
+  emoji: string;
+  label: string;
+  dropTarget?: string;
 }
 
 interface TripleTask {
   id: string;
-  text: string; // natural teacher instruction
-  steps: [StepDef, StepDef, StepDef];
+  text: string;
+  sequence: [string, string, string];
+  items: SceneItem[];
 }
-
-/* ───────────────── task pool — varied & independent ───────────────── */
 
 const TASK_POOL: TripleTask[] = [
   {
     id: 't01',
-    text: 'Yıldıza dokun, topu sepete koy, telefonu salla',
-    steps: [
-      { kind: 'tap', label: 'Yıldıza dokun', emoji: '⭐', color: '#fbbf24' },
-      { kind: 'drag', label: 'Topu sepete koy', emoji: '🪄', targetEmoji: '🧺', color: '#38bdf8' },
-      { kind: 'shake', label: 'Telefonu salla' },
+    text: 'Yıldıza dokun, topu sepete koy, zile bas',
+    sequence: ['star', 'ball', 'bell'],
+    items: [
+      { id: 'star', kind: 'tap', emoji: '⭐', label: 'Yıldız' },
+      { id: 'ball', kind: 'drag', emoji: '⚽', label: 'Top', dropTarget: 'basket' },
+      { id: 'basket', kind: 'tap', emoji: '🧺', label: 'Sepet' },
+      { id: 'bell', kind: 'tap', emoji: '🔔', label: 'Zil' },
+      { id: 'trash', kind: 'tap', emoji: '🗑️', label: 'Çöp' },
     ],
   },
   {
     id: 't02',
-    text: 'Kırmızı kalbe basılı tut, kartı kaydır, anahtarı çevir',
-    steps: [
-      { kind: 'hold', label: 'Kalbe basılı tut', emoji: '❤️', holdMs: 900, color: '#f43f5e' },
-      { kind: 'swipe', label: 'Kartı yana kaydır', emoji: '🃏' },
-      { kind: 'toggle', label: 'Anahtarı çevir', emoji: '🔑' },
+    text: 'Kalbe basılı tut, kartı kaydır, anahtarı çevir',
+    sequence: ['heart', 'card', 'key'],
+    items: [
+      { id: 'heart', kind: 'hold', emoji: '❤️', label: 'Kalp' },
+      { id: 'card', kind: 'swipe', emoji: '🃏', label: 'Kart' },
+      { id: 'key', kind: 'toggle', emoji: '🔑', label: 'Anahtar' },
+      { id: 'star', kind: 'tap', emoji: '⭐', label: 'Yıldız' },
+      { id: 'bell', kind: 'tap', emoji: '🔔', label: 'Zil' },
     ],
   },
   {
     id: 't03',
-    text: 'Üç kez zile bas, çubugu sağa çek, ekranı kapat',
-    steps: [
-      { kind: 'multiTap', label: 'Üç kez zile bas', emoji: '🔔', count: 3, color: '#a78bfa' },
-      { kind: 'slider', label: 'Çubuğu sağa çek' },
-      { kind: 'tap', label: 'X’e bas', emoji: '✖️', color: '#94a3b8' },
+    text: 'Zile bas, yıldızı çöpe at, telefonu salla',
+    sequence: ['bell', 'star', 'shake'],
+    items: [
+      { id: 'bell', kind: 'tap', emoji: '🔔', label: 'Zil' },
+      { id: 'star', kind: 'drag', emoji: '⭐', label: 'Yıldız', dropTarget: 'trash' },
+      { id: 'trash', kind: 'tap', emoji: '🗑️', label: 'Çöp' },
+      { id: 'shake', kind: 'shake', emoji: '📱', label: 'Telefon' },
+      { id: 'heart', kind: 'tap', emoji: '🧡', label: 'Kalp' },
     ],
   },
   {
     id: 't04',
-    text: 'Yuvarlak çiz, yıldızı çöpe at, telefonu salla',
-    steps: [
-      { kind: 'draw', label: 'Yuvarlak çiz' },
-      { kind: 'drag', label: 'Yıldızı çöpe at', emoji: '⭐', targetEmoji: '🗑️', color: '#fbbf24' },
-      { kind: 'shake', label: 'Telefonu salla' },
+    text: 'Yeşil düğmeye bas, topu kutuya koy, ışığı aç',
+    sequence: ['green', 'ball', 'light'],
+    items: [
+      { id: 'green', kind: 'tap', emoji: '🟢', label: 'Yeşil' },
+      { id: 'ball', kind: 'drag', emoji: '⚽', label: 'Top', dropTarget: 'box' },
+      { id: 'box', kind: 'tap', emoji: '📦', label: 'Kutu' },
+      { id: 'light', kind: 'toggle', emoji: '💡', label: 'Işık' },
+      { id: 'red', kind: 'tap', emoji: '🔴', label: 'Kırmızı' },
     ],
   },
   {
     id: 't05',
-    text: 'Ekranı avuçla kapat, yeşil düğmeye bas, ışığı aç',
-    steps: [
-      { kind: 'cover', label: 'Ekranı avuçla kapat' },
-      { kind: 'tap', label: 'Yeşil düğmeye bas', emoji: '🟢', color: '#22c55e' },
-      { kind: 'toggle', label: 'İşığı aç', emoji: '💡' },
+    text: 'Balonu patlat, kartı kaydır, kalbi basılı tut',
+    sequence: ['balloon', 'card', 'heart'],
+    items: [
+      { id: 'balloon', kind: 'tap', emoji: '🪇', label: 'Balon' },
+      { id: 'card', kind: 'swipe', emoji: '📝', label: 'Kart' },
+      { id: 'heart', kind: 'hold', emoji: '❤️', label: 'Kalp' },
+      { id: 'star', kind: 'tap', emoji: '⭐', label: 'Yıldız' },
+      { id: 'bell', kind: 'tap', emoji: '🔔', label: 'Zil' },
     ],
   },
   {
     id: 't06',
-    text: 'Balonu patlat, kaydırıcıyı sona getir, kalbi basılı tut',
-    steps: [
-      { kind: 'tap', label: 'Balonu patlat', emoji: '🪇', color: '#fb7185' },
-      { kind: 'slider', label: 'Sona çek' },
-      { kind: 'hold', label: 'Kalbi basılı tut', emoji: '🧡', holdMs: 800, color: '#f43f5e' },
+    text: 'Kilidi aç, yıldıza dokun, telefonu salla',
+    sequence: ['lock', 'star', 'shake'],
+    items: [
+      { id: 'lock', kind: 'toggle', emoji: '🔒', label: 'Kilit' },
+      { id: 'star', kind: 'tap', emoji: '⭐', label: 'Yıldız' },
+      { id: 'shake', kind: 'shake', emoji: '📱', label: 'Telefon' },
+      { id: 'heart', kind: 'tap', emoji: '🧡', label: 'Kalp' },
+      { id: 'trash', kind: 'tap', emoji: '🗑️', label: 'Çöp' },
     ],
   },
   {
     id: 't07',
-    text: 'Kilit aç, çöpü süpür gibi kaydır, iki kez yıldıza dokun',
-    steps: [
-      { kind: 'toggle', label: 'Kilidi aç', emoji: '🔒' },
-      { kind: 'swipe', label: 'Süpür gibi kaydır', emoji: '🧹' },
-      { kind: 'multiTap', label: 'İki kez yıldıza dokun', emoji: '⭐', count: 2, color: '#fbbf24' },
+    text: 'Topu sepete koy, zile bas, kartı kaydır',
+    sequence: ['ball', 'bell', 'card'],
+    items: [
+      { id: 'ball', kind: 'drag', emoji: '🏀', label: 'Top', dropTarget: 'basket' },
+      { id: 'basket', kind: 'tap', emoji: '🧺', label: 'Sepet' },
+      { id: 'bell', kind: 'tap', emoji: '🔔', label: 'Zil' },
+      { id: 'card', kind: 'swipe', emoji: '🃏', label: 'Kart' },
+      { id: 'star', kind: 'tap', emoji: '⭐', label: 'Yıldız' },
     ],
   },
   {
     id: 't08',
-    text: 'Topu kutuya koy, telefonu salla, onay işaretine bas',
-    steps: [
-      { kind: 'drag', label: 'Topu kutuya koy', emoji: '⚽', targetEmoji: '📦', color: '#94a3b8' },
-      { kind: 'shake', label: 'Telefonu salla' },
-      { kind: 'tap', label: 'Onaya bas', emoji: '✅', color: '#22c55e' },
+    text: 'Onaya bas, kalbi basılı tut, ışığı aç',
+    sequence: ['ok', 'heart', 'light'],
+    items: [
+      { id: 'ok', kind: 'tap', emoji: '✅', label: 'Onay' },
+      { id: 'heart', kind: 'hold', emoji: '🧡', label: 'Kalp' },
+      { id: 'light', kind: 'toggle', emoji: '💡', label: 'Işık' },
+      { id: 'bell', kind: 'tap', emoji: '🔔', label: 'Zil' },
+      { id: 'red', kind: 'tap', emoji: '❌', label: 'Hayır' },
     ],
   },
   {
     id: 't09',
-    text: 'Çizgi çiz, düğmeyi basılı tut, kartı fırlat',
-    steps: [
-      { kind: 'draw', label: 'Çizgi çiz' },
-      { kind: 'hold', label: 'Düğmeyi basılı tut', emoji: '🔵', holdMs: 1000, color: '#3b82f6' },
-      { kind: 'swipe', label: 'Kartı fırlat', emoji: '📝' },
+    text: 'Yıldızı çöpe at, yeşile bas, telefonu salla',
+    sequence: ['star', 'green', 'shake'],
+    items: [
+      { id: 'star', kind: 'drag', emoji: '⭐', label: 'Yıldız', dropTarget: 'trash' },
+      { id: 'trash', kind: 'tap', emoji: '🗑️', label: 'Çöp' },
+      { id: 'green', kind: 'tap', emoji: '🟢', label: 'Yeşil' },
+      { id: 'shake', kind: 'shake', emoji: '📱', label: 'Telefon' },
+      { id: 'heart', kind: 'tap', emoji: '❤️', label: 'Kalp' },
     ],
   },
   {
     id: 't10',
-    text: 'Ekranı kapat gibi kapat, zili çal, çubuğu sağa sürükle',
-    steps: [
-      { kind: 'cover', label: 'Ekranı kapat' },
-      { kind: 'tap', label: 'Zili çal', emoji: '🔔', color: '#c084fc' },
-      { kind: 'slider', label: 'Çubuğu sağa sürükle' },
+    text: 'Kartı kaydır, zile bas, topu kutuya koy',
+    sequence: ['card', 'bell', 'ball'],
+    items: [
+      { id: 'card', kind: 'swipe', emoji: '📝', label: 'Kart' },
+      { id: 'bell', kind: 'tap', emoji: '🔔', label: 'Zil' },
+      { id: 'ball', kind: 'drag', emoji: '⚽', label: 'Top', dropTarget: 'box' },
+      { id: 'box', kind: 'tap', emoji: '📦', label: 'Kutu' },
+      { id: 'star', kind: 'tap', emoji: '⭐', label: 'Yıldız' },
     ],
   },
   {
     id: 't11',
-    text: 'Yıldızı sepete at, üç kez bas, telefonu salla',
-    steps: [
-      { kind: 'drag', label: 'Yıldızı sepete at', emoji: '⭐', targetEmoji: '🧺', color: '#fbbf24' },
-      { kind: 'multiTap', label: 'Üç kez bas', emoji: '👆', count: 3, color: '#38bdf8' },
-      { kind: 'shake', label: 'Telefonu salla' },
+    text: 'Anahtarı çevir, yıldıza dokun, kalbi basılı tut',
+    sequence: ['key', 'star', 'heart'],
+    items: [
+      { id: 'key', kind: 'toggle', emoji: '🔑', label: 'Anahtar' },
+      { id: 'star', kind: 'tap', emoji: '⭐', label: 'Yıldız' },
+      { id: 'heart', kind: 'hold', emoji: '❤️', label: 'Kalp' },
+      { id: 'bell', kind: 'tap', emoji: '🔔', label: 'Zil' },
+      { id: 'trash', kind: 'tap', emoji: '🗑️', label: 'Çöp' },
     ],
   },
   {
     id: 't12',
-    text: 'Işığı aç, daire çiz, kırmızıya dokun',
-    steps: [
-      { kind: 'toggle', label: 'Işığı aç', emoji: '💡' },
-      { kind: 'draw', label: 'Daire çiz' },
-      { kind: 'tap', label: 'Kırmızıya dokun', emoji: '🔴', color: '#ef4444' },
+    text: 'Telefonu salla, onaya bas, kartı kaydır',
+    sequence: ['shake', 'ok', 'card'],
+    items: [
+      { id: 'shake', kind: 'shake', emoji: '📱', label: 'Telefon' },
+      { id: 'ok', kind: 'tap', emoji: '✅', label: 'Onay' },
+      { id: 'card', kind: 'swipe', emoji: '🃏', label: 'Kart' },
+      { id: 'star', kind: 'tap', emoji: '⭐', label: 'Yıldız' },
+      { id: 'heart', kind: 'tap', emoji: '🧡', label: 'Kalp' },
     ],
   },
 ];
@@ -158,489 +175,210 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-/* ───────────────── step UIs ───────────────── */
-
-function TapStep({
-  step,
-  onDone,
+function ItemTile({
+  item,
+  disabled,
+  done,
+  isDropHighlight,
+  onAction,
 }: {
-  step: StepDef;
-  onDone: () => void;
+  item: SceneItem;
+  disabled: boolean;
+  done: boolean;
+  isDropHighlight?: boolean;
+  onAction: (itemId: string, meta?: { dropOn?: string }) => void;
 }) {
-  return (
-    <button
-      type="button"
-      onClick={onDone}
-      className="w-36 h-36 sm:w-44 sm:h-44 rounded-3xl flex flex-col items-center justify-center gap-2 border-2 border-slate-600 bg-slate-800/80 active:scale-95 transition-transform shadow-xl"
-      style={{ boxShadow: step.color ? `0 0 40px ${step.color}33` : undefined }}
-    >
-      <span className="text-6xl leading-none">{step.emoji || '👆'}</span>
-      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide px-2 text-center">
-        Dokun
-      </span>
-    </button>
-  );
-}
-
-function DragStep({
-  step,
-  onDone,
-}: {
-  step: StepDef;
-  onDone: () => void;
-}) {
-  const [pos, setPos] = useState({ x: 40, y: 80 });
-  const [dragging, setDragging] = useState(false);
-  const areaRef = useRef<HTMLDivElement>(null);
-  const doneRef = useRef(false);
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    setDragging(true);
-  };
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!dragging || !areaRef.current) return;
-    const rect = areaRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left - 36;
-    const y = e.clientY - rect.top - 36;
-    setPos({
-      x: Math.max(0, Math.min(rect.width - 72, x)),
-      y: Math.max(0, Math.min(rect.height - 72, y)),
-    });
-  };
-  const onPointerUp = () => {
-    setDragging(false);
-    if (doneRef.current || !areaRef.current) return;
-    const rect = areaRef.current.getBoundingClientRect();
-    // target zone bottom-right
-    const tx = rect.width - 90;
-    const ty = rect.height - 90;
-    const cx = pos.x + 36;
-    const cy = pos.y + 36;
-    if (Math.hypot(cx - (tx + 36), cy - (ty + 36)) < 70) {
-      doneRef.current = true;
-      onDone();
-    }
-  };
-
-  return (
-    <div
-      ref={areaRef}
-      className="relative w-full max-w-sm h-52 sm:h-60 rounded-2xl border border-slate-700 bg-slate-900/80 overflow-hidden touch-none"
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-    >
-      <div className="absolute bottom-3 right-3 w-[72px] h-[72px] rounded-2xl border-2 border-dashed border-slate-500 flex items-center justify-center text-4xl bg-slate-800/50">
-        {step.targetEmoji || '🧺'}
-      </div>
-      <div
-        className="absolute w-[72px] h-[72px] rounded-2xl flex items-center justify-center text-4xl bg-slate-700 border border-slate-500 shadow-lg cursor-grab active:cursor-grabbing"
-        style={{ left: pos.x, top: pos.y, touchAction: 'none' }}
-        onPointerDown={onPointerDown}
-      >
-        {step.emoji || '⚽'}
-      </div>
-      <p className="absolute top-2 left-0 right-0 text-center text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-        Sürükle → hedef
-      </p>
-    </div>
-  );
-}
-
-function ShakeStep({ onDone }: { onDone: () => void }) {
-  const doneRef = useRef(false);
-  const lastRef = useRef(0);
+  const holdTimer = useRef<number | null>(null);
+  const holdStart = useRef(0);
+  const [holdP, setHoldP] = useState(0);
+  const swipeStart = useRef(0);
+  const [swipeDx, setSwipeDx] = useState(0);
+  const [toggled, setToggled] = useState(false);
+  const dragging = useRef(false);
+  const [dragStyle, setDragStyle] = useState<{ left: number; top: number } | null>(null);
+  const doneShake = useRef(false);
 
   useEffect(() => {
-    const threshold = 18;
+    if (item.kind !== 'shake' || done || disabled) return;
+    doneShake.current = false;
     const handler = (e: DeviceMotionEvent) => {
-      if (doneRef.current) return;
+      if (doneShake.current) return;
       const a = e.accelerationIncludingGravity;
       if (!a) return;
       const mag = Math.hypot(a.x || 0, a.y || 0, a.z || 0);
-      const now = Date.now();
-      if (mag > threshold && now - lastRef.current > 400) {
-        lastRef.current = now;
-        // require a second peak shortly after
-        setTimeout(() => {
-          if (doneRef.current) return;
-          doneRef.current = true;
-          onDone();
-        }, 180);
+      if (mag > 18) {
+        doneShake.current = true;
+        onAction(item.id);
       }
     };
-
-    const request = async () => {
+    const req = async () => {
       try {
-        const DOM = DeviceMotionEvent as unknown as {
-          requestPermission?: () => Promise<string>;
-        };
-        if (typeof DOM.requestPermission === 'function') {
-          await DOM.requestPermission();
-        }
+        const DOM = DeviceMotionEvent as unknown as { requestPermission?: () => Promise<string> };
+        if (typeof DOM.requestPermission === 'function') await DOM.requestPermission();
       } catch {
         /* ignore */
       }
       window.addEventListener('devicemotion', handler);
     };
-    request();
+    req();
     return () => window.removeEventListener('devicemotion', handler);
-  }, [onDone]);
+  }, [item.kind, item.id, done, disabled, onAction]);
 
-  return (
-    <div className="flex flex-col items-center gap-4 py-6">
-      <div className="w-36 h-36 rounded-full border-4 border-violet-500/40 bg-violet-500/10 flex items-center justify-center animate-pulse">
-        <span className="text-6xl">📱</span>
-      </div>
-      <p className="text-violet-300 font-bold text-lg animate-bounce">Salla!</p>
-      <p className="text-xs text-slate-500 text-center max-w-[220px]">
-        Telefonu iki elinle tutup güçlüce salla
-      </p>
-    </div>
-  );
-}
-
-function HoldStep({
-  step,
-  onDone,
-}: {
-  step: StepDef;
-  onDone: () => void;
-}) {
-  const [progress, setProgress] = useState(0);
-  const timerRef = useRef<number | null>(null);
-  const startRef = useRef(0);
-  const need = step.holdMs || 900;
-
-  const clear = () => {
-    if (timerRef.current) cancelAnimationFrame(timerRef.current);
-    timerRef.current = null;
-    setProgress(0);
+  const clearHold = () => {
+    if (holdTimer.current) cancelAnimationFrame(holdTimer.current);
+    holdTimer.current = null;
+    setHoldP(0);
   };
 
-  const tick = () => {
-    const p = Math.min(1, (Date.now() - startRef.current) / need);
-    setProgress(p);
-    if (p >= 1) {
-      onDone();
-      return;
-    }
-    timerRef.current = requestAnimationFrame(tick);
-  };
+  const baseCls = `relative w-[4.75rem] h-[4.75rem] sm:w-24 sm:h-24 rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all select-none touch-none ${
+    done
+      ? 'opacity-35 border-emerald-500/40 bg-emerald-500/10'
+      : isDropHighlight
+        ? 'border-sky-400 bg-sky-500/20 scale-105'
+        : 'border-slate-600 bg-slate-800/90'
+  } ${disabled && !done ? 'opacity-60' : ''}`;
 
-  const down = (e: React.PointerEvent) => {
-    e.preventDefault();
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    startRef.current = Date.now();
-    tick();
-  };
-  const up = () => clear();
-
-  useEffect(() => () => clear(), []);
-
-  return (
-    <button
-      type="button"
-      onPointerDown={down}
-      onPointerUp={up}
-      onPointerLeave={up}
-      onPointerCancel={up}
-      className="relative w-40 h-40 rounded-full flex flex-col items-center justify-center border-4 border-slate-600 bg-slate-800 overflow-hidden active:scale-95"
-    >
-      <div
-        className="absolute bottom-0 left-0 right-0 bg-rose-500/40 transition-all"
-        style={{ height: `${progress * 100}%` }}
-      />
-      <span className="text-5xl relative z-10">{step.emoji || '❤️'}</span>
-      <span className="text-[10px] font-bold text-slate-400 uppercase relative z-10 mt-1">
-        Basılı tut
-      </span>
-    </button>
-  );
-}
-
-function SwipeStep({
-  step,
-  onDone,
-}: {
-  step: StepDef;
-  onDone: () => void;
-}) {
-  const startX = useRef(0);
-  const [dx, setDx] = useState(0);
-  const done = useRef(false);
-
-  return (
-    <div
-      className="w-full max-w-xs h-36 relative touch-none"
-      onPointerDown={(e) => {
-        startX.current = e.clientX;
-        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-      }}
-      onPointerMove={(e) => {
-        if (done.current) return;
-        setDx(e.clientX - startX.current);
-      }}
-      onPointerUp={() => {
-        if (done.current) return;
-        if (Math.abs(dx) > 90) {
-          done.current = true;
-          onDone();
-        } else setDx(0);
-      }}
-    >
-      <div
-        className="absolute inset-x-4 top-4 bottom-4 rounded-2xl bg-slate-800 border border-slate-600 flex items-center justify-center text-5xl shadow-xl transition-transform"
-        style={{ transform: `translateX(${dx}px) rotate(${dx * 0.05}deg)` }}
+  if (item.kind === 'tap') {
+    return (
+      <button
+        type="button"
+        disabled={disabled || done}
+        onClick={() => onAction(item.id)}
+        className={baseCls + ' active:scale-95'}
       >
-        {step.emoji || '🃏'}
-      </div>
-      <p className="absolute -bottom-1 left-0 right-0 text-center text-[10px] text-slate-500 font-bold uppercase">
-        Sola veya sağa kaydır
-      </p>
-    </div>
-  );
-}
+        <span className="text-3xl sm:text-4xl leading-none">{item.emoji}</span>
+        <span className="text-[9px] font-bold text-slate-400 uppercase">{item.label}</span>
+      </button>
+    );
+  }
 
-function SliderStep({ onDone }: { onDone: () => void }) {
-  const [val, setVal] = useState(0);
-  const done = useRef(false);
-  return (
-    <div className="w-full max-w-xs space-y-3 px-2">
-      <input
-        type="range"
-        min={0}
-        max={100}
-        value={val}
-        onChange={(e) => {
-          const v = Number(e.target.value);
-          setVal(v);
-          if (!done.current && v >= 92) {
-            done.current = true;
-            onDone();
-          }
-        }}
-        className="w-full h-4 accent-sky-500 cursor-pointer"
-      />
-      <p className="text-center text-xs text-slate-400 font-bold uppercase tracking-wider">
-        Çubuğu sona çek · %{val}
-      </p>
-    </div>
-  );
-}
-
-function MultiTapStep({
-  step,
-  onDone,
-}: {
-  step: StepDef;
-  onDone: () => void;
-}) {
-  const need = step.count || 3;
-  const [n, setN] = useState(0);
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        const next = n + 1;
-        setN(next);
-        if (next >= need) onDone();
-      }}
-      className="w-40 h-40 rounded-3xl border-2 border-violet-500/50 bg-violet-500/10 flex flex-col items-center justify-center gap-2 active:scale-95"
-    >
-      <span className="text-5xl">{step.emoji || '🔔'}</span>
-      <span className="text-sm font-black text-violet-300">
-        {n} / {need}
-      </span>
-    </button>
-  );
-}
-
-function ToggleStep({
-  step,
-  onDone,
-}: {
-  step: StepDef;
-  onDone: () => void;
-}) {
-  const [on, setOn] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        if (on) return;
-        setOn(true);
-        setTimeout(onDone, 280);
-      }}
-      className={`w-48 h-20 rounded-full border-2 flex items-center px-2 transition-all ${
-        on ? 'bg-emerald-500/30 border-emerald-400' : 'bg-slate-800 border-slate-600'
-      }`}
-    >
-      <div
-        className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl shadow-lg transition-transform ${
-          on ? 'translate-x-[5.5rem] bg-emerald-400' : 'translate-x-0 bg-slate-600'
-        }`}
-      >
-        {step.emoji || '🔑'}
-      </div>
-    </button>
-  );
-}
-
-function DrawStep({ onDone }: { onDone: () => void }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(false);
-  const points = useRef<{ x: number; y: number }[]>([]);
-  const done = useRef(false);
-
-  useEffect(() => {
-    const c = canvasRef.current;
-    if (!c) return;
-    const parent = c.parentElement!;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = parent.clientWidth;
-    const h = parent.clientHeight;
-    c.width = w * dpr;
-    c.height = h * dpr;
-    c.style.width = `${w}px`;
-    c.style.height = `${h}px`;
-    const ctx = c.getContext('2d')!;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.lineCap = 'round';
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = '#38bdf8';
-  }, []);
-
-  const pos = (e: React.PointerEvent) => {
-    const r = canvasRef.current!.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
-  };
-
-  const checkEnough = () => {
-    if (done.current) return;
-    if (points.current.length < 18) return;
-    let len = 0;
-    for (let i = 1; i < points.current.length; i++) {
-      const a = points.current[i - 1];
-      const b = points.current[i];
-      len += Math.hypot(a.x - b.x, a.y - b.y);
-    }
-    if (len > 100) {
-      done.current = true;
-      onDone();
-    }
-  };
-
-  return (
-    <div className="w-full max-w-xs h-44 rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden touch-none relative">
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
+  if (item.kind === 'hold') {
+    const tick = () => {
+      const p = Math.min(1, (Date.now() - holdStart.current) / 850);
+      setHoldP(p);
+      if (p >= 1) {
+        onAction(item.id);
+        return;
+      }
+      holdTimer.current = requestAnimationFrame(tick);
+    };
+    return (
+      <button
+        type="button"
+        disabled={disabled || done}
         onPointerDown={(e) => {
-          drawing.current = true;
-          points.current = [pos(e)];
+          e.preventDefault();
+          (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+          holdStart.current = Date.now();
+          tick();
+        }}
+        onPointerUp={clearHold}
+        onPointerLeave={clearHold}
+        onPointerCancel={clearHold}
+        className={baseCls + ' overflow-hidden'}
+      >
+        <div className="absolute bottom-0 left-0 right-0 bg-rose-500/35" style={{ height: `${holdP * 100}%` }} />
+        <span className="text-3xl sm:text-4xl leading-none relative z-10">{item.emoji}</span>
+        <span className="text-[9px] font-bold text-slate-400 uppercase relative z-10">Tut</span>
+      </button>
+    );
+  }
+
+  if (item.kind === 'toggle') {
+    return (
+      <button
+        type="button"
+        disabled={disabled || done}
+        onClick={() => {
+          if (toggled) return;
+          setToggled(true);
+          onAction(item.id);
+        }}
+        className={baseCls + (toggled ? ' bg-emerald-500/25 border-emerald-400' : '')}
+      >
+        <span className="text-3xl sm:text-4xl leading-none">{item.emoji}</span>
+        <span className="text-[9px] font-bold text-slate-400 uppercase">Çevir</span>
+      </button>
+    );
+  }
+
+  if (item.kind === 'swipe') {
+    return (
+      <div
+        className={baseCls}
+        style={{ transform: `translateX(${Math.max(-40, Math.min(40, swipeDx))}px)` }}
+        onPointerDown={(e) => {
+          if (disabled || done) return;
+          swipeStart.current = e.clientX;
           (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
         }}
         onPointerMove={(e) => {
-          if (!drawing.current) return;
-          const p = pos(e);
-          points.current.push(p);
-          const ctx = canvasRef.current!.getContext('2d')!;
-          const pts = points.current;
-          if (pts.length < 2) return;
-          ctx.beginPath();
-          ctx.moveTo(pts[pts.length - 2].x, pts[pts.length - 2].y);
-          ctx.lineTo(p.x, p.y);
-          ctx.stroke();
+          if (disabled || done) return;
+          setSwipeDx(e.clientX - swipeStart.current);
         }}
         onPointerUp={() => {
-          drawing.current = false;
-          checkEnough();
+          if (Math.abs(swipeDx) > 45) onAction(item.id);
+          setSwipeDx(0);
         }}
-      />
-      <p className="absolute bottom-2 left-0 right-0 text-center text-[10px] text-slate-500 font-bold pointer-events-none">
-        Parmakla çiz
-      </p>
-    </div>
-  );
-}
-
-function CoverStep({ onDone }: { onDone: () => void }) {
-  const [covering, setCovering] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const done = useRef(false);
-
-  const start = () => {
-    setCovering(true);
-    timer.current = setTimeout(() => {
-      if (!done.current) {
-        done.current = true;
-        onDone();
-      }
-    }, 700);
-  };
-  const stop = () => {
-    setCovering(false);
-    if (timer.current) clearTimeout(timer.current);
-  };
-
-  return (
-    <div
-      className={`w-full max-w-xs h-48 rounded-3xl border-2 border-dashed flex flex-col items-center justify-center gap-3 transition-colors touch-none ${
-        covering ? 'bg-slate-700 border-sky-400' : 'bg-slate-900 border-slate-600'
-      }`}
-      onPointerDown={(e) => {
-        e.preventDefault();
-        start();
-      }}
-      onPointerUp={stop}
-      onPointerLeave={stop}
-      onPointerCancel={stop}
-    >
-      <Hand size={48} className={covering ? 'text-sky-300' : 'text-slate-500'} />
-      <p className="text-sm font-bold text-slate-400 text-center px-4">
-        {covering ? 'Tutmaya devam…' : 'Avucunla ekranı kapat'}
-      </p>
-    </div>
-  );
-}
-
-function StepPlayer({
-  step,
-  onDone,
-}: {
-  step: StepDef;
-  onDone: () => void;
-}) {
-  switch (step.kind) {
-    case 'tap':
-      return <TapStep step={step} onDone={onDone} />;
-    case 'drag':
-      return <DragStep step={step} onDone={onDone} />;
-    case 'shake':
-      return <ShakeStep onDone={onDone} />;
-    case 'hold':
-      return <HoldStep step={step} onDone={onDone} />;
-    case 'swipe':
-      return <SwipeStep step={step} onDone={onDone} />;
-    case 'slider':
-      return <SliderStep onDone={onDone} />;
-    case 'multiTap':
-      return <MultiTapStep step={step} onDone={onDone} />;
-    case 'toggle':
-      return <ToggleStep step={step} onDone={onDone} />;
-    case 'draw':
-      return <DrawStep onDone={onDone} />;
-    case 'cover':
-      return <CoverStep onDone={onDone} />;
-    default:
-      return null;
+        onPointerCancel={() => setSwipeDx(0)}
+      >
+        <span className="text-3xl sm:text-4xl leading-none">{item.emoji}</span>
+        <span className="text-[9px] font-bold text-slate-400 uppercase">Kaydır</span>
+      </div>
+    );
   }
-}
 
-/* ───────────────── main component ───────────────── */
+  if (item.kind === 'shake') {
+    return (
+      <div className={baseCls + (!done && !disabled ? ' animate-pulse border-violet-400/60' : '')}>
+        <span className="text-3xl sm:text-4xl leading-none">{item.emoji}</span>
+        <span className="text-[9px] font-bold text-violet-300 uppercase">Salla</span>
+      </div>
+    );
+  }
+
+  if (item.kind === 'drag') {
+    return (
+      <div
+        className={baseCls + ' cursor-grab active:cursor-grabbing'}
+        style={
+          dragStyle
+            ? { position: 'fixed', left: dragStyle.left, top: dragStyle.top, zIndex: 80, pointerEvents: 'none' }
+            : undefined
+        }
+        onPointerDown={(e) => {
+          if (disabled || done) return;
+          e.preventDefault();
+          (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+          dragging.current = true;
+          setDragStyle({ left: e.clientX - 40, top: e.clientY - 40 });
+        }}
+        onPointerMove={(e) => {
+          if (!dragging.current) return;
+          setDragStyle({ left: e.clientX - 40, top: e.clientY - 40 });
+        }}
+        onPointerUp={(e) => {
+          if (!dragging.current) return;
+          dragging.current = false;
+          setDragStyle(null);
+          const els = document.elementsFromPoint(e.clientX, e.clientY);
+          const dropEl = els.find((el) => el.getAttribute('data-drop-id'));
+          const dropId = dropEl?.getAttribute('data-drop-id') || undefined;
+          onAction(item.id, { dropOn: dropId });
+        }}
+        onPointerCancel={() => {
+          dragging.current = false;
+          setDragStyle(null);
+        }}
+      >
+        <span className="text-3xl sm:text-4xl leading-none">{item.emoji}</span>
+        <span className="text-[9px] font-bold text-slate-400 uppercase">Sürükle</span>
+      </div>
+    );
+  }
+
+  return null;
+}
 
 interface Yonerge12Props {
   itemCode?: string;
@@ -660,62 +398,86 @@ export default function Yonerge12({
   const [tasks] = useState(() => shuffle(TASK_POOL).slice(0, 10));
   const [phase, setPhase] = useState<Phase>('running');
   const [idx, setIdx] = useState(0);
-  const [stepIdx, setStepIdx] = useState(0);
+  const [seqPos, setSeqPos] = useState(0);
+  const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const [score, setScore] = useState(0);
   const [locked, setLocked] = useState(false);
-  const [stepDone, setStepDone] = useState([false, false, false]);
+  const [flash, setFlash] = useState<'ok' | 'bad' | null>(null);
+  const [layoutItems, setLayoutItems] = useState<SceneItem[]>([]);
 
   const task = tasks[idx];
-  const currentStep = task?.steps[stepIdx];
+  const nextNeeded = task?.sequence[seqPos];
 
-  const finishTrial = (correct: boolean) => {
-    if (locked) return;
-    setLocked(true);
-    const newScore = score + (correct ? 1 : 0);
-    setScore(newScore);
-    if (correct) confetti({ particleCount: 50, spread: 50, origin: { y: 0.7 } });
-    setTimeout(() => {
-      const next = idx + 1;
-      if (next >= 10) {
-        setPhase('result');
-        if (newScore >= 8) confetti({ particleCount: 220, spread: 90, origin: { y: 0.55 } });
+  useEffect(() => {
+    if (!task) return;
+    setLayoutItems(shuffle(task.items));
+  }, [task?.id]);
+
+  const finishTrial = useCallback(
+    (correct: boolean) => {
+      if (locked) return;
+      setLocked(true);
+      setFlash(correct ? 'ok' : 'bad');
+      const newScore = score + (correct ? 1 : 0);
+      setScore(newScore);
+      if (correct) confetti({ particleCount: 45, spread: 50, origin: { y: 0.7 } });
+      setTimeout(() => {
+        const next = idx + 1;
+        if (next >= 10) {
+          setPhase('result');
+          if (newScore >= 8) confetti({ particleCount: 220, spread: 90, origin: { y: 0.55 } });
+          return;
+        }
+        setIdx(next);
+        setSeqPos(0);
+        setDoneIds(new Set());
+        setFlash(null);
+        setLocked(false);
+      }, 750);
+    },
+    [locked, score, idx]
+  );
+
+  const onAction = useCallback(
+    (itemId: string, meta?: { dropOn?: string }) => {
+      if (locked || !task) return;
+      const expected = task.sequence[seqPos];
+      const item = task.items.find((i) => i.id === itemId);
+      if (!item) return;
+
+      // Drop targets are only valid as drop destinations, not as tap actions when not expected
+      if (item.kind === 'drag') {
+        if (!meta?.dropOn || meta.dropOn !== item.dropTarget) {
+          if (itemId !== expected) finishTrial(false);
+          return;
+        }
+      }
+
+      if (itemId === expected) {
+        setDoneIds((prev) => new Set(prev).add(itemId));
+        const nextPos = seqPos + 1;
+        if (nextPos >= 3) {
+          setSeqPos(3);
+          setTimeout(() => finishTrial(true), 300);
+        } else {
+          setSeqPos(nextPos);
+        }
         return;
       }
-      setIdx(next);
-      setStepIdx(0);
-      setStepDone([false, false, false]);
-      setLocked(false);
-    }, 600);
-  };
 
-  const onStepComplete = useCallback(() => {
-    setStepDone((prev) => {
-      const copy = [...prev] as [boolean, boolean, boolean];
-      copy[stepIdx] = true;
-      return copy;
-    });
-    if (stepIdx >= 2) {
-      // all three done
-      setTimeout(() => finishTrial(true), 350);
-    } else {
-      setTimeout(() => setStepIdx((s) => s + 1), 320);
-    }
-  }, [stepIdx, locked, score, idx]);
-
-  // reset step player when step changes by key
-  const stepKey = `${task?.id}-${stepIdx}`;
+      // Wrong item or out of order
+      finishTrial(false);
+    },
+    [locked, task, seqPos, finishTrial]
+  );
 
   return (
     <div
       className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none"
       style={{ touchAction: 'none' }}
     >
-      {/* header */}
       <div className="shrink-0 p-3 sm:p-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/90 backdrop-blur-md z-10">
-        <button
-          onClick={onClose}
-          className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white"
-        >
+        <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white">
           <XCircle className="w-7 h-7" />
         </button>
         <div className="text-center px-2 min-w-0">
@@ -735,50 +497,76 @@ export default function Yonerge12({
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {phase === 'running' && task && (
           <>
-            {/* instruction */}
             <div className="shrink-0 px-4 pt-3 pb-2 text-center space-y-2">
               <span className="inline-block text-[10px] font-bold tracking-widest uppercase text-violet-300 bg-violet-500/15 border border-violet-500/30 px-2.5 py-0.5 rounded-full">
-                Üç bağımsız yönerge
+                Üç yönergeyi sırayla hatırla ve yap
               </span>
-              <h1 className="text-lg sm:text-2xl font-black leading-snug text-white">
+              <h1 className="text-base sm:text-xl font-black leading-snug text-white max-w-lg mx-auto">
                 {task.text}
               </h1>
-              {/* progress pills */}
               <div className="flex items-center justify-center gap-2 pt-1">
                 {[0, 1, 2].map((i) => (
                   <div
                     key={i}
                     className={`h-2 w-10 rounded-full transition-colors ${
-                      stepDone[i]
-                        ? 'bg-emerald-400'
-                        : i === stepIdx
-                          ? 'bg-violet-400'
-                          : 'bg-slate-700'
+                      i < seqPos ? 'bg-emerald-400' : i === seqPos ? 'bg-violet-400' : 'bg-slate-700'
                     }`}
                   />
                 ))}
               </div>
-              <p className="text-xs text-slate-400 font-medium">
-                Adım {stepIdx + 1}/3 · {currentStep?.label}
+              <p className="text-[10px] text-slate-500">
+                Önünde 5 seçenek var · doğru üçünü söylenen sırada yap
               </p>
             </div>
 
-            {/* interactive area */}
-            <div className="flex-1 min-h-0 flex items-center justify-center px-4 pb-2">
-              {!locked && currentStep && (
-                <div key={stepKey} className="w-full flex justify-center animate-in fade-in zoom-in-95 duration-300">
-                  <StepPlayer step={currentStep} onDone={onStepComplete} />
+            <div
+              className={`flex-1 min-h-0 flex items-center justify-center px-3 pb-2 relative ${
+                flash === 'ok' ? 'bg-emerald-500/5' : flash === 'bad' ? 'bg-red-500/10' : ''
+              }`}
+            >
+              <div className="grid grid-cols-3 gap-3 sm:gap-4 place-items-center content-center max-w-md w-full">
+                {layoutItems.map((it) => {
+                  const isDone = doneIds.has(it.id);
+                  const isDropSurface =
+                    it.id === 'basket' || it.id === 'box' || it.id === 'trash' ||
+                    task.items.some((x) => x.dropTarget === it.id);
+                  return (
+                    <div
+                      key={it.id}
+                      data-drop-id={isDropSurface ? it.id : undefined}
+                      className="flex items-center justify-center"
+                    >
+                      <ItemTile
+                        item={it}
+                        disabled={locked}
+                        done={isDone}
+                        isDropHighlight={
+                          !!nextNeeded &&
+                          task.items.find((x) => x.id === nextNeeded)?.dropTarget === it.id
+                        }
+                        onAction={onAction}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              {flash === 'ok' && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="bg-emerald-500 text-white p-3 rounded-full shadow-lg">
+                    <Check size={36} strokeWidth={3} />
+                  </div>
                 </div>
               )}
-              {locked && (
-                <div className="text-emerald-400 flex flex-col items-center gap-2">
-                  <Check size={48} />
-                  <span className="font-bold">Tamam!</span>
+              {flash === 'bad' && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="bg-red-500 text-white p-3 rounded-full shadow-lg">
+                    <X size={36} strokeWidth={3} />
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* teacher override */}
             <div className="shrink-0 p-4 pb-6 border-t border-slate-800 bg-slate-900/95 space-y-2">
               <div className="flex gap-3 max-w-md mx-auto">
                 <button
@@ -801,7 +589,7 @@ export default function Yonerge12({
                 </button>
               </div>
               <p className="text-[10px] text-center text-slate-500">
-                Üç adım da biterse otomatik doğru. Şüphede öğretmen butonları.
+                Yanlış seçenek veya yanlış sıra = başarısız. Öğretmen butonları açık.
               </p>
             </div>
           </>
