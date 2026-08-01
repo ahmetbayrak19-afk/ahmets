@@ -89,9 +89,9 @@ const POSITIVE_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2
 const NEGATIVE_SOUNDS = [tekrardene1, tekrardene2];
 
 // --- DEĞERLENDİRME NÖTR GEÇİŞ (sadece dijital) ---
-import devametNotr from '@/aba/esle/ses/devamet notr.mp3';
-import devamet2Notr from '@/aba/esle/ses/devamet2 notr.mp3';
-import simdisiradakiNotr from '@/aba/esle/ses/simdisiradaki notr.mp3';
+import devametNotr from '@/aba/esle/ses/devametnotr.mp3';
+import devamet2Notr from '@/aba/esle/ses/devamet2notr.mp3';
+import simdisiradakiNotr from '@/aba/esle/ses/simdisiradakinotr.mp3';
 
 const NEUTRAL_SOUNDS = [devametNotr, devamet2Notr, simdisiradakiNotr];
 const NEUTRAL_CHANCE = 0.3;
