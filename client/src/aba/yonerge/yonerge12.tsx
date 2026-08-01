@@ -18,10 +18,10 @@ import zilSesi from './sesgorsel/zilsesi.mp3';
 import onaySes from './sesgorsel/onay.mp3';
 
 /* ═══════════════════════════════════════════════════════════
-   YTB 4.1 — Üç bağımsız yönerge
-   - 4–5 büyük nesne aynı anda (yazı yok)
-   - Sırayla doğru eylem; yanlış hareket / yanlış sıra = başarısız
-   - Eylem tipleri: tap, hold, drag, swipe, draw, shake, rotate, balloon, marakas
+   YTB 4.1 — Üç bağımsız yönerge (Değerlendirme)
+   - 2x3 büyük nesne (yazı yok)
+   - Sadece doğru sıra ilerler; yanlış hareket yok sayılır
+   - Her hamlede onay.mp3, konfeti/ikon yok
    ═══════════════════════════════════════════════════════════ */
 
 type ActKind =
@@ -34,6 +34,7 @@ type ActKind =
   | 'rotate'
   | 'balloon'
   | 'marakas'
+  | 'bell'
   | 'target';
 
 interface SceneItem {
@@ -62,7 +63,7 @@ const TASK_POOL: TripleTask[] = [
       { id: 'star', kind: 'tap', emoji: '⭐' },
       { id: 'ball', kind: 'drag', img: topImg, dropTarget: 'basket', mergeImg: sepetTopImg, successSound: topsepetSes },
       { id: 'basket', kind: 'target', img: sepetImg },
-      { id: 'bell', kind: 'tap', img: zilAcikImg, successSound: zilSesi },
+      { id: 'bell', kind: 'bell', img: zilAcikImg },
       { id: 'trash', kind: 'target', emoji: '🗑️' },
     ],
   },
@@ -73,9 +74,9 @@ const TASK_POOL: TripleTask[] = [
     items: [
       { id: 'heart', kind: 'hold', emoji: '❤️' },
       { id: 'pencil', kind: 'tap', img: kalemImg },
-      { id: 'draw', kind: 'draw', img: kalemImg },
       { id: 'star', kind: 'tap', emoji: '⭐' },
-      { id: 'bell', kind: 'tap', img: zilAcikImg },
+      { id: 'bell', kind: 'bell', img: zilAcikImg },
+      { id: 'card', kind: 'swipe', emoji: '🃏' },
     ],
   },
   {
@@ -83,7 +84,7 @@ const TASK_POOL: TripleTask[] = [
     text: 'Zile bas, yıldızı çöpe at, balonu patlat',
     sequence: ['bell', 'star', 'balloon'],
     items: [
-      { id: 'bell', kind: 'tap', img: zilAcikImg, successSound: zilSesi },
+      { id: 'bell', kind: 'bell', img: zilAcikImg },
       { id: 'star', kind: 'drag', emoji: '⭐', dropTarget: 'trash' },
       { id: 'trash', kind: 'target', emoji: '🗑️' },
       { id: 'balloon', kind: 'balloon' },
@@ -110,7 +111,7 @@ const TASK_POOL: TripleTask[] = [
       { id: 'balloon', kind: 'balloon' },
       { id: 'heart', kind: 'hold', emoji: '❤️' },
       { id: 'pencil', kind: 'tap', img: kalemImg },
-      { id: 'bell', kind: 'tap', img: zilAcikImg },
+      { id: 'bell', kind: 'bell', img: zilAcikImg },
       { id: 'star', kind: 'tap', emoji: '⭐' },
     ],
   },
@@ -123,7 +124,7 @@ const TASK_POOL: TripleTask[] = [
       { id: 'marakas', kind: 'marakas', img: marakasImg, successSound: marakasSes },
       { id: 'card', kind: 'swipe', emoji: '🃏' },
       { id: 'heart', kind: 'hold', emoji: '🧡' },
-      { id: 'bell', kind: 'tap', img: zilAcikImg },
+      { id: 'bell', kind: 'bell', img: zilAcikImg },
     ],
   },
   {
@@ -134,7 +135,7 @@ const TASK_POOL: TripleTask[] = [
       { id: 'ball', kind: 'drag', img: topImg, dropTarget: 'basket', mergeImg: sepetTopImg, successSound: topsepetSes },
       { id: 'basket', kind: 'target', img: sepetImg },
       { id: 'balloon', kind: 'balloon' },
-      { id: 'bell', kind: 'tap', img: zilAcikImg, successSound: zilSesi },
+      { id: 'bell', kind: 'bell', img: zilAcikImg },
       { id: 'star', kind: 'tap', emoji: '⭐' },
     ],
   },
@@ -144,10 +145,10 @@ const TASK_POOL: TripleTask[] = [
     sequence: ['pencil', 'draw', 'rotate'],
     items: [
       { id: 'pencil', kind: 'tap', img: kalemImg },
-      { id: 'draw', kind: 'draw', img: kalemImg },
       { id: 'rotate', kind: 'rotate', emoji: '📳' },
-      { id: 'bell', kind: 'tap', img: zilAcikImg },
+      { id: 'bell', kind: 'bell', img: zilAcikImg },
       { id: 'heart', kind: 'tap', emoji: '❤️' },
+      { id: 'star', kind: 'tap', emoji: '⭐' },
     ],
   },
   {
@@ -171,7 +172,7 @@ const TASK_POOL: TripleTask[] = [
       { id: 'balloon', kind: 'balloon' },
       { id: 'heart', kind: 'hold', emoji: '❤️' },
       { id: 'star', kind: 'tap', emoji: '⭐' },
-      { id: 'bell', kind: 'tap', img: zilAcikImg },
+      { id: 'bell', kind: 'bell', img: zilAcikImg },
     ],
   },
   {
@@ -179,7 +180,7 @@ const TASK_POOL: TripleTask[] = [
     text: 'Zile bas, kaleme dokun, topu sepete koy',
     sequence: ['bell', 'pencil', 'ball'],
     items: [
-      { id: 'bell', kind: 'tap', img: zilAcikImg, successSound: zilSesi },
+      { id: 'bell', kind: 'bell', img: zilAcikImg },
       { id: 'pencil', kind: 'tap', img: kalemImg },
       { id: 'ball', kind: 'drag', img: topImg, dropTarget: 'basket', mergeImg: sepetTopImg, successSound: topsepetSes },
       { id: 'basket', kind: 'target', img: sepetImg },
@@ -195,7 +196,7 @@ const TASK_POOL: TripleTask[] = [
       { id: 'star', kind: 'tap', emoji: '⭐' },
       { id: 'balloon', kind: 'balloon' },
       { id: 'heart', kind: 'hold', emoji: '❤️' },
-      { id: 'bell', kind: 'tap', img: zilAcikImg },
+      { id: 'bell', kind: 'bell', img: zilAcikImg },
     ],
   },
   {
@@ -205,7 +206,7 @@ const TASK_POOL: TripleTask[] = [
     items: [
       { id: 'marakas', kind: 'marakas', img: marakasImg, successSound: marakasSes },
       { id: 'card', kind: 'swipe', emoji: '🃏' },
-      { id: 'bell', kind: 'tap', img: zilAcikImg, successSound: zilSesi },
+      { id: 'bell', kind: 'bell', img: zilAcikImg },
       { id: 'star', kind: 'tap', emoji: '⭐' },
       { id: 'heart', kind: 'tap', emoji: '🧡' },
     ],
@@ -216,10 +217,34 @@ const TASK_POOL: TripleTask[] = [
     sequence: ['pencil', 'draw', 'marakas'],
     items: [
       { id: 'pencil', kind: 'tap', img: kalemImg },
-      { id: 'draw', kind: 'draw', img: kalemImg },
       { id: 'marakas', kind: 'marakas', img: marakasImg, successSound: marakasSes },
-      { id: 'bell', kind: 'tap', img: zilAcikImg },
+      { id: 'bell', kind: 'bell', img: zilAcikImg },
       { id: 'star', kind: 'tap', emoji: '⭐' },
+      { id: 'heart', kind: 'tap', emoji: '❤️' },
+    ],
+  },
+  {
+    id: 't15',
+    text: 'Telefonu salla, yıldıza dokun, zile bas',
+    sequence: ['shake', 'star', 'bell'],
+    items: [
+      { id: 'shake', kind: 'shake', emoji: '📱' },
+      { id: 'star', kind: 'tap', emoji: '⭐' },
+      { id: 'bell', kind: 'bell', img: zilAcikImg },
+      { id: 'heart', kind: 'hold', emoji: '❤️' },
+      { id: 'card', kind: 'swipe', emoji: '🃏' },
+    ],
+  },
+  {
+    id: 't16',
+    text: 'Yıldıza dokun, telefonu salla, balonu patlat',
+    sequence: ['star', 'shake', 'balloon'],
+    items: [
+      { id: 'star', kind: 'tap', emoji: '⭐' },
+      { id: 'shake', kind: 'shake', emoji: '📱' },
+      { id: 'balloon', kind: 'balloon' },
+      { id: 'bell', kind: 'bell', img: zilAcikImg },
+      { id: 'heart', kind: 'tap', emoji: '🧡' },
     ],
   },
 ];
@@ -266,7 +291,7 @@ function DrawOverlay({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.lineWidth = 7;
+    ctx.lineWidth = 8;
     ctx.strokeStyle = '#38bdf8';
     ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, 0, w, h);
@@ -330,15 +355,13 @@ function DrawOverlay({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
   );
 }
 
-/* ───── Floating balloon — büyük + sağa-sola salınım ───── */
+/* ───── Floating balloon ───── */
 function FloatingBalloon({
   active,
   onPop,
-  onWrongPop,
 }: {
   active: boolean;
   onPop: () => void;
-  onWrongPop: () => void;
 }) {
   const [y, setY] = useState(110);
   const [x, setX] = useState(() => 20 + Math.random() * 60);
@@ -404,9 +427,9 @@ function FloatingBalloon({
     const ox = (rect.left + rect.width / 2) / window.innerWidth;
     const oy = (rect.top + rect.height / 2) / window.innerHeight;
     confetti({
-      particleCount: 100,
-      spread: 75,
-      startVelocity: 30,
+      particleCount: 80,
+      spread: 70,
+      startVelocity: 28,
       origin: { x: ox, y: oy },
       colors: ['#ef4444', '#3b82f6', '#fbbf24', '#f472b6', '#a78bfa'],
     });
@@ -416,8 +439,7 @@ function FloatingBalloon({
       if (active) {
         onPop();
       } else {
-        onWrongPop();
-        setTimeout(() => startRise(), 350);
+        setTimeout(() => startRise(), 400);
       }
     }, 200);
   };
@@ -432,8 +454,8 @@ function FloatingBalloon({
         left: `${x}%`,
         top: `${y}%`,
         transform: `translate(-50%, -50%) scale(${scale}) rotate(${sway * 1.2}deg)`,
-        width: '7.2rem',
-        height: '9rem',
+        width: '8rem',
+        height: '10rem',
       }}
       onClick={handlePop}
     >
@@ -449,50 +471,30 @@ function FloatingBalloon({
   );
 }
 
-/* ───── Free drag ───── */
+/* ───── Free drag — sadece görsel, çerçeve yok ───── */
 function DragItem({
   item,
   disabled,
   done,
-  merged,
   onDrop,
 }: {
   item: SceneItem;
   disabled: boolean;
   done: boolean;
-  merged?: boolean;
   onDrop: (clientX: number, clientY: number) => void;
 }) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const dragging = useRef(false);
 
-  const visual = merged && item.mergeImg ? item.mergeImg : item.img;
-  const emoji = item.emoji;
-
-  if (done && !merged) {
-    return (
-      <div className="w-[5.5rem] h-[5.5rem] sm:w-28 sm:h-28 rounded-3xl border-2 border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center opacity-30">
-        {visual ? (
-          <img src={visual} alt="" className="w-14 h-14 sm:w-16 sm:h-16 object-contain" draggable={false} />
-        ) : (
-          <span className="text-5xl sm:text-6xl leading-none">{emoji}</span>
-        )}
-      </div>
-    );
-  }
-
-  if (merged) {
-    return (
-      <div className="w-[5.5rem] h-[5.5rem] sm:w-28 sm:h-28 rounded-3xl border-2 border-emerald-500/40 bg-emerald-500/10 flex items-center justify-center">
-        <img src={item.mergeImg!} alt="" className="w-16 h-16 sm:w-20 sm:h-20 object-contain" draggable={false} />
-      </div>
-    );
+  // Bittiğinde tamamen kaybol
+  if (done) {
+    return <div className="w-32 h-32 sm:w-40 sm:h-40" />;
   }
 
   return (
     <div
-      className={`w-[5.5rem] h-[5.5rem] sm:w-28 sm:h-28 rounded-3xl border-2 border-slate-600 bg-slate-800 flex items-center justify-center touch-none ${
-        pos ? 'opacity-40' : ''
+      className={`w-32 h-32 sm:w-40 sm:h-40 flex items-center justify-center touch-none ${
+        pos ? 'opacity-0' : ''
       } ${disabled ? 'opacity-50' : ''}`}
       onPointerDown={(e) => {
         if (disabled) return;
@@ -517,20 +519,20 @@ function DragItem({
         setPos(null);
       }}
     >
-      {visual ? (
-        <img src={visual} alt="" className="w-14 h-14 sm:w-16 sm:h-16 object-contain pointer-events-none" draggable={false} />
+      {item.img ? (
+        <img src={item.img} alt="" className="w-24 h-24 sm:w-28 sm:h-28 object-contain pointer-events-none" draggable={false} />
       ) : (
-        <span className="text-5xl sm:text-6xl leading-none pointer-events-none">{emoji}</span>
+        <span className="text-6xl sm:text-7xl leading-none pointer-events-none">{item.emoji}</span>
       )}
       {pos && (
         <div
-          className="fixed z-[90] w-[5.5rem] h-[5.5rem] sm:w-28 sm:h-28 rounded-3xl border-2 border-sky-400 bg-slate-800/95 flex items-center justify-center shadow-2xl pointer-events-none"
-          style={{ left: pos.x - 44, top: pos.y - 44 }}
+          className="fixed z-[90] pointer-events-none flex items-center justify-center"
+          style={{ left: pos.x - 48, top: pos.y - 48, width: 96, height: 96 }}
         >
-          {visual ? (
-            <img src={visual} alt="" className="w-14 h-14 sm:w-16 sm:h-16 object-contain" draggable={false} />
+          {item.img ? (
+            <img src={item.img} alt="" className="w-24 h-24 object-contain drop-shadow-2xl" draggable={false} />
           ) : (
-            <span className="text-5xl sm:text-6xl leading-none">{emoji}</span>
+            <span className="text-6xl leading-none drop-shadow-2xl">{item.emoji}</span>
           )}
         </div>
       )}
@@ -543,17 +545,21 @@ function TileShell({
   done,
   children,
   className = '',
+  noBorder = false,
 }: {
   done?: boolean;
   children: React.ReactNode;
   className?: string;
+  noBorder?: boolean;
 }) {
   return (
     <div
-      className={`w-[5.5rem] h-[5.5rem] sm:w-28 sm:h-28 rounded-3xl border-2 flex items-center justify-center ${
+      className={`w-32 h-32 sm:w-40 sm:h-40 rounded-3xl flex items-center justify-center ${
         done
-          ? 'opacity-30 border-emerald-500/30 bg-emerald-500/10'
-          : 'border-slate-600 bg-slate-800'
+          ? 'opacity-0'
+          : noBorder
+          ? ''
+          : 'border-2 border-slate-600 bg-slate-800'
       } ${className}`}
     >
       {children}
@@ -568,11 +574,152 @@ function ItemVisual({ item, size = 'md' }: { item: SceneItem; size?: 'md' | 'lg'
         src={item.img}
         alt=""
         draggable={false}
-        className={`${size === 'lg' ? 'w-16 h-16 sm:w-20 sm:h-20' : 'w-14 h-14 sm:w-16 sm:h-16'} object-contain pointer-events-none`}
+        className={`${size === 'lg' ? 'w-24 h-24 sm:w-28 sm:h-28' : 'w-20 h-20 sm:w-24 sm:h-24'} object-contain pointer-events-none`}
       />
     );
   }
-  return <span className="text-5xl sm:text-6xl leading-none pointer-events-none">{item.emoji}</span>;
+  return <span className="text-6xl sm:text-7xl leading-none pointer-events-none">{item.emoji}</span>;
+}
+
+/* ───── Marakas — tutup sağa-sola / yukarı-aşağı salla ───── */
+function MarakasTile({
+  item,
+  done,
+  disabled,
+  isExpected,
+  onShake,
+}: {
+  item: SceneItem;
+  done: boolean;
+  disabled: boolean;
+  isExpected: boolean;
+  onShake: () => void;
+}) {
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const start = useRef({ x: 0, y: 0 });
+  const moved = useRef(0);
+  const fired = useRef(false);
+
+  if (done) return <div className="w-32 h-32 sm:w-40 sm:h-40" />;
+
+  return (
+    <div
+      className={`w-32 h-32 sm:w-40 sm:h-40 flex items-center justify-center touch-none ${disabled ? 'opacity-50' : ''}`}
+      style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
+      onPointerDown={(e) => {
+        if (disabled) return;
+        e.preventDefault();
+        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+        start.current = { x: e.clientX, y: e.clientY };
+        moved.current = 0;
+        fired.current = false;
+        setOffset({ x: 0, y: 0 });
+      }}
+      onPointerMove={(e) => {
+        if (disabled) return;
+        const dx = e.clientX - start.current.x;
+        const dy = e.clientY - start.current.y;
+        setOffset({ x: Math.max(-40, Math.min(40, dx)), y: Math.max(-40, Math.min(40, dy)) });
+        moved.current = Math.max(moved.current, Math.hypot(dx, dy));
+        if (!fired.current && moved.current > 55) {
+          fired.current = true;
+          if (isExpected) {
+            playFx(item.successSound || marakasSes);
+            onShake();
+          }
+        }
+      }}
+      onPointerUp={() => setOffset({ x: 0, y: 0 })}
+      onPointerCancel={() => setOffset({ x: 0, y: 0 })}
+    >
+      <img src={item.img} alt="" className="w-24 h-24 sm:w-28 sm:h-28 object-contain pointer-events-none drop-shadow-lg" draggable={false} />
+    </div>
+  );
+}
+
+/* ───── Zil — 1 saniye basılı tut, ses sürekli ───── */
+function BellTile({
+  item,
+  done,
+  disabled,
+  isExpected,
+  onSuccess,
+}: {
+  item: SceneItem;
+  done: boolean;
+  disabled: boolean;
+  isExpected: boolean;
+  onSuccess: () => void;
+}) {
+  const [p, setP] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const raf = useRef<number | null>(null);
+  const start = useRef(0);
+  const successFired = useRef(false);
+
+  const stopSound = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
+  };
+
+  const clear = () => {
+    if (raf.current) cancelAnimationFrame(raf.current);
+    raf.current = null;
+    setP(0);
+    stopSound();
+  };
+
+  if (done) return <div className="w-32 h-32 sm:w-40 sm:h-40" />;
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      className="relative overflow-hidden active:scale-95"
+      onPointerDown={(e) => {
+        if (disabled) return;
+        e.preventDefault();
+        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+        start.current = Date.now();
+        successFired.current = false;
+        // Ses başlat (loop)
+        try {
+          const a = new Audio(zilSesi);
+          a.loop = true;
+          a.volume = 0.85;
+          a.play().catch(() => {});
+          audioRef.current = a;
+        } catch {
+          /* */
+        }
+        const tick = () => {
+          const v = Math.min(1, (Date.now() - start.current) / 1000);
+          setP(v);
+          if (v >= 1 && !successFired.current) {
+            successFired.current = true;
+            stopSound();
+            if (isExpected) onSuccess();
+            return;
+          }
+          raf.current = requestAnimationFrame(tick);
+        };
+        raf.current = requestAnimationFrame(tick);
+      }}
+      onPointerUp={clear}
+      onPointerLeave={clear}
+      onPointerCancel={clear}
+    >
+      <TileShell done={false}>
+        <div className="absolute bottom-0 left-0 right-0 bg-amber-400/50 transition-all" style={{ height: `${p * 100}%` }} />
+        <span className="relative z-10">
+          <ItemVisual item={item} size="lg" />
+        </span>
+      </TileShell>
+    </button>
+  );
 }
 
 /* ───── Main ───── */
@@ -600,15 +747,18 @@ export default function Yonerge12({
   const [mergedIds, setMergedIds] = useState<Set<string>>(new Set());
   const [score, setScore] = useState(0);
   const [locked, setLocked] = useState(false);
-  const [flash, setFlash] = useState<'ok' | 'bad' | null>(null);
   const [layoutItems, setLayoutItems] = useState<SceneItem[]>([]);
   const [drawingId, setDrawingId] = useState<string | null>(null);
   const [balloonKey, setBalloonKey] = useState(0);
-  const [drawUnlocked, setDrawUnlocked] = useState(false);
 
   const task = tasks[idx];
   const expected = task?.sequence[seqPos];
   const expectedKind = task?.items.find((i) => i.id === expected)?.kind;
+
+  // Kalem → çiz birleşik mi?
+  const pencilOpensDraw =
+    expected === 'pencil' &&
+    task?.sequence[seqPos + 1] === 'draw';
 
   const lockPortrait = useCallback(async () => {
     try {
@@ -646,9 +796,15 @@ export default function Yonerge12({
 
   useEffect(() => {
     if (!task) return;
-    setLayoutItems(shuffle(task.items.filter((i) => i.kind !== 'balloon')));
+    // draw tile'ı layout'tan çıkar (kalem açacak)
+    setLayoutItems(
+      shuffle(
+        task.items.filter(
+          (i) => i.kind !== 'balloon' && i.kind !== 'draw'
+        )
+      )
+    );
     setBalloonKey((k) => k + 1);
-    setDrawUnlocked(false);
     setMergedIds(new Set());
   }, [task?.id]);
 
@@ -657,44 +813,46 @@ export default function Yonerge12({
       if (locked) return;
       setLocked(true);
       setDrawingId(null);
-      setFlash(correct ? 'ok' : 'bad');
+      playFx(onaySes);
       const newScore = score + (correct ? 1 : 0);
       setScore(newScore);
-      if (correct) confetti({ particleCount: 50, spread: 55, origin: { y: 0.65 } });
       setTimeout(() => {
         const next = idx + 1;
         if (next >= 10) {
           setPhase('result');
-          if (newScore >= 8) confetti({ particleCount: 220, spread: 90, origin: { y: 0.55 } });
           return;
         }
         setIdx(next);
         setSeqPos(0);
         setDoneIds(new Set());
-        setFlash(null);
         setLocked(false);
-      }, 700);
+      }, 500);
     },
     [locked, score, idx]
   );
 
   const advance = useCallback(
-    (itemId: string, extra?: { merge?: boolean; sound?: string }) => {
+    (itemId: string, extra?: { merge?: boolean; sound?: string; skipDraw?: boolean }) => {
       if (locked || !task) return;
-      if (itemId !== expected) {
-        finishTrial(false);
-        return;
-      }
+      if (itemId !== expected) return; // soft — yanlış yok say
+
       playFx(extra?.sound || onaySes);
+
       if (extra?.merge) {
         setMergedIds((prev) => new Set(prev).add(itemId));
       }
       setDoneIds((prev) => new Set(prev).add(itemId));
-      if (itemId === 'pencil') setDrawUnlocked(true);
-      const nextPos = seqPos + 1;
+
+      // Kalem + çiz birleşik: çizim bittiyse 2 adım ilerle
+      let nextPos = seqPos + 1;
+      if (extra?.skipDraw && task.sequence[seqPos + 1] === 'draw') {
+        nextPos = seqPos + 2;
+        setDoneIds((prev) => new Set(prev).add('draw'));
+      }
+
       if (nextPos >= 3) {
         setSeqPos(3);
-        setTimeout(() => finishTrial(true), 320);
+        setTimeout(() => finishTrial(true), 280);
       } else {
         setSeqPos(nextPos);
       }
@@ -702,9 +860,10 @@ export default function Yonerge12({
     [locked, task, expected, seqPos, finishTrial]
   );
 
+  // Cihaz sallama (telefonu salla) — yüksek eşik
   useEffect(() => {
     if (phase !== 'running' || locked) return;
-    if (expectedKind !== 'shake' && expectedKind !== 'marakas') return;
+    if (expectedKind !== 'shake') return;
 
     let last = 0;
     const handler = (e: DeviceMotionEvent) => {
@@ -712,14 +871,9 @@ export default function Yonerge12({
       if (!a) return;
       const mag = Math.hypot(a.x || 0, a.y || 0, a.z || 0);
       const now = Date.now();
-      if (mag > 26 && now - last > 900) {
+      if (mag > 28 && now - last > 1000) {
         last = now;
-        if (expectedKind === 'marakas') {
-          const it = task?.items.find((i) => i.id === expected);
-          advance(expected!, { sound: it?.successSound || marakasSes });
-        } else {
-          advance(expected!);
-        }
+        advance(expected!);
       }
     };
     const req = async () => {
@@ -733,8 +887,9 @@ export default function Yonerge12({
     };
     req();
     return () => window.removeEventListener('devicemotion', handler);
-  }, [phase, locked, expectedKind, expected, advance, task]);
+  }, [phase, locked, expectedKind, expected, advance]);
 
+  // Telefonu çevir
   useEffect(() => {
     if (phase !== 'running' || locked) return;
     if (expectedKind !== 'rotate') return;
@@ -795,7 +950,7 @@ export default function Yonerge12({
       {phase === 'running' && task && (
         <>
           <div className="shrink-0 px-4 pt-3 pb-1 text-center">
-            <h1 className="text-lg sm:text-2xl font-black leading-snug text-white">{task.text}</h1>
+            <h1 className="text-base sm:text-xl font-black leading-snug text-white">{task.text}</h1>
             <div className="flex items-center justify-center gap-2 mt-2">
               {[0, 1, 2].map((i) => (
                 <div
@@ -808,12 +963,8 @@ export default function Yonerge12({
             </div>
           </div>
 
-          <div
-            className={`relative flex-1 min-h-0 flex items-center justify-center px-2 ${
-              flash === 'ok' ? 'bg-emerald-500/5' : flash === 'bad' ? 'bg-red-500/10' : ''
-            }`}
-          >
-            <div className="grid grid-cols-3 gap-4 sm:gap-5 place-items-center content-center w-full max-w-md">
+          <div className="relative flex-1 min-h-0 flex items-center justify-center px-2">
+            <div className="grid grid-cols-2 gap-5 sm:gap-6 place-items-center content-center w-full max-w-sm">
               {layoutItems.map((it) => {
                 const isDone = doneIds.has(it.id);
                 const isMerged = mergedIds.has(it.id);
@@ -825,7 +976,6 @@ export default function Yonerge12({
                       item={it}
                       disabled={locked}
                       done={isDone}
-                      merged={isMerged}
                       onDrop={(cx, cy) => {
                         if (locked) return;
                         const els = document.elementsFromPoint(cx, cy);
@@ -833,23 +983,22 @@ export default function Yonerge12({
                         const dropId = dropEl?.getAttribute('data-drop-id');
                         if (it.id === expected && dropId === it.dropTarget) {
                           advance(it.id, { merge: !!it.mergeImg, sound: it.successSound });
-                        } else if (it.id === expected) {
-                          // soft
-                        } else {
-                          finishTrial(false);
                         }
+                        // yanlış hedef / yanlış sıra → soft, hiçbir şey olmaz
                       }}
                     />
                   );
                 }
 
                 if (it.kind === 'target') {
-                  const ballMerged = mergedIds.has('ball') && it.id === 'basket';
+                  const showMerge =
+                    (it.id === 'basket' && mergedIds.has('ball')) ||
+                    (it.id === 'trash' && doneIds.has('star') && task.items.find((x) => x.id === 'star')?.dropTarget === 'trash');
                   return (
                     <div key={it.id} data-drop-id={it.id}>
                       <TileShell done={false}>
-                        {ballMerged && sepetTopImg ? (
-                          <img src={sepetTopImg} alt="" className="w-16 h-16 sm:w-20 sm:h-20 object-contain" draggable={false} />
+                        {showMerge && it.id === 'basket' && sepetTopImg ? (
+                          <img src={sepetTopImg} alt="" className="w-24 h-24 sm:w-28 sm:h-28 object-contain" draggable={false} />
                         ) : (
                           <ItemVisual item={it} size="lg" />
                         )}
@@ -866,7 +1015,6 @@ export default function Yonerge12({
                       done={isDone}
                       disabled={locked}
                       onHold={() => advance(it.id)}
-                      onWrong={() => finishTrial(false)}
                       isExpected={expected === it.id}
                     />
                   );
@@ -880,51 +1028,61 @@ export default function Yonerge12({
                       done={isDone}
                       disabled={locked}
                       onSwipe={() => advance(it.id)}
-                      onWrong={() => finishTrial(false)}
                       isExpected={expected === it.id}
                     />
                   );
                 }
 
-                if (it.kind === 'draw') {
-                  const canOpen = expected === it.id && (drawUnlocked || !task.sequence.includes('pencil'));
+                if (it.kind === 'marakas') {
                   return (
-                    <button
+                    <MarakasTile
                       key={it.id}
-                      type="button"
-                      disabled={locked || isDone}
-                      onClick={() => {
-                        if (canOpen) setDrawingId(it.id);
-                        else if (expected === it.id && !drawUnlocked) {
-                          // soft
-                        } else {
-                          finishTrial(false);
-                        }
-                      }}
-                    >
-                      <TileShell done={isDone}>
-                        <ItemVisual item={it} />
-                      </TileShell>
-                    </button>
+                      item={it}
+                      done={isDone}
+                      disabled={locked}
+                      isExpected={expected === it.id}
+                      onShake={() => advance(it.id, { sound: it.successSound })}
+                    />
                   );
                 }
 
-                if (it.kind === 'shake' || it.kind === 'rotate' || it.kind === 'marakas') {
+                if (it.kind === 'bell') {
                   return (
-                    <TileShell key={it.id} done={isDone} className={!isDone ? 'border-violet-500/30' : ''}>
+                    <BellTile
+                      key={it.id}
+                      item={it}
+                      done={isDone}
+                      disabled={locked}
+                      isExpected={expected === it.id}
+                      onSuccess={() => advance(it.id)}
+                    />
+                  );
+                }
+
+                if (it.kind === 'shake' || it.kind === 'rotate') {
+                  return (
+                    <TileShell key={it.id} done={isDone} className={!isDone ? 'border-violet-500/40' : ''}>
                       <ItemVisual item={it} size="lg" />
                     </TileShell>
                   );
                 }
 
+                // normal tap (yıldız, ok, kalem vb.)
                 return (
                   <button
                     key={it.id}
                     type="button"
                     disabled={locked || isDone}
                     onClick={() => {
-                      if (expected === it.id) advance(it.id, { sound: it.successSound });
-                      else finishTrial(false);
+                      if (expected !== it.id) return; // soft
+                      if (it.id === 'pencil' && pencilOpensDraw) {
+                        setDrawingId('draw');
+                        // kalemi done işaretle, çizim bitince skipDraw ile ilerleyecek
+                        setDoneIds((prev) => new Set(prev).add('pencil'));
+                        playFx(onaySes);
+                      } else {
+                        advance(it.id, { sound: it.successSound });
+                      }
                     }}
                     className="active:scale-95"
                   >
@@ -941,7 +1099,6 @@ export default function Yonerge12({
                 key={`${task.id}-${balloonKey}`}
                 active={expectedKind === 'balloon'}
                 onPop={() => advance('balloon')}
-                onWrongPop={() => finishTrial(false)}
               />
             )}
 
@@ -949,25 +1106,19 @@ export default function Yonerge12({
               <DrawOverlay
                 onDone={() => {
                   setDrawingId(null);
-                  advance(drawingId);
+                  // pencil zaten done, draw'ı da atla
+                  advance('pencil', { skipDraw: true });
                 }}
-                onCancel={() => setDrawingId(null)}
+                onCancel={() => {
+                  setDrawingId(null);
+                  // kalemi geri aç
+                  setDoneIds((prev) => {
+                    const n = new Set(prev);
+                    n.delete('pencil');
+                    return n;
+                  });
+                }}
               />
-            )}
-
-            {flash === 'ok' && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
-                <div className="bg-emerald-500 text-white p-3 rounded-full">
-                  <Check size={36} strokeWidth={3} />
-                </div>
-              </div>
-            )}
-            {flash === 'bad' && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
-                <div className="bg-red-500 text-white p-3 rounded-full">
-                  <X size={36} strokeWidth={3} />
-                </div>
-              </div>
             )}
           </div>
 
@@ -1032,14 +1183,12 @@ function HoldTile({
   done,
   disabled,
   onHold,
-  onWrong,
   isExpected,
 }: {
   item: SceneItem;
   done: boolean;
   disabled: boolean;
   onHold: () => void;
-  onWrong: () => void;
   isExpected: boolean;
 }) {
   const [p, setP] = useState(0);
@@ -1055,15 +1204,17 @@ function HoldTile({
     setP(v);
     if (v >= 1) {
       if (isExpected) onHold();
-      else onWrong();
       return;
     }
     raf.current = requestAnimationFrame(tick);
   };
+
+  if (done) return <div className="w-32 h-32 sm:w-40 sm:h-40" />;
+
   return (
     <button
       type="button"
-      disabled={disabled || done}
+      disabled={disabled}
       className="relative overflow-hidden active:scale-95"
       onPointerDown={(e) => {
         e.preventDefault();
@@ -1075,7 +1226,7 @@ function HoldTile({
       onPointerLeave={clear}
       onPointerCancel={clear}
     >
-      <TileShell done={done}>
+      <TileShell done={false}>
         <div className="absolute bottom-0 left-0 right-0 bg-rose-500/40" style={{ height: `${p * 100}%` }} />
         <span className="relative z-10">
           <ItemVisual item={item} />
@@ -1090,41 +1241,41 @@ function SwipeTile({
   done,
   disabled,
   onSwipe,
-  onWrong,
   isExpected,
 }: {
   item: SceneItem;
   done: boolean;
   disabled: boolean;
   onSwipe: () => void;
-  onWrong: () => void;
   isExpected: boolean;
 }) {
   const sx = useRef(0);
   const [dx, setDx] = useState(0);
+
+  if (done) return <div className="w-32 h-32 sm:w-40 sm:h-40" />;
+
   return (
     <div
       className="touch-none"
-      style={{ transform: `translateX(${Math.max(-56, Math.min(56, dx))}px)` }}
+      style={{ transform: `translateX(${Math.max(-60, Math.min(60, dx))}px)` }}
       onPointerDown={(e) => {
-        if (disabled || done) return;
+        if (disabled) return;
         sx.current = e.clientX;
         (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
       }}
       onPointerMove={(e) => {
-        if (disabled || done) return;
+        if (disabled) return;
         setDx(e.clientX - sx.current);
       }}
       onPointerUp={() => {
-        if (Math.abs(dx) > 95) {
-          if (isExpected) onSwipe();
-          else onWrong();
+        if (Math.abs(dx) > 95 && isExpected) {
+          onSwipe();
         }
         setDx(0);
       }}
       onPointerCancel={() => setDx(0)}
     >
-      <TileShell done={done}>
+      <TileShell done={false}>
         <ItemVisual item={item} />
       </TileShell>
     </div>
