@@ -18,6 +18,7 @@ import Yonerge7 from '@/aba/yonerge/yonerge7';
 import Yonerge8 from '@/aba/yonerge/yonerge8';
 import Yonerge9 from '@/aba/yonerge/yonerge9';
 import Yonerge10 from '@/aba/yonerge/yonerge10';
+import Yonerge11 from '@/aba/yonerge/yonerge11';
 
 interface YonergeTakipPageProps {
   studentId: string;
@@ -129,6 +130,9 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
     if (activeItem.includes("3.5")) {
         return <Yonerge10 itemCode={code} itemText={text} studentName={studentName} onClose={() => setActiveItem(null)} onComplete={handleSessionSave} />;
     }
+    if (activeItem.includes("3.6")) {
+        return <Yonerge11 itemCode={code} itemText={text} onClose={() => setActiveItem(null)} onComplete={handleSessionSave} />;
+    }
   }
 
   return (
@@ -171,7 +175,8 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
                 item.includes("3.1") ||
                 item.includes("3.3") ||
                 item.includes("3.4") ||
-                item.includes("3.5");
+                item.includes("3.5") ||
+                item.includes("3.6");
 
             return (
                 <div key={item} className={twMerge("group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4",
