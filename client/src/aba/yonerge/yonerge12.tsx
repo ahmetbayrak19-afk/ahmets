@@ -20,9 +20,6 @@ import onaySes from './sesgorsel/onay.mp3';
 
 /* ═══════════════════════════════════════════════════════════
    YTB 4.1 — Üç bağımsız yönerge (Değerlendirme)
-   - 2x3 büyük nesne (yazı yok)
-   - Sadece doğru sıra ilerler; yanlış hareket yok sayılır
-   - Her hamlede onay.mp3, konfeti/ikon yok
    ═══════════════════════════════════════════════════════════ */
 
 type ActKind =
@@ -270,7 +267,6 @@ function playFx(src?: string) {
   }
 }
 
-/* ───── Draw overlay ───── */
 function DrawOverlay({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
@@ -356,14 +352,7 @@ function DrawOverlay({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
   );
 }
 
-/* ───── Floating balloon ───── */
-function FloatingBalloon({
-  active,
-  onPop,
-}: {
-  active: boolean;
-  onPop: () => void;
-}) {
+function FloatingBalloon({ active, onPop }: { active: boolean; onPop: () => void }) {
   const [y, setY] = useState(110);
   const [x, setX] = useState(() => 20 + Math.random() * 60);
   const [sway, setSway] = useState(0);
@@ -423,7 +412,6 @@ function FloatingBalloon({
     popped.current = true;
     setBurst(true);
     setScale(1.4);
-
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const ox = (rect.left + rect.width / 2) / window.innerWidth;
     const oy = (rect.top + rect.height / 2) / window.innerHeight;
@@ -434,14 +422,10 @@ function FloatingBalloon({
       origin: { x: ox, y: oy },
       colors: ['#ef4444', '#3b82f6', '#fbbf24', '#f472b6', '#a78bfa'],
     });
-
     setTimeout(() => {
       setVisible(false);
-      if (active) {
-        onPop();
-      } else {
-        setTimeout(() => startRise(), 400);
-      }
+      if (active) onPop();
+      else setTimeout(() => startRise(), 400);
     }, 200);
   };
 
@@ -464,17 +448,13 @@ function FloatingBalloon({
         src={img}
         alt=""
         draggable={false}
-        className={`w-full h-full object-contain drop-shadow-xl pointer-events-none select-none ${
-          burst ? 'opacity-0 transition-opacity duration-150' : ''
-        }`}
+        className={`w-full h-full object-contain drop-shadow-xl pointer-events-none select-none ${burst ? 'opacity-0 transition-opacity duration-150' : ''}`}
       />
     </button>
   );
 }
 
-/* ───── Free drag ─────
-   Durağan: çerçeveli
-   Sürüklerken: orijinal kaybolur, sadece top/yıldız parmak altında ───── */
+/* Durağan: çerçeveli. Sürüklerken: sadece top (çerçevesiz) parmak altında */
 function DragItem({
   item,
   disabled,
@@ -489,7 +469,6 @@ function DragItem({
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const dragging = useRef(false);
 
-  // Bittiğinde yer tamamen boş
   if (done) {
     return <div className="w-32 h-32 sm:w-40 sm:h-40" />;
   }
@@ -497,8 +476,7 @@ function DragItem({
   return (
     <>
       <div
-        className={`w-32 h-32 sm:w-40 sm:h-40 rounded-3xl border-2 border-slate-600 bg-slate-800 flex items-center justify-center touch-none ${\n          pos ? 'opacity-0' : ''
-        } ${disabled ? 'opacity-50' : ''}`}
+        className={`w-32 h-32 sm:w-40 sm:h-40 rounded-3xl border-2 border-slate-600 bg-slate-800 flex items-center justify-center touch-none ${pos ? 'opacity-0' : ''} ${disabled ? 'opacity-50' : ''}`}
         onPointerDown={(e) => {
           if (disabled) return;
           e.preventDefault();
@@ -529,7 +507,6 @@ function DragItem({
         )}
       </div>
 
-      {/* Hayalet: sadece görsel, çerçeve yok */}
       {pos && (
         <div
           className="fixed z-[90] pointer-events-none flex items-center justify-center"
@@ -545,7 +522,7 @@ function DragItem({
             <img
               src={item.img}
               alt=""
-              className="w-28 h-28 object-contain drop-shadow-2xl"
+              className="w-28 h-28 object-contain"
               draggable={false}
               style={{ filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.45))' }}
             />
@@ -560,7 +537,6 @@ function DragItem({
   );
 }
 
-/* ───── Generic tile ───── */
 function TileShell({
   done,
   children,
@@ -572,8 +548,7 @@ function TileShell({
 }) {
   return (
     <div
-      className={`w-32 h-32 sm:w-40 sm:h-40 rounded-3xl flex items-center justify-center border-2 ${\n        done ? 'border-emerald-500/30 bg-emerald-500/10 opacity-60' : 'border-slate-600 bg-slate-800'
-      } ${className}`}
+      className={`w-32 h-32 sm:w-40 sm:h-40 rounded-3xl flex items-center justify-center border-2 ${done ? 'border-emerald-500/30 bg-emerald-500/10 opacity-60' : 'border-slate-600 bg-slate-800'} ${className}`}
     >
       {children}
     </div>
@@ -594,7 +569,6 @@ function ItemVisual({ item, size = 'md' }: { item: SceneItem; size?: 'md' | 'lg'
   return <span className="text-6xl sm:text-7xl leading-none pointer-events-none">{item.emoji}</span>;
 }
 
-/* ───── Marakas — tutup salla, kaybolmaz ───── */
 function MarakasTile({
   item,
   done,
@@ -615,8 +589,7 @@ function MarakasTile({
 
   return (
     <div
-      className={`w-32 h-32 sm:w-40 sm:h-40 rounded-3xl border-2 flex items-center justify-center touch-none ${\n        done ? 'border-emerald-500/30 bg-emerald-500/10 opacity-60' : 'border-slate-600 bg-slate-800'
-      } ${disabled ? 'opacity-50' : ''}`}
+      className={`w-32 h-32 sm:w-40 sm:h-40 rounded-3xl border-2 flex items-center justify-center touch-none ${done ? 'border-emerald-500/30 bg-emerald-500/10 opacity-60' : 'border-slate-600 bg-slate-800'} ${disabled ? 'opacity-50' : ''}`}
       style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
       onPointerDown={(e) => {
         if (disabled || done) return;
@@ -649,7 +622,6 @@ function MarakasTile({
   );
 }
 
-/* ───── Zil — kapalı başlar, basınca açılır, progress yok, kaybolmaz ───── */
 function BellTile({
   done,
   disabled,
@@ -721,8 +693,7 @@ function BellTile({
       onPointerCancel={clear}
     >
       <div
-        className={`w-32 h-32 sm:w-40 sm:h-40 rounded-3xl border-2 flex items-center justify-center ${\n          done ? 'border-emerald-500/30 bg-emerald-500/10 opacity-60' : 'border-slate-600 bg-slate-800'
-        }`}
+        className={`w-32 h-32 sm:w-40 sm:h-40 rounded-3xl border-2 flex items-center justify-center ${done ? 'border-emerald-500/30 bg-emerald-500/10 opacity-60' : 'border-slate-600 bg-slate-800'}`}
       >
         <img
           src={pressing ? zilAcikImg : zilKapaliImg}
@@ -734,8 +705,6 @@ function BellTile({
     </button>
   );
 }
-
-/* ───── Main ───── */
 
 interface Yonerge12Props {
   itemCode?: string;
@@ -768,9 +737,7 @@ export default function Yonerge12({
   const expected = task?.sequence[seqPos];
   const expectedKind = task?.items.find((i) => i.id === expected)?.kind;
 
-  const pencilOpensDraw =
-    expected === 'pencil' &&
-    task?.sequence[seqPos + 1] === 'draw';
+  const pencilOpensDraw = expected === 'pencil' && task?.sequence[seqPos + 1] === 'draw';
 
   const lockPortrait = useCallback(async () => {
     try {
@@ -808,13 +775,7 @@ export default function Yonerge12({
 
   useEffect(() => {
     if (!task) return;
-    setLayoutItems(
-      shuffle(
-        task.items.filter(
-          (i) => i.kind !== 'balloon' && i.kind !== 'draw'
-        )
-      )
-    );
+    setLayoutItems(shuffle(task.items.filter((i) => i.kind !== 'balloon' && i.kind !== 'draw')));
     setBalloonKey((k) => k + 1);
     setMergedIds(new Set());
   }, [task?.id]);
@@ -870,7 +831,6 @@ export default function Yonerge12({
     [locked, task, expected, seqPos, finishTrial]
   );
 
-  // Cihaz sallama
   useEffect(() => {
     if (phase !== 'running' || locked) return;
     if (expectedKind !== 'shake') return;
@@ -899,7 +859,6 @@ export default function Yonerge12({
     return () => window.removeEventListener('devicemotion', handler);
   }, [phase, locked, expectedKind, expected, advance]);
 
-  // Telefonu çevir
   useEffect(() => {
     if (phase !== 'running' || locked) return;
     if (expectedKind !== 'rotate') return;
@@ -965,8 +924,7 @@ export default function Yonerge12({
               {[0, 1, 2].map((i) => (
                 <div
                   key={i}
-                  className={`h-1.5 w-8 rounded-full ${\n                    i < seqPos ? 'bg-emerald-400' : i === seqPos ? 'bg-violet-400' : 'bg-slate-700'
-                  }`}
+                  className={`h-1.5 w-8 rounded-full ${i < seqPos ? 'bg-emerald-400' : i === seqPos ? 'bg-violet-400' : 'bg-slate-700'}`}
                 />
               ))}
             </div>
@@ -1267,7 +1225,6 @@ function SwipeTile({
         setDx(e.clientX - sx.current);
       }}
       onPointerUp={() => {
-        // 3 kat daha yüksek eşik (~285 px)
         if (Math.abs(dx) > 285 && isExpected) {
           onSwipe();
         }
