@@ -20,6 +20,7 @@ import Yonerge9 from '@/aba/yonerge/yonerge9';
 import Yonerge10 from '@/aba/yonerge/yonerge10';
 import Yonerge11 from '@/aba/yonerge/yonerge11';
 import Yonerge12 from '@/aba/yonerge/yonerge12';
+import Yonerge13 from '@/aba/yonerge/yonerge13';
 
 interface YonergeTakipPageProps {
   studentId: string;
@@ -137,6 +138,9 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
     if (activeItem.includes("4.1")) {
         return <Yonerge12 itemCode={code} itemText={text} onClose={() => setActiveItem(null)} onComplete={handleSessionSave} />;
     }
+    if (activeItem.includes("4.2")) {
+        return <Yonerge13 itemCode={code} itemText={text} onClose={() => setActiveItem(null)} onComplete={handleSessionSave} />;
+    }
   }
 
   return (
@@ -182,20 +186,18 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
                 item.includes("3.4") ||
                 item.includes("3.5") ||
                 item.includes("3.6") ||
-                item.includes("4.1");
+                item.includes("4.1") ||
+                item.includes("4.2");
 
             return (
                 <div
                   key={item}
                   className={twMerge(
                     "group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4",
-                    // Geçti: sönük ama tıklanabilir
                     isPassed &&
                       "bg-green-950/15 border-green-500/15 opacity-45 hover:opacity-80",
-                    // Geçemedi: belirgin kırmızı vurgu
                     isFailed &&
                       "bg-red-950/30 border-red-500/50 shadow-[0_0_0_1px_rgba(239,68,68,0.15)] hover:border-red-400/70 hover:bg-red-950/40",
-                    // Henüz değerlendirilmedi
                     !isPassed &&
                       !isFailed &&
                       "bg-slate-900/40 border-slate-800 hover:bg-slate-800 hover:border-slate-700"
