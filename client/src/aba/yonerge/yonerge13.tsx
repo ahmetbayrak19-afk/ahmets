@@ -26,6 +26,10 @@ import uykuluesne2 from './sesgorsel/yonerge13/uykuluesne2.png';
 import yatakImg from './sesgorsel/yonerge13/yatak.png';
 import yataktauyuyan from './sesgorsel/yonerge13/yataktauyuyan.png';
 
+import esnemeSes from './sesgorsel/yonerge13/esnemeses.mp3';
+import fircaSes from './sesgorsel/yonerge13/fircasesi.mp3';
+import sacTaramaSes from './sesgorsel/yonerge13/sactaramases.mp3';
+
 const NEUTRAL_SOUNDS = [devametNotr, devamet2Notr, simdisiradakiNotr];
 
 type SceneType = 'candle' | 'teeth' | 'hair' | 'sleep' | 'teacher';
@@ -74,7 +78,7 @@ function playNeutralTransition(): Promise<void> {
   });
 }
 
-/* ───────────── Live Candle (SVG + DeviceMotion) ───────────── */
+/* ───────────── Live Candle — exaggerated sway on small shake ───────────── */
 function LiveCandle({ onExtinguish, active }: { onExtinguish: () => void; active: boolean }) {
   const flameRef = useRef<HTMLDivElement>(null);
   const totalShake = useRef(0);
@@ -91,31 +95,30 @@ function LiveCandle({ onExtinguish, active }: { onExtinguish: () => void; active
       const a = e.accelerationIncludingGravity;
       if (!a) return;
       const mag = Math.hypot(a.x || 0, a.y || 0, a.z || 0);
-      const shake = Math.max(0, mag - 10.5);
+      const shake = Math.max(0, mag - 9.6);
       const now = Date.now();
-      if (shake < 1.2) {
-        setIntensity((v) => Math.max(0, v * 0.85));
+      if (shake < 0.4) {
+        setIntensity((v) => Math.max(0, v * 0.88));
         return;
       }
-      if (now - last < 40) return;
+      if (now - last < 35) return;
       last = now;
 
-      const amount = Math.min(18, shake * 2.2);
+      const amount = Math.min(42, 10 + shake * 8);
       setIntensity(amount);
-      totalShake.current += shake;
+      totalShake.current += shake * 1.4;
 
       if (flameRef.current) {
+        const rot = (Math.random() - 0.5) * amount * 3.2;
+        const tx = (Math.random() - 0.5) * amount * 1.8;
+        const ty = -Math.random() * amount * 0.55;
         flameRef.current.animate(
-          [
-            {
-              transform: `translateX(-50%) rotate(${(Math.random() - 0.5) * amount * 2}deg) translate(${(Math.random() - 0.5) * amount}px, ${-Math.random() * amount * 0.4}px) scale(${1 + amount * 0.015})`,
-            },
-          ],
-          { duration: 90, fill: 'forwards' }
+          [{ transform: `translateX(-50%) rotate(${rot}deg) translate(${tx}px, ${ty}px) scale(${1 + amount * 0.012})` }],
+          { duration: 70, fill: 'forwards' }
         );
       }
 
-      if (totalShake.current > 55) {
+      if (totalShake.current > 28) {
         extinguished.current = true;
         setGone(true);
         setTimeout(() => onExtinguish(), 500);
@@ -136,31 +139,23 @@ function LiveCandle({ onExtinguish, active }: { onExtinguish: () => void; active
   return (
     <div className="relative flex flex-col items-center justify-end h-64 w-40">
       {!gone && (
-        <div
-          ref={flameRef}
-          className="absolute bottom-[118px] left-1/2 origin-bottom"
-          style={{ transform: 'translateX(-50%)' }}
-        >
+        <div ref={flameRef} className="absolute bottom-[118px] left-1/2 origin-bottom" style={{ transform: 'translateX(-50%)' }}>
           <div
             className="w-7 h-12 rounded-[50%_50%_40%_40%] relative"
             style={{
               background: 'radial-gradient(ellipse at 50% 80%, #fff9c4 0%, #ffeb3b 25%, #ff9800 55%, #ff5722 85%, transparent 100%)',
-              filter: `blur(${0.4 + intensity * 0.04}px)`,
-              boxShadow: `0 0 ${12 + intensity}px ${4 + intensity * 0.3}px rgba(255,152,0,0.55)`,
+              filter: `blur(${0.4 + intensity * 0.03}px)`,
+              boxShadow: `0 0 ${12 + intensity * 0.6}px ${4 + intensity * 0.25}px rgba(255,152,0,0.55)`,
             }}
           >
             <div
               className="absolute left-1/2 -translate-x-1/2 bottom-1 w-3.5 h-6 rounded-[50%_50%_40%_40%]"
-              style={{
-                background: 'radial-gradient(ellipse at 50% 90%, #fffde7 0%, #fff59d 40%, transparent 80%)',
-              }}
+              style={{ background: 'radial-gradient(ellipse at 50% 90%, #fffde7 0%, #fff59d 40%, transparent 80%)' }}
             />
           </div>
         </div>
       )}
-      {!gone && (
-        <div className="absolute bottom-[112px] left-1/2 -translate-x-1/2 w-1 h-3 bg-slate-800 rounded-t-sm z-10" />
-      )}
+      {!gone && <div className="absolute bottom-[112px] left-1/2 -translate-x-1/2 w-1 h-3 bg-slate-800 rounded-t-sm z-10" />}
       <div
         className="w-10 h-28 rounded-t-md relative z-0"
         style={{
@@ -171,20 +166,20 @@ function LiveCandle({ onExtinguish, active }: { onExtinguish: () => void; active
         <div className="absolute top-0 left-0 right-0 h-2 bg-amber-100/80 rounded-t-md" />
       </div>
       <div className="w-16 h-3 bg-amber-900/70 rounded-b-md -mt-0.5" />
-      {gone && (
-        <div className="absolute top-8 text-sm font-bold text-emerald-400 animate-pulse">Söndü!</div>
-      )}
+      {gone && <div className="absolute top-8 text-sm font-bold text-emerald-400 animate-pulse">Söndü!</div>}
     </div>
   );
 }
 
-/* ───────────── Teeth Scene ───────────── */
+/* ───────────── Teeth Scene — center zone, 3 strokes, brush sound ───────────── */
 function TeethScene({ onSuccess, locked }: { onSuccess: () => void; locked: boolean }) {
   const [stage, setStage] = useState(0);
   const [holding, setHolding] = useState(false);
   const [brushPos, setBrushPos] = useState<{ x: number; y: number } | null>(null);
   const lastY = useRef(0);
   const strokes = useRef(0);
+  const faceRef = useRef<HTMLDivElement>(null);
+  const lastSound = useRef(0);
 
   const imgs = [diskipkirlikapali, diskipkirli, diskirli, distemiz];
   const brushSrc = holding ? disfircasikullan : disfircasi;
@@ -196,17 +191,35 @@ function TeethScene({ onSuccess, locked }: { onSuccess: () => void; locked: bool
     }
   }, [stage]);
 
-  const onBrushMove = (clientY: number) => {
+  const inTeethZone = (cx: number, cy: number) => {
+    const el = faceRef.current;
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    const nx = (cx - r.left) / r.width;
+    const ny = (cy - r.top) / r.height;
+    return nx >= 0.25 && nx <= 0.75 && ny >= 0.28 && ny <= 0.72;
+  };
+
+  const onBrushMove = (cx: number, cy: number) => {
     if (locked || stage < 1 || stage >= 3) return;
-    const dy = Math.abs(clientY - lastY.current);
-    if (dy > 12) {
+    if (!inTeethZone(cx, cy)) return;
+
+    const dy = Math.abs(cy - lastY.current);
+    if (dy > 14) {
       strokes.current += 1;
-      lastY.current = clientY;
-      if (strokes.current >= 6 && stage === 1) {
+      lastY.current = cy;
+
+      const now = Date.now();
+      if (now - lastSound.current > 280) {
+        lastSound.current = now;
+        playFx(fircaSes);
+      }
+
+      if (strokes.current >= 3 && stage === 1) {
         setStage(2);
         strokes.current = 0;
         playFx(onaySes);
-      } else if (strokes.current >= 6 && stage === 2) {
+      } else if (strokes.current >= 3 && stage === 2) {
         setStage(3);
         playFx(onaySes);
         setTimeout(() => onSuccess(), 600);
@@ -216,7 +229,7 @@ function TeethScene({ onSuccess, locked }: { onSuccess: () => void; locked: bool
 
   return (
     <div className="flex flex-col items-center h-full w-full relative">
-      <div className="flex-1 flex items-center justify-center w-full px-4">
+      <div ref={faceRef} className="flex-1 flex items-center justify-center w-full px-4">
         <img src={imgs[stage]} alt="" className="max-h-[42vh] w-auto object-contain drop-shadow-xl" draggable={false} />
       </div>
       <div className="shrink-0 flex items-center justify-center gap-6 pb-6 pt-2">
@@ -235,7 +248,7 @@ function TeethScene({ onSuccess, locked }: { onSuccess: () => void; locked: bool
           onPointerMove={(e) => {
             if (!holding) return;
             setBrushPos({ x: e.clientX, y: e.clientY });
-            onBrushMove(e.clientY);
+            onBrushMove(e.clientX, e.clientY);
           }}
           onPointerUp={() => { setHolding(false); setBrushPos(null); }}
           onPointerCancel={() => { setHolding(false); setBrushPos(null); }}
@@ -258,28 +271,48 @@ function TeethScene({ onSuccess, locked }: { onSuccess: () => void; locked: bool
   );
 }
 
-/* ───────────── Hair Scene ───────────── */
+/* ───────────── Hair Scene — upper zone only, 3 strokes, comb sound ───────────── */
 function HairScene({ onSuccess, locked }: { onSuccess: () => void; locked: boolean }) {
   const [stage, setStage] = useState(0);
   const [holding, setHolding] = useState(false);
   const [combPos, setCombPos] = useState<{ x: number; y: number } | null>(null);
   const lastX = useRef(0);
   const strokes = useRef(0);
+  const headRef = useRef<HTMLDivElement>(null);
+  const lastSound = useRef(0);
 
   const imgs = [sacdapdaginik, sacdaginik, sacduzgun];
   const combSrc = holding ? tarakkullan : tarakImg;
 
-  const onCombMove = (clientX: number) => {
+  const inHairZone = (cx: number, cy: number) => {
+    const el = headRef.current;
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    const nx = (cx - r.left) / r.width;
+    const ny = (cy - r.top) / r.height;
+    return nx >= 0.1 && nx <= 0.9 && ny >= 0.02 && ny <= 0.55;
+  };
+
+  const onCombMove = (cx: number, cy: number) => {
     if (locked || stage >= 2) return;
-    const dx = Math.abs(clientX - lastX.current);
-    if (dx > 14) {
+    if (!inHairZone(cx, cy)) return;
+
+    const dx = Math.abs(cx - lastX.current);
+    if (dx > 16) {
       strokes.current += 1;
-      lastX.current = clientX;
-      if (strokes.current >= 5 && stage === 0) {
+      lastX.current = cx;
+
+      const now = Date.now();
+      if (now - lastSound.current > 300) {
+        lastSound.current = now;
+        playFx(sacTaramaSes);
+      }
+
+      if (strokes.current >= 3 && stage === 0) {
         setStage(1);
         strokes.current = 0;
         playFx(onaySes);
-      } else if (strokes.current >= 5 && stage === 1) {
+      } else if (strokes.current >= 3 && stage === 1) {
         setStage(2);
         playFx(onaySes);
         setTimeout(() => onSuccess(), 600);
@@ -289,7 +322,7 @@ function HairScene({ onSuccess, locked }: { onSuccess: () => void; locked: boole
 
   return (
     <div className="flex flex-col items-center h-full w-full relative">
-      <div className="flex-1 flex items-center justify-center w-full px-4">
+      <div ref={headRef} className="flex-1 flex items-center justify-center w-full px-4">
         <img src={imgs[stage]} alt="" className="max-h-[42vh] w-auto object-contain drop-shadow-xl" draggable={false} />
       </div>
       <div className="shrink-0 flex items-center justify-center gap-6 pb-6 pt-2">
@@ -308,7 +341,7 @@ function HairScene({ onSuccess, locked }: { onSuccess: () => void; locked: boole
           onPointerMove={(e) => {
             if (!holding) return;
             setCombPos({ x: e.clientX, y: e.clientY });
-            onCombMove(e.clientX);
+            onCombMove(e.clientX, e.clientY);
           }}
           onPointerUp={() => { setHolding(false); setCombPos(null); }}
           onPointerCancel={() => { setHolding(false); setCombPos(null); }}
@@ -331,18 +364,37 @@ function HairScene({ onSuccess, locked }: { onSuccess: () => void; locked: boole
   );
 }
 
-/* ───────────── Sleep Scene ───────────── */
+/* ───────────── Sleep Scene — 4s normal, yawn + sound, back ───────────── */
 function SleepScene({ onSuccess, locked }: { onSuccess: () => void; locked: boolean }) {
   const [done, setDone] = useState(false);
-  const [frame, setFrame] = useState(0);
+  const [yawning, setYawning] = useState(false);
   const [holding, setHolding] = useState(false);
   const [bedPos, setBedPos] = useState<{ x: number; y: number } | null>(null);
   const childRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (done) return;
-    const id = setInterval(() => setFrame((f) => (f === 0 ? 1 : 0)), 1000);
-    return () => clearInterval(id);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const loop = () => {
+      timer = setTimeout(() => {
+        if (cancelled) return;
+        setYawning(true);
+        playFx(esnemeSes);
+        timer = setTimeout(() => {
+          if (cancelled) return;
+          setYawning(false);
+          loop();
+        }, 1200);
+      }, 4000);
+    };
+    loop();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [done]);
 
   const checkDrop = (cx: number, cy: number) => {
@@ -359,7 +411,7 @@ function SleepScene({ onSuccess, locked }: { onSuccess: () => void; locked: bool
     <div className="flex flex-col items-center h-full w-full relative">
       <div ref={childRef} className="flex-1 flex items-center justify-center w-full px-4">
         <img
-          src={done ? yataktauyuyan : frame === 0 ? uykuluesne : uykuluesne2}
+          src={done ? yataktauyuyan : yawning ? uykuluesne : uykuluesne2}
           alt=""
           className="max-h-[42vh] w-auto object-contain drop-shadow-xl transition-opacity duration-200"
           draggable={false}
@@ -517,17 +569,9 @@ export default function Yonerge13({
               </div>
             )}
 
-            {trial.type === 'teeth' && (
-              <TeethScene locked={locked} onSuccess={() => finishTrial(true)} />
-            )}
-
-            {trial.type === 'hair' && (
-              <HairScene locked={locked} onSuccess={() => finishTrial(true)} />
-            )}
-
-            {trial.type === 'sleep' && (
-              <SleepScene locked={locked} onSuccess={() => finishTrial(true)} />
-            )}
+            {trial.type === 'teeth' && <TeethScene locked={locked} onSuccess={() => finishTrial(true)} />}
+            {trial.type === 'hair' && <HairScene locked={locked} onSuccess={() => finishTrial(true)} />}
+            {trial.type === 'sleep' && <SleepScene locked={locked} onSuccess={() => finishTrial(true)} />}
 
             {trial.type === 'teacher' && (
               <div className="flex-1 flex items-center justify-center px-6">
@@ -565,10 +609,7 @@ export default function Yonerge13({
       {phase === 'result' && (
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="flex flex-col items-center text-center p-8 bg-slate-900/90 rounded-3xl border border-slate-700 max-w-xl w-full">
-            <Trophy
-              size={72}
-              className={score >= 8 ? 'text-yellow-500 mb-5 animate-bounce' : 'text-slate-500 mb-5'}
-            />
+            <Trophy size={72} className={score >= 8 ? 'text-yellow-500 mb-5 animate-bounce' : 'text-slate-500 mb-5'} />
             <h1 className="text-3xl font-black mb-2">Değerlendirme Bitti!</h1>
             <p className="text-slate-400 mb-6 text-lg">
               Doğru: <span className="text-white font-black text-3xl mx-2">{score}</span> / 10
