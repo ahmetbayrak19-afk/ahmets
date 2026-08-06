@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { XCircle, Check, X, Trophy } from 'lucide-react';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 
@@ -7,7 +7,6 @@ import devametNotr from '@/aba/esle/ses/devametnotr.mp3';
 import devamet2Notr from '@/aba/esle/ses/devamet2notr.mp3';
 import simdisiradakiNotr from '@/aba/esle/ses/simdisiradakinotr.mp3';
 
-// YTB 4.2 assets
 import diskipkirlikapali from './sesgorsel/yonerge13/diskipkirlikapaliagiz.png';
 import diskipkirli from './sesgorsel/yonerge13/diskipkirli.png';
 import diskirli from './sesgorsel/yonerge13/diskirli.png';
@@ -78,7 +77,61 @@ function playNeutralTransition(): Promise<void> {
   });
 }
 
-/* ───────────── Live Candle — exaggerated sway on small shake ───────────── */
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** Single looping motion sound — no stacking */
+function useMotionSound(src: string) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const a = new Audio(src);
+    a.loop = true;
+    a.volume = 0.85;
+    a.preload = 'auto';
+    audioRef.current = a;
+    return () => {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+      a.pause();
+      a.src = '';
+      audioRef.current = null;
+    };
+  }, [src]);
+
+  const start = useCallback(() => {
+    if (idleTimer.current) {
+      clearTimeout(idleTimer.current);
+      idleTimer.current = null;
+    }
+    const a = audioRef.current;
+    if (!a) return;
+    if (a.paused) a.play().catch(() => {});
+  }, []);
+
+  const stop = useCallback(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    a.pause();
+    try { a.currentTime = 0; } catch { /* */ }
+  }, []);
+
+  const pulse = useCallback(() => {
+    start();
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => stop(), 180);
+  }, [start, stop]);
+
+  return { pulse, stop };
+}
+
+/* ───────────── Live Candle ───────────── */
 function LiveCandle({ onExtinguish, active }: { onExtinguish: () => void; active: boolean }) {
   const flameRef = useRef<HTMLDivElement>(null);
   const totalShake = useRef(0);
@@ -97,28 +150,28 @@ function LiveCandle({ onExtinguish, active }: { onExtinguish: () => void; active
       const mag = Math.hypot(a.x || 0, a.y || 0, a.z || 0);
       const shake = Math.max(0, mag - 9.6);
       const now = Date.now();
-      if (shake < 0.4) {
-        setIntensity((v) => Math.max(0, v * 0.88));
+      if (shake < 0.35) {
+        setIntensity((v) => Math.max(0, v * 0.9));
         return;
       }
-      if (now - last < 35) return;
+      if (now - last < 30) return;
       last = now;
 
-      const amount = Math.min(42, 10 + shake * 8);
+      const amount = Math.min(58, 14 + shake * 11);
       setIntensity(amount);
-      totalShake.current += shake * 1.4;
 
       if (flameRef.current) {
-        const rot = (Math.random() - 0.5) * amount * 3.2;
-        const tx = (Math.random() - 0.5) * amount * 1.8;
-        const ty = -Math.random() * amount * 0.55;
+        const rot = (Math.random() - 0.5) * amount * 3.8;
         flameRef.current.animate(
-          [{ transform: `translateX(-50%) rotate(${rot}deg) translate(${tx}px, ${ty}px) scale(${1 + amount * 0.012})` }],
-          { duration: 70, fill: 'forwards' }
+          [{ transform: `translateX(-50%) rotate(${rot}deg) scaleY(${1 + amount * 0.006})` }],
+          { duration: 65, fill: 'forwards' }
         );
       }
 
-      if (totalShake.current > 28) {
+      if (shake > 1.8) {
+        totalShake.current += shake * 0.55;
+      }
+      if (totalShake.current > 95) {
         extinguished.current = true;
         setGone(true);
         setTimeout(() => onExtinguish(), 500);
@@ -139,13 +192,17 @@ function LiveCandle({ onExtinguish, active }: { onExtinguish: () => void; active
   return (
     <div className="relative flex flex-col items-center justify-end h-64 w-40">
       {!gone && (
-        <div ref={flameRef} className="absolute bottom-[118px] left-1/2 origin-bottom" style={{ transform: 'translateX(-50%)' }}>
+        <div
+          ref={flameRef}
+          className="absolute bottom-[118px] left-1/2"
+          style={{ transform: 'translateX(-50%)', transformOrigin: '50% 100%' }}
+        >
           <div
             className="w-7 h-12 rounded-[50%_50%_40%_40%] relative"
             style={{
               background: 'radial-gradient(ellipse at 50% 80%, #fff9c4 0%, #ffeb3b 25%, #ff9800 55%, #ff5722 85%, transparent 100%)',
-              filter: `blur(${0.4 + intensity * 0.03}px)`,
-              boxShadow: `0 0 ${12 + intensity * 0.6}px ${4 + intensity * 0.25}px rgba(255,152,0,0.55)`,
+              filter: `blur(${0.4 + intensity * 0.025}px)`,
+              boxShadow: `0 0 ${12 + intensity * 0.55}px ${4 + intensity * 0.22}px rgba(255,152,0,0.55)`,
             }}
           >
             <div
@@ -171,18 +228,38 @@ function LiveCandle({ onExtinguish, active }: { onExtinguish: () => void; active
   );
 }
 
-/* ───────────── Teeth Scene — center zone, 3 strokes, brush sound ───────────── */
-function TeethScene({ onSuccess, locked }: { onSuccess: () => void; locked: boolean }) {
+type ToolId = 'brush' | 'comb' | 'bed';
+
+/* ───────────── Teeth Scene ───────────── */
+function TeethScene({
+  onSuccess,
+  onFail,
+  locked,
+}: {
+  onSuccess: () => void;
+  onFail: () => void;
+  locked: boolean;
+}) {
   const [stage, setStage] = useState(0);
   const [holding, setHolding] = useState(false);
   const [brushPos, setBrushPos] = useState<{ x: number; y: number } | null>(null);
   const lastY = useRef(0);
   const strokes = useRef(0);
-  const faceRef = useRef<HTMLDivElement>(null);
-  const lastSound = useRef(0);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const { pulse, stop } = useMotionSound(fircaSes);
 
   const imgs = [diskipkirlikapali, diskipkirli, diskirli, distemiz];
   const brushSrc = holding ? disfircasikullan : disfircasi;
+
+  const options = useMemo(
+    () =>
+      shuffle([
+        { id: 'brush' as ToolId, src: disfircasi },
+        { id: 'comb' as ToolId, src: tarakImg },
+        { id: 'bed' as ToolId, src: yatakImg },
+      ]),
+    []
+  );
 
   useEffect(() => {
     if (stage === 0) {
@@ -191,79 +268,104 @@ function TeethScene({ onSuccess, locked }: { onSuccess: () => void; locked: bool
     }
   }, [stage]);
 
+  useEffect(() => () => stop(), [stop]);
+
   const inTeethZone = (cx: number, cy: number) => {
-    const el = faceRef.current;
+    const el = imgRef.current;
     if (!el) return false;
     const r = el.getBoundingClientRect();
+    if (r.width < 8 || r.height < 8) return false;
     const nx = (cx - r.left) / r.width;
     const ny = (cy - r.top) / r.height;
-    return nx >= 0.25 && nx <= 0.75 && ny >= 0.28 && ny <= 0.72;
+    return nx >= 0.34 && nx <= 0.66 && ny >= 0.42 && ny <= 0.62;
   };
 
   const onBrushMove = (cx: number, cy: number) => {
     if (locked || stage < 1 || stage >= 3) return;
-    if (!inTeethZone(cx, cy)) return;
+    if (!inTeethZone(cx, cy)) {
+      stop();
+      return;
+    }
 
     const dy = Math.abs(cy - lastY.current);
-    if (dy > 14) {
+    if (dy > 16) {
       strokes.current += 1;
       lastY.current = cy;
+      pulse();
 
-      const now = Date.now();
-      if (now - lastSound.current > 280) {
-        lastSound.current = now;
-        playFx(fircaSes);
-      }
-
-      if (strokes.current >= 3 && stage === 1) {
+      if (strokes.current >= 8 && stage === 1) {
         setStage(2);
         strokes.current = 0;
+        stop();
         playFx(onaySes);
-      } else if (strokes.current >= 3 && stage === 2) {
+      } else if (strokes.current >= 8 && stage === 2) {
         setStage(3);
+        stop();
         playFx(onaySes);
         setTimeout(() => onSuccess(), 600);
       }
     }
   };
 
+  const endHold = () => {
+    setHolding(false);
+    setBrushPos(null);
+    stop();
+  };
+
   return (
     <div className="flex flex-col items-center h-full w-full relative">
-      <div ref={faceRef} className="flex-1 flex items-center justify-center w-full px-4">
-        <img src={imgs[stage]} alt="" className="max-h-[42vh] w-auto object-contain drop-shadow-xl" draggable={false} />
+      <div className="flex-1 flex items-center justify-center w-full px-4">
+        <img
+          ref={imgRef}
+          src={imgs[stage]}
+          alt=""
+          className="max-h-[42vh] w-auto object-contain drop-shadow-xl"
+          draggable={false}
+        />
       </div>
-      <div className="shrink-0 flex items-center justify-center gap-6 pb-6 pt-2">
-        <div
-          className={`w-24 h-24 rounded-2xl border-2 flex items-center justify-center touch-none ${
-            holding ? 'border-emerald-400 bg-emerald-500/10 opacity-40' : 'border-slate-600 bg-slate-800'
-          }`}
-          onPointerDown={(e) => {
-            if (locked || stage < 1 || stage >= 3) return;
-            e.preventDefault();
-            (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-            setHolding(true);
-            lastY.current = e.clientY;
-            setBrushPos({ x: e.clientX, y: e.clientY });
-          }}
-          onPointerMove={(e) => {
-            if (!holding) return;
-            setBrushPos({ x: e.clientX, y: e.clientY });
-            onBrushMove(e.clientX, e.clientY);
-          }}
-          onPointerUp={() => { setHolding(false); setBrushPos(null); }}
-          onPointerCancel={() => { setHolding(false); setBrushPos(null); }}
-        >
-          <img src={disfircasi} alt="" className="w-16 h-16 object-contain pointer-events-none" draggable={false} />
-        </div>
-        <div className="w-20 h-20 rounded-2xl border-2 border-slate-700 bg-slate-800/60 flex items-center justify-center opacity-50">
-          <span className="text-3xl">🥄</span>
-        </div>
-        <div className="w-20 h-20 rounded-2xl border-2 border-slate-700 bg-slate-800/60 flex items-center justify-center opacity-50">
-          <span className="text-3xl">🪥</span>
-        </div>
+      <div className="shrink-0 flex items-center justify-center gap-4 pb-6 pt-2 px-2">
+        {options.map((opt) => {
+          const isCorrect = opt.id === 'brush';
+          const isHoldingThis = holding && isCorrect;
+          return (
+            <div
+              key={opt.id}
+              className={`w-24 h-24 rounded-2xl border-2 flex items-center justify-center touch-none ${
+                isHoldingThis
+                  ? 'border-emerald-400 bg-emerald-500/10 opacity-40'
+                  : 'border-slate-600 bg-slate-800'
+              }`}
+              onPointerDown={(e) => {
+                if (locked || stage < 1 || stage >= 3) return;
+                e.preventDefault();
+                if (!isCorrect) {
+                  onFail();
+                  return;
+                }
+                (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+                setHolding(true);
+                lastY.current = e.clientY;
+                setBrushPos({ x: e.clientX, y: e.clientY });
+              }}
+              onPointerMove={(e) => {
+                if (!holding || !isCorrect) return;
+                setBrushPos({ x: e.clientX, y: e.clientY });
+                onBrushMove(e.clientX, e.clientY);
+              }}
+              onPointerUp={endHold}
+              onPointerCancel={endHold}
+            >
+              <img src={opt.src} alt="" className="w-16 h-16 object-contain pointer-events-none" draggable={false} />
+            </div>
+          );
+        })}
       </div>
       {brushPos && (
-        <div className="fixed z-[90] pointer-events-none" style={{ left: brushPos.x, top: brushPos.y, transform: 'translate(-50%, -50%)' }}>
+        <div
+          className="fixed z-[90] pointer-events-none"
+          style={{ left: brushPos.x, top: brushPos.y, transform: 'translate(-50%, -50%)' }}
+        >
           <img src={brushSrc} alt="" className="w-20 h-20 object-contain drop-shadow-2xl" draggable={false} />
         </div>
       )}
@@ -271,92 +373,135 @@ function TeethScene({ onSuccess, locked }: { onSuccess: () => void; locked: bool
   );
 }
 
-/* ───────────── Hair Scene — upper zone only, 3 strokes, comb sound ───────────── */
-function HairScene({ onSuccess, locked }: { onSuccess: () => void; locked: boolean }) {
+/* ───────────── Hair Scene ───────────── */
+function HairScene({
+  onSuccess,
+  onFail,
+  locked,
+}: {
+  onSuccess: () => void;
+  onFail: () => void;
+  locked: boolean;
+}) {
   const [stage, setStage] = useState(0);
   const [holding, setHolding] = useState(false);
   const [combPos, setCombPos] = useState<{ x: number; y: number } | null>(null);
   const lastX = useRef(0);
   const strokes = useRef(0);
-  const headRef = useRef<HTMLDivElement>(null);
-  const lastSound = useRef(0);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const { pulse, stop } = useMotionSound(sacTaramaSes);
 
   const imgs = [sacdapdaginik, sacdaginik, sacduzgun];
   const combSrc = holding ? tarakkullan : tarakImg;
 
+  const options = useMemo(
+    () =>
+      shuffle([
+        { id: 'comb' as ToolId, src: tarakImg },
+        { id: 'brush' as ToolId, src: disfircasi },
+        { id: 'bed' as ToolId, src: yatakImg },
+      ]),
+    []
+  );
+
+  useEffect(() => () => stop(), [stop]);
+
   const inHairZone = (cx: number, cy: number) => {
-    const el = headRef.current;
+    const el = imgRef.current;
     if (!el) return false;
     const r = el.getBoundingClientRect();
+    if (r.width < 8 || r.height < 8) return false;
     const nx = (cx - r.left) / r.width;
     const ny = (cy - r.top) / r.height;
-    return nx >= 0.1 && nx <= 0.9 && ny >= 0.02 && ny <= 0.55;
+    return nx >= 0.25 && nx <= 0.75 && ny >= 0.0 && ny <= 0.25;
   };
 
   const onCombMove = (cx: number, cy: number) => {
     if (locked || stage >= 2) return;
-    if (!inHairZone(cx, cy)) return;
+    if (!inHairZone(cx, cy)) {
+      stop();
+      return;
+    }
 
     const dx = Math.abs(cx - lastX.current);
-    if (dx > 16) {
+    if (dx > 36) {
       strokes.current += 1;
       lastX.current = cx;
+      pulse();
 
-      const now = Date.now();
-      if (now - lastSound.current > 300) {
-        lastSound.current = now;
-        playFx(sacTaramaSes);
-      }
-
-      if (strokes.current >= 3 && stage === 0) {
+      if (strokes.current >= 7 && stage === 0) {
         setStage(1);
         strokes.current = 0;
+        stop();
         playFx(onaySes);
-      } else if (strokes.current >= 3 && stage === 1) {
+      } else if (strokes.current >= 7 && stage === 1) {
         setStage(2);
+        stop();
         playFx(onaySes);
         setTimeout(() => onSuccess(), 600);
       }
     }
   };
 
+  const endHold = () => {
+    setHolding(false);
+    setCombPos(null);
+    stop();
+  };
+
   return (
     <div className="flex flex-col items-center h-full w-full relative">
-      <div ref={headRef} className="flex-1 flex items-center justify-center w-full px-4">
-        <img src={imgs[stage]} alt="" className="max-h-[42vh] w-auto object-contain drop-shadow-xl" draggable={false} />
+      <div className="flex-1 flex items-center justify-center w-full px-4">
+        <img
+          ref={imgRef}
+          src={imgs[stage]}
+          alt=""
+          className="max-h-[42vh] w-auto object-contain drop-shadow-xl"
+          draggable={false}
+        />
       </div>
-      <div className="shrink-0 flex items-center justify-center gap-6 pb-6 pt-2">
-        <div
-          className={`w-24 h-24 rounded-2xl border-2 flex items-center justify-center touch-none ${
-            holding ? 'border-emerald-400 bg-emerald-500/10 opacity-40' : 'border-slate-600 bg-slate-800'
-          }`}
-          onPointerDown={(e) => {
-            if (locked || stage >= 2) return;
-            e.preventDefault();
-            (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-            setHolding(true);
-            lastX.current = e.clientX;
-            setCombPos({ x: e.clientX, y: e.clientY });
-          }}
-          onPointerMove={(e) => {
-            if (!holding) return;
-            setCombPos({ x: e.clientX, y: e.clientY });
-            onCombMove(e.clientX, e.clientY);
-          }}
-          onPointerUp={() => { setHolding(false); setCombPos(null); }}
-          onPointerCancel={() => { setHolding(false); setCombPos(null); }}
-        >
-          <img src={tarakImg} alt="" className="w-16 h-16 object-contain pointer-events-none" draggable={false} />
-        </div>
-        <div className="w-20 h-20 rounded-2xl border-2 border-slate-700 bg-slate-800/60 flex items-center justify-center opacity-50">
-          <span className="text-3xl">🪥</span>
-        </div>
-        <div className="w-20 h-20 rounded-2xl border-2 border-slate-700 bg-slate-800/60 flex items-center justify-center opacity-50">
-          <span className="text-3xl">🥄</span>
-        </div>
+      <div className="shrink-0 flex items-center justify-center gap-4 pb-6 pt-2 px-2">
+        {options.map((opt) => {
+          const isCorrect = opt.id === 'comb';
+          const isHoldingThis = holding && isCorrect;
+          return (
+            <div
+              key={opt.id}
+              className={`w-24 h-24 rounded-2xl border-2 flex items-center justify-center touch-none ${
+                isHoldingThis
+                  ? 'border-emerald-400 bg-emerald-500/10 opacity-40'
+                  : 'border-slate-600 bg-slate-800'
+              }`}
+              onPointerDown={(e) => {
+                if (locked || stage >= 2) return;
+                e.preventDefault();
+                if (!isCorrect) {
+                  onFail();
+                  return;
+                }
+                (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+                setHolding(true);
+                lastX.current = e.clientX;
+                setCombPos({ x: e.clientX, y: e.clientY });
+              }}
+              onPointerMove={(e) => {
+                if (!holding || !isCorrect) return;
+                setCombPos({ x: e.clientX, y: e.clientY });
+                onCombMove(e.clientX, e.clientY);
+              }}
+              onPointerUp={endHold}
+              onPointerCancel={endHold}
+            >
+              <img src={opt.src} alt="" className="w-16 h-16 object-contain pointer-events-none" draggable={false} />
+            </div>
+          );
+        })}
       </div>
       {combPos && (
-        <div className="fixed z-[90] pointer-events-none" style={{ left: combPos.x, top: combPos.y, transform: 'translate(-50%, -50%)' }}>
+        <div
+          className="fixed z-[90] pointer-events-none"
+          style={{ left: combPos.x, top: combPos.y, transform: 'translate(-50%, -50%)' }}
+        >
           <img src={combSrc} alt="" className="w-20 h-20 object-contain drop-shadow-2xl" draggable={false} />
         </div>
       )}
@@ -364,13 +509,31 @@ function HairScene({ onSuccess, locked }: { onSuccess: () => void; locked: boole
   );
 }
 
-/* ───────────── Sleep Scene — 4s normal, yawn + sound, back ───────────── */
-function SleepScene({ onSuccess, locked }: { onSuccess: () => void; locked: boolean }) {
+/* ───────────── Sleep Scene — 10s normal between yawns ───────────── */
+function SleepScene({
+  onSuccess,
+  onFail,
+  locked,
+}: {
+  onSuccess: () => void;
+  onFail: () => void;
+  locked: boolean;
+}) {
   const [done, setDone] = useState(false);
   const [yawning, setYawning] = useState(false);
   const [holding, setHolding] = useState(false);
   const [bedPos, setBedPos] = useState<{ x: number; y: number } | null>(null);
-  const childRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  const options = useMemo(
+    () =>
+      shuffle([
+        { id: 'bed' as ToolId, src: yatakImg },
+        { id: 'brush' as ToolId, src: disfircasi },
+        { id: 'comb' as ToolId, src: tarakImg },
+      ]),
+    []
+  );
 
   useEffect(() => {
     if (done) return;
@@ -387,7 +550,7 @@ function SleepScene({ onSuccess, locked }: { onSuccess: () => void; locked: bool
           setYawning(false);
           loop();
         }, 1200);
-      }, 4000);
+      }, 10000);
     };
     loop();
 
@@ -398,8 +561,8 @@ function SleepScene({ onSuccess, locked }: { onSuccess: () => void; locked: bool
   }, [done]);
 
   const checkDrop = (cx: number, cy: number) => {
-    if (!childRef.current || locked || done) return;
-    const r = childRef.current.getBoundingClientRect();
+    if (!imgRef.current || locked || done) return;
+    const r = imgRef.current.getBoundingClientRect();
     if (cx >= r.left - 20 && cx <= r.right + 20 && cy >= r.top - 20 && cy <= r.bottom + 20) {
       setDone(true);
       playFx(onaySes);
@@ -409,56 +572,70 @@ function SleepScene({ onSuccess, locked }: { onSuccess: () => void; locked: bool
 
   return (
     <div className="flex flex-col items-center h-full w-full relative">
-      <div ref={childRef} className="flex-1 flex items-center justify-center w-full px-4">
+      <div className="flex-1 flex items-center justify-center w-full px-4">
         <img
+          ref={imgRef}
           src={done ? yataktauyuyan : yawning ? uykuluesne : uykuluesne2}
           alt=""
           className="max-h-[42vh] w-auto object-contain drop-shadow-xl transition-opacity duration-200"
           draggable={false}
         />
       </div>
-      <div className="shrink-0 flex items-center justify-center gap-6 pb-6 pt-2">
-        <div
-          className={`w-28 h-24 rounded-2xl border-2 flex items-center justify-center touch-none ${
-            holding || done ? 'border-emerald-400 bg-emerald-500/10 opacity-40' : 'border-slate-600 bg-slate-800'
-          }`}
-          onPointerDown={(e) => {
-            if (locked || done) return;
-            e.preventDefault();
-            (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-            setHolding(true);
-            setBedPos({ x: e.clientX, y: e.clientY });
-          }}
-          onPointerMove={(e) => {
-            if (!holding) return;
-            setBedPos({ x: e.clientX, y: e.clientY });
-          }}
-          onPointerUp={(e) => {
-            if (holding) checkDrop(e.clientX, e.clientY);
-            setHolding(false);
-            setBedPos(null);
-          }}
-          onPointerCancel={() => { setHolding(false); setBedPos(null); }}
-        >
-          <img src={yatakImg} alt="" className="w-20 h-16 object-contain pointer-events-none" draggable={false} />
-        </div>
-        <div className="w-20 h-20 rounded-2xl border-2 border-slate-700 bg-slate-800/60 flex items-center justify-center opacity-50">
-          <span className="text-3xl">🧸</span>
-        </div>
-        <div className="w-20 h-20 rounded-2xl border-2 border-slate-700 bg-slate-800/60 flex items-center justify-center opacity-50">
-          <span className="text-3xl">🥄</span>
-        </div>
+      <div className="shrink-0 flex items-center justify-center gap-4 pb-6 pt-2 px-2">
+        {options.map((opt) => {
+          const isCorrect = opt.id === 'bed';
+          const isHoldingThis = (holding || done) && isCorrect;
+          return (
+            <div
+              key={opt.id}
+              className={`w-24 h-24 rounded-2xl border-2 flex items-center justify-center touch-none ${
+                isHoldingThis
+                  ? 'border-emerald-400 bg-emerald-500/10 opacity-40'
+                  : 'border-slate-600 bg-slate-800'
+              }`}
+              onPointerDown={(e) => {
+                if (locked || done) return;
+                e.preventDefault();
+                if (!isCorrect) {
+                  onFail();
+                  return;
+                }
+                (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+                setHolding(true);
+                setBedPos({ x: e.clientX, y: e.clientY });
+              }}
+              onPointerMove={(e) => {
+                if (!holding || !isCorrect) return;
+                setBedPos({ x: e.clientX, y: e.clientY });
+              }}
+              onPointerUp={(e) => {
+                if (holding && isCorrect) checkDrop(e.clientX, e.clientY);
+                setHolding(false);
+                setBedPos(null);
+              }}
+              onPointerCancel={() => {
+                setHolding(false);
+                setBedPos(null);
+              }}
+            >
+              <img src={opt.src} alt="" className="w-16 h-16 object-contain pointer-events-none" draggable={false} />
+            </div>
+          );
+        })}
       </div>
       {bedPos && (
-        <div className="fixed z-[90] pointer-events-none" style={{ left: bedPos.x, top: bedPos.y, transform: 'translate(-50%, -50%)' }}>
-          <img src={yatakImg} alt="" className="w-24 h-20 object-contain drop-shadow-2xl" draggable={false} />
+        <div
+          className="fixed z-[90] pointer-events-none"
+          style={{ left: bedPos.x, top: bedPos.y, transform: 'translate(-50%, -50%)' }}
+        >
+          <img src={yatakImg} alt="" className="w-20 h-16 object-contain drop-shadow-2xl" draggable={false} />
         </div>
       )}
     </div>
   );
 }
 
-/* ───────────── Main Component ───────────── */
+/* ───────────── Main ───────────── */
 interface Yonerge13Props {
   itemCode?: string;
   itemText?: string;
@@ -569,9 +746,27 @@ export default function Yonerge13({
               </div>
             )}
 
-            {trial.type === 'teeth' && <TeethScene locked={locked} onSuccess={() => finishTrial(true)} />}
-            {trial.type === 'hair' && <HairScene locked={locked} onSuccess={() => finishTrial(true)} />}
-            {trial.type === 'sleep' && <SleepScene locked={locked} onSuccess={() => finishTrial(true)} />}
+            {trial.type === 'teeth' && (
+              <TeethScene
+                locked={locked}
+                onSuccess={() => finishTrial(true)}
+                onFail={() => finishTrial(false)}
+              />
+            )}
+            {trial.type === 'hair' && (
+              <HairScene
+                locked={locked}
+                onSuccess={() => finishTrial(true)}
+                onFail={() => finishTrial(false)}
+              />
+            )}
+            {trial.type === 'sleep' && (
+              <SleepScene
+                locked={locked}
+                onSuccess={() => finishTrial(true)}
+                onFail={() => finishTrial(false)}
+              />
+            )}
 
             {trial.type === 'teacher' && (
               <div className="flex-1 flex items-center justify-center px-6">
