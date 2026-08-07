@@ -146,19 +146,38 @@ function evaluateStroke(stroke: Pt[], task: DigitalTask, w: number, h: number): 
     return covered >= Math.ceil(pathPx.length * 0.7);
   }
 
-  if ((task.kind === 'sequence' || task.kind === 'shape') && task.points && task.points.length >= 2) {
+  if (task.kind === 'sequence' && task.points && task.points.length >= 2) {
     const pts = task.points.map((p) => toPx(p, w, h));
     let idx = 0;
     for (const p of stroke) {
       if (idx < pts.length && dist(p, pts[idx]) <= tol * 1.2) idx++;
     }
-    if (task.kind === 'shape') {
-      const last = stroke[stroke.length - 1];
-      const closeToStart = dist(last, pts[0]) <= tol * 1.3;
-      const closeToLast = dist(last, pts[pts.length - 1]) <= tol * 1.3;
-      return idx >= pts.length - 1 && (closeToStart || closeToLast);
-    }
     return idx >= pts.length;
+  }
+
+  if (task.kind === 'shape' && task.points && task.points.length >= 3) {
+    const pts = task.points.map((p) => toPx(p, w, h));
+    const n = pts.length;
+    const orders: Pt[][] = [];
+    for (let start = 0; start < n; start++) {
+      const cw: Pt[] = [];
+      const ccw: Pt[] = [];
+      for (let i = 0; i < n; i++) {
+        cw.push(pts[(start + i) % n]);
+        ccw.push(pts[(start - i + n * 10) % n]);
+      }
+      orders.push(cw, ccw);
+    }
+    const hitOrder = (order: Pt[]) => {
+      let idx = 0;
+      for (const p of stroke) {
+        if (idx < order.length && dist(p, order[idx]) <= tol * 1.25) idx++;
+      }
+      if (idx < order.length) return false;
+      const last = stroke[stroke.length - 1];
+      return dist(last, order[0]) <= tol * 1.4 || dist(last, order[order.length - 1]) <= tol * 1.4;
+    };
+    return orders.some(hitOrder);
   }
 
   return false;
@@ -313,11 +332,15 @@ function DrawCanvas({ task, locked, onSuccess, onFail }: { task: DigitalTask; lo
     if (!c || evaluatedRef.current || locked) return;
     const cssW = c.getBoundingClientRect().width;
     const cssH = c.getBoundingClientRect().height;
-    const ok = evaluateStroke(strokeRef.current, task, cssW, cssH);
+    const stroke = strokeRef.current;
+    if (stroke.length < 8) return;
+    const ok = evaluateStroke(stroke, task, cssW, cssH);
+    evaluatedRef.current = true;
     if (ok) {
-      evaluatedRef.current = true;
       playFx(onaySes);
       setTimeout(() => onSuccess(), 450);
+    } else {
+      setTimeout(() => onFail(), 350);
     }
   };
 
