@@ -207,23 +207,22 @@ function LiveCandle({ onExtinguish, onFail, active }: { onExtinguish: () => void
           let sum = 0;
           for (let i = 0; i < td.length; i++) { const v = (td[i] - 128) / 128; sum += v * v; }
           const rms = Math.sqrt(sum / td.length);
-          // Orta hassasiyet: üfleme kolay, AA zor
-          let isBlow = rms > 0.04 && zcr > 0.10 && high > 0.025;
-          if (low > high * 1.6) isBlow = false;
-          if (zcr < 0.09) isBlow = false;
-          if (highRatio < 0.28) isBlow = false;
+          // Mobil mic: üfleme mid/düşük bantta gelir. Yüksek frekans şartı yok.
+          // AA = düşük frekans baskın + düşük ZCR → reddet. Diğer güçlü ses = üfleme.
+          const isVoiceLike = low > high * 2.4 && zcr < 0.11 && high < 0.035;
+          const isBlow = rms > 0.025 && !isVoiceLike;
           if (isBlow) {
-            blowAccum.current += rms * 1.6 + high * 1.1;
-            const blowAmount = Math.min(55, rms * 100 + high * 40);
+            blowAccum.current += rms * 2.4 + Math.max(0, high) * 0.8;
+            const blowAmount = Math.min(55, rms * 110 + high * 30);
             setIntensity((v) => Math.max(v, blowAmount));
             if (flameRef.current) {
               const rot = -10 - rms * 50 + (Math.random() - 0.5) * 12;
               flameRef.current.animate([{ transform: `translateX(-50%) rotate(${rot}deg) scaleY(${Math.max(0.35, 1 - rms)})` }], { duration: 45, fill: 'forwards' });
             }
           } else {
-            blowAccum.current = Math.max(0, blowAccum.current * 0.7);
+            blowAccum.current = Math.max(0, blowAccum.current * 0.72);
           }
-          if (blowAccum.current > 2.0) doExtinguish();
+          if (blowAccum.current > 1.15) doExtinguish();
           raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
