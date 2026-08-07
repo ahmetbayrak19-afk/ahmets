@@ -207,15 +207,13 @@ function LiveCandle({ onExtinguish, onFail, active }: { onExtinguish: () => void
           let sum = 0;
           for (let i = 0; i < td.length; i++) { const v = (td[i] - 128) / 128; sum += v * v; }
           const rms = Math.sqrt(sum / td.length);
-          // Üfleme = gürültü (yüksek ZCR + yüksek frekans). "aaa" = düşük ZCR + düşük frekans → reddet
-          const isBlow =
-            rms > 0.055 &&
-            zcr > 0.18 &&
-            highRatio > 0.55 &&
-            high > 0.055 &&
-            low < high * 0.95;
+          // Orta hassasiyet: üfleme kolay, AA zor
+          let isBlow = rms > 0.04 && zcr > 0.10 && high > 0.025;
+          if (low > high * 1.6) isBlow = false;
+          if (zcr < 0.09) isBlow = false;
+          if (highRatio < 0.28) isBlow = false;
           if (isBlow) {
-            blowAccum.current += rms * 1.2 + high * 0.9;
+            blowAccum.current += rms * 1.6 + high * 1.1;
             const blowAmount = Math.min(55, rms * 100 + high * 40);
             setIntensity((v) => Math.max(v, blowAmount));
             if (flameRef.current) {
@@ -223,9 +221,9 @@ function LiveCandle({ onExtinguish, onFail, active }: { onExtinguish: () => void
               flameRef.current.animate([{ transform: `translateX(-50%) rotate(${rot}deg) scaleY(${Math.max(0.35, 1 - rms)})` }], { duration: 45, fill: 'forwards' });
             }
           } else {
-            blowAccum.current = Math.max(0, blowAccum.current * 0.65);
+            blowAccum.current = Math.max(0, blowAccum.current * 0.7);
           }
-          if (blowAccum.current > 3.5) doExtinguish();
+          if (blowAccum.current > 2.0) doExtinguish();
           raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
