@@ -21,6 +21,7 @@ import Yonerge10 from '@/aba/yonerge/yonerge10';
 import Yonerge11 from '@/aba/yonerge/yonerge11';
 import Yonerge12 from '@/aba/yonerge/yonerge12';
 import Yonerge13 from '@/aba/yonerge/yonerge13';
+import Yonerge15 from '@/aba/yonerge/yonerge15';
 import Yonerge16 from '@/aba/yonerge/yonerge16';
 
 interface YonergeTakipPageProps {
@@ -142,6 +143,9 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
     if (activeItem.includes("4.2")) {
         return <Yonerge13 itemCode={code} itemText={text} onClose={() => setActiveItem(null)} onComplete={handleSessionSave} />;
     }
+    if (activeItem.includes("4.4")) {
+        return <Yonerge15 itemCode={code} itemText={text} onClose={() => setActiveItem(null)} onComplete={handleSessionSave} />;
+    }
     if (activeItem.includes("4.5")) {
         return <Yonerge16 itemCode={code} itemText={text} onClose={() => setActiveItem(null)} onComplete={handleSessionSave} />;
     }
@@ -192,6 +196,7 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
                 item.includes("3.6") ||
                 item.includes("4.1") ||
                 item.includes("4.2") ||
+                item.includes("4.4") ||
                 item.includes("4.5");
 
             return (
