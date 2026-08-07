@@ -90,7 +90,6 @@ function shuffle<T>(arr: T[]): T[] {
 function useMotionSound(src: string) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   useEffect(() => {
     const a = new Audio(src);
     a.loop = true;
@@ -104,30 +103,23 @@ function useMotionSound(src: string) {
       audioRef.current = null;
     };
   }, [src]);
-
   const start = useCallback(() => {
-    if (idleTimer.current) {
-      clearTimeout(idleTimer.current);
-      idleTimer.current = null;
-    }
+    if (idleTimer.current) { clearTimeout(idleTimer.current); idleTimer.current = null; }
     const a = audioRef.current;
     if (!a) return;
     if (a.paused) a.play().catch(() => {});
   }, []);
-
   const stop = useCallback(() => {
     const a = audioRef.current;
     if (!a) return;
     a.pause();
     try { a.currentTime = 0; } catch { /* */ }
   }, []);
-
   const pulse = useCallback(() => {
     start();
     if (idleTimer.current) clearTimeout(idleTimer.current);
     idleTimer.current = setTimeout(() => stop(), 180);
   }, [start, stop]);
-
   return { pulse, stop };
 }
 
@@ -136,8 +128,10 @@ function LiveCandle({ onExtinguish, active }: { onExtinguish: () => void; active
   const totalShake = useRef(0);
   const blowAccum = useRef(0);
   const extinguished = useRef(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const [gone, setGone] = useState(false);
   const [intensity, setIntensity] = useState(0);
+  const [micOn, setMicOn] = useState(false);
 
   const doExtinguish = useCallback(() => {
     if (extinguished.current) return;
@@ -156,10 +150,7 @@ function LiveCandle({ onExtinguish, active }: { onExtinguish: () => void; active
       const mag = Math.hypot(a.x || 0, a.y || 0, a.z || 0);
       const shake = Math.max(0, mag - 9.6);
       const now = Date.now();
-      if (shake < 0.35) {
-        setIntensity((v) => Math.max(0, v * 0.9));
-        return;
-      }
+      if (shake < 0.35) { setIntensity((v) => Math.max(0, v * 0.9)); return; }
       if (now - last < 30) return;
       last = now;
       const amount = Math.min(58, 14 + shake * 11);
@@ -188,125 +179,115 @@ function LiveCandle({ onExtinguish, active }: { onExtinguish: () => void; active
   useEffect(() => {
     if (!active || extinguished.current) return;
     let stream: MediaStream | null = null;
-    let ctx: AudioContext | null = null;
     let raf = 0;
     let cancelled = false;
 
-    const start = async () => {
+    const startMic = async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-          video: false,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
         const AC = window.AudioContext || (window as any).webkitAudioContext;
-        ctx = new AC();
+        const ctx: AudioContext = new AC();
+        audioCtxRef.current = ctx;
         if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
         const source = ctx.createMediaStreamSource(stream);
         const analyser = ctx.createAnalyser();
-        analyser.fftSize = 512;
-        analyser.smoothingTimeConstant = 0.3;
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.2;
         source.connect(analyser);
-        const data = new Uint8Array(analyser.fftSize);
+        const td = new Uint8Array(analyser.fftSize);
+        const fd = new Uint8Array(analyser.frequencyBinCount);
+        setMicOn(true);
 
         const tick = () => {
           if (cancelled || extinguished.current) return;
-          analyser.getByteTimeDomainData(data);
+          if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+          analyser.getByteTimeDomainData(td);
+          analyser.getByteFrequencyData(fd);
           let sum = 0;
-          for (let i = 0; i < data.length; i++) {
-            const v = (data[i] - 128) / 128;
+          for (let i = 0; i < td.length; i++) {
+            const v = (td[i] - 128) / 128;
             sum += v * v;
           }
-          const rms = Math.sqrt(sum / data.length);
-          if (rms > 0.12) {
-            blowAccum.current += rms;
-            const blowAmount = Math.min(50, rms * 80);
+          const rms = Math.sqrt(sum / td.length);
+          let mid = 0;
+          const n = fd.length;
+          for (let i = Math.floor(n * 0.05); i < Math.floor(n * 0.5); i++) mid += fd[i];
+          mid = mid / (n * 0.45) / 255;
+          const level = Math.max(rms, mid * 0.8);
+          if (level > 0.045) {
+            blowAccum.current += level * 1.4;
+            const blowAmount = Math.min(55, level * 120);
             setIntensity((v) => Math.max(v, blowAmount));
             if (flameRef.current) {
-              const rot = -8 - rms * 40 + (Math.random() - 0.5) * 10;
+              const rot = -10 - level * 55 + (Math.random() - 0.5) * 12;
               flameRef.current.animate(
-                [{ transform: `translateX(-50%) rotate(${rot}deg) scaleY(${Math.max(0.4, 1 - rms)})` }],
-                { duration: 50, fill: 'forwards' }
+                [{ transform: `translateX(-50%) rotate(${rot}deg) scaleY(${Math.max(0.35, 1 - level * 1.2)})` }],
+                { duration: 45, fill: 'forwards' }
               );
             }
           } else {
-            blowAccum.current = Math.max(0, blowAccum.current * 0.85);
+            blowAccum.current = Math.max(0, blowAccum.current * 0.82);
           }
-          if (blowAccum.current > 4.5) doExtinguish();
+          if (blowAccum.current > 2.2) doExtinguish();
           raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
       } catch (e) {
         console.log('Mic / üfleme izni yok veya hata:', e);
+        setMicOn(false);
       }
     };
-    start();
+    startMic();
+
+    const unlock = () => {
+      const ctx = audioCtxRef.current;
+      if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+    };
+    window.addEventListener('touchstart', unlock, { passive: true });
+    window.addEventListener('pointerdown', unlock);
 
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
-      try { ctx?.close(); } catch { /* */ }
+      window.removeEventListener('touchstart', unlock);
+      window.removeEventListener('pointerdown', unlock);
+      try { audioCtxRef.current?.close(); } catch { /* */ }
+      audioCtxRef.current = null;
       stream?.getTracks().forEach((t) => t.stop());
+      setMicOn(false);
     };
   }, [active, doExtinguish]);
 
   return (
     <div className="relative w-full max-w-sm mx-auto aspect-[3/4] max-h-[52vh]">
-      <img
-        src={eliyanancocuk}
-        alt=""
-        className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
-        draggable={false}
-      />
-      <div
-        className="absolute z-10"
-        style={{ left: '11%', top: '46%', transform: 'translate(-50%, 0)' }}
-      >
+      <img src={eliyanancocuk} alt="" className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none" draggable={false} />
+      <div className="absolute z-10" style={{ left: '9%', top: '58%', transform: 'translate(-50%, 0)' }}>
         <div className="relative flex flex-col items-center" style={{ width: 36 }}>
           {!gone && (
-            <div
-              ref={flameRef}
-              className="absolute bottom-[52px] left-1/2"
-              style={{ transform: 'translateX(-50%)', transformOrigin: '50% 100%' }}
-            >
-              <div
-                className="w-5 h-9 rounded-[50%_50%_40%_40%] relative"
-                style={{
-                  background: 'radial-gradient(ellipse at 50% 80%, #fff9c4 0%, #ffeb3b 25%, #ff9800 55%, #ff5722 85%, transparent 100%)',
-                  filter: `blur(${0.3 + intensity * 0.02}px)`,
-                  boxShadow: `0 0 ${10 + intensity * 0.5}px ${3 + intensity * 0.2}px rgba(255,152,0,0.55)`,
-                }}
-              >
-                <div
-                  className="absolute left-1/2 -translate-x-1/2 bottom-0.5 w-2.5 h-4 rounded-[50%_50%_40%_40%]"
-                  style={{ background: 'radial-gradient(ellipse at 50% 90%, #fffde7 0%, #fff59d 40%, transparent 80%)' }}
-                />
+            <div ref={flameRef} className="absolute bottom-[52px] left-1/2" style={{ transform: 'translateX(-50%)', transformOrigin: '50% 100%' }}>
+              <div className="w-5 h-9 rounded-[50%_50%_40%_40%] relative" style={{
+                background: 'radial-gradient(ellipse at 50% 80%, #fff9c4 0%, #ffeb3b 25%, #ff9800 55%, #ff5722 85%, transparent 100%)',
+                filter: `blur(${0.3 + intensity * 0.02}px)`,
+                boxShadow: `0 0 ${10 + intensity * 0.5}px ${3 + intensity * 0.2}px rgba(255,152,0,0.55)`,
+              }}>
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-0.5 w-2.5 h-4 rounded-[50%_50%_40%_40%]" style={{ background: 'radial-gradient(ellipse at 50% 90%, #fffde7 0%, #fff59d 40%, transparent 80%)' }} />
               </div>
             </div>
           )}
-          {!gone && (
-            <div className="absolute bottom-[48px] left-1/2 -translate-x-1/2 w-0.5 h-2.5 bg-slate-800 rounded-t-sm z-10" />
-          )}
-          <div
-            className="w-6 h-14 rounded-t-md relative z-0 mt-8"
-            style={{
-              background: 'linear-gradient(90deg, #f5e6c8 0%, #fff8e7 40%, #e8d5a3 100%)',
-              boxShadow: 'inset -3px 0 6px rgba(0,0,0,0.12)',
-            }}
-          >
+          {!gone && <div className="absolute bottom-[48px] left-1/2 -translate-x-1/2 w-0.5 h-2.5 bg-slate-800 rounded-t-sm z-10" />}
+          <div className="w-6 h-14 rounded-t-md relative z-0 mt-8" style={{ background: 'linear-gradient(90deg, #f5e6c8 0%, #fff8e7 40%, #e8d5a3 100%)', boxShadow: 'inset -3px 0 6px rgba(0,0,0,0.12)' }}>
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-amber-100/80 rounded-t-md" />
           </div>
           <div className="w-9 h-2 bg-amber-900/70 rounded-b-md -mt-0.5" />
-          {gone && (
-            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-bold text-emerald-400 animate-pulse whitespace-nowrap">
-              Söndü!
-            </div>
-          )}
+          {gone && <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-bold text-emerald-400 animate-pulse whitespace-nowrap">Söndü!</div>}
         </div>
       </div>
+      {active && !gone && (
+        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-slate-500">
+          {micOn ? '🎤 Üfle veya salla' : '🎤 Mikrofon açılıyor…'}
+        </div>
+      )}
     </div>
   );
 }
@@ -328,7 +309,6 @@ function TeethScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
     { id: 'comb' as ToolId, src: tarakImg },
     { id: 'bed' as ToolId, src: yatakImg },
   ]), []);
-
   useEffect(() => {
     if (stage === 0) {
       const t = setTimeout(() => setStage(1), 1200);
@@ -336,7 +316,6 @@ function TeethScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
     }
   }, [stage]);
   useEffect(() => () => stop(), [stop]);
-
   const inTeethZone = (cx: number, cy: number) => {
     const el = imgRef.current;
     if (!el) return false;
@@ -346,7 +325,6 @@ function TeethScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
     const ny = (cy - r.top) / r.height;
     return nx >= 0.34 && nx <= 0.66 && ny >= 0.42 && ny <= 0.62;
   };
-
   const onBrushMove = (cx: number, cy: number) => {
     if (locked || stage < 1 || stage >= 3) return;
     if (!inTeethZone(cx, cy)) { stop(); return; }
@@ -359,9 +337,7 @@ function TeethScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
       else if (strokes.current >= 8 && stage === 2) { setStage(3); stop(); playFx(onaySes); setTimeout(() => onSuccess(), 600); }
     }
   };
-
   const endHold = () => { setHolding(false); setBrushPos(null); stop(); };
-
   return (
     <div className="flex flex-col items-center h-full w-full relative">
       <div className="flex-1 flex items-center justify-center w-full px-4">
@@ -412,7 +388,6 @@ function HairScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFai
     { id: 'bed' as ToolId, src: yatakImg },
   ]), []);
   useEffect(() => () => stop(), [stop]);
-
   const inHairZone = (cx: number, cy: number) => {
     const el = imgRef.current;
     if (!el) return false;
@@ -422,7 +397,6 @@ function HairScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFai
     const ny = (cy - r.top) / r.height;
     return nx >= 0.25 && nx <= 0.75 && ny >= 0.0 && ny <= 0.25;
   };
-
   const onCombMove = (cx: number, cy: number) => {
     if (locked || stage >= 2) return;
     if (!inHairZone(cx, cy)) { stop(); return; }
@@ -435,9 +409,7 @@ function HairScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFai
       else if (strokes.current >= 7 && stage === 1) { setStage(2); stop(); playFx(onaySes); setTimeout(() => onSuccess(), 600); }
     }
   };
-
   const endHold = () => { setHolding(false); setCombPos(null); stop(); };
-
   return (
     <div className="flex flex-col items-center h-full w-full relative">
       <div className="flex-1 flex items-center justify-center w-full px-4">
@@ -482,13 +454,11 @@ function SleepScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
   const yawnAudioRef = useRef<HTMLAudioElement | null>(null);
   const waitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const doneRef = useRef(false);
-
   const options = useMemo(() => shuffle([
     { id: 'bed' as ToolId, src: yatakImg },
     { id: 'brush' as ToolId, src: disfircasi },
     { id: 'comb' as ToolId, src: tarakImg },
   ]), []);
-
   useEffect(() => {
     const a = new Audio(uykuluesniyorSes);
     a.preload = 'auto';
@@ -496,7 +466,6 @@ function SleepScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
     yawnAudioRef.current = a;
     return () => { a.pause(); a.src = ''; yawnAudioRef.current = null; };
   }, []);
-
   useEffect(() => {
     const b = bedRef.current;
     if (!b) return;
@@ -508,7 +477,6 @@ function SleepScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
     b.preload = 'auto';
     b.load();
   }, []);
-
   useEffect(() => {
     if (done) return;
     const v = yawnRef.current;
@@ -522,10 +490,7 @@ function SleepScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
     v.setAttribute('playsinline', 'true');
     v.setAttribute('webkit-playsinline', 'true');
     v.preload = 'auto';
-
-    const clearWait = () => {
-      if (waitTimerRef.current) { clearTimeout(waitTimerRef.current); waitTimerRef.current = null; }
-    };
+    const clearWait = () => { if (waitTimerRef.current) { clearTimeout(waitTimerRef.current); waitTimerRef.current = null; } };
     const stopYawnAudio = () => {
       const a = yawnAudioRef.current;
       if (!a) return;
@@ -554,12 +519,10 @@ function SleepScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
     else v.addEventListener('loadeddata', start, { once: true });
     return () => { clearWait(); v.removeEventListener('ended', onEnded); v.pause(); stopYawnAudio(); };
   }, [done]);
-
   const checkDrop = (cx: number, cy: number) => {
     if (!dropRef.current || locked || done) return;
     const r = dropRef.current.getBoundingClientRect();
     if (cx < r.left - 20 || cx > r.right + 20 || cy < r.top - 20 || cy > r.bottom + 20) return;
-
     doneRef.current = true;
     setDone(true);
     if (waitTimerRef.current) { clearTimeout(waitTimerRef.current); waitTimerRef.current = null; }
@@ -567,10 +530,8 @@ function SleepScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
     if (ya) { ya.pause(); try { ya.currentTime = 0; } catch { /* */ } }
     const yv = yawnRef.current;
     if (yv) { yv.pause(); try { yv.currentTime = 0; } catch { /* */ } }
-
     const bv = bedRef.current;
     if (!bv) { onSuccess(); return; }
-
     const finish = () => { bv.removeEventListener('ended', finish); onSuccess(); };
     bv.addEventListener('ended', finish);
     const playBed = () => {
@@ -580,10 +541,7 @@ function SleepScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
     if (bv.readyState >= 2) playBed();
     else bv.addEventListener('loadeddata', playBed, { once: true });
   };
-
-  const videoClass =
-    'max-h-[42vh] w-auto object-contain drop-shadow-xl rounded-xl bg-black pointer-events-none [&::-webkit-media-controls]:hidden [&::-webkit-media-controls-enclosure]:hidden [&::-webkit-media-controls-panel]:hidden [&::-webkit-media-controls-start-playback-button]:hidden [&::-webkit-media-controls-overlay-play-button]:hidden';
-
+  const videoClass = 'max-h-[42vh] w-auto object-contain drop-shadow-xl rounded-xl bg-black pointer-events-none [&::-webkit-media-controls]:hidden [&::-webkit-media-controls-enclosure]:hidden [&::-webkit-media-controls-panel]:hidden [&::-webkit-media-controls-start-playback-button]:hidden [&::-webkit-media-controls-overlay-play-button]:hidden';
   return (
     <div className="flex flex-col items-center h-full w-full relative">
       <div ref={dropRef} className="flex-1 flex items-center justify-center w-full px-4 relative">
