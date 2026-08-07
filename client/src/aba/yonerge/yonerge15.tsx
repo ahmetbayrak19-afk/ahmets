@@ -158,22 +158,24 @@ export default function Yonerge15({
 
       {phase === 'running' && trial && (
         <>
-          <div className="shrink-0 px-4 pt-4 pb-2 text-center">
-            <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">
-              Öğretmen · {SET_LABEL[trial.set]}
-            </p>
-            <h1 className="text-lg sm:text-2xl font-black leading-snug text-white">
-              {trial.text}
-            </h1>
-          </div>
-
-          <div className="flex-1 flex flex-col items-center justify-center px-6 gap-4">
-            <p className="text-base text-slate-300 text-center font-medium max-w-md">
-              Öğrenci söylenen alana gidip yönergeyi yerine getirsin.
-            </p>
-            <p className="text-sm text-slate-500 text-center">
-              5–10 saniye içinde bağımsız yaparsa doğru sayılır.
-            </p>
+          <div className="flex-1 flex flex-col items-center justify-center px-4 py-4 overflow-y-auto">
+            <div className="w-full max-w-3xl bg-slate-800/60 border-2 border-slate-700 rounded-[2rem] p-8 md:p-12 flex flex-col items-center shadow-2xl">
+              <span className="text-blue-400 font-bold tracking-widest uppercase mb-3 text-sm">
+                Öğrenciye söyleyin
+              </span>
+              <p className="text-[10px] text-slate-500 font-bold uppercase mb-4">
+                {SET_LABEL[trial.set]}
+              </p>
+              <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-center text-white leading-snug mb-6">
+                "{trial.text}"
+              </h1>
+              <p className="text-slate-400 text-sm text-center max-w-md">
+                Öğrenci söylenen alana gidip yönergeyi yerine getirsin.
+              </p>
+              <p className="text-slate-500 text-xs text-center mt-2">
+                5–10 saniye içinde bağımsız yaparsa doğru sayılır.
+              </p>
+            </div>
           </div>
 
           <div className="shrink-0 p-3 pb-5 border-t border-slate-800 bg-slate-900/95 flex gap-3 justify-center items-center">
