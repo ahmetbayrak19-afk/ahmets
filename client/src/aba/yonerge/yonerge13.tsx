@@ -20,14 +20,14 @@ import sacduzgun from './sesgorsel/yonerge13/sacduzgun.png';
 import tarakImg from './sesgorsel/yonerge13/tarak.png';
 import tarakkullan from './sesgorsel/yonerge13/tarakkullan.png';
 
-import uykuluesne from './sesgorsel/yonerge13/uykuluesne.png';
-import uykuluesne2 from './sesgorsel/yonerge13/uykuluesne2.png';
 import yatakImg from './sesgorsel/yonerge13/yatak.png';
-import yataktauyuyan from './sesgorsel/yonerge13/yataktauyuyan.png';
 
-import esnemeSes from './sesgorsel/yonerge13/esnemeses.mp3';
 import fircaSes from './sesgorsel/yonerge13/fircasesi.mp3';
 import sacTaramaSes from './sesgorsel/yonerge13/sactaramases.mp3';
+
+import uykuluesniyorVid from './sesgorsel/yonerge13/uykuluesniyor.mp4';
+import uykuluyatagayatanVid from './sesgorsel/yonerge13/uykuluyatagayatan.mp4';
+import uykuluesniyorSes from './sesgorsel/yonerge13/uykuluesniyor.mp3';
 
 const NEUTRAL_SOUNDS = [devametNotr, devamet2Notr, simdisiradakiNotr];
 
@@ -509,7 +509,7 @@ function HairScene({
   );
 }
 
-/* ───────────── Sleep Scene — 10s normal between yawns ───────────── */
+/* ───────────── Sleep Scene — video yawn loop + bed success video ───────────── */
 function SleepScene({
   onSuccess,
   onFail,
@@ -520,10 +520,13 @@ function SleepScene({
   locked: boolean;
 }) {
   const [done, setDone] = useState(false);
-  const [yawning, setYawning] = useState(false);
   const [holding, setHolding] = useState(false);
   const [bedPos, setBedPos] = useState<{ x: number; y: number } | null>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+  const yawnAudioRef = useRef<HTMLAudioElement | null>(null);
+  const waitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const doneRef = useRef(false);
 
   const options = useMemo(
     () =>
@@ -536,49 +539,137 @@ function SleepScene({
   );
 
   useEffect(() => {
-    if (done) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout>;
-
-    const loop = () => {
-      timer = setTimeout(() => {
-        if (cancelled) return;
-        setYawning(true);
-        playFx(esnemeSes);
-        timer = setTimeout(() => {
-          if (cancelled) return;
-          setYawning(false);
-          loop();
-        }, 1200);
-      }, 10000);
+    const a = new Audio(uykuluesniyorSes);
+    a.preload = 'auto';
+    a.volume = 1;
+    yawnAudioRef.current = a;
+    return () => {
+      a.pause();
+      a.src = '';
+      yawnAudioRef.current = null;
     };
-    loop();
+  }, []);
+
+  useEffect(() => {
+    if (done) return;
+    const v = videoRef.current;
+    if (!v) return;
+
+    doneRef.current = false;
+    v.src = uykuluesniyorVid;
+    v.muted = true;
+    v.playsInline = true;
+    v.setAttribute('playsinline', 'true');
+    v.setAttribute('webkit-playsinline', 'true');
+    v.preload = 'auto';
+
+    const clearWait = () => {
+      if (waitTimerRef.current) {
+        clearTimeout(waitTimerRef.current);
+        waitTimerRef.current = null;
+      }
+    };
+
+    const stopYawnAudio = () => {
+      const a = yawnAudioRef.current;
+      if (!a) return;
+      a.pause();
+      try { a.currentTime = 0; } catch { /* */ }
+    };
+
+    const playYawn = () => {
+      if (doneRef.current) return;
+      clearWait();
+      try { v.currentTime = 0; } catch { /* */ }
+      const a = yawnAudioRef.current;
+      if (a) {
+        try { a.currentTime = 0; } catch { /* */ }
+        a.play().catch(() => {});
+      }
+      v.play().catch(() => {});
+    };
+
+    const onEnded = () => {
+      if (doneRef.current) return;
+      v.pause();
+      try { v.currentTime = 0; } catch { /* */ }
+      stopYawnAudio();
+      clearWait();
+      waitTimerRef.current = setTimeout(() => {
+        if (!doneRef.current) playYawn();
+      }, 5000);
+    };
+
+    v.addEventListener('ended', onEnded);
+
+    const start = () => playYawn();
+    if (v.readyState >= 2) start();
+    else v.addEventListener('loadeddata', start, { once: true });
 
     return () => {
-      cancelled = true;
-      clearTimeout(timer);
+      clearWait();
+      v.removeEventListener('ended', onEnded);
+      v.pause();
+      stopYawnAudio();
     };
   }, [done]);
 
   const checkDrop = (cx: number, cy: number) => {
-    if (!imgRef.current || locked || done) return;
-    const r = imgRef.current.getBoundingClientRect();
-    if (cx >= r.left - 20 && cx <= r.right + 20 && cy >= r.top - 20 && cy <= r.bottom + 20) {
-      setDone(true);
-      playFx(onaySes);
-      setTimeout(() => onSuccess(), 700);
+    if (!dropRef.current || locked || done) return;
+    const r = dropRef.current.getBoundingClientRect();
+    if (cx < r.left - 20 || cx > r.right + 20 || cy < r.top - 20 || cy > r.bottom + 20) return;
+
+    doneRef.current = true;
+    setDone(true);
+
+    if (waitTimerRef.current) {
+      clearTimeout(waitTimerRef.current);
+      waitTimerRef.current = null;
     }
+    const ya = yawnAudioRef.current;
+    if (ya) {
+      ya.pause();
+      try { ya.currentTime = 0; } catch { /* */ }
+    }
+
+    const v = videoRef.current;
+    if (!v) {
+      onSuccess();
+      return;
+    }
+
+    v.pause();
+    v.onended = null;
+    v.src = uykuluyatagayatanVid;
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = 'auto';
+
+    const finish = () => {
+      v.removeEventListener('ended', finish);
+      onSuccess();
+    };
+    v.addEventListener('ended', finish);
+
+    const playBed = () => {
+      try { v.currentTime = 0; } catch { /* */ }
+      v.play().catch(() => {
+        setTimeout(finish, 800);
+      });
+    };
+    if (v.readyState >= 2) playBed();
+    else v.addEventListener('loadeddata', playBed, { once: true });
   };
 
   return (
     <div className="flex flex-col items-center h-full w-full relative">
-      <div className="flex-1 flex items-center justify-center w-full px-4">
-        <img
-          ref={imgRef}
-          src={done ? yataktauyuyan : yawning ? uykuluesne : uykuluesne2}
-          alt=""
-          className="max-h-[42vh] w-auto object-contain drop-shadow-xl transition-opacity duration-200"
-          draggable={false}
+      <div ref={dropRef} className="flex-1 flex items-center justify-center w-full px-4">
+        <video
+          ref={videoRef}
+          className="max-h-[42vh] w-auto object-contain drop-shadow-xl rounded-xl bg-black"
+          playsInline
+          muted
+          preload="auto"
         />
       </div>
       <div className="shrink-0 flex items-center justify-center gap-4 pb-6 pt-2 px-2">
