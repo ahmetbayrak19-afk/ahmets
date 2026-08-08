@@ -587,26 +587,37 @@ export default function Yonerge18({
                       }}
                       className="relative rounded-xl overflow-hidden border-2 border-slate-700 bg-slate-900 active:scale-[0.98] transition-transform"
                     >
-                      {playingAlkisId === c.id ? (
+                      {/* Statik görsel her zaman altta — video gelene kadar siyah/play ikonu flaşı olmasın */}
+                      <img
+                        src={displayImg(c, holdObj)}
+                        alt={c.label}
+                        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                        draggable={false}
+                      />
+                      {playingAlkisId === c.id && (
                         <video
                           src={c.alkisVideo}
                           autoPlay
                           playsInline
-                          muted={false}
-                          className="absolute inset-0 w-full h-full object-contain"
+                          muted
+                          controls={false}
+                          disablePictureInPicture
+                          preload="auto"
+                          className="absolute inset-0 w-full h-full object-contain pointer-events-none [&::-webkit-media-controls]:hidden [&::-webkit-media-controls-enclosure]:hidden [&::-webkit-media-controls-panel]:hidden [&::-webkit-media-controls-start-playback-button]:hidden [&::-webkit-media-controls-overlay-play-button]:hidden"
+                          onLoadedData={(e) => {
+                            const v = e.currentTarget;
+                            v.muted = false;
+                            v.play().catch(() => {});
+                          }}
+                          onPlay={(e) => {
+                            e.currentTarget.muted = false;
+                          }}
                           onEnded={() => {
                             if (!lockedRef.current) finishTrial(true);
                           }}
                           onError={() => {
                             if (!lockedRef.current) finishTrial(true);
                           }}
-                        />
-                      ) : (
-                        <img
-                          src={displayImg(c, holdObj)}
-                          alt={c.label}
-                          className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-                          draggable={false}
                         />
                       )}
                     </div>
