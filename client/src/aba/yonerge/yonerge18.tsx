@@ -10,22 +10,28 @@ import simdisiradakiNotr from '@/aba/esle/ses/simdisiradakinotr.mp3';
 import c1 from './sesgorsel/yonerge13/kirmizitshirtkisasacoturgozlukerkek.png';
 import c1top from './sesgorsel/yonerge13/kirmizitshirtkisasacoturgozlukerkektop.png';
 import c1bayrak from './sesgorsel/yonerge13/kirmizitshirtkisasacoturgozlukerkekbayrak.png';
+import c1alkis from './sesgorsel/yonerge13/kirmizitshirtkisasacoturgozlukerkekalkis.mp4';
 
 import c2 from './sesgorsel/yonerge13/yesiltshirtkısasacayaktagozluksuzerkek.png';
 import c2top from './sesgorsel/yonerge13/yesiltshirtkısasacayaktagozluksuzerkektop.png';
 import c2bayrak from './sesgorsel/yonerge13/yesiltshirtkısasacayaktagozluksuzerkekbayrak.png';
+// klasördeki dosya adında yazım: gozlulsuz
+import c2alkis from './sesgorsel/yonerge13/yesiltshirtkısasacayaktagozlulsuzerkekalkis.mp4';
 
 import c3 from './sesgorsel/yonerge13/uzunsacsaritshirtayaktagozluksuzerkek.png';
 import c3top from './sesgorsel/yonerge13/uzunsacsaritshirtayaktagozluksuzerkektop.png';
 import c3bayrak from './sesgorsel/yonerge13/uzunsacsaritshirtayaktagozluksuzerkekbayrak.png';
+import c3alkis from './sesgorsel/yonerge13/uzunsacsaritshirtayaktagozluksuzerkekalkis.mp4';
 
 import c4 from './sesgorsel/yonerge13/mortshirtuzunsacoturgozlukerkek.png';
 import c4top from './sesgorsel/yonerge13/mortshirtuzunsacoturgozlukerkektop.png';
 import c4bayrak from './sesgorsel/yonerge13/mortshirtuzunsacoturgozlukerkekbayrak.png';
+import c4alkis from './sesgorsel/yonerge13/mortshirtuzunsacoturgozlukerkekalkis.mp4';
 
 import c5 from './sesgorsel/yonerge13/etekbeyaztshirtuzunsacgozlukkiz.png';
 import c5top from './sesgorsel/yonerge13/etekbeyaztshirtuzunsacgozlukkiztop.png';
 import c5bayrak from './sesgorsel/yonerge13/etekbeyaztshirtuzunsacgozlukkizbayrak.png';
+import c5alkis from './sesgorsel/yonerge13/etekbeyaztshirtuzunsacgozlukkizalkis.mp4';
 
 import objAlkis from './sesgorsel/yonerge13/alkis.png';
 import objTop from './sesgorsel/yonerge13/top.png';
@@ -44,6 +50,7 @@ interface Character {
   img: string;
   imgTop: string;
   imgBayrak: string;
+  alkisVideo: string;
   hair: Hair;
   glasses: Glasses;
   pose: Pose;
@@ -58,6 +65,7 @@ const CHARACTERS: Character[] = [
     img: c1,
     imgTop: c1top,
     imgBayrak: c1bayrak,
+    alkisVideo: c1alkis,
     hair: 'kisa',
     glasses: 'gozluk',
     pose: 'otur',
@@ -69,6 +77,7 @@ const CHARACTERS: Character[] = [
     img: c2,
     imgTop: c2top,
     imgBayrak: c2bayrak,
+    alkisVideo: c2alkis,
     hair: 'kisa',
     glasses: 'gozluksuz',
     pose: 'ayakta',
@@ -80,6 +89,7 @@ const CHARACTERS: Character[] = [
     img: c3,
     imgTop: c3top,
     imgBayrak: c3bayrak,
+    alkisVideo: c3alkis,
     hair: 'uzun',
     glasses: 'gozluksuz',
     pose: 'ayakta',
@@ -91,6 +101,7 @@ const CHARACTERS: Character[] = [
     img: c4,
     imgTop: c4top,
     imgBayrak: c4bayrak,
+    alkisVideo: c4alkis,
     hair: 'uzun',
     glasses: 'gozluk',
     pose: 'otur',
@@ -102,6 +113,7 @@ const CHARACTERS: Character[] = [
     img: c5,
     imgTop: c5top,
     imgBayrak: c5bayrak,
+    alkisVideo: c5alkis,
     hair: 'uzun',
     glasses: 'gozluk',
     pose: 'ayakta',
@@ -225,6 +237,14 @@ function findCorrectId(task: DigitalTask): string | null {
   return hits.length === 1 ? hits[0].id : null;
 }
 
+/** 5 kişiden 4 seç — doğru cevap her zaman dahil */
+function pickVisibleFour(correctId: string): Character[] {
+  const correct = CHARACTERS.find((c) => c.id === correctId);
+  if (!correct) return shuffle(CHARACTERS).slice(0, 4);
+  const others = shuffle(CHARACTERS.filter((c) => c.id !== correctId)).slice(0, 3);
+  return shuffle([correct, ...others]);
+}
+
 function displayImg(c: Character, hold: { charId: string; objectId: ObjectId } | null): string {
   if (!hold || hold.charId !== c.id) return c.img;
   if (hold.objectId === 'top') return c.imgTop;
@@ -259,7 +279,15 @@ export default function Yonerge18({
   const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
   /** Doğru sürüklemede karakterin top/bayrak PNG'si kısa süre gösterilir */
   const [holdObj, setHoldObj] = useState<{ charId: string; objectId: ObjectId } | null>(null);
+  /** Alkış videosu oynayan karakter id */
+  const [playingAlkisId, setPlayingAlkisId] = useState<string | null>(null);
+  /** Bu denemede gösterilecek 4 karakter (2x2) */
+  const [visibleChars, setVisibleChars] = useState<Character[]>([]);
+
   const charRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const tapGapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lockedRef = useRef(false);
 
   const [trials, setTrials] = useState<Trial[]>(() => {
     const digital = shuffle(DIGITAL_POOL)
@@ -278,6 +306,17 @@ export default function Yonerge18({
   );
 
   const correctId = trial?.mode === 'digital' ? findCorrectId(trial.task) : null;
+
+  const clearTapTimers = useCallback(() => {
+    if (tapGapTimer.current) {
+      clearTimeout(tapGapTimer.current);
+      tapGapTimer.current = null;
+    }
+    if (confirmTimer.current) {
+      clearTimeout(confirmTimer.current);
+      confirmTimer.current = null;
+    }
+  }, []);
 
   const lockPortrait = useCallback(async () => {
     try {
@@ -308,17 +347,29 @@ export default function Yonerge18({
     };
   }, [lockPortrait, unlockOrientation]);
 
+  // Deneme değişince: timer temizle, 4 kişi seç (doğru dahil), state sıfırla
   useEffect(() => {
+    clearTapTimers();
     setTapCount(0);
     setDragObj(null);
     setPointer(null);
     setHoldObj(null);
-  }, [idx, trial && trial.mode === 'digital' ? trial.task.id : '']);
+    setPlayingAlkisId(null);
+    lockedRef.current = false;
+
+    if (trial?.mode === 'digital' && correctId) {
+      setVisibleChars(pickVisibleFour(correctId));
+    } else {
+      setVisibleChars([]);
+    }
+  }, [idx, trial && trial.mode === 'digital' ? trial.task.id : '', correctId, clearTapTimers]);
 
   const finishTrial = useCallback(
     async (correct: boolean) => {
-      if (locked) return;
+      if (lockedRef.current) return;
+      lockedRef.current = true;
       setLocked(true);
+      clearTapTimers();
       const newScore = score + (correct ? 1 : 0);
       setScore(newScore);
       if (correct) playFx(onaySes);
@@ -330,8 +381,9 @@ export default function Yonerge18({
       }
       setIdx(next);
       setLocked(false);
+      lockedRef.current = false;
     },
-    [locked, score, idx],
+    [score, idx, clearTapTimers],
   );
 
   const swapDigital = () => {
@@ -339,6 +391,7 @@ export default function Yonerge18({
     const candidates = DIGITAL_POOL.filter((t) => !usedDigitalIds.has(t.id));
     if (candidates.length === 0) return;
     const next = candidates[Math.floor(Math.random() * candidates.length)];
+    clearTapTimers();
     setTrials((prev) => {
       const copy = [...prev];
       copy[idx] = { mode: 'digital', task: next };
@@ -347,27 +400,68 @@ export default function Yonerge18({
     setTapCount(0);
     setDragObj(null);
     setHoldObj(null);
+    setPlayingAlkisId(null);
   };
 
+  /**
+   * Dokun kuralları:
+   * - Yanlış kişi → hemen yanlış
+   * - Gerekenden fazla dokunuş → yanlış
+   * - Ara boşluk > 2 sn → yanlış
+   * - Tam sayıya ulaşınca 1 sn bekle → doğru
+   */
   const onCharTap = (charId: string) => {
-    if (locked || !trial || trial.mode !== 'digital') return;
+    if (lockedRef.current || !trial || trial.mode !== 'digital') return;
     const task = trial.task;
+
+    // Sürükleme görevinde kişiye dokunmak hata
     if (task.kind !== 'tap') {
       finishTrial(false);
       return;
     }
+
     if (!correctId || charId !== correctId) {
+      clearTapTimers();
       finishTrial(false);
       return;
     }
+
     const need = task.tapsNeeded || 1;
     const next = tapCount + 1;
+
+    // Fazla dokunuş
+    if (next > need) {
+      clearTapTimers();
+      finishTrial(false);
+      return;
+    }
+
     setTapCount(next);
-    if (next >= need) finishTrial(true);
+    clearTapTimers();
+
+    if (next === need) {
+      // Tam sayı → 1 saniye sonra onay
+      confirmTimer.current = setTimeout(() => {
+        finishTrial(true);
+      }, 1000);
+    } else {
+      // Ara boşluk 2 sn'yi aşarsa yanlış
+      tapGapTimer.current = setTimeout(() => {
+        finishTrial(false);
+      }, 2000);
+    }
   };
 
   const onObjPointerDown = (e: React.PointerEvent, objId: ObjectId) => {
-    if (locked || !trial || trial.mode !== 'digital' || trial.task.kind !== 'drag') return;
+    if (lockedRef.current || !trial || trial.mode !== 'digital') return;
+
+    // Dokun görevinde alt nesneye dokunmak / sürüklemek → yanlış
+    if (trial.task.kind === 'tap') {
+      clearTapTimers();
+      finishTrial(false);
+      return;
+    }
+
     e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     setDragObj(objId);
@@ -380,16 +474,22 @@ export default function Yonerge18({
   };
 
   const onObjPointerUp = (e: React.PointerEvent) => {
-    if (!dragObj || locked || !trial || trial.mode !== 'digital') {
+    if (!dragObj || lockedRef.current || !trial || trial.mode !== 'digital') {
       setDragObj(null);
       setPointer(null);
       return;
     }
     const task = trial.task;
+    if (task.kind !== 'drag') {
+      setDragObj(null);
+      setPointer(null);
+      return;
+    }
+
     const x = e.clientX;
     const y = e.clientY;
     let hitId: string | null = null;
-    for (const c of CHARACTERS) {
+    for (const c of visibleChars) {
       const el = charRefs.current[c.id];
       if (!el) continue;
       const r = el.getBoundingClientRect();
@@ -406,11 +506,20 @@ export default function Yonerge18({
 
     const okObj = task.objectId === dropped;
     const okChar = correctId === hitId;
+
     if (okObj && okChar) {
-      // Top / bayrak: karakterin nesneli PNG'sini göster
       if (dropped === 'top' || dropped === 'bayrak') {
+        // Karakter görseli ...top.png / ...bayrak.png'ye döner
         setHoldObj({ charId: hitId, objectId: dropped });
         setTimeout(() => finishTrial(true), 900);
+      } else if (dropped === 'alkis') {
+        // Karakterin alkış videosu oynar
+        setPlayingAlkisId(hitId);
+        // Video bitince finishTrial çağrılır (onEnded)
+        // Güvenlik: video yüklenmezse 2.5 sn sonra geç
+        setTimeout(() => {
+          if (!lockedRef.current) finishTrial(true);
+        }, 2500);
       } else {
         finishTrial(true);
       }
@@ -462,58 +571,49 @@ export default function Yonerge18({
                   )}
                 </div>
 
-                {/* 5 karakter: 3 + 2 */}
-                <div className="flex-1 min-h-0 px-2 pb-1 flex flex-col gap-2">
-                  <div className="flex-1 grid grid-cols-3 gap-2 min-h-0">
-                    {CHARACTERS.slice(0, 3).map((c) => (
-                      <div
-                        key={c.id}
-                        ref={(el) => {
-                          charRefs.current[c.id] = el;
-                        }}
-                        onPointerDown={(e) => {
-                          if (trial.task.kind === 'tap') {
-                            e.preventDefault();
-                            onCharTap(c.id);
-                          }
-                        }}
-                        className="relative rounded-xl overflow-hidden border-2 border-slate-700 bg-slate-900 active:scale-[0.98] transition-transform"
-                      >
+                {/* 2x2 — 5 kişiden 4'ü (doğru cevap her zaman var) */}
+                <div className="flex-1 min-h-0 px-2 pb-1 grid grid-cols-2 grid-rows-2 gap-2">
+                  {visibleChars.map((c) => (
+                    <div
+                      key={c.id}
+                      ref={(el) => {
+                        charRefs.current[c.id] = el;
+                      }}
+                      onPointerDown={(e) => {
+                        if (trial.task.kind === 'tap' && !playingAlkisId) {
+                          e.preventDefault();
+                          onCharTap(c.id);
+                        }
+                      }}
+                      className="relative rounded-xl overflow-hidden border-2 border-slate-700 bg-slate-900 active:scale-[0.98] transition-transform"
+                    >
+                      {playingAlkisId === c.id ? (
+                        <video
+                          src={c.alkisVideo}
+                          autoPlay
+                          playsInline
+                          muted={false}
+                          className="absolute inset-0 w-full h-full object-contain"
+                          onEnded={() => {
+                            if (!lockedRef.current) finishTrial(true);
+                          }}
+                          onError={() => {
+                            if (!lockedRef.current) finishTrial(true);
+                          }}
+                        />
+                      ) : (
                         <img
                           src={displayImg(c, holdObj)}
                           alt={c.label}
                           className="absolute inset-0 w-full h-full object-contain pointer-events-none"
                           draggable={false}
                         />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex-1 grid grid-cols-2 gap-2 min-h-0 max-w-[70%] mx-auto w-full">
-                    {CHARACTERS.slice(3, 5).map((c) => (
-                      <div
-                        key={c.id}
-                        ref={(el) => {
-                          charRefs.current[c.id] = el;
-                        }}
-                        onPointerDown={(e) => {
-                          if (trial.task.kind === 'tap') {
-                            e.preventDefault();
-                            onCharTap(c.id);
-                          }
-                        }}
-                        className="relative rounded-xl overflow-hidden border-2 border-slate-700 bg-slate-900 active:scale-[0.98] transition-transform"
-                      >
-                        <img
-                          src={displayImg(c, holdObj)}
-                          alt={c.label}
-                          className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-                          draggable={false}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
 
+                {/* Nesneler her zaman aktif — dokun görevinde de tıklanırsa yanlış */}
                 <div className="shrink-0 px-3 py-2 flex justify-center gap-4 border-t border-slate-800/60 bg-slate-900/50">
                   {OBJECTS.map((o) => (
                     <div
@@ -525,9 +625,9 @@ export default function Yonerge18({
                         setDragObj(null);
                         setPointer(null);
                       }}
-                      className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-slate-800 border border-slate-600 flex items-center justify-center p-1.5 ${
-                        trial.task.kind === 'drag' ? 'active:scale-95' : 'opacity-40'
-                      } ${dragObj === o.id ? 'opacity-30' : ''}`}
+                      className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-slate-800 border border-slate-600 flex items-center justify-center p-1.5 active:scale-95 ${
+                        dragObj === o.id ? 'opacity-30' : ''
+                      }`}
                     >
                       <img
                         src={o.img}
