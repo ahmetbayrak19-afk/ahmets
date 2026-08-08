@@ -32,7 +32,7 @@ interface Character {
   label: string;
 }
 
-/** 2×2 ızgara — her çift özellik kombinasyonu tek kişiye ait */
+/** 2×2 — her çift özellik tek kişiye denk gelir (saç+gözlük veya saç+duruş) */
 const CHARACTERS: Character[] = [
   { id: 'c1', img: c1, hair: 'kisa', glasses: 'gozluk', pose: 'otur', label: 'Kırmızı · kısa · gözlük · oturan' },
   { id: 'c2', img: c2, hair: 'kisa', glasses: 'gozluksuz', pose: 'ayakta', label: 'Yeşil · kısa · gözlüksüz · ayakta' },
@@ -48,7 +48,6 @@ const OBJECTS: { id: ObjectId; img: string; label: string }[] = [
 
 interface DigitalTask {
   id: string;
-  /** tap = N kez doğru kişiye dokun; drag = doğru nesneyi doğru kişiye sürükle */
   kind: 'tap' | 'drag';
   text: string;
   hair?: Hair;
@@ -58,28 +57,31 @@ interface DigitalTask {
   objectId?: ObjectId;
 }
 
-/** Dijital havuz — her yönergede tek doğru kişi */
+/**
+ * Sadece tek eşleşen kişi üreten çiftler:
+ * saç+gözlük veya saç+duruş (gözlük+duruş tek başına kullanılmaz)
+ */
 const DIGITAL_POOL: DigitalTask[] = [
   // Dokun
   { id: 't1', kind: 'tap', text: 'Uzun saçlı ve gözlüklü kişiye 3 kez dokun', hair: 'uzun', glasses: 'gozluk', tapsNeeded: 3 },
   { id: 't2', kind: 'tap', text: 'Kısa saçlı ve oturan kişiye 2 kez dokun', hair: 'kisa', pose: 'otur', tapsNeeded: 2 },
-  { id: 't3', kind: 'tap', text: 'Gözlüksüz ve ayakta olan kişiye 3 kez dokun', glasses: 'gozluksuz', pose: 'ayakta', tapsNeeded: 3 },
+  { id: 't3', kind: 'tap', text: 'Kısa saçlı ve gözlüksüz kişiye 3 kez dokun', hair: 'kisa', glasses: 'gozluksuz', tapsNeeded: 3 },
   { id: 't4', kind: 'tap', text: 'Kısa saçlı ve gözlüklü kişiye 2 kez dokun', hair: 'kisa', glasses: 'gozluk', tapsNeeded: 2 },
   { id: 't5', kind: 'tap', text: 'Uzun saçlı ve ayakta olan kişiye 3 kez dokun', hair: 'uzun', pose: 'ayakta', tapsNeeded: 3 },
-  { id: 't6', kind: 'tap', text: 'Gözlüklü ve oturan kişiye 2 kez dokun', glasses: 'gozluk', pose: 'otur', tapsNeeded: 2 },
+  { id: 't6', kind: 'tap', text: 'Uzun saçlı ve oturan kişiye 2 kez dokun', hair: 'uzun', pose: 'otur', tapsNeeded: 2 },
   { id: 't7', kind: 'tap', text: 'Kısa saçlı ve ayakta olan kişiye 3 kez dokun', hair: 'kisa', pose: 'ayakta', tapsNeeded: 3 },
   { id: 't8', kind: 'tap', text: 'Uzun saçlı ve gözlüksüz kişiye 2 kez dokun', hair: 'uzun', glasses: 'gozluksuz', tapsNeeded: 2 },
-  // Sürükle — alkış / top / bayrak
+  // Sürükle
   { id: 'd1', kind: 'drag', text: 'Uzun saçlı ve gözlüklü kişi alkış yapsın', hair: 'uzun', glasses: 'gozluk', objectId: 'alkis' },
-  { id: 'd2', kind: 'drag', text: 'Gözlüksüz ve oturan kişiye top ver', glasses: 'gozluksuz', pose: 'otur', objectId: 'top' },
+  { id: 'd2', kind: 'drag', text: 'Kısa saçlı ve gözlüksüz kişiye top ver', hair: 'kisa', glasses: 'gozluksuz', objectId: 'top' },
   { id: 'd3', kind: 'drag', text: 'Kısa saçlı ve ayakta olana bayrak ver', hair: 'kisa', pose: 'ayakta', objectId: 'bayrak' },
-  { id: 'd4', kind: 'drag', text: 'Gözlüklü ve oturan kişi alkış yapsın', glasses: 'gozluk', pose: 'otur', objectId: 'alkis' },
+  { id: 'd4', kind: 'drag', text: 'Uzun saçlı ve oturan kişi alkış yapsın', hair: 'uzun', pose: 'otur', objectId: 'alkis' },
   { id: 'd5', kind: 'drag', text: 'Uzun saçlı ve ayakta olana top ver', hair: 'uzun', pose: 'ayakta', objectId: 'top' },
   { id: 'd6', kind: 'drag', text: 'Kısa saçlı ve gözlüklü kişiye bayrak ver', hair: 'kisa', glasses: 'gozluk', objectId: 'bayrak' },
-  { id: 'd7', kind: 'drag', text: 'Gözlüksüz ve ayakta olan kişi alkış yapsın', glasses: 'gozluksuz', pose: 'ayakta', objectId: 'alkis' },
+  { id: 'd7', kind: 'drag', text: 'Kısa saçlı ve oturan kişi alkış yapsın', hair: 'kisa', pose: 'otur', objectId: 'alkis' },
   { id: 'd8', kind: 'drag', text: 'Uzun saçlı ve gözlüksüz kişiye top ver', hair: 'uzun', glasses: 'gozluksuz', objectId: 'top' },
   { id: 'd9', kind: 'drag', text: 'Kısa saçlı ve oturan kişiye bayrak ver', hair: 'kisa', pose: 'otur', objectId: 'bayrak' },
-  { id: 'd10', kind: 'drag', text: 'Gözlüklü ve ayakta olana top ver', glasses: 'gozluk', pose: 'ayakta', objectId: 'top' },
+  { id: 'd10', kind: 'drag', text: 'Uzun saçlı ve gözlüklü kişiye top ver', hair: 'uzun', glasses: 'gozluk', objectId: 'top' },
 ];
 
 interface TeacherTask {
@@ -268,7 +270,6 @@ export default function Yonerge18({
     if (locked || !trial || trial.mode !== 'digital') return;
     const task = trial.task;
     if (task.kind !== 'tap') {
-      // Sürükle yönergesinde sadece dokunmak hata
       finishTrial(false);
       return;
     }
@@ -317,7 +318,7 @@ export default function Yonerge18({
     setDragObj(null);
     setPointer(null);
 
-    if (!hitId) return; // boşluğa bırakıldı — devam
+    if (!hitId) return;
 
     const okObj = task.objectId === dragObj;
     const okChar = correctId === hitId;
@@ -367,7 +368,6 @@ export default function Yonerge18({
                   )}
                 </div>
 
-                {/* 2×2 karakterler */}
                 <div className="flex-1 min-h-0 px-2 pb-1">
                   <div className="h-full grid grid-cols-2 grid-rows-2 gap-2">
                     {CHARACTERS.map((c) => (
@@ -395,7 +395,6 @@ export default function Yonerge18({
                   </div>
                 </div>
 
-                {/* Alt nesneler */}
                 <div className="shrink-0 px-3 py-2 flex justify-center gap-4 border-t border-slate-800/60 bg-slate-900/50">
                   {OBJECTS.map((o) => (
                     <div
@@ -423,7 +422,6 @@ export default function Yonerge18({
                   ))}
                 </div>
 
-                {/* Sürüklenen hayalet */}
                 {dragObj && pointer && (
                   <div
                     className="fixed z-50 w-16 h-16 pointer-events-none opacity-90"
