@@ -461,6 +461,7 @@ export default function KavramAssessmentPage() {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
   const [expandedChild, setExpandedChild] = useState<string | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   
   // Oyun state'leri
   const [activeGame, setActiveGame] = useState<string | null>(null); 
@@ -1074,118 +1075,183 @@ export default function KavramAssessmentPage() {
 
       <main className="max-w-4xl mx-auto">
         {loading ? <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" size={40}/></div> : (
-          <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
-            {CATEGORY_GROUPS.map((group) => {
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
+            {/* Ana kategoriler — 2 sütun */}
+            <div className="grid grid-cols-2 gap-3">
+              {CATEGORY_GROUPS.map((group) => {
+                const groupScore = calculateGroupScore(group);
+                const colorClass = getScoreColor(groupScore);
+                const barColor = getProgressBarColor(groupScore);
+                const filled = group.children.filter((c) => !c.empty).length;
+                return (
+                  <button
+                    key={group.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedGroupId(group.id);
+                      setExpandedChild(null);
+                    }}
+                    className={twMerge(
+                      "relative flex flex-col items-start p-3 sm:p-4 rounded-2xl border text-left transition-all active:scale-[0.98] min-h-[112px] overflow-hidden",
+                      colorClass,
+                    )}
+                  >
+                    <p className="text-[9px] font-bold tracking-wider uppercase text-white/50 mb-1">
+                      {filled}/{group.children.length} alt
+                    </p>
+                    <h3 className="text-xs sm:text-sm font-black text-white leading-snug mb-auto pr-1">
+                      {group.title}
+                    </h3>
+                    <div className="w-full mt-2">
+                      <div className="flex items-end justify-between gap-1 mb-1">
+                        <span className="text-[10px] text-white/60">ortalama</span>
+                        <span className={twMerge("text-base sm:text-lg font-black tabular-nums", groupScore === null ? "text-white/40" : "text-white")}>
+                          {groupScore === null ? "—" : `%${groupScore}`}
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full bg-black/30 rounded-full overflow-hidden">
+                        <div
+                          className={twMerge("h-full rounded-full transition-all", barColor)}
+                          style={{ width: `${groupScore ?? 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Alt kategoriler — popup */}
+            {selectedGroupId && (() => {
+              const group = CATEGORY_GROUPS.find((g) => g.id === selectedGroupId);
+              if (!group) return null;
               const groupScore = calculateGroupScore(group);
-              const groupColor = getScoreColor(groupScore);
-              const groupBar = getProgressBarColor(groupScore);
               return (
-                <div key={group.id} className="rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden">
-                  {/* Ana başlık */}
-                  <div className={twMerge("px-4 py-3 flex items-center justify-between gap-3 border-b border-slate-800/80", groupColor)}>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-bold tracking-widest uppercase text-slate-400">Ana kategori</p>
-                      <h3 className="text-sm sm:text-base font-black text-white leading-snug">{group.title}</h3>
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+                  <button
+                    type="button"
+                    className="absolute inset-0 bg-black/65 backdrop-blur-[2px]"
+                    aria-label="Kapat"
+                    onClick={() => {
+                      setSelectedGroupId(null);
+                      setExpandedChild(null);
+                    }}
+                  />
+                  <div className="relative w-full sm:max-w-md max-h-[85dvh] overflow-y-auto rounded-t-3xl sm:rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl p-4 sm:p-5 space-y-3 animate-in slide-in-from-bottom-4 duration-300">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold tracking-widest uppercase text-slate-400">Alt kategoriler</p>
+                        <h3 className="text-base sm:text-lg font-black text-white leading-snug">{group.title}</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Ortalama: {groupScore === null ? "—" : `%${groupScore}`}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedGroupId(null);
+                          setExpandedChild(null);
+                        }}
+                        className="shrink-0 p-2 rounded-full bg-slate-800 text-slate-300 hover:text-white"
+                      >
+                        <X size={18} />
+                      </button>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className={twMerge("text-lg font-black tabular-nums", groupScore === null ? "text-slate-500" : "text-white")}>
-                        {groupScore === null ? "—" : `%${groupScore}`}
-                      </p>
-                      <p className="text-[10px] text-slate-400">ortalama</p>
-                    </div>
-                  </div>
-                  {groupScore !== null && (
-                    <div className="h-1 w-full bg-slate-800">
-                      <div className={twMerge("h-full transition-all duration-500", groupBar)} style={{ width: `${groupScore}%` }} />
-                    </div>
-                  )}
 
-                  {/* Alt kategoriler */}
-                  <div className="p-2 space-y-1.5">
-                    {group.children.map((child) => {
-                      const childKey = `${group.id}:${child.title}`;
-                      const score = calculateChildScore(child);
-                      const colorClass = getScoreColor(score);
-                      const barColor = getProgressBarColor(score);
-                      const isEmpty = !!child.empty;
-                      const isGames = !!(child.gameIds && child.gameIds.length);
-                      const cat = child.contentId ? getCatById(child.contentId) : null;
-                      const expanded = expandedChild === childKey;
+                    <div className="space-y-2">
+                      {group.children.map((child) => {
+                        const childKey = `${group.id}:${child.title}`;
+                        const score = calculateChildScore(child);
+                        const colorClass = getScoreColor(score);
+                        const barColor = getProgressBarColor(score);
+                        const isEmpty = !!child.empty;
+                        const isGames = !!(child.gameIds && child.gameIds.length);
+                        const cat = child.contentId ? getCatById(child.contentId) : null;
+                        const expanded = expandedChild === childKey;
 
-                      return (
-                        <div key={childKey}>
-                          <button
-                            type="button"
-                            disabled={isEmpty}
-                            onClick={() => {
-                              if (isEmpty) return;
-                              if (isGames) {
-                                setExpandedChild(expanded ? null : childKey);
-                                return;
-                              }
-                              if (cat) startEvaluation(cat);
-                            }}
-                            className={twMerge(
-                              "w-full relative flex items-center gap-3 p-3 rounded-xl border transition-all text-left",
-                              isEmpty
-                                ? "border-slate-800/60 bg-slate-950/40 opacity-50 cursor-not-allowed"
-                                : colorClass + " hover:brightness-110 active:scale-[0.99]",
-                            )}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-bold text-white truncate">{child.title}</span>
-                                {isEmpty && (
-                                  <span className="text-[9px] uppercase tracking-wide text-slate-500 border border-slate-700 rounded px-1.5 py-0.5">Boş</span>
-                                )}
-                                {isGames && (
-                                  <span className="text-[9px] text-slate-400">{expanded ? "▲" : "▼"}</span>
+                        return (
+                          <div key={childKey}>
+                            <button
+                              type="button"
+                              disabled={isEmpty}
+                              onClick={() => {
+                                if (isEmpty) return;
+                                if (isGames) {
+                                  setExpandedChild(expanded ? null : childKey);
+                                  return;
+                                }
+                                if (cat) {
+                                  setSelectedGroupId(null);
+                                  setExpandedChild(null);
+                                  startEvaluation(cat);
+                                }
+                              }}
+                              className={twMerge(
+                                "w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all",
+                                isEmpty
+                                  ? "border-slate-800 bg-slate-950/50 opacity-45 cursor-not-allowed"
+                                  : colorClass + " active:scale-[0.99]",
+                              )}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-bold text-white truncate">{child.title}</span>
+                                  {isEmpty && (
+                                    <span className="text-[9px] uppercase text-slate-500 border border-slate-700 rounded px-1.5 py-0.5">Boş</span>
+                                  )}
+                                  {isGames && (
+                                    <span className="text-[10px] text-slate-400">{expanded ? "▲" : "▼"}</span>
+                                  )}
+                                </div>
+                                {!isEmpty && score !== null && (
+                                  <div className="mt-1.5 h-1.5 w-full max-w-[160px] bg-black/25 rounded-full overflow-hidden">
+                                    <div className={twMerge("h-full rounded-full", barColor)} style={{ width: `${score}%` }} />
+                                  </div>
                                 )}
                               </div>
-                              {!isEmpty && score !== null && (
-                                <div className="mt-1.5 h-1.5 w-full max-w-[140px] bg-black/30 rounded-full overflow-hidden">
-                                  <div className={twMerge("h-full rounded-full", barColor)} style={{ width: `${score}%` }} />
-                                </div>
-                              )}
-                            </div>
-                            <div className={twMerge("text-base font-black tabular-nums shrink-0", score === null ? "text-slate-500" : "text-white")}>
-                              {isEmpty ? "—" : score === null ? "—" : `%${score}`}
-                            </div>
-                          </button>
+                              <span className={twMerge("text-base font-black tabular-nums shrink-0", score === null ? "text-slate-500" : "text-white")}>
+                                {isEmpty || score === null ? "—" : `%${score}`}
+                              </span>
+                            </button>
 
-                          {isGames && expanded && (
-                            <div className="mt-1 ml-2 pl-2 border-l border-slate-700 space-y-1">
-                              {child.gameIds!.map((gid) => {
-                                const gcat = getCatById(gid);
-                                if (!gcat) return null;
-                                const gs = calculateScore(gcat);
-                                const gc = getScoreColor(gs);
-                                return (
-                                  <button
-                                    key={gid}
-                                    type="button"
-                                    onClick={() => startEvaluation(gcat)}
-                                    className={twMerge(
-                                      "w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-left text-sm",
-                                      gc,
-                                    )}
-                                  >
-                                    <span className="font-semibold text-white/90">{gcat.title}</span>
-                                    <span className="font-bold tabular-nums text-white/80">
-                                      {gs === null ? "—" : `%${gs}`}
-                                    </span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                            {isGames && expanded && (
+                              <div className="mt-1.5 ml-1 pl-3 border-l-2 border-slate-700 space-y-1.5">
+                                {child.gameIds!.map((gid) => {
+                                  const gcat = getCatById(gid);
+                                  if (!gcat) return null;
+                                  const gs = calculateScore(gcat);
+                                  const gc = getScoreColor(gs);
+                                  return (
+                                    <button
+                                      key={gid}
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedGroupId(null);
+                                        setExpandedChild(null);
+                                        startEvaluation(gcat);
+                                      }}
+                                      className={twMerge(
+                                        "w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border text-left text-sm",
+                                        gc,
+                                      )}
+                                    >
+                                      <span className="font-semibold text-white/90">{gcat.title}</span>
+                                      <span className="font-bold tabular-nums text-white/80">
+                                        {gs === null ? "—" : `%${gs}`}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               );
-            })}
+            })()}
           </div>
         )}
       </main>
