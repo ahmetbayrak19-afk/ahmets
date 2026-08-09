@@ -181,7 +181,9 @@ function LiveCandle({ onExtinguish, onFail, active }: { onExtinguish: () => void
   const totalShake = useRef(0);
   const blowAccum = useRef(0);
   const extinguished = useRef(false);
+  const activeRef = useRef(active);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  useEffect(() => { activeRef.current = active; }, [active]);
   const [gone, setGone] = useState(false);
   const [intensity, setIntensity] = useState(0);
   const [micOn, setMicOn] = useState(false);
@@ -243,66 +245,72 @@ function LiveCandle({ onExtinguish, onFail, active }: { onExtinguish: () => void
     return () => window.removeEventListener('devicemotion', handler);
   }, [active, doExtinguish]);
 
+  // Mikrofon mount'ta açılır; yönerge bitince jest kaybı olmaz
   useEffect(() => {
-    if (!active || extinguished.current) return;
     let stream: MediaStream | null = null;
     let raf = 0;
     let cancelled = false;
     const startMic = async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+          video: false,
+        });
+        if (cancelled) { stream.getTracks().forEach((tr) => tr.stop()); return; }
         const AC = window.AudioContext || (window as any).webkitAudioContext;
         const ctx: AudioContext = new AC();
         audioCtxRef.current = ctx;
         if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
         const source = ctx.createMediaStreamSource(stream);
         const analyser = ctx.createAnalyser();
-        analyser.fftSize = 512;
-        analyser.smoothingTimeConstant = 0.25;
+        analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0.15;
         source.connect(analyser);
         const td = new Uint8Array(analyser.fftSize);
-        const fd = new Uint8Array(analyser.frequencyBinCount);
         setMicOn(true);
         const tick = () => {
           if (cancelled || extinguished.current) return;
           if (ctx.state === 'suspended') ctx.resume().catch(() => {});
           analyser.getByteTimeDomainData(td);
-          analyser.getByteFrequencyData(fd);
-          let zc = 0;
-          for (let i = 1; i < td.length; i++) {
-            const a = td[i - 1] - 128; const b = td[i] - 128;
-            if ((a >= 0 && b < 0) || (a < 0 && b >= 0)) zc++;
-          }
-          const zcr = zc / td.length;
-          const n = fd.length;
-          let low = 0; let high = 0;
-          const lowEnd = Math.floor(n * 0.12);
-          const highStart = Math.floor(n * 0.18);
-          for (let i = 0; i < lowEnd; i++) low += fd[i];
-          for (let i = highStart; i < n; i++) high += fd[i];
-          low = low / (lowEnd * 255);
-          high = high / ((n - highStart) * 255);
-          const highRatio = high / (low + high + 1e-6);
           let sum = 0;
-          for (let i = 0; i < td.length; i++) { const v = (td[i] - 128) / 128; sum += v * v; }
+          let zc = 0;
+          for (let i = 0; i < td.length; i++) {
+            const v = (td[i] - 128) / 128;
+            sum += v * v;
+            if (i > 0) {
+              const a = td[i - 1] - 128;
+              const b = td[i] - 128;
+              if ((a >= 0 && b < 0) || (a < 0 && b >= 0)) zc++;
+            }
+          }
           const rms = Math.sqrt(sum / td.length);
-          // Üfleme: sürekli nefes gürültüsü. AA/konuşma = düşük ZCR + düşük frekans baskın → reddet.
-          const isSpeech = zcr < 0.075 && low > 0.035 && low > high * 2.2;
-          const isBlow = rms > 0.028 && !isSpeech && (zcr > 0.09 || highRatio > 0.28 || rms > 0.06);
+          const zcr = zc / td.length;
+
+          if (!activeRef.current) {
+            blowAccum.current = 0;
+            raf = requestAnimationFrame(tick);
+            return;
+          }
+
+          // Toleranslı üfleme: yeterli ses + saf AA değilse
+          const isPureVoice = zcr < 0.045 && rms < 0.09;
+          const isBlow = rms > 0.015 && !isPureVoice;
           if (isBlow) {
-            blowAccum.current += 0.14 + rms * 0.6;
-            const blowAmount = Math.min(60, rms * 120 + high * 35);
+            blowAccum.current += 0.22 + rms * 1.2;
+            const blowAmount = Math.min(65, rms * 140);
             setIntensity((v) => Math.max(v, blowAmount));
             if (flameRef.current) {
-              const rot = -10 - rms * 50 + (Math.random() - 0.5) * 12;
-              flameRef.current.animate([{ transform: `translateX(-50%) rotate(${rot}deg) scaleY(${Math.max(0.35, 1 - rms)})` }], { duration: 45, fill: 'forwards' });
+              const rot = -12 - rms * 55 + (Math.random() - 0.5) * 14;
+              flameRef.current.animate(
+                [{ transform: `translateX(-50%) rotate(${rot}deg) scaleY(${Math.max(0.3, 1 - rms)})` }],
+                { duration: 45, fill: 'forwards' },
+              );
             }
           } else {
-            blowAccum.current = Math.max(0, blowAccum.current * 0.86);
+            blowAccum.current = Math.max(0, blowAccum.current * 0.88);
+            setIntensity((v) => Math.max(0, v * 0.92));
           }
-          // ~0.5–1 sn üfleme
-          if (blowAccum.current > 1.7) doExtinguish();
+          if (blowAccum.current > 1.1) doExtinguish();
           raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
@@ -312,19 +320,24 @@ function LiveCandle({ onExtinguish, onFail, active }: { onExtinguish: () => void
       }
     };
     startMic();
-    const unlock = () => { const ctx = audioCtxRef.current; if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {}); };
+    const unlock = () => {
+      const ctx = audioCtxRef.current;
+      if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+    };
     window.addEventListener('touchstart', unlock, { passive: true });
     window.addEventListener('pointerdown', unlock);
     return () => {
-      cancelled = true; cancelAnimationFrame(raf);
+      cancelled = true;
+      cancelAnimationFrame(raf);
       window.removeEventListener('touchstart', unlock);
       window.removeEventListener('pointerdown', unlock);
       try { audioCtxRef.current?.close(); } catch { /* */ }
       audioCtxRef.current = null;
-      stream?.getTracks().forEach((t) => t.stop());
+      stream?.getTracks().forEach((tr) => tr.stop());
       setMicOn(false);
     };
-  }, [active, doExtinguish]);
+  }, [doExtinguish]);
+
 
   return (
     <div className="relative w-full max-w-sm mx-auto aspect-[3/4] max-h-[52vh]">
@@ -773,17 +786,6 @@ export default function Yonerge13({ itemCode = 'YTB 4.2', itemText = 'Mantık Ku
 
       {phase === 'running' && trial && (
         <>
-          {trial.type === 'teacher' && (
-            <div className="shrink-0 px-4 pt-3 pb-2 text-center">
-              <h1 className="text-base sm:text-xl font-black leading-snug text-white">{trial.text}</h1>
-              {trial.need && (
-                <p className="text-sm text-amber-300/90 mt-2 font-semibold">
-                  İhtiyaç: <span className="text-white">{trial.need}</span>
-                </p>
-              )}
-              <p className="text-xs text-slate-500 mt-1">Öğretmen yönergesi — ses yok</p>
-            </div>
-          )}
           <div className="relative flex-1 min-h-0 flex flex-col">
             {trial.type === 'candle' && (
               <div className="flex-1 flex flex-col items-center justify-center gap-4">
@@ -795,12 +797,15 @@ export default function Yonerge13({ itemCode = 'YTB 4.2', itemText = 'Mantık Ku
             {trial.type === 'hair' && <HairScene locked={locked} onSuccess={() => finishTrial(true)} onFail={() => finishTrial(false)} />}
             {trial.type === 'sleep' && <SleepScene locked={locked} onSuccess={() => finishTrial(true)} onFail={() => finishTrial(false)} />}
             {trial.type === 'teacher' && (
-              <div className="flex-1 flex items-center justify-center px-6">
-                <p className="text-lg text-slate-300 text-center font-medium">
-                  Öğretmen ile yapın.
-                  <br />
-                  <span className="text-sm text-slate-500">Malzemeyi kullanarak yönergeyi verin, sonucu işaretleyin.</span>
-                </p>
+              <div className="flex-1 flex flex-col items-center justify-center px-6 gap-5">
+                <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-center text-white leading-snug max-w-lg">
+                  {trial.text}
+                </h1>
+                {trial.need && (
+                  <p className="text-base sm:text-xl text-center text-amber-300 font-semibold max-w-md">
+                    Lazım olan: <span className="text-white">{trial.need}</span>
+                  </p>
+                )}
               </div>
             )}
           </div>
