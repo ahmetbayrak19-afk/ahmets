@@ -292,6 +292,7 @@ export default function Yonerge18({
   const [holdObj, setHoldObj] = useState<{ charId: string; objectId: ObjectId } | null>(null);
   /** Alkış videosu oynayan karakter id */
   const [playingAlkisId, setPlayingAlkisId] = useState<string | null>(null);
+  const [alkisVideoVisible, setAlkisVideoVisible] = useState(false);
   /** Bu denemede gösterilecek 4 karakter (2x2) */
   const [visibleChars, setVisibleChars] = useState<Character[]>([]);
 
@@ -382,7 +383,7 @@ export default function Yonerge18({
     setDragObj(null);
     setPointer(null);
     setHoldObj(null);
-    setPlayingAlkisId(null);
+    setPlayingAlkisId(null); setAlkisVideoVisible(false);
     lockedRef.current = false;
 
     if (trial?.mode === 'digital' && correctId) {
@@ -428,7 +429,7 @@ export default function Yonerge18({
     setTapCount(0);
     setDragObj(null);
     setHoldObj(null);
-    setPlayingAlkisId(null);
+    setPlayingAlkisId(null); setAlkisVideoVisible(false);
   };
 
   /**
@@ -542,7 +543,7 @@ export default function Yonerge18({
         setTimeout(() => finishTrial(true), 900);
       } else if (dropped === 'alkis') {
         // Karakterin alkış videosu oynar
-        setPlayingAlkisId(hitId);
+        setAlkisVideoVisible(false); setPlayingAlkisId(hitId);
         // Video bitince finishTrial çağrılır (onEnded)
         // Güvenlik: video yüklenmezse 2.5 sn sonra geç
         setTimeout(() => {
@@ -610,37 +611,53 @@ export default function Yonerge18({
                           onCharTap(c.id);
                         }
                       }}
-                      className="relative rounded-xl overflow-hidden border-2 border-slate-700 bg-slate-900 active:scale-[0.98] transition-transform"
+                      className="relative rounded-xl overflow-hidden border-2 border-slate-700 bg-black active:scale-[0.98] transition-transform"
                     >
                       {/* Statik görsel her zaman altta — video gelene kadar siyah/play ikonu flaşı olmasın */}
                       <img
                         src={displayImg(c, holdObj)}
                         alt={c.label}
-                        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                        className="absolute inset-0 w-full h-full object-contain object-center pointer-events-none bg-black"
                         draggable={false}
                       />
                       {playingAlkisId === c.id && (
                         <video
+                          key={'alkis-' + c.id}
                           src={c.alkisVideo}
                           autoPlay
                           playsInline
                           muted
                           controls={false}
                           disablePictureInPicture
+                          disableRemotePlayback
                           preload="auto"
-                          className="absolute inset-0 w-full h-full object-contain pointer-events-none [&::-webkit-media-controls]:hidden [&::-webkit-media-controls-enclosure]:hidden [&::-webkit-media-controls-panel]:hidden [&::-webkit-media-controls-start-playback-button]:hidden [&::-webkit-media-controls-overlay-play-button]:hidden"
+                          className={
+                            'absolute inset-0 w-full h-full object-contain object-center pointer-events-none bg-black ' +
+                            (alkisVideoVisible ? 'opacity-100' : 'opacity-0') +
+                            ' [&::-webkit-media-controls]:hidden [&::-webkit-media-controls-enclosure]:hidden' +
+                            ' [&::-webkit-media-controls-panel]:hidden [&::-webkit-media-controls-start-playback-button]:hidden' +
+                            ' [&::-webkit-media-controls-overlay-play-button]:!hidden [&::-webkit-media-controls-play-button]:hidden'
+                          }
+                          style={{ backgroundColor: '#000' }}
                           onLoadedData={(e) => {
                             const v = e.currentTarget;
-                            v.muted = false;
+                            v.muted = true;
                             v.play().catch(() => {});
                           }}
+                          onPlaying={() => {
+                            setAlkisVideoVisible(true);
+                            // ses: muted kalmasın
+                          }}
                           onPlay={(e) => {
-                            e.currentTarget.muted = false;
+                            // Oynama başlayınca ses aç (play ikonu muted iken basılmaz)
+                            try { e.currentTarget.muted = false; } catch { /* */ }
                           }}
                           onEnded={() => {
+                            setAlkisVideoVisible(false);
                             if (!lockedRef.current) finishTrial(true);
                           }}
                           onError={() => {
+                            setAlkisVideoVisible(false);
                             if (!lockedRef.current) finishTrial(true);
                           }}
                         />
