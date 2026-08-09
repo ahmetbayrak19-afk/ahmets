@@ -157,14 +157,21 @@ function useMotionSound(src: string) {
   }, [src]);
   const start = useCallback(() => {
     if (idleTimer.current) { clearTimeout(idleTimer.current); idleTimer.current = null; }
-    const a = audioRef.current; if (!a) return; if (a.paused) a.play().catch(() => {});
+    const a = audioRef.current; if (!a) return;
+    // Zaten çalıyorsa dokunma — yeniden başlatma
+    if (a.paused) a.play().catch(() => {});
   }, []);
   const stop = useCallback(() => {
-    const a = audioRef.current; if (!a) return; a.pause(); try { a.currentTime = 0; } catch { /* */ }
+    if (idleTimer.current) { clearTimeout(idleTimer.current); idleTimer.current = null; }
+    const a = audioRef.current; if (!a) return;
+    a.pause();
+    // currentTime sıfırlama: kısa duraksamada ses kaldığı yerden devam eder
   }, []);
   const pulse = useCallback(() => {
-    start(); if (idleTimer.current) clearTimeout(idleTimer.current);
-    idleTimer.current = setTimeout(() => stop(), 180);
+    start();
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    // Hareket aralığında (yukarı-aşağı geçiş) ses kesilmesin
+    idleTimer.current = setTimeout(() => stop(), 480);
   }, [start, stop]);
   return { pulse, stop };
 }
@@ -280,26 +287,22 @@ function LiveCandle({ onExtinguish, onFail, active }: { onExtinguish: () => void
           let sum = 0;
           for (let i = 0; i < td.length; i++) { const v = (td[i] - 128) / 128; sum += v * v; }
           const rms = Math.sqrt(sum / td.length);
-          // Sadece "fff" üfleme: yüksek ZCR + yüksek frekans. Konuşma/AA reddedilir.
-          const isVoiceLike = low > high * 1.6 && zcr < 0.14;
-          const isBlow =
-            rms > 0.05 &&
-            zcr > 0.16 &&
-            highRatio > 0.42 &&
-            high > 0.035 &&
-            !isVoiceLike;
+          // Üfleme: sürekli nefes gürültüsü. AA/konuşma = düşük ZCR + düşük frekans baskın → reddet.
+          const isSpeech = zcr < 0.075 && low > 0.035 && low > high * 2.2;
+          const isBlow = rms > 0.028 && !isSpeech && (zcr > 0.09 || highRatio > 0.28 || rms > 0.06);
           if (isBlow) {
-            blowAccum.current += 0.09;
-            const blowAmount = Math.min(60, rms * 100 + high * 40);
+            blowAccum.current += 0.14 + rms * 0.6;
+            const blowAmount = Math.min(60, rms * 120 + high * 35);
             setIntensity((v) => Math.max(v, blowAmount));
             if (flameRef.current) {
               const rot = -10 - rms * 50 + (Math.random() - 0.5) * 12;
               flameRef.current.animate([{ transform: `translateX(-50%) rotate(${rot}deg) scaleY(${Math.max(0.35, 1 - rms)})` }], { duration: 45, fill: 'forwards' });
             }
           } else {
-            blowAccum.current = Math.max(0, blowAccum.current * 0.82);
+            blowAccum.current = Math.max(0, blowAccum.current * 0.86);
           }
-          if (blowAccum.current > 3.0) doExtinguish();
+          // ~0.5–1 sn üfleme
+          if (blowAccum.current > 1.7) doExtinguish();
           raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
@@ -510,14 +513,27 @@ function SleepScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
     const clearWait = () => { if (waitTimerRef.current) { clearTimeout(waitTimerRef.current); waitTimerRef.current = null; } };
     const stopYawnAudio = () => { const a = yawnAudioRef.current; if (!a) return; a.pause(); try { a.currentTime = 0; } catch { /* */ } };
     const playYawn = () => {
-      if (doneRef.current) return; clearWait(); try { v.currentTime = 0; } catch { /* */ }
-      const a = yawnAudioRef.current; if (a) { try { a.currentTime = 0; } catch { /* */ } a.play().catch(() => {}); }
+      if (doneRef.current) return;
+      clearWait();
+      try { v.currentTime = 0; } catch { /* */ }
+      setYawnVisible(true);
+      const a = yawnAudioRef.current;
+      if (a) { try { a.currentTime = 0; } catch { /* */ } a.play().catch(() => {}); }
       v.play().catch(() => {});
     };
     const onEnded = () => {
-      if (doneRef.current) return; v.pause(); try { v.currentTime = 0; } catch { /* */ }
-      stopYawnAudio(); clearWait();
-      waitTimerRef.current = setTimeout(() => { if (!doneRef.current) playYawn(); }, 5000);
+      if (doneRef.current) return;
+      stopYawnAudio();
+      clearWait();
+      try {
+        v.pause();
+        v.currentTime = 0;
+      } catch { /* */ }
+      // İlk kare ekranda kalsın (kaybolmasın)
+      setYawnVisible(true);
+      waitTimerRef.current = setTimeout(() => {
+        if (!doneRef.current) playYawn();
+      }, 7000);
     };
     v.addEventListener('ended', onEnded);
     const start = () => playYawn();
@@ -552,7 +568,10 @@ function SleepScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
           disablePictureInPicture
           preload="auto"
           onPlaying={() => setYawnVisible(true)}
-          onPause={() => setYawnVisible(false)}
+          onLoadedData={() => {
+            // İlk kare hazır — play ikonu yerine kare görünsün
+            setYawnVisible(true);
+          }}
         />
         <video
           ref={bedRef}
