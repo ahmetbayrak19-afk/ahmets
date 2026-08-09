@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   XCircle, Check, X, Trophy, PlayCircle, RefreshCw, Filter, Box,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+
+import girisSes from './sesgorsel/girisses.mp3';
 
 interface ConditionalTask {
   id: string;
@@ -120,6 +122,28 @@ export default function Yonerge10({
   const [score, setScore] = useState(0);
   const [locked, setLocked] = useState(false);
 
+  const introRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (phase !== 'prep') return;
+    const a = new Audio(girisSes);
+    introRef.current = a;
+    a.volume = 1;
+    a.play().catch(() => {});
+    return () => {
+      a.pause();
+      a.currentTime = 0;
+    };
+  }, [phase]);
+
+  const stopIntro = () => {
+    if (introRef.current) {
+      introRef.current.pause();
+      introRef.current.currentTime = 0;
+      introRef.current = null;
+    }
+  };
+
   const displayText = (text: string) => fillName(text, studentName.trim());
 
   const materialsList = (() => {
@@ -141,6 +165,7 @@ export default function Yonerge10({
   };
 
   const startAssessment = () => {
+    stopIntro();
     setCurrentIndex(0);
     setScore(0);
     setLocked(false);
@@ -175,7 +200,7 @@ export default function Yonerge10({
     >
       <div className="shrink-0 p-4 landscape:py-2 landscape:px-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md relative z-10">
         <button
-          onClick={onClose}
+          onClick={() => { stopIntro(); onClose(); }}
           className="p-2 landscape:p-1.5 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
         >
           <XCircle className="w-7 h-7 landscape:w-6 landscape:h-6" />

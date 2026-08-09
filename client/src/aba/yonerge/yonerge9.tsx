@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-import girisSes from './sesgorsel/yonerge34.mp3';
+import girisSes from './sesgorsel/girisses.mp3';
 
 interface GroupTask {
   id: string;
