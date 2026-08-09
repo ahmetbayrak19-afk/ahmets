@@ -46,20 +46,78 @@ import uykuluesniyorSes from './sesgorsel/yonerge13/uykuluesniyor.mp3';
 const NEUTRAL_SOUNDS = [devametNotr, devamet2Notr, simdisiradakiNotr];
 
 type SceneType = 'candle' | 'teeth' | 'hair' | 'sleep' | 'teacher';
-interface Trial { id: string; type: SceneType; text: string; }
+interface Trial {
+  id: string;
+  type: SceneType;
+  text: string;
+  /** Öğretmen yönergesinde altta gösterilecek malzeme ihtiyacı */
+  need?: string;
+}
 
-const TRIALS: Trial[] = [
+const DIGITAL_TRIALS: Trial[] = [
   { id: 't1', type: 'candle', text: 'Yanan eli kurtar!' },
   { id: 't2', type: 'teeth', text: 'Çocuğun dişlerini temizle' },
   { id: 't3', type: 'hair', text: 'Çocuğun saçını tara' },
   { id: 't4', type: 'sleep', text: 'Uykusu gelen çocuğu uyut' },
-  // Öğretmen: durum → mantıklı çözüm (düz emir değil)
-  { id: 't5', type: 'teacher', text: 'Elleri kirli, yıka' },
-  { id: 't6', type: 'teacher', text: 'Ayakkabı bağları açık, bağla' },
-  { id: 't7', type: 'teacher', text: 'Oda karanlık, ışığı aç' },
-  { id: 't8', type: 'teacher', text: 'Kapı açık kalmış, kapat' },
-  { id: 't9', type: 'teacher', text: 'Masa dağınık, topla' },
-  { id: 't10', type: 'teacher', text: 'Pencere açık ve üşüyor, kapat' },
+];
+
+type SetId = 'okul' | 'doktor' | 'mutfak';
+
+interface MaterialSet {
+  id: SetId;
+  label: string;
+  materials: string[];
+  trials: Trial[];
+}
+
+const MATERIAL_SETS: MaterialSet[] = [
+  {
+    id: 'okul',
+    label: 'OKUL SETİ',
+    materials: [
+      'kalem', 'defter', 'kitap', 'kalemtraş', 'silgi', 'mendil',
+      'okul çantası', 'sınıf tahtası', 'tahta silgisi',
+    ],
+    trials: [
+      { id: 'o1', type: 'teacher', text: 'Burnunu sil', need: 'mendil' },
+      { id: 'o2', type: 'teacher', text: 'Kalemi aç', need: 'kalemtraş' },
+      { id: 'o3', type: 'teacher', text: 'Defterdeki çizgiyi sil', need: 'silgi' },
+      { id: 'o4', type: 'teacher', text: 'Tahtayı sil', need: 'tahta silgisi' },
+      { id: 'o5', type: 'teacher', text: 'Okula gidiyorsun. Çantanı hazırla', need: 'kalem, defter, kitap, kalemtraş, silgi, mendil, okul çantası' },
+      { id: 'o6', type: 'teacher', text: 'Top resmi çiz', need: 'defter, kalem' },
+    ],
+  },
+  {
+    id: 'doktor',
+    label: 'DOKTOR SETİ',
+    materials: [
+      'ambulans', 'steteskop', 'otoskop', 'abeslang', 'kağıt', 'kalem',
+      'ilaç', 'iğne', 'oyuncak bebek',
+    ],
+    trials: [
+      { id: 'd1', type: 'teacher', text: 'Çocuk hasta görünüyor. Acil hastaneye götür.', need: 'ambulans' },
+      { id: 'd2', type: 'teacher', text: 'Çocuk hasta mı bak. Göğsünü dinle', need: 'steteskop' },
+      { id: 'd3', type: 'teacher', text: 'Çocuğun kulağını kontrol et.', need: 'otoskop' },
+      { id: 'd4', type: 'teacher', text: 'Çocuğun boğazını kontrol et', need: 'abeslang' },
+      { id: 'd5', type: 'teacher', text: 'Çocuk hastalanmış. Hadi ilaç yaz', need: 'kağıt, kalem' },
+      { id: 'd6', type: 'teacher', text: 'Çocuk öksürüyor. Ne yapalım?', need: 'ilaç veya iğne' },
+    ],
+  },
+  {
+    id: 'mutfak',
+    label: 'MUTFAK SETİ',
+    materials: [
+      'peçete', 'kaşık', 'tabak', 'ocak', 'bıçak', 'sebze', 'tencere',
+    ],
+    trials: [
+      { id: 'm1', type: 'teacher', text: 'Bebeğin karnı acıktı. Hadi yemek yapalım. Sebze kes', need: 'bıçak ve sebze' },
+      { id: 'm2', type: 'teacher', text: 'Kestiğin sebzeleri pişir.', need: 'ocak, tencere' },
+      { id: 'm3', type: 'teacher', text: 'Pişerken karıştır', need: 'kaşık' },
+      { id: 'm4', type: 'teacher', text: 'Yemek pişti. Servis et.', need: 'tabak, kaşık' },
+      { id: 'm5', type: 'teacher', text: 'Bebeğe yemeği yedir.', need: 'kaşık' },
+      { id: 'm6', type: 'teacher', text: 'Bebeğin ağzını sil', need: 'peçete' },
+    ],
+  },
 ];
 
 function playFx(src?: string) {
@@ -505,14 +563,16 @@ function SleepScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
 }
 
 interface Yonerge13Props { itemCode?: string; itemText?: string; onClose: () => void; onComplete: (success: boolean) => void; }
-type Phase = 'running' | 'result';
+type Phase = 'select' | 'running' | 'result';
 
 export default function Yonerge13({ itemCode = 'YTB 4.2', itemText = 'Mantık Kurarak Yönergeleri Yerine Getirme', onClose, onComplete }: Yonerge13Props) {
-  const [phase, setPhase] = useState<Phase>('running');
+  const [phase, setPhase] = useState<Phase>('select');
+  const [selectedSet, setSelectedSet] = useState<SetId | null>(null);
+  const [trials, setTrials] = useState<Trial[]>([]);
   const [idx, setIdx] = useState(0);
   const [score, setScore] = useState(0);
   const [locked, setLocked] = useState(false);
-  const trial = TRIALS[idx];
+  const trial = trials[idx];
   const instrAudioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {
     if (!trial) return;
@@ -559,24 +619,88 @@ export default function Yonerge13({ itemCode = 'YTB 4.2', itemText = 'Mantık Ku
     if (correct) playFx(onaySes);
     await playNeutralTransition();
     const next = idx + 1;
-    if (next >= 10) { setPhase('result'); return; }
+    if (next >= trials.length) { setPhase('result'); return; }
     setIdx(next); setLocked(false);
-  }, [locked, score, idx]);
+  }, [locked, score, idx, trials.length]);
 
   return (
     <div className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none overflow-hidden" style={{ touchAction: 'none' }}>
       <div className="shrink-0 px-3 py-2 flex items-center justify-between border-b border-slate-800/80 bg-slate-900/90 z-20">
         <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white"><XCircle className="w-6 h-6" /></button>
         <div className="text-center min-w-0 flex-1 px-2">
-          <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">{phase === 'running' ? `${idx + 1}/10` : 'Sonuç'} · {itemCode}</p>
+          <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase">{phase === 'running' ? `${idx + 1}/${trials.length || 10}` : phase === 'select' ? 'Set seç' : 'Sonuç'} · {itemCode}</p>
         </div>
         <div className="w-8 text-right text-xs font-bold text-violet-400 tabular-nums">{phase === 'running' ? score : ''}</div>
       </div>
+
+      {phase === 'select' && (
+        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto px-4 py-4 gap-4">
+          <div className="text-center">
+            <h1 className="text-lg font-black text-white">Malzeme seti seçin</h1>
+            <p className="text-xs text-slate-400 mt-1">
+              Elinizdeki malzemelere göre set seçin. Eksik varsa başka sete geçebilirsiniz.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 max-w-lg mx-auto w-full">
+            {MATERIAL_SETS.map((s) => {
+              const active = selectedSet === s.id;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSelectedSet(s.id)}
+                  className={
+                    'text-left rounded-2xl border-2 p-4 transition-all active:scale-[0.98] ' +
+                    (active
+                      ? 'border-violet-400 bg-violet-500/15 shadow-lg shadow-violet-900/30'
+                      : 'border-slate-700 bg-slate-900/80 hover:border-slate-500')
+                  }
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-black text-base tracking-wide text-white">{s.label}</span>
+                    {active && <span className="text-[10px] font-bold uppercase text-violet-300">Seçili</span>}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                    Malzemeler: {s.materials.join(', ')}
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-1">{s.trials.length} öğretmen yönergesi</p>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-auto pt-2 pb-4 flex justify-center">
+            <button
+              type="button"
+              disabled={!selectedSet}
+              onClick={() => {
+                if (!selectedSet) return;
+                const setDef = MATERIAL_SETS.find((x) => x.id === selectedSet)!;
+                setTrials([...DIGITAL_TRIALS, ...setDef.trials]);
+                setIdx(0);
+                setScore(0);
+                setLocked(false);
+                setPhase('running');
+              }}
+              className="w-full max-w-sm py-4 rounded-2xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:pointer-events-none text-white font-black text-lg active:scale-95"
+            >
+              BAŞLA
+            </button>
+          </div>
+        </div>
+      )}
+
       {phase === 'running' && trial && (
         <>
           {trial.type === 'teacher' && (
             <div className="shrink-0 px-4 pt-3 pb-2 text-center">
               <h1 className="text-base sm:text-xl font-black leading-snug text-white">{trial.text}</h1>
+              {trial.need && (
+                <p className="text-sm text-amber-300/90 mt-2 font-semibold">
+                  İhtiyaç: <span className="text-white">{trial.need}</span>
+                </p>
+              )}
               <p className="text-xs text-slate-500 mt-1">Öğretmen yönergesi — ses yok</p>
             </div>
           )}
@@ -592,7 +716,11 @@ export default function Yonerge13({ itemCode = 'YTB 4.2', itemText = 'Mantık Ku
             {trial.type === 'sleep' && <SleepScene locked={locked} onSuccess={() => finishTrial(true)} onFail={() => finishTrial(false)} />}
             {trial.type === 'teacher' && (
               <div className="flex-1 flex items-center justify-center px-6">
-                <p className="text-lg text-slate-300 text-center font-medium">Öğretmen ile yapın.<br /><span className="text-sm text-slate-500">Aşağıdaki butonlardan işaretleyin.</span></p>
+                <p className="text-lg text-slate-300 text-center font-medium">
+                  Öğretmen ile yapın.
+                  <br />
+                  <span className="text-sm text-slate-500">Malzemeyi kullanarak yönergeyi verin, sonucu işaretleyin.</span>
+                </p>
               </div>
             )}
           </div>
@@ -609,15 +737,15 @@ export default function Yonerge13({ itemCode = 'YTB 4.2', itemText = 'Mantık Ku
       {phase === 'result' && (
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="flex flex-col items-center text-center p-8 bg-slate-900/90 rounded-3xl border border-slate-700 max-w-xl w-full">
-            <Trophy size={72} className={score >= 8 ? 'text-yellow-500 mb-5 animate-bounce' : 'text-slate-500 mb-5'} />
+            <Trophy size={72} className={score >= Math.ceil((trials.length || 10) * 0.8) ? 'text-yellow-500 mb-5 animate-bounce' : 'text-slate-500 mb-5'} />
             <h1 className="text-3xl font-black mb-2">Değerlendirme Bitti!</h1>
-            <p className="text-slate-400 mb-6 text-lg">Doğru: <span className="text-white font-black text-3xl mx-2">{score}</span> / 10</p>
-            {score >= 8 ? (
+            <p className="text-slate-400 mb-6 text-lg">Doğru: <span className="text-white font-black text-3xl mx-2">{score}</span> / {trials.length || 10}</p>
+            {score >= Math.ceil((trials.length || 10) * 0.8) ? (
               <div className="bg-green-500/10 text-green-400 border border-green-500/20 px-6 py-3 rounded-xl mb-8 font-bold">Kazanım başarıyla sağlandı!</div>
             ) : (
               <div className="bg-orange-500/10 text-orange-400 border border-orange-500/20 px-6 py-3 rounded-xl mb-8 font-bold">Henüz yeterli bağımsızlık düzeyinde değil.</div>
             )}
-            <button onClick={() => onComplete(score >= 8)} className="bg-violet-600 hover:bg-violet-500 text-white px-12 py-4 rounded-xl font-bold text-xl active:scale-95 w-full sm:w-auto">KAYDET VE ÇIK</button>
+            <button onClick={() => onComplete(score >= Math.ceil((trials.length || 10) * 0.8))} className="bg-violet-600 hover:bg-violet-500 text-white px-12 py-4 rounded-xl font-bold text-xl active:scale-95 w-full sm:w-auto">KAYDET VE ÇIK</button>
           </div>
         </div>
       )}
