@@ -35,6 +35,7 @@ import tarakkullan from './sesgorsel/yonerge13/tarakkullan.png';
 
 import yatakImg from './sesgorsel/yonerge13/yatak.png';
 import eliyanancocuk from './sesgorsel/yonerge13/eliyanancocuk.png';
+import eliyanancocukmutlu from './sesgorsel/yonerge13/eliyanancocukmutlu.png';
 
 import fircaSes from './sesgorsel/yonerge13/fircasesi.mp3';
 import sacTaramaSes from './sesgorsel/yonerge13/sactaramases.mp3';
@@ -279,22 +280,26 @@ function LiveCandle({ onExtinguish, onFail, active }: { onExtinguish: () => void
           let sum = 0;
           for (let i = 0; i < td.length; i++) { const v = (td[i] - 128) / 128; sum += v * v; }
           const rms = Math.sqrt(sum / td.length);
-          // Mobil mic: üfleme mid/düşük bantta gelir. Yüksek frekans şartı yok.
-          // AA = düşük frekans baskın + düşük ZCR → reddet. Diğer güçlü ses = üfleme.
-          const isVoiceLike = low > high * 2.4 && zcr < 0.11 && high < 0.035;
-          const isBlow = rms > 0.025 && !isVoiceLike;
+          // Sadece "fff" üfleme: yüksek ZCR + yüksek frekans. Konuşma/AA reddedilir.
+          const isVoiceLike = low > high * 1.6 && zcr < 0.14;
+          const isBlow =
+            rms > 0.05 &&
+            zcr > 0.16 &&
+            highRatio > 0.42 &&
+            high > 0.035 &&
+            !isVoiceLike;
           if (isBlow) {
-            blowAccum.current += rms * 2.4 + Math.max(0, high) * 0.8;
-            const blowAmount = Math.min(55, rms * 110 + high * 30);
+            blowAccum.current += 0.09;
+            const blowAmount = Math.min(60, rms * 100 + high * 40);
             setIntensity((v) => Math.max(v, blowAmount));
             if (flameRef.current) {
               const rot = -10 - rms * 50 + (Math.random() - 0.5) * 12;
               flameRef.current.animate([{ transform: `translateX(-50%) rotate(${rot}deg) scaleY(${Math.max(0.35, 1 - rms)})` }], { duration: 45, fill: 'forwards' });
             }
           } else {
-            blowAccum.current = Math.max(0, blowAccum.current * 0.72);
+            blowAccum.current = Math.max(0, blowAccum.current * 0.82);
           }
-          if (blowAccum.current > 1.15) doExtinguish();
+          if (blowAccum.current > 3.0) doExtinguish();
           raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
@@ -325,7 +330,7 @@ function LiveCandle({ onExtinguish, onFail, active }: { onExtinguish: () => void
           secsLeft <= 3 ? 'border-red-400 text-red-400 bg-red-500/15 animate-pulse' : 'border-slate-500 text-slate-200 bg-slate-900/70'
         }`}>{secsLeft}</div>
       )}
-      <img src={eliyanancocuk} alt="" className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none" draggable={false} />
+      <img src={gone ? eliyanancocukmutlu : eliyanancocuk} alt="" className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none" draggable={false} />
       <div className="absolute z-10" style={{ left: '14%', top: '63%', transform: 'translate(-50%, 0)' }}>
         <div className="relative flex flex-col items-center" style={{ width: 36 }}>
           {!gone && (
@@ -382,8 +387,8 @@ function TeethScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
     const dy = Math.abs(cy - lastY.current);
     if (dy > 16) {
       strokes.current += 1; lastY.current = cy; pulse();
-      if (strokes.current >= 8 && stage === 1) { setStage(2); strokes.current = 0; stop(); playFx(onaySes); }
-      else if (strokes.current >= 8 && stage === 2) { setStage(3); stop(); playFx(onaySes); setTimeout(() => onSuccess(), 600); }
+      if (strokes.current >= 14 && stage === 1) { setStage(2); strokes.current = 0; stop(); }
+      else if (strokes.current >= 14 && stage === 2) { setStage(3); stop(); setTimeout(() => onSuccess(), 600); }
     }
   };
   const endHold = () => { setHolding(false); setBrushPos(null); stop(); };
@@ -440,8 +445,8 @@ function HairScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFai
     const dx = Math.abs(cx - lastX.current);
     if (dx > 36) {
       strokes.current += 1; lastX.current = cx; pulse();
-      if (strokes.current >= 7 && stage === 0) { setStage(1); strokes.current = 0; stop(); playFx(onaySes); }
-      else if (strokes.current >= 7 && stage === 1) { setStage(2); stop(); playFx(onaySes); setTimeout(() => onSuccess(), 600); }
+      if (strokes.current >= 12 && stage === 0) { setStage(1); strokes.current = 0; stop(); }
+      else if (strokes.current >= 12 && stage === 1) { setStage(2); stop(); setTimeout(() => onSuccess(), 600); }
     }
   };
   const endHold = () => { setHolding(false); setCombPos(null); stop(); };
@@ -477,6 +482,8 @@ function SleepScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
   const [done, setDone] = useState(false);
   const [holding, setHolding] = useState(false);
   const [bedPos, setBedPos] = useState<{ x: number; y: number } | null>(null);
+  const [yawnVisible, setYawnVisible] = useState(false);
+  const [bedVisible, setBedVisible] = useState(false);
   const yawnRef = useRef<HTMLVideoElement>(null);
   const bedRef = useRef<HTMLVideoElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
@@ -535,8 +542,29 @@ function SleepScene({ onSuccess, onFail, locked }: { onSuccess: () => void; onFa
   return (
     <div className="flex flex-col items-center h-full w-full relative">
       <div ref={dropRef} className="flex-1 flex items-center justify-center w-full px-4 relative">
-        <video ref={yawnRef} className={videoClass} style={{ display: done ? 'none' : 'block' }} playsInline muted controls={false} disablePictureInPicture preload="auto" />
-        <video ref={bedRef} className={videoClass} style={{ display: done ? 'block' : 'none' }} playsInline muted controls={false} disablePictureInPicture preload="auto" />
+        <video
+          ref={yawnRef}
+          className={videoClass + (yawnVisible ? ' opacity-100' : ' opacity-0')}
+          style={{ display: done ? 'none' : 'block', backgroundColor: '#000' }}
+          playsInline
+          muted
+          controls={false}
+          disablePictureInPicture
+          preload="auto"
+          onPlaying={() => setYawnVisible(true)}
+          onPause={() => setYawnVisible(false)}
+        />
+        <video
+          ref={bedRef}
+          className={videoClass + (bedVisible ? ' opacity-100' : ' opacity-0')}
+          style={{ display: done ? 'block' : 'none', backgroundColor: '#000' }}
+          playsInline
+          muted
+          controls={false}
+          disablePictureInPicture
+          preload="auto"
+          onPlaying={() => setBedVisible(true)}
+        />
       </div>
       <div className="shrink-0 flex items-center justify-center gap-4 pb-6 pt-2 px-2">
         {options.map((opt) => {
@@ -573,21 +601,54 @@ export default function Yonerge13({ itemCode = 'YTB 4.2', itemText = 'Mantık Ku
   const [score, setScore] = useState(0);
   const [locked, setLocked] = useState(false);
   const trial = trials[idx];
+  const [instrReady, setInstrReady] = useState(false);
   const instrAudioRef = useRef<HTMLAudioElement | null>(null);
+
   useEffect(() => {
-    if (!trial) return;
-    // Öğretmen yönergelerinde ses yok
-    if (trial.type === 'teacher') return;
-    const src = ses42(SES42_BY_ID[trial.id] || '');
+    if (phase !== 'select') return;
+    const src = ses42('yonergegiris');
     if (!src) return;
+    let a: HTMLAudioElement | null = null;
     try {
-      if (instrAudioRef.current) { instrAudioRef.current.pause(); instrAudioRef.current = null; }
-      const a = new Audio(src);
+      a = new Audio(src);
       a.volume = 1;
-      instrAudioRef.current = a;
       a.play().catch(() => {});
     } catch { /* */ }
+    return () => { if (a) { a.pause(); a.src = ''; } };
+  }, [phase]);
+
+  useEffect(() => {
+    setInstrReady(false);
+    if (!trial) return;
+    if (trial.type === 'teacher') {
+      setInstrReady(true);
+      return;
+    }
+    const src = ses42(SES42_BY_ID[trial.id] || '');
+    if (!src) {
+      setInstrReady(true);
+      return;
+    }
+    let finished = false;
+    const markReady = () => {
+      if (finished) return;
+      finished = true;
+      setInstrReady(true);
+    };
+    try {
+      if (instrAudioRef.current) { instrAudioRef.current.pause(); instrAudioRef.current = null; }
+      const audio = new Audio(src);
+      audio.volume = 1;
+      instrAudioRef.current = audio;
+      audio.addEventListener('ended', markReady, { once: true });
+      audio.addEventListener('error', markReady, { once: true });
+      audio.play().catch(markReady);
+    } catch {
+      markReady();
+    }
+    const safety = setTimeout(markReady, 10000);
     return () => {
+      clearTimeout(safety);
       if (instrAudioRef.current) { instrAudioRef.current.pause(); instrAudioRef.current = null; }
     };
   }, [trial?.id]);
@@ -707,7 +768,7 @@ export default function Yonerge13({ itemCode = 'YTB 4.2', itemText = 'Mantık Ku
           <div className="relative flex-1 min-h-0 flex flex-col">
             {trial.type === 'candle' && (
               <div className="flex-1 flex flex-col items-center justify-center gap-4">
-                <LiveCandle active={!locked} onExtinguish={() => finishTrial(true)} onFail={() => finishTrial(false)} />
+                <LiveCandle active={!locked && instrReady} onExtinguish={() => finishTrial(true)} onFail={() => finishTrial(false)} />
                 <p className="text-xs text-slate-400 mt-2">Salla veya üfle → mum söner · 10 sn</p>
               </div>
             )}
@@ -724,14 +785,17 @@ export default function Yonerge13({ itemCode = 'YTB 4.2', itemText = 'Mantık Ku
               </div>
             )}
           </div>
-          <div className="shrink-0 p-3 pb-5 border-t border-slate-800 bg-slate-900/95 flex gap-3 justify-center">
-            <button type="button" disabled={locked} onClick={() => finishTrial(false)} className="flex-1 max-w-[160px] flex items-center justify-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 disabled:opacity-40 active:scale-95">
-              <X className="w-5 h-5" /><span className="text-xs font-bold uppercase">Yapamadı</span>
-            </button>
-            <button type="button" disabled={locked} onClick={() => finishTrial(true)} className="flex-1 max-w-[160px] flex items-center justify-center gap-2 p-3 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 disabled:opacity-40 active:scale-95">
-              <Check className="w-5 h-5" /><span className="text-xs font-bold uppercase">Yaptı</span>
-            </button>
-          </div>
+
+          {trial.type === 'teacher' && (
+            <div className="shrink-0 p-3 pb-5 border-t border-slate-800 bg-slate-900/95 flex gap-3 justify-center">
+              <button type="button" disabled={locked} onClick={() => finishTrial(false)} className="flex-1 max-w-[160px] flex items-center justify-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 disabled:opacity-40 active:scale-95">
+                <X className="w-5 h-5" /><span className="text-xs font-bold uppercase">Yapamadı</span>
+              </button>
+              <button type="button" disabled={locked} onClick={() => finishTrial(true)} className="flex-1 max-w-[160px] flex items-center justify-center gap-2 p-3 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 disabled:opacity-40 active:scale-95">
+                <Check className="w-5 h-5" /><span className="text-xs font-bold uppercase">Yaptı</span>
+              </button>
+            </div>
+          )}
         </>
       )}
       {phase === 'result' && (

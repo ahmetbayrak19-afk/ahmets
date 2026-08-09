@@ -733,26 +733,15 @@ export default function Yonerge18({
 
           <div className="shrink-0 p-3 pb-5 border-t border-slate-800 bg-slate-900/95 flex gap-3 justify-center items-center">
             {trial.mode === 'digital' && (
-              <>
-                <button
-                  type="button"
-                  disabled={locked}
-                  onClick={swapDigital}
-                  className="flex items-center justify-center gap-1.5 px-3 py-3 rounded-xl bg-slate-800 border border-slate-600 text-slate-300 disabled:opacity-40 active:scale-95"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  <span className="text-xs font-bold">Değiştir</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={locked}
-                  onClick={() => finishTrial(false)}
-                  className="flex items-center justify-center gap-1.5 px-3 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 disabled:opacity-40 active:scale-95"
-                >
-                  <X className="w-4 h-4" />
-                  <span className="text-xs font-bold">Yapamadı</span>
-                </button>
-              </>
+              <button
+                type="button"
+                disabled={locked}
+                onClick={swapDigital}
+                className="flex items-center justify-center gap-1.5 px-6 py-3 rounded-xl bg-slate-800 border border-slate-600 text-slate-300 disabled:opacity-40 active:scale-95"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span className="text-xs font-bold">Değiştir</span>
+              </button>
             )}
             {trial.mode === 'teacher' && (
               <>
