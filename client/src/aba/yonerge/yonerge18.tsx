@@ -3,6 +3,17 @@ import { XCircle, Check, X, Trophy, RefreshCw } from 'lucide-react';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 
 import onaySes from './sesgorsel/onay.mp3';
+
+const SES47 = import.meta.glob('./sesgorsel/ses/47ses/*.mp3', { eager: true, import: 'default' }) as Record<string, string>;
+function ses47(name: string): string {
+  return SES47[`./sesgorsel/ses/47ses/${name}.mp3`] || '';
+}
+/** DIGITAL_POOL sırası: t1–t9 → 1–9, d1–d10 → 10–19 */
+const SES47_BY_ID: Record<string, string> = {
+  t1: '1', t2: '2', t3: '3', t4: '4', t5: '5', t6: '6', t7: '7', t8: '8', t9: '9',
+  d1: '10', d2: '11', d3: '12', d4: '13', d5: '14', d6: '15', d7: '16', d8: '17', d9: '18', d10: '19',
+};
+
 import devametNotr from '@/aba/esle/ses/devametnotr.mp3';
 import devamet2Notr from '@/aba/esle/ses/devamet2notr.mp3';
 import simdisiradakiNotr from '@/aba/esle/ses/simdisiradakinotr.mp3';
@@ -300,6 +311,23 @@ export default function Yonerge18({
   });
 
   const trial = trials[idx];
+  const instrAudioRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    if (!trial || trial.mode !== 'digital') return;
+    const src = ses47(SES47_BY_ID[trial.task.id] || '');
+    if (!src) return;
+    try {
+      if (instrAudioRef.current) { instrAudioRef.current.pause(); instrAudioRef.current = null; }
+      const a = new Audio(src);
+      a.volume = 1;
+      instrAudioRef.current = a;
+      a.play().catch(() => {});
+    } catch { /* */ }
+    return () => {
+      if (instrAudioRef.current) { instrAudioRef.current.pause(); instrAudioRef.current = null; }
+    };
+  }, [trial?.mode === 'digital' ? trial.task.id : null]);
+
   const usedDigitalIds = useMemo(
     () => new Set(trials.filter((t) => t.mode === 'digital').map((t) => t.task.id)),
     [trials],
@@ -556,9 +584,6 @@ export default function Yonerge18({
                   <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">
                     Dijital · koşullu yönerge
                   </p>
-                  <h1 className="text-base sm:text-xl font-black leading-snug text-white">
-                    {trial.task.text}
-                  </h1>
                   {trial.task.kind === 'tap' && (
                     <p className="text-[11px] text-slate-400 mt-1">
                       Dokunuş: {tapCount}/{trial.task.tapsNeeded || 1}

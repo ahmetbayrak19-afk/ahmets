@@ -3,6 +3,17 @@ import { XCircle, Check, X, Trophy, RefreshCw, Eraser } from 'lucide-react';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 
 import onaySes from './sesgorsel/onay.mp3';
+
+const SES45 = import.meta.glob('./sesgorsel/ses/45ses/*.mp3', { eager: true, import: 'default' }) as Record<string, string>;
+function ses45(name: string): string {
+  return SES45[`./sesgorsel/ses/45ses/${name}.mp3`] || '';
+}
+/** DIGITAL_POOL sırası: d1→1 … d12→12 */
+const SES45_BY_ID: Record<string, string> = {
+  d1: '1', d2: '2', d3: '3', d4: '4', d5: '5', d6: '6',
+  d7: '7', d8: '8', d9: '9', d10: '10', d11: '11', d12: '12',
+};
+
 import devametNotr from '@/aba/esle/ses/devametnotr.mp3';
 import devamet2Notr from '@/aba/esle/ses/devamet2notr.mp3';
 import simdisiradakiNotr from '@/aba/esle/ses/simdisiradakinotr.mp3';
@@ -395,6 +406,23 @@ export default function Yonerge16({
   });
 
   const trial = trials[idx];
+  const instrAudioRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    if (!trial || trial.mode !== 'digital') return;
+    const src = ses45(SES45_BY_ID[trial.task.id] || '');
+    if (!src) return;
+    try {
+      if (instrAudioRef.current) { instrAudioRef.current.pause(); instrAudioRef.current = null; }
+      const a = new Audio(src);
+      a.volume = 1;
+      instrAudioRef.current = a;
+      a.play().catch(() => {});
+    } catch { /* */ }
+    return () => {
+      if (instrAudioRef.current) { instrAudioRef.current.pause(); instrAudioRef.current = null; }
+    };
+  }, [trial?.mode === 'digital' ? trial.task.id : null]);
+
   const usedDigitalIds = useMemo(
     () => new Set(trials.filter((t) => t.mode === 'digital').map((t) => t.task.id)),
     [trials],
@@ -462,7 +490,6 @@ export default function Yonerge16({
               <>
                 <div className="shrink-0 px-4 pt-2 pb-1 text-center">
                   <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Dijital çizim</p>
-                  <h1 className="text-lg sm:text-2xl font-black leading-snug text-white">{trial.task.text}</h1>
                 </div>
                 <DrawCanvas key={trial.task.id} task={trial.task} locked={locked} onSuccess={() => finishTrial(true)} onFail={() => finishTrial(false)} />
               </>
