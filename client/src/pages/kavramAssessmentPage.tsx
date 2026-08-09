@@ -352,6 +352,67 @@ const CATEGORY_MAP = [
   { id: 'Sıcak-Soğuk', title: 'Sıcak-Soğuk', icon: <ThermometerSun />, isGame: true },
 ];
 
+/** Ana başlıklar ve alt kategoriler. contentId → CATEGORY_MAP.id; empty → henüz içerik yok */
+const CATEGORY_GROUPS: {
+  id: string;
+  title: string;
+  children: { title: string; contentId?: string; empty?: boolean; gameIds?: string[] }[];
+}[] = [
+  {
+    id: 'nesneler',
+    title: 'NESNELER (Eşyalarımız)',
+    children: [
+      { title: 'Sınıf ve Okul Eşyaları', empty: true },
+      { title: 'Ev Eşyaları', empty: true },
+      { title: 'Giysiler', contentId: 'clothes' },
+    ],
+  },
+  {
+    id: 'canlilar',
+    title: 'CANLILAR VE ÇEVREMİZ',
+    children: [
+      { title: 'Vücudumuz', contentId: 'limbs' },
+      { title: 'Hayvanlar', contentId: 'animals' },
+      { title: 'Taşıtlar', contentId: 'vehicles' },
+      { title: 'Meslekler', contentId: 'jobs' },
+      { title: 'Çevremizdeki Mekanlar', empty: true },
+    ],
+  },
+  {
+    id: 'yiyecekler',
+    title: 'YİYECEKLER VE İÇECEKLER',
+    children: [
+      { title: 'Meyveler', contentId: 'fruits' },
+      { title: 'Sebzeler', contentId: 'vegetables' },
+      { title: 'İçecekler', empty: true },
+      { title: 'Temel Gıdalar', empty: true },
+    ],
+  },
+  {
+    id: 'akademik',
+    title: 'TEMEL AKADEMİK KAVRAMLAR',
+    children: [
+      { title: 'Renkler', contentId: 'colors' },
+      { title: 'Şekiller', contentId: 'shapes' },
+      { title: 'Sayılar', empty: true },
+      { title: 'Zaman ve Doğa', empty: true },
+    ],
+  },
+  {
+    id: 'eylemler',
+    title: 'EYLEMLER VE DURUM KAVRAMLARI',
+    children: [
+      {
+        title: 'Zıt Kavramlar',
+        gameIds: ['Boş-Dolu', 'Az-Çok', 'Ağır-Hafif', 'Açık-Kapalı', 'Uzun-Kısa', 'Büyük-Küçük', 'Sıcak-Soğuk'],
+      },
+      { title: 'Temel Konumlar', empty: true },
+      { title: 'Eylemler (Hareketler)', empty: true },
+      { title: 'Duygular', contentId: 'emotions' },
+    ],
+  },
+];
+
 const shuffleArray = (array: any[]) => {
   let currentIndex = array.length, randomIndex;
   while (currentIndex !== 0) {
@@ -368,6 +429,7 @@ export default function KavramAssessmentPage() {
   const { students } = useStudentData();
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
+  const [expandedChild, setExpandedChild] = useState<string | null>(null);
   
   // Oyun state'leri
   const [activeGame, setActiveGame] = useState<string | null>(null); 
@@ -678,6 +740,39 @@ export default function KavramAssessmentPage() {
     return Math.round((naming + showing) / 2);
   };
 
+  const getCatById = (id: string) => CATEGORY_MAP.find((c) => c.id === id);
+
+  const calculateChildScore = (child: {
+    contentId?: string;
+    empty?: boolean;
+    gameIds?: string[];
+  }): number | null => {
+    if (child.empty) return null;
+    if (child.gameIds && child.gameIds.length) {
+      const scores = child.gameIds
+        .map((gid) => {
+          const cat = getCatById(gid);
+          return cat ? calculateScore(cat) : null;
+        })
+        .filter((s): s is number => s !== null);
+      if (!scores.length) return null;
+      return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+    }
+    if (child.contentId) {
+      const cat = getCatById(child.contentId);
+      return cat ? calculateScore(cat) : null;
+    }
+    return null;
+  };
+
+  const calculateGroupScore = (group: (typeof CATEGORY_GROUPS)[number]): number | null => {
+    const scores = group.children
+      .map((ch) => calculateChildScore(ch))
+      .filter((s): s is number => s !== null);
+    if (!scores.length) return null;
+    return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  };
+
   const getScoreColor = (score: number | null) => {
     if (score === null) return "bg-slate-800 border-slate-700 opacity-80 hover:opacity-100 hover:border-slate-500";
     if (score === 100) return "bg-emerald-500/10 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/20";
@@ -948,44 +1043,116 @@ export default function KavramAssessmentPage() {
 
       <main className="max-w-4xl mx-auto">
         {loading ? <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" size={40}/></div> : (
-          <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {CATEGORY_MAP.map((cat) => {
-              const score = calculateScore(cat);
-              const colorClass = getScoreColor(score);
-              const barColor = getProgressBarColor(score);
-
+          <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
+            {CATEGORY_GROUPS.map((group) => {
+              const groupScore = calculateGroupScore(group);
+              const groupColor = getScoreColor(groupScore);
+              const groupBar = getProgressBarColor(groupScore);
               return (
-                <button 
-                  key={cat.id} 
-                  onClick={() => startEvaluation(cat)}
-                  className={twMerge(
-                    "relative group flex flex-col items-start p-4 rounded-xl border transition-all duration-300 overflow-hidden h-32",
-                    colorClass
+                <div key={group.id} className="rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden">
+                  {/* Ana başlık */}
+                  <div className={twMerge("px-4 py-3 flex items-center justify-between gap-3 border-b border-slate-800/80", groupColor)}>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold tracking-widest uppercase text-slate-400">Ana kategori</p>
+                      <h3 className="text-sm sm:text-base font-black text-white leading-snug">{group.title}</h3>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={twMerge("text-lg font-black tabular-nums", groupScore === null ? "text-slate-500" : "text-white")}>
+                        {groupScore === null ? "—" : `%${groupScore}`}
+                      </p>
+                      <p className="text-[10px] text-slate-400">ortalama</p>
+                    </div>
+                  </div>
+                  {groupScore !== null && (
+                    <div className="h-1 w-full bg-slate-800">
+                      <div className={twMerge("h-full transition-all duration-500", groupBar)} style={{ width: `${groupScore}%` }} />
+                    </div>
                   )}
-                >
-                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity transform group-hover:scale-110 duration-500">
-                    <div className="scale-[2.5]">{cat.icon}</div>
-                  </div>
 
-                  <div className="relative z-10 w-full flex flex-col h-full justify-between">
-                    <div className="flex items-start justify-between w-full">
-                      <div className={twMerge("p-2 rounded-lg bg-black/20 backdrop-blur-sm border border-white/10", score === 100 ? "text-emerald-400" : "text-white/70")}>
-                        {cat.icon}
-                      </div>
-                      {score !== null && (
-                        <div className="flex flex-col items-end">
-                          <span className="text-2xl font-black tracking-tighter">{score}%</span>
+                  {/* Alt kategoriler */}
+                  <div className="p-2 space-y-1.5">
+                    {group.children.map((child) => {
+                      const childKey = `${group.id}:${child.title}`;
+                      const score = calculateChildScore(child);
+                      const colorClass = getScoreColor(score);
+                      const barColor = getProgressBarColor(score);
+                      const isEmpty = !!child.empty;
+                      const isGames = !!(child.gameIds && child.gameIds.length);
+                      const cat = child.contentId ? getCatById(child.contentId) : null;
+                      const expanded = expandedChild === childKey;
+
+                      return (
+                        <div key={childKey}>
+                          <button
+                            type="button"
+                            disabled={isEmpty}
+                            onClick={() => {
+                              if (isEmpty) return;
+                              if (isGames) {
+                                setExpandedChild(expanded ? null : childKey);
+                                return;
+                              }
+                              if (cat) startEvaluation(cat);
+                            }}
+                            className={twMerge(
+                              "w-full relative flex items-center gap-3 p-3 rounded-xl border transition-all text-left",
+                              isEmpty
+                                ? "border-slate-800/60 bg-slate-950/40 opacity-50 cursor-not-allowed"
+                                : colorClass + " hover:brightness-110 active:scale-[0.99]",
+                            )}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-white truncate">{child.title}</span>
+                                {isEmpty && (
+                                  <span className="text-[9px] uppercase tracking-wide text-slate-500 border border-slate-700 rounded px-1.5 py-0.5">Boş</span>
+                                )}
+                                {isGames && (
+                                  <span className="text-[9px] text-slate-400">{expanded ? "▲" : "▼"}</span>
+                                )}
+                              </div>
+                              {!isEmpty && score !== null && (
+                                <div className="mt-1.5 h-1.5 w-full max-w-[140px] bg-black/30 rounded-full overflow-hidden">
+                                  <div className={twMerge("h-full rounded-full", barColor)} style={{ width: `${score}%` }} />
+                                </div>
+                              )}
+                            </div>
+                            <div className={twMerge("text-base font-black tabular-nums shrink-0", score === null ? "text-slate-500" : "text-white")}>
+                              {isEmpty ? "—" : score === null ? "—" : `%${score}`}
+                            </div>
+                          </button>
+
+                          {isGames && expanded && (
+                            <div className="mt-1 ml-2 pl-2 border-l border-slate-700 space-y-1">
+                              {child.gameIds!.map((gid) => {
+                                const gcat = getCatById(gid);
+                                if (!gcat) return null;
+                                const gs = calculateScore(gcat);
+                                const gc = getScoreColor(gs);
+                                return (
+                                  <button
+                                    key={gid}
+                                    type="button"
+                                    onClick={() => startEvaluation(gcat)}
+                                    className={twMerge(
+                                      "w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-left text-sm",
+                                      gc,
+                                    )}
+                                  >
+                                    <span className="font-semibold text-white/90">{gcat.title}</span>
+                                    <span className="font-bold tabular-nums text-white/80">
+                                      {gs === null ? "—" : `%${gs}`}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <div className="w-full">
-                      <h3 className="text-sm font-bold leading-tight mb-2">{cat.title}</h3>
-                      <div className="h-1.5 w-full bg-black/20 rounded-full overflow-hidden">
-                        <div className={`h-full ${barColor} transition-all duration-500`} style={{ width: `${score || 0}%` }}></div>
-                      </div>
-                    </div>
+                      );
+                    })}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
