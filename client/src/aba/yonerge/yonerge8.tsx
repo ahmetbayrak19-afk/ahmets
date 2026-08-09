@@ -3,6 +3,7 @@ import {
   XCircle, Check, X, Trophy, PlayCircle, RefreshCw, ListOrdered, Box,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { ScreenOrientation } from '@capacitor/screen-orientation';
 import Yonerge8Tutorial from './Yonerge8Tutorial';
 
 import topImg from './sesgorsel/top.png';
@@ -237,9 +238,9 @@ type Phase = 'prep' | 'running' | 'result';
 
 const HOLD_OK_MS = 500;
 const MOVE_FOR_DRAG = 8;
-const SHAKE_THRESHOLD = 6;
-/** En az 1.5 sn aktif sallama */
-const SHAKE_MIN_MS = 1500;
+const SHAKE_THRESHOLD = 3;
+/** En az ~0.85 sn aktif sallama — biraz serbest */
+const SHAKE_MIN_MS = 850;
 const TAP_MAX_MOVE = 18;
 const HOLD_CANCEL_MOVE = 55;
 
@@ -251,6 +252,30 @@ export default function Yonerge8({
   const [showTut, setShowTut] = useState(false);
   const [selected, setSelected] = useState<SequentialTask[]>(() => shuffle(TASK_POOL).slice(0, 10));
   const [phase, setPhase] = useState<Phase>('prep');
+
+  useEffect(() => {
+    const lock = async () => {
+      try {
+        if ((window as any).AndroidOrientation) {
+          (window as any).AndroidOrientation.lockOrientation('portrait');
+        } else {
+          await ScreenOrientation.lock({ orientation: 'portrait' });
+        }
+      } catch (e) {
+        console.log('Portrait lock hatası:', e);
+      }
+    };
+    lock();
+    return () => {
+      try {
+        if ((window as any).AndroidOrientation) {
+          (window as any).AndroidOrientation.lockOrientation('unlock');
+        } else {
+          ScreenOrientation.unlock();
+        }
+      } catch { /* */ }
+    };
+  }, []);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [locked, setLocked] = useState(false);
@@ -349,27 +374,35 @@ export default function Yonerge8({
   };
 
   /** Ghost src + konum — React re-render'da (0,0)/boş src flaşı olmasın diye ref ile yönetilir */
-  const applyGhostDom = (id: string | null, x: number, y: number, angle = 0) => {
+  const applyGhostDom = (id: string | null, x: number, y: number, angle = 0, grow = false) => {
     const el = ghostRef.current;
     if (!el) return;
     if (id && OBJECTS[id]?.img) {
       const src = OBJECTS[id].img!;
       if (el.getAttribute('src') !== src) el.setAttribute('src', src);
     }
-    el.style.left = `${x - 56}px`;
-    el.style.top = `${y - 56}px`;
-    el.style.transform = `rotate(${angle}deg)`;
+    // Tutunca büyüsün (marakas sallama)
+    const size = grow ? 80 : 56; // yarı genişlik
+    el.style.width = grow ? '160px' : '112px';
+    el.style.height = grow ? '160px' : '112px';
+    el.style.left = `${x - size}px`;
+    el.style.top = `${y - size}px`;
+    el.style.transform = grow
+      ? `rotate(${angle}deg) scale(1.12)`
+      : `rotate(${angle}deg)`;
     el.style.display = id ? 'block' : 'none';
-    el.style.opacity = id ? '0.95' : '0';
+    el.style.opacity = id ? '1' : '0';
+    el.style.filter = grow ? 'drop-shadow(0 8px 16px rgba(0,0,0,0.45))' : '';
   };
 
-  const updateGhostPos = (x: number, y: number, angle = 0) => {
+  const updateGhostPos = (x: number, y: number, angle = 0, grow = false) => {
     dragPosRef.current = { x, y };
     if (rafRef.current != null) return;
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = null;
       const id = ptr.current?.id ?? null;
-      applyGhostDom(id, dragPosRef.current.x, dragPosRef.current.y, angle);
+      const doGrow = grow || !!ptr.current?.isShakeTarget;
+      applyGhostDom(id, dragPosRef.current.x, dragPosRef.current.y, angle, doGrow);
     });
   };
 
@@ -510,17 +543,23 @@ export default function Yonerge8({
 
       if (p.isShakeTarget || p.moved) {
         // Önce DOM'da ghost src+konum, sonra state (flash önleme)
-        applyGhostDom(p.id, e.clientX, e.clientY, p.isShakeTarget
-          ? Math.max(-28, Math.min(28, dx * 0.35 + Math.sin(Date.now() / 60) * 8))
-          : 0);
+        applyGhostDom(
+          p.id,
+          e.clientX,
+          e.clientY,
+          p.isShakeTarget
+            ? Math.max(-32, Math.min(32, dx * 0.4 + Math.sin(Date.now() / 55) * 10))
+            : 0,
+          p.isShakeTarget,
+        );
         setDragId((prev) => (prev === p.id ? prev : p.id));
         const angle = p.isShakeTarget
           ? Math.max(-28, Math.min(28, dx * 0.35 + Math.sin(Date.now() / 60) * 8))
           : 0;
-        updateGhostPos(e.clientX, e.clientY, angle);
+        updateGhostPos(e.clientX, e.clientY, angle, p.isShakeTarget);
       }
 
-      // Sallama: aktif hareket süresini biriktir, min 1.5 sn
+      // Sallama: aktif hareket süresini biriktir, min ~0.85 sn
       const sdx = e.clientX - p.lastX;
       const sdy = e.clientY - p.lastY;
       const stepDist = Math.sqrt(sdx * sdx + sdy * sdy);
@@ -675,8 +714,8 @@ export default function Yonerge8({
     }
     if (isShakeTarget) {
       setShakeActiveId(id);
-      // Önce src+konum, sonra state
-      applyGhostDom(id, e.clientX, e.clientY, 0);
+      // Tutunca çerçeve yok, ghost büyür
+      applyGhostDom(id, e.clientX, e.clientY, 0, true);
       dragPosRef.current = { x: e.clientX, y: e.clientY };
       setDragId(id);
     }
@@ -810,7 +849,7 @@ export default function Yonerge8({
                           `relative flex flex-col items-center justify-center rounded-2xl border-2 bg-slate-800/80 overflow-hidden w-full h-full p-2 transition-colors duration-150 ` +
                           (wrongId === item.id ? 'border-red-400 ring-2 ring-red-500/50 ' :
                             done ? 'border-green-400 ring-2 ring-green-500/40 bg-green-900/25 opacity-55 ' :
-                            shaking ? 'border-amber-400 ring-2 ring-amber-500/40 ' :
+                            shaking ? 'border-transparent ring-0 bg-transparent shadow-none ' :
                             zilPressed && item.id === 'zil' ? 'border-yellow-400 ring-2 ring-yellow-500/40 ' :
                             'border-slate-700 ') +
                           (locked || done || consumed ? 'pointer-events-none ' : 'cursor-grab active:cursor-grabbing ')
@@ -860,7 +899,7 @@ export default function Yonerge8({
       <img
         ref={ghostRef}
         alt=""
-        className="fixed pointer-events-none z-[200] w-28 h-28 object-contain drop-shadow-2xl"
+        className="fixed pointer-events-none z-[200] object-contain drop-shadow-2xl"
         style={{ display: 'none', left: 0, top: 0, transformOrigin: 'center center', opacity: 0 }}
         draggable={false}
       />
