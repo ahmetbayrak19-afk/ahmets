@@ -233,6 +233,21 @@ import sariImg from '@/colours/sari.jpg';
 import siyahImg from '@/colours/siyah.jpg';
 import turuncuImg from '@/colours/turuncu.jpg';
 import yesilImg from '@/colours/yesil.jpg';
+
+import cetvelImg from '@/okulmalzemeleri/cetvel.png';
+import derskitabiImg from '@/okulmalzemeleri/derskitabi.png';
+import kalemImg from '@/okulmalzemeleri/kalem.png';
+import kalemtrasImg from '@/okulmalzemeleri/kalemtras.png';
+import okulcantasiImg from '@/okulmalzemeleri/okulcantasi.png';
+import okuldefteriImg from '@/okulmalzemeleri/okuldefteri.png';
+import okulkiyafetiImg from '@/okulmalzemeleri/okulkiyafeti.png';
+import panoImg from '@/okulmalzemeleri/pano.png';
+import silgiImg from '@/okulmalzemeleri/silgi.png';
+import sinifsirasiImg from '@/okulmalzemeleri/sinifsirasi.png';
+import siniftahtasiImg from '@/okulmalzemeleri/siniftahtasi.png';
+import suluboyaImg from '@/okulmalzemeleri/suluboya.png';
+import sulukImg from '@/okulmalzemeleri/suluk.png';
+
 import besgenImg from '@/shapes/besgen.jpg';
 import daireImg from '@/shapes/daire.jpg';
 import dikdortgenImg from '@/shapes/dikdortgen.jpg';
@@ -306,6 +321,21 @@ const FRUITS_WITH_IMAGE = [ { name: "Ananas", src: ananasImg }, { name: "Armut",
 const VEGETABLES_WITH_IMAGE = [ { name: "Biber", src: biberImg }, { name: "Brokoli", src: brokoliImg }, { name: "Domates", src: domatesImg }, { name: "Havuç", src: havucImg }, { name: "Kabak", src: kabakImg }, { name: "Mantar", src: mantarImg }, { name: "Mısır", src: misirImg }, { name: "Patates", src: patatesImg }, { name: "Patlıcan", src: patlicanImg }, { name: "Salatalık", src: salatalikImg }, { name: "Soğan", src: soganImg } ];
 const CLOTHES_WITH_IMAGE = [ { name: "Atlet", src: atletImg }, { name: "Ayakkabı", src: ayakkabiImg }, { name: "Çorap", src: corapImg }, { name: "Etek", src: etekImg }, { name: "Gömlek", src: gomlekImg }, { name: "Kaban", src: kabanImg }, { name: "Kazak", src: kazakImg }, { name: "Pantolon", src: pantolonImg }, { name: "Şapka", src: sapkaImg }, { name: "Tişört", src: tshirtImg } ];
 const COLOURS_WITH_IMAGE = [ { name: "Beyaz", src: beyazImg }, { name: "Kırmızı", src: kirmiziImg }, { name: "Mavi", src: maviImg }, { name: "Mor", src: morImg }, { name: "Sarı", src: sariImg }, { name: "Siyah", src: siyahImg }, { name: "Turuncu", src: turuncuImg }, { name: "Yeşil", src: yesilImg } ];
+const SCHOOL_WITH_IMAGE = [
+  { name: "Cetvel", src: cetvelImg },
+  { name: "Ders kitabı", src: derskitabiImg },
+  { name: "Kalem", src: kalemImg },
+  { name: "Kalemtraş", src: kalemtrasImg },
+  { name: "Okul çantası", src: okulcantasiImg },
+  { name: "Okul defteri", src: okuldefteriImg },
+  { name: "Okul kıyafeti", src: okulkiyafetiImg },
+  { name: "Pano", src: panoImg },
+  { name: "Silgi", src: silgiImg },
+  { name: "Sınıf sırası", src: sinifsirasiImg },
+  { name: "Sınıf tahtası", src: siniftahtasiImg },
+  { name: "Suluboya", src: suluboyaImg },
+  { name: "Suluk", src: sulukImg },
+];
 const SHAPES_WITH_IMAGE = [ { name: "Beşgen", src: besgenImg }, { name: "Daire", src: daireImg }, { name: "Dikdörtgen", src: dikdortgenImg }, { name: "Kare", src: kareImg }, { name: "Üçgen", src: ucgenImg } ];
 
 const ANIMAL_DISCRIMINATION_SCENARIOS = [
@@ -340,6 +370,7 @@ const CATEGORY_MAP = [
   { id: 'fruits', title: 'Meyveler', icon: <Apple />, data: FRUITS_WITH_IMAGE, type: 'image' },
   { id: 'vegetables', title: 'Sebzeler', icon: <Carrot />, data: VEGETABLES_WITH_IMAGE, type: 'image' },
   { id: 'clothes', title: 'Giysiler', icon: <Shirt />, data: CLOTHES_WITH_IMAGE, type: 'image' },
+  { id: 'school', title: 'Sınıf ve Okul Eşyaları', icon: <Briefcase />, data: SCHOOL_WITH_IMAGE, type: 'image' },
   { id: 'colors', title: 'Renkler', icon: <Palette />, data: COLOURS_WITH_IMAGE, type: 'image' },
   { id: 'shapes', title: 'Şekiller', icon: <Shapes />, data: SHAPES_WITH_IMAGE, type: 'image' },
   { id: 'emotions', title: 'Duygular', icon: <Smile />, data: EMOTIONS_WITH_VIDEO, type: 'video' },
@@ -362,7 +393,7 @@ const CATEGORY_GROUPS: {
     id: 'nesneler',
     title: 'NESNELER (Eşyalarımız)',
     children: [
-      { title: 'Sınıf ve Okul Eşyaları', empty: true },
+      { title: 'Sınıf ve Okul Eşyaları', contentId: 'school' },
       { title: 'Ev Eşyaları', empty: true },
       { title: 'Giysiler', contentId: 'clothes' },
     ],
