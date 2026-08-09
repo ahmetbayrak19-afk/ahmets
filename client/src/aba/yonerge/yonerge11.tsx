@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  XCircle, Trophy, Eraser, Sparkles, Pencil,
+  XCircle, Check, X, Trophy, Eraser, Sparkles, Pencil,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -541,6 +541,7 @@ export default function Yonerge11({
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const w = parent.clientWidth;
     const h = parent.clientHeight;
+    if (w < 8 || h < 8) return;
     canvas.width = Math.floor(w * dpr);
     canvas.height = Math.floor(h * dpr);
     canvas.style.width = `${w}px`;
@@ -606,12 +607,19 @@ export default function Yonerge11({
   useEffect(() => {
     setupCanvas();
     redraw();
+    const t1 = requestAnimationFrame(() => {
+      setupCanvas();
+      redraw();
+    });
     const onResize = () => {
       setupCanvas();
       redraw();
     };
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    return () => {
+      cancelAnimationFrame(t1);
+      window.removeEventListener('resize', onResize);
+    };
   }, [setupCanvas, redraw, currentIndex]);
 
   const getPos = (e: React.PointerEvent<HTMLCanvasElement>): Pt => {
