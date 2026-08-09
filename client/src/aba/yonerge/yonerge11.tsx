@@ -1,8 +1,22 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  XCircle, Check, X, Trophy, Eraser, Sparkles, Pencil,
+  XCircle, Trophy, Eraser, Sparkles, Pencil,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+
+import { ScreenOrientation } from '@capacitor/screen-orientation';
+
+const SES11 = import.meta.glob('./sesgorsel/ses/11ses/*.mp3', { eager: true, import: 'default' }) as Record<string, string>;
+function ses11(name: string): string {
+  return SES11[`./sesgorsel/ses/11ses/${name}.mp3`] || '';
+}
+/** TASK_POOL sırası: s01→1 … s15→15 */
+const SES11_BY_ID: Record<string, string> = {
+  s01: '1', s02: '2', s03: '3', s04: '4', s05: '5',
+  s06: '6', s07: '7', s08: '8', s09: '9', s10: '10',
+  s11: '11', s12: '12', s13: '13', s14: '14', s15: '15',
+};
+
 
 type ShapeKind =
   | 'plus'
@@ -39,12 +53,9 @@ const TASK_POOL: ShapeTask[] = [
   { id: 's10', kind: 'wave', text: 'Dalga çiz', hint: '〜' },
   { id: 's11', kind: 'l', text: 'L çiz', hint: 'L' },
   { id: 's12', kind: 't', text: 'T çiz', hint: 'T' },
-  { id: 's13', kind: 'v', text: 'V çiz', hint: 'V' },
-  { id: 's14', kind: 'plus', text: 'Artı işareti yap', hint: '+' },
-  { id: 's15', kind: 'cross', text: 'Çarpı işareti yap', hint: '×' },
-  { id: 's16', kind: 'circle', text: 'Yuvarlak çiz', hint: '○' },
-  { id: 's17', kind: 'hline', text: 'Çizgi çiz', hint: '—' },
-  { id: 's18', kind: 'vline', text: 'Dik çizgi çiz', hint: '|' },
+  { id: 's13', kind: 'v', text: 'V şekli çiz', hint: 'V' },
+  { id: 's14', kind: 'circle', text: 'Yuvarlak çiz', hint: '○' },
+  { id: 's15', kind: 'hline', text: 'Çizgi çiz', hint: '—' },
 ];
 
 function shuffle<T>(arr: T[]): T[] {
@@ -83,17 +94,17 @@ function undirectedAngle(deg: number) {
   return a;
 }
 
-function isHoriz(deg: number, tol = 28) {
+function isHoriz(deg: number, tol = 16) {
   const a = undirectedAngle(deg);
   return a <= tol || a >= 180 - tol;
 }
 
-function isVert(deg: number, tol = 28) {
+function isVert(deg: number, tol = 16) {
   const a = undirectedAngle(deg);
   return Math.abs(a - 90) <= tol;
 }
 
-function isDiag(deg: number, tol = 28) {
+function isDiag(deg: number, tol = 16) {
   const a = undirectedAngle(deg);
   return Math.abs(a - 45) <= tol || Math.abs(a - 135) <= tol;
 }
@@ -157,7 +168,7 @@ function effectiveStrokes(strokes: Stroke[]): Stroke[] {
   const out: Stroke[] = [];
   for (const s of strokes) {
     if (s.length < 2) continue;
-    if (strokeLength(s) < 12) continue;
+    if (strokeLength(s) < 20) continue;
     const parts = splitByDirection(s);
     out.push(...parts);
   }
@@ -171,23 +182,23 @@ function checkPlus(strokes: Stroke[]): boolean {
   let v: Stroke | null = null;
   for (const s of segs) {
     const a = strokeAngleDeg(s);
-    if (!h && isHoriz(a) && strokeLength(s) >= 30) h = s;
-    else if (!v && isVert(a) && strokeLength(s) >= 30) v = s;
+    if (!h && isHoriz(a) && strokeLength(s) >= 48) h = s;
+    else if (!v && isVert(a) && strokeLength(s) >= 48) v = s;
   }
   if (!h || !v) return false;
   const bh = bbox(h);
   const bv = bbox(v);
-  return boxesOverlap(bh, bv, 50) || midpointsClose(bh, bv, 100);
+  return boxesOverlap(bh, bv, 32) || midpointsClose(bh, bv, 60);
 }
 
 function checkMinus(strokes: Stroke[]): boolean {
   const segs = effectiveStrokes(strokes);
   if (segs.length === 0) return false;
   // Prefer single dominant horizontal; allow slight multi-stroke
-  const horiz = segs.filter((s) => isHoriz(strokeAngleDeg(s)) && strokeLength(s) >= 40);
+  const horiz = segs.filter((s) => isHoriz(strokeAngleDeg(s)) && strokeLength(s) >= 55);
   if (horiz.length === 0) return false;
   // Reject if strong vertical present (would be plus)
-  const strongVert = segs.some((s) => isVert(strokeAngleDeg(s)) && strokeLength(s) >= 40);
+  const strongVert = segs.some((s) => isVert(strokeAngleDeg(s)) && strokeLength(s) >= 32);
   if (strongVert) return false;
   return true;
 }
@@ -195,32 +206,32 @@ function checkMinus(strokes: Stroke[]): boolean {
 function checkCross(strokes: Stroke[]): boolean {
   const segs = effectiveStrokes(strokes);
   if (segs.length < 2) return false;
-  const diags = segs.filter((s) => isDiag(strokeAngleDeg(s)) && strokeLength(s) >= 30);
+  const diags = segs.filter((s) => isDiag(strokeAngleDeg(s)) && strokeLength(s) >= 48);
   if (diags.length >= 2) {
     const b0 = bbox(diags[0]);
     const b1 = bbox(diags[1]);
-    return boxesOverlap(b0, b1, 55) || midpointsClose(b0, b1, 110);
+    return boxesOverlap(b0, b1, 30) || midpointsClose(b0, b1, 55);
   }
   // Two strokes of opposite-ish diagonal angles
   let d1: Stroke | null = null;
   let d2: Stroke | null = null;
   for (const s of segs) {
-    if (strokeLength(s) < 30) continue;
+    if (strokeLength(s) < 48) continue;
     const a = undirectedAngle(strokeAngleDeg(s));
     if (!d1 && a > 20 && a < 70) d1 = s;
     else if (!d2 && a > 110 && a < 160) d2 = s;
   }
   if (d1 && d2) {
-    return boxesOverlap(bbox(d1), bbox(d2), 55) || midpointsClose(bbox(d1), bbox(d2), 110);
+    return boxesOverlap(bbox(d1), bbox(d2), 30) || midpointsClose(bbox(d1), bbox(d2), 55);
   }
   return false;
 }
 
 function checkVLine(strokes: Stroke[]): boolean {
   const segs = effectiveStrokes(strokes);
-  const verts = segs.filter((s) => isVert(strokeAngleDeg(s)) && strokeLength(s) >= 40);
+  const verts = segs.filter((s) => isVert(strokeAngleDeg(s)) && strokeLength(s) >= 55);
   if (verts.length === 0) return false;
-  const strongHoriz = segs.some((s) => isHoriz(strokeAngleDeg(s)) && strokeLength(s) >= 45);
+  const strongHoriz = segs.some((s) => isHoriz(strokeAngleDeg(s)) && strokeLength(s) >= 32);
   if (strongHoriz) return false;
   return true;
 }
@@ -231,8 +242,8 @@ function checkHLine(strokes: Stroke[]): boolean {
 
 function checkCircle(strokes: Stroke[]): boolean {
   const pts = allPoints(strokes);
-  if (pts.length < 12) return false;
-  if (totalInk(strokes) < 80) return false;
+  if (pts.length < 18) return false;
+  if (totalInk(strokes) < 110) return false;
   let sx = 0, sy = 0;
   for (const p of pts) {
     sx += p.x;
@@ -242,39 +253,46 @@ function checkCircle(strokes: Stroke[]): boolean {
   const cy = sy / pts.length;
   const radii = pts.map((p) => dist(p, { x: cx, y: cy }));
   const mean = radii.reduce((a, b) => a + b, 0) / radii.length;
-  if (mean < 18) return false;
+  if (mean < 24) return false;
   const variance =
     radii.reduce((sum, r) => sum + (r - mean) ** 2, 0) / radii.length;
   const std = Math.sqrt(variance);
   // Tolerant: std relative to radius
-  if (std / mean > 0.45) return false;
+  if (std / mean > 0.32) return false;
   // Rough closure: first and last of overall path reasonably close
   const first = pts[0];
   const last = pts[pts.length - 1];
-  const close = dist(first, last) < mean * 0.85;
+  const close = dist(first, last) < mean * 0.5;
   // Or multiple strokes that cover circle-ish
   return close || strokes.length >= 1;
 }
 
 function checkSquare(strokes: Stroke[]): boolean {
   const segs = effectiveStrokes(strokes);
-  const hs = segs.filter((s) => isHoriz(strokeAngleDeg(s)) && strokeLength(s) >= 25);
-  const vs = segs.filter((s) => isVert(strokeAngleDeg(s)) && strokeLength(s) >= 25);
-  if (hs.length >= 2 && vs.length >= 2) return true;
-  // Single continuous square path: check bbox aspect + enough ink
+  const hs = segs.filter((s) => isHoriz(strokeAngleDeg(s)) && strokeLength(s) >= 40);
+  const vs = segs.filter((s) => isVert(strokeAngleDeg(s)) && strokeLength(s) >= 40);
+  if (hs.length >= 2 && vs.length >= 2) {
+    // Kenar uzunlukları benzer olsun
+    const hLens = hs.map(strokeLength).sort((a,b)=>a-b);
+    const vLens = vs.map(strokeLength).sort((a,b)=>a-b);
+    const hRatio = hLens[0] / hLens[hLens.length-1];
+    const vRatio = vLens[0] / vLens[vLens.length-1];
+    if (hRatio < 0.55 || vRatio < 0.55) return false;
+    return true;
+  }
   const pts = allPoints(strokes);
-  if (pts.length < 16) return false;
+  if (pts.length < 22) return false;
   const b = bbox(pts);
-  if (b.w < 30 || b.h < 30) return false;
+  if (b.w < 40 || b.h < 40) return false;
   const ratio = b.w / b.h;
-  if (ratio < 0.55 || ratio > 1.8) return false;
-  return totalInk(strokes) > (b.w + b.h) * 1.2;
+  if (ratio < 0.72 || ratio > 1.38) return false;
+  return totalInk(strokes) > (b.w + b.h) * 1.6;
 }
 
 function checkTriangle(strokes: Stroke[]): boolean {
   const segs = effectiveStrokes(strokes);
   // Three edges of decent length
-  const edges = segs.filter((s) => strokeLength(s) >= 28);
+  const edges = segs.filter((s) => strokeLength(s) >= 42);
   if (edges.length >= 3) return true;
   // Continuous triangle-ish: enough path + not circle
   const pts = allPoints(strokes);
@@ -466,6 +484,54 @@ export default function Yonerge11({
   const [hasInk, setHasInk] = useState(false);
 
   const current = tasks[currentIndex];
+  const instrAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (!current) return;
+    const src = ses11(SES11_BY_ID[current.id] || '');
+    if (!src) return;
+    try {
+      if (instrAudioRef.current) {
+        instrAudioRef.current.pause();
+        instrAudioRef.current = null;
+      }
+      const a = new Audio(src);
+      a.volume = 1;
+      instrAudioRef.current = a;
+      a.play().catch(() => {});
+    } catch { /* */ }
+    return () => {
+      if (instrAudioRef.current) {
+        instrAudioRef.current.pause();
+        instrAudioRef.current = null;
+      }
+    };
+  }, [current?.id]);
+
+  useEffect(() => {
+    const lock = async () => {
+      try {
+        if ((window as any).AndroidOrientation) {
+          (window as any).AndroidOrientation.lockOrientation('portrait');
+        } else {
+          await ScreenOrientation.lock({ orientation: 'portrait' });
+        }
+      } catch (e) {
+        console.log('Portrait lock hatası:', e);
+      }
+    };
+    lock();
+    return () => {
+      try {
+        if ((window as any).AndroidOrientation) {
+          (window as any).AndroidOrientation.lockOrientation('unlock');
+        } else {
+          ScreenOrientation.unlock();
+        }
+      } catch { /* */ }
+    };
+  }, []);
+
 
   const setupCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -662,18 +728,6 @@ export default function Yonerge11({
       <div className="flex-1 relative flex flex-col min-h-0 overflow-hidden">
         {phase === 'running' && current && (
           <>
-            {/* Instruction */}
-            <div className="shrink-0 px-4 pt-3 pb-2 flex flex-col items-center gap-1">
-              <span className="text-[10px] font-bold tracking-widest uppercase text-sky-400/90 bg-sky-500/10 border border-sky-500/25 px-2.5 py-0.5 rounded-full">
-                Öğrenciye söyleyin · çizsin
-              </span>
-              <h1 className="text-2xl sm:text-3xl font-black text-center text-white leading-tight">
-                {current.text}
-              </h1>
-              <span className="text-4xl text-slate-600 font-light select-none" aria-hidden>
-                {current.hint}
-              </span>
-            </div>
 
             {/* Canvas area */}
             <div className="flex-1 min-h-0 px-3 sm:px-6 pb-2 flex items-center justify-center">
@@ -739,26 +793,6 @@ export default function Yonerge11({
                 <Sparkles size={20} />
                 Kontrol Et
               </button>
-              <div className="flex items-center justify-center gap-3 max-w-md mx-auto">
-                <button
-                  type="button"
-                  onClick={() => handleTeacher(false)}
-                  disabled={locked}
-                  className="flex-1 flex items-center justify-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 hover:bg-red-500/20 disabled:opacity-40 active:scale-95 transition-all"
-                >
-                  <X className="w-5 h-5" />
-                  <span className="text-xs font-bold uppercase">Yapamadı</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleTeacher(true)}
-                  disabled={locked}
-                  className="flex-1 flex items-center justify-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-xl text-green-400 hover:bg-green-500/20 disabled:opacity-40 active:scale-95 transition-all"
-                >
-                  <Check className="w-5 h-5" />
-                  <span className="text-xs font-bold uppercase">Yaptı</span>
-                </button>
-              </div>
               <p className="text-[10px] text-center text-slate-500 max-w-sm mx-auto leading-relaxed">
                 Sistem titrek / hafif yamuk çizimleri kabul eder. Şüphede öğretmen butonlarını kullanın.
               </p>
