@@ -248,6 +248,32 @@ import siniftahtasiImg from '@/okulmalzemeleri/siniftahtasi.png';
 import suluboyaImg from '@/okulmalzemeleri/suluboya.png';
 import sulukImg from '@/okulmalzemeleri/suluk.png';
 
+import bankaImg from '@/mekanlar/banka.png';
+import camiImg from '@/mekanlar/cami.png';
+import eczaneImg from '@/mekanlar/eczane.png';
+import evImg from '@/mekanlar/ev.png';
+import firinImg from '@/mekanlar/firin.png';
+import hastaneImg from '@/mekanlar/hastane.png';
+import havalimaniImg from '@/mekanlar/havalimani.png';
+import karakolImg from '@/mekanlar/karakol.png';
+import kasapImg from '@/mekanlar/kasap.png';
+import manavImg from '@/mekanlar/manav.png';
+import marketImg from '@/mekanlar/market.png';
+import okulImg from '@/mekanlar/okul.png';
+import otoparkImg from '@/mekanlar/otopark.png';
+import parkImg from '@/mekanlar/park.png';
+
+import ayranImg from '@/icecekler/ayran.png';
+import cayImg from '@/icecekler/cay.png';
+import kahvaImg from '@/icecekler/kahva.png';
+import kolaImg from '@/icecekler/kola.png';
+import limonataImg from '@/icecekler/limonata.png';
+import meyvesuyuImg from '@/icecekler/meyvesuyu.png';
+import sodaImg from '@/icecekler/soda.png';
+import suImg from '@/icecekler/su.png';
+import sutImg from '@/icecekler/sut.png';
+import tursusuyuImg from '@/icecekler/tursusuyu.png';
+
 import besgenImg from '@/shapes/besgen.jpg';
 import daireImg from '@/shapes/daire.jpg';
 import dikdortgenImg from '@/shapes/dikdortgen.jpg';
@@ -336,6 +362,34 @@ const SCHOOL_WITH_IMAGE = [
   { name: "Suluboya", src: suluboyaImg },
   { name: "Suluk", src: sulukImg },
 ];
+const PLACES_WITH_IMAGE = [
+  { name: "Banka", src: bankaImg },
+  { name: "Cami", src: camiImg },
+  { name: "Eczane", src: eczaneImg },
+  { name: "Ev", src: evImg },
+  { name: "Fırın", src: firinImg },
+  { name: "Hastane", src: hastaneImg },
+  { name: "Havalimanı", src: havalimaniImg },
+  { name: "Karakol", src: karakolImg },
+  { name: "Kasap", src: kasapImg },
+  { name: "Manav", src: manavImg },
+  { name: "Market", src: marketImg },
+  { name: "Okul", src: okulImg },
+  { name: "Otopark", src: otoparkImg },
+  { name: "Park", src: parkImg },
+];
+const DRINKS_WITH_IMAGE = [
+  { name: "Ayran", src: ayranImg },
+  { name: "Çay", src: cayImg },
+  { name: "Kahve", src: kahvaImg },
+  { name: "Kola", src: kolaImg },
+  { name: "Limonata", src: limonataImg },
+  { name: "Meyve suyu", src: meyvesuyuImg },
+  { name: "Soda", src: sodaImg },
+  { name: "Su", src: suImg },
+  { name: "Süt", src: sutImg },
+  { name: "Turşu suyu", src: tursusuyuImg },
+];
 const SHAPES_WITH_IMAGE = [ { name: "Beşgen", src: besgenImg }, { name: "Daire", src: daireImg }, { name: "Dikdörtgen", src: dikdortgenImg }, { name: "Kare", src: kareImg }, { name: "Üçgen", src: ucgenImg } ];
 
 const ANIMAL_DISCRIMINATION_SCENARIOS = [
@@ -371,6 +425,8 @@ const CATEGORY_MAP = [
   { id: 'vegetables', title: 'Sebzeler', icon: <Carrot />, data: VEGETABLES_WITH_IMAGE, type: 'image' },
   { id: 'clothes', title: 'Giysiler', icon: <Shirt />, data: CLOTHES_WITH_IMAGE, type: 'image' },
   { id: 'school', title: 'Sınıf ve Okul Eşyaları', icon: <Briefcase />, data: SCHOOL_WITH_IMAGE, type: 'image' },
+  { id: 'places', title: 'Çevremizdeki Mekanlar', icon: <Car />, data: PLACES_WITH_IMAGE, type: 'image' },
+  { id: 'drinks', title: 'İçecekler', icon: <Apple />, data: DRINKS_WITH_IMAGE, type: 'image' },
   { id: 'colors', title: 'Renkler', icon: <Palette />, data: COLOURS_WITH_IMAGE, type: 'image' },
   { id: 'shapes', title: 'Şekiller', icon: <Shapes />, data: SHAPES_WITH_IMAGE, type: 'image' },
   { id: 'emotions', title: 'Duygular', icon: <Smile />, data: EMOTIONS_WITH_VIDEO, type: 'video' },
@@ -406,7 +462,7 @@ const CATEGORY_GROUPS: {
       { title: 'Hayvanlar', contentId: 'animals' },
       { title: 'Taşıtlar', contentId: 'vehicles' },
       { title: 'Meslekler', contentId: 'jobs' },
-      { title: 'Çevremizdeki Mekanlar', empty: true },
+      { title: 'Çevremizdeki Mekanlar', contentId: 'places' },
     ],
   },
   {
@@ -415,7 +471,7 @@ const CATEGORY_GROUPS: {
     children: [
       { title: 'Meyveler', contentId: 'fruits' },
       { title: 'Sebzeler', contentId: 'vegetables' },
-      { title: 'İçecekler', empty: true },
+      { title: 'İçecekler', contentId: 'drinks' },
       { title: 'Temel Gıdalar', empty: true },
     ],
   },
