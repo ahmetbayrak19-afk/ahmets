@@ -274,6 +274,47 @@ import suImg from '@/icecekler/su.png';
 import sutImg from '@/icecekler/sut.png';
 import tursusuyuImg from '@/icecekler/tursusuyu.png';
 
+import balImg from '@/temelgidalar/bal.png';
+import balikImg from '@/temelgidalar/balik.png';
+import corbaImg from '@/temelgidalar/corba.png';
+import ekmekImg from '@/temelgidalar/ekmek.png';
+import etImg from '@/temelgidalar/et.png';
+import kuruyemisImg from '@/temelgidalar/kuruyemis.png';
+import makarnaImg from '@/temelgidalar/makarna.png';
+import peynirImg from '@/temelgidalar/peynir.png';
+import pilavImg from '@/temelgidalar/pilav.png';
+import recelImg from '@/temelgidalar/recel.png';
+import tavukGidaImg from '@/temelgidalar/tavuk.png';
+import yagImg from '@/temelgidalar/yag.png';
+import yogurtImg from '@/temelgidalar/yogurt.png';
+import yumurtaImg from '@/temelgidalar/yumurta.png';
+import zeytinImg from '@/temelgidalar/zeytin.png';
+
+import buzdolabiImg from '@/evesyalari/buzdolabi.png';
+import camasirmakinesiImg from '@/evesyalari/camasirmakinesi.png';
+import dolapImg from '@/evesyalari/dolap.png';
+import firnImg from '@/evesyalari/fırn.png';
+import haliImg from '@/evesyalari/hali.png';
+import koltukImg from '@/evesyalari/koltuk.png';
+import masaImg from '@/evesyalari/masa.png';
+import perdeImg from '@/evesyalari/perde.png';
+import sandalyeImg from '@/evesyalari/sandalye.png';
+import supurgeImg from '@/evesyalari/supurge.png';
+import televizyonImg from '@/evesyalari/televizyon.png';
+import tostmakinesiImg from '@/evesyalari/tostmakinesi.png';
+import utuImg from '@/evesyalari/utu.png';
+import yatakImg from '@/evesyalari/yatak.png';
+
+import sayiBirImg from '@/aba/esle/bir.png';
+import sayiIkiImg from '@/aba/esle/iki.png';
+import sayiUcImg from '@/aba/esle/uc.png';
+import sayiDortImg from '@/aba/esle/dort.png';
+import sayiBesImg from '@/aba/esle/bes.png';
+import sayiAltiImg from '@/aba/esle/alti.png';
+import sayiYediImg from '@/aba/esle/yedi.png';
+import sayiSekizImg from '@/aba/esle/sekiz.png';
+import sayiDokuzImg from '@/aba/esle/dokuz.png';
+
 import besgenImg from '@/shapes/besgen.jpg';
 import daireImg from '@/shapes/daire.jpg';
 import dikdortgenImg from '@/shapes/dikdortgen.jpg';
@@ -390,6 +431,50 @@ const DRINKS_WITH_IMAGE = [
   { name: "Süt", src: sutImg },
   { name: "Turşu suyu", src: tursusuyuImg },
 ];
+const FOODS_WITH_IMAGE = [
+  { name: "Bal", src: balImg },
+  { name: "Balık", src: balikImg },
+  { name: "Çorba", src: corbaImg },
+  { name: "Ekmek", src: ekmekImg },
+  { name: "Et", src: etImg },
+  { name: "Kuruyemiş", src: kuruyemisImg },
+  { name: "Makarna", src: makarnaImg },
+  { name: "Peynir", src: peynirImg },
+  { name: "Pilav", src: pilavImg },
+  { name: "Reçel", src: recelImg },
+  { name: "Tavuk", src: tavukGidaImg },
+  { name: "Yağ", src: yagImg },
+  { name: "Yoğurt", src: yogurtImg },
+  { name: "Yumurta", src: yumurtaImg },
+  { name: "Zeytin", src: zeytinImg },
+];
+const HOME_WITH_IMAGE = [
+  { name: "Buzdolabı", src: buzdolabiImg },
+  { name: "Çamaşır makinesi", src: camasirmakinesiImg },
+  { name: "Dolap", src: dolapImg },
+  { name: "Fırın", src: firnImg },
+  { name: "Halı", src: haliImg },
+  { name: "Koltuk", src: koltukImg },
+  { name: "Masa", src: masaImg },
+  { name: "Perde", src: perdeImg },
+  { name: "Sandalye", src: sandalyeImg },
+  { name: "Süpürge", src: supurgeImg },
+  { name: "Televizyon", src: televizyonImg },
+  { name: "Tost makinesi", src: tostmakinesiImg },
+  { name: "Ütü", src: utuImg },
+  { name: "Yatak", src: yatakImg },
+];
+const NUMBERS_WITH_IMAGE = [
+  { name: "Bir", src: sayiBirImg },
+  { name: "İki", src: sayiIkiImg },
+  { name: "Üç", src: sayiUcImg },
+  { name: "Dört", src: sayiDortImg },
+  { name: "Beş", src: sayiBesImg },
+  { name: "Altı", src: sayiAltiImg },
+  { name: "Yedi", src: sayiYediImg },
+  { name: "Sekiz", src: sayiSekizImg },
+  { name: "Dokuz", src: sayiDokuzImg },
+];
 const SHAPES_WITH_IMAGE = [ { name: "Beşgen", src: besgenImg }, { name: "Daire", src: daireImg }, { name: "Dikdörtgen", src: dikdortgenImg }, { name: "Kare", src: kareImg }, { name: "Üçgen", src: ucgenImg } ];
 
 const ANIMAL_DISCRIMINATION_SCENARIOS = [
@@ -427,6 +512,9 @@ const CATEGORY_MAP = [
   { id: 'school', title: 'Sınıf ve Okul Eşyaları', icon: <Briefcase />, data: SCHOOL_WITH_IMAGE, type: 'image' },
   { id: 'places', title: 'Çevremizdeki Mekanlar', icon: <Car />, data: PLACES_WITH_IMAGE, type: 'image' },
   { id: 'drinks', title: 'İçecekler', icon: <Apple />, data: DRINKS_WITH_IMAGE, type: 'image' },
+  { id: 'foods', title: 'Temel Gıdalar', icon: <Apple />, data: FOODS_WITH_IMAGE, type: 'image' },
+  { id: 'home', title: 'Ev Eşyaları', icon: <Shirt />, data: HOME_WITH_IMAGE, type: 'image' },
+  { id: 'numbers', title: 'Sayılar', icon: <Shapes />, data: NUMBERS_WITH_IMAGE, type: 'image' },
   { id: 'colors', title: 'Renkler', icon: <Palette />, data: COLOURS_WITH_IMAGE, type: 'image' },
   { id: 'shapes', title: 'Şekiller', icon: <Shapes />, data: SHAPES_WITH_IMAGE, type: 'image' },
   { id: 'emotions', title: 'Duygular', icon: <Smile />, data: EMOTIONS_WITH_VIDEO, type: 'video' },
@@ -450,7 +538,7 @@ const CATEGORY_GROUPS: {
     title: 'NESNELER (Eşyalarımız)',
     children: [
       { title: 'Sınıf ve Okul Eşyaları', contentId: 'school' },
-      { title: 'Ev Eşyaları', empty: true },
+      { title: 'Ev Eşyaları', contentId: 'home' },
       { title: 'Giysiler', contentId: 'clothes' },
     ],
   },
@@ -472,7 +560,7 @@ const CATEGORY_GROUPS: {
       { title: 'Meyveler', contentId: 'fruits' },
       { title: 'Sebzeler', contentId: 'vegetables' },
       { title: 'İçecekler', contentId: 'drinks' },
-      { title: 'Temel Gıdalar', empty: true },
+      { title: 'Temel Gıdalar', contentId: 'foods' },
     ],
   },
   {
@@ -481,7 +569,7 @@ const CATEGORY_GROUPS: {
     children: [
       { title: 'Renkler', contentId: 'colors' },
       { title: 'Şekiller', contentId: 'shapes' },
-      { title: 'Sayılar', empty: true },
+      { title: 'Sayılar', contentId: 'numbers' },
       { title: 'Zaman ve Doğa', empty: true },
     ],
   },
