@@ -1,85 +1,78 @@
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   Check,
   Eye,
-  Image as ImageIcon,
   PackageOpen,
   PlayCircle,
-  Puzzle,
   Trophy,
   X,
   XCircle,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 
-type ConditionId = "materyalsiz" | "materyalli" | "mesgul";
+type ExchangeType = "alirken" | "verirken";
 type Phase = "intro" | "assessment" | "result";
 
 interface TrialResult {
   id: number;
-  conditionId: ConditionId;
-  looked: boolean;
+  type: ExchangeType;
+  correct: boolean;
   timestamp: number;
 }
 
-interface ConditionCard {
-  id: ConditionId;
-  title: string;
-  instruction: string;
-  material: string;
-  icon: typeof PackageOpen;
-  color: string;
-}
-
-interface OrtakDikkat1Props {
+interface OrtakDikkat2Props {
   itemCode?: string;
   itemText?: string;
   onClose: () => void;
   onComplete: (success: boolean) => void;
 }
 
-const CONDITIONS: ConditionCard[] = [
+interface ExchangeCard {
+  id: ExchangeType;
+  title: string;
+  description: string;
+  instruction: string;
+  icon: typeof ArrowDown;
+  color: string;
+}
+
+const EXCHANGES: ExchangeCard[] = [
   {
-    id: "materyalsiz",
-    title: "Materyalsiz",
+    id: "alirken",
+    title: "Nesne alırken",
+    description:
+      "Öğrenci kendisine uzatılan nesneyi alırken öğretmenin yüzüne bağımsız olarak yönelir.",
     instruction:
-      "Önünde nesne yokken doğal bir anda yalnızca bir kez “Bana bak” deyin.",
-    material: "Malzeme gerekmiyor",
-    icon: PackageOpen,
+      "Sevdiği nesneyi doğal biçimde uzatın. “İster misin?” diyebilirsiniz; “Bana bak” demeyin.",
+    icon: ArrowDown,
     color: "border-sky-500/35 bg-sky-500/10 text-sky-300",
   },
   {
-    id: "materyalli",
-    title: "Nesne veya resim varken",
+    id: "verirken",
+    title: "Nesne verirken",
+    description:
+      "Öğrenci nesneyi karşısındaki kişiye verirken öğretmenin yüzüne bağımsız olarak yönelir.",
     instruction:
-      "Önüne bir nesne ya da resim koyup uygun anda yalnızca bir kez “Bana bak” deyin.",
-    material: "Bir nesne veya resim",
-    icon: ImageIcon,
+      "Elinizi uzatıp “Bana verir misin?” deyin. Göz kontağı kurmasını ayrıca istemeyin.",
+    icon: ArrowUp,
     color: "border-violet-500/35 bg-violet-500/10 text-violet-300",
-  },
-  {
-    id: "mesgul",
-    title: "Etkinlikle meşgulken",
-    instruction:
-      "Sevdiği etkinlikle uğraşırken doğal bir anda yalnızca bir kez “Bana bak” deyin.",
-    material: "Sevdiği bir etkinlik materyali",
-    icon: Puzzle,
-    color: "border-amber-500/35 bg-amber-500/10 text-amber-300",
   },
 ];
 
-const TRIALS_PER_CONDITION = 4;
-const TOTAL_TRIALS = 12;
-const PASS_SCORE = 10;
+const TRIALS_PER_EXCHANGE = 5;
+const TOTAL_TRIALS = 10;
+const PASS_SCORE = 8;
 const SHORT_INTERVAL_MS = 2 * 60 * 1000;
 
-export default function OrtakDikkat1({
-  itemCode = "OD 1.1",
-  itemText = "“Bana Bak” Yönergesine Tepkide Bulunma",
+export default function OrtakDikkat2({
+  itemCode = "OD 1.2",
+  itemText = "Göz Kontağı Kurma",
   onClose,
   onComplete,
-}: OrtakDikkat1Props) {
+}: OrtakDikkat2Props) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [results, setResults] = useState<TrialResult[]>([]);
   const [lastMarkedAt, setLastMarkedAt] = useState<number | null>(null);
@@ -88,38 +81,30 @@ export default function OrtakDikkat1({
   const [locked, setLocked] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  const displayItemCode = itemCode.trim() === "OD" ? "OD 1.1" : itemCode;
-  const displayItemText = itemText.replace(/^1\.1\.\s*/, "");
+  const displayItemCode = itemCode.trim() === "OD" ? "OD 1.2" : itemCode;
+  const displayItemText = itemText.replace(/^1\.2\.\s*/, "");
 
   const counts = useMemo(
-    () =>
-      CONDITIONS.reduce(
-        (accumulator, condition) => {
-          accumulator[condition.id] = results.filter(
-            (result) => result.conditionId === condition.id,
-          ).length;
-          return accumulator;
-        },
-        {} as Record<ConditionId, number>,
-      ),
+    () => ({
+      alirken: results.filter((result) => result.type === "alirken").length,
+      verirken: results.filter((result) => result.type === "verirken").length,
+    }),
     [results],
   );
 
   const correctCounts = useMemo(
-    () =>
-      CONDITIONS.reduce(
-        (accumulator, condition) => {
-          accumulator[condition.id] = results.filter(
-            (result) => result.conditionId === condition.id && result.looked,
-          ).length;
-          return accumulator;
-        },
-        {} as Record<ConditionId, number>,
-      ),
+    () => ({
+      alirken: results.filter(
+        (result) => result.type === "alirken" && result.correct,
+      ).length,
+      verirken: results.filter(
+        (result) => result.type === "verirken" && result.correct,
+      ).length,
+    }),
     [results],
   );
 
-  const score = results.filter((result) => result.looked).length;
+  const score = results.filter((result) => result.correct).length;
   const success = results.length === TOTAL_TRIALS && score >= PASS_SCORE;
 
   const startAssessment = () => {
@@ -140,8 +125,8 @@ export default function OrtakDikkat1({
     }
   };
 
-  const handleAssessment = (conditionId: ConditionId, looked: boolean) => {
-    if (locked || counts[conditionId] >= TRIALS_PER_CONDITION) return;
+  const handleAssessment = (type: ExchangeType, correct: boolean) => {
+    if (locked || counts[type] >= TRIALS_PER_EXCHANGE) return;
     setLocked(true);
 
     const now = Date.now();
@@ -151,21 +136,20 @@ export default function OrtakDikkat1({
       ...results,
       {
         id: results.length + 1,
-        conditionId,
-        looked,
+        type,
+        correct,
         timestamp: now,
       },
     ];
-    const finalScore = updatedResults.filter((result) => result.looked).length;
+    const finalScore = updatedResults.filter((result) => result.correct).length;
     const completed = updatedResults.length === TOTAL_TRIALS;
-    const conditionTitle = CONDITIONS.find(
-      (condition) => condition.id === conditionId,
-    )!.title;
 
     setResults(updatedResults);
     setLastMarkedAt(now);
     setFeedback(
-      `${conditionTitle} · ${looked ? "Baktı" : "Bakmadı"} kaydedildi`,
+      `${type === "alirken" ? "Nesne alırken" : "Nesne verirken"} · ${
+        correct ? "Göz kontağı kurdu" : "Kurmadı"
+      } kaydedildi`,
     );
     window.setTimeout(() => setFeedback(null), 1600);
 
@@ -222,31 +206,37 @@ export default function OrtakDikkat1({
 
       <main className="relative flex flex-1 flex-col items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-slate-950 p-3 sm:p-4">
         {phase === "intro" && (
-          <div className="max-h-full w-full max-w-3xl space-y-4 overflow-y-auto pb-5 animate-in zoom-in-95 duration-300">
+          <div className="max-h-full w-full max-w-3xl space-y-5 overflow-y-auto pb-6 animate-in zoom-in-95 duration-300">
             <div className="text-center">
-              <Eye className="mx-auto mb-2 h-11 w-11 text-cyan-400" />
+              <Eye className="mx-auto mb-3 h-12 w-12 text-cyan-400 drop-shadow-[0_0_14px_rgba(34,211,238,0.35)]" />
               <h1 className="mb-2 text-2xl font-black">
-                “Bana Bak” Değerlendirmesi
+                Göz Kontağı Değerlendirmesi
               </h1>
-              <p className="mx-auto max-w-xl text-sm leading-relaxed text-slate-400">
-                Üç farklı durumda dörder olmak üzere toplam 12 doğal fırsatı
-                değerlendirin.
+              <p className="mx-auto max-w-2xl px-2 text-sm leading-relaxed text-slate-400">
+                Öğrenci nesne alırken veya verirken öğretmenin yüzüne bağımsız
+                olarak yaklaşık 2 saniye yönelir. Her durumdan 5 olmak üzere
+                toplam 10 doğal fırsat değerlendirilir.
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              {CONDITIONS.map((condition) => {
-                const Icon = condition.icon;
+            <div className="grid gap-3 sm:grid-cols-2">
+              {EXCHANGES.map((exchange) => {
+                const Icon = exchange.icon;
                 return (
                   <div
-                    key={condition.id}
-                    className={`rounded-2xl border p-4 ${condition.color}`}
+                    key={exchange.id}
+                    className={`rounded-2xl border p-4 ${exchange.color}`}
                   >
-                    <Icon className="mb-2 h-6 w-6" />
-                    <h3 className="font-bold text-slate-100">
-                      {condition.title}
+                    <Icon className="mb-3 h-7 w-7" />
+                    <h3 className="mb-1 font-bold text-slate-100">
+                      {exchange.title}
                     </h3>
-                    <p className="mt-1 text-xs text-slate-400">4 deneme</p>
+                    <p className="text-xs leading-relaxed text-slate-400">
+                      {exchange.description}
+                    </p>
+                    <p className="mt-3 text-[11px] font-semibold text-slate-300">
+                      5 deneme
+                    </p>
                   </div>
                 );
               })}
@@ -254,31 +244,28 @@ export default function OrtakDikkat1({
 
             <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
               <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-300">
-                Öğretmen ne yapacak?
+                Değerlendirme ölçütü
               </h3>
               <div className="space-y-2 text-sm leading-relaxed text-slate-400">
+                <p>• Nesneyi doğal el veya göğüs hizasında tutun.</p>
                 <p>
-                  • Uygun doğal anı seçip yalnızca bir kez “Bana bak” deyin.
+                  • Öğrenci nesneyi almadan önce, alırken ya da hemen sonrasında
+                  yüzünüze yaklaşık 2 saniye bağımsız yönelirse doğru sayın.
                 </p>
                 <p>
-                  • Öğrenci 3–5 saniye içinde bağımsız bakarsa “Baktı”yı seçin.
+                  • Yalnızca nesneye bakarsa veya “Bana bak”, ismini söyleme ya
+                  da başka bir ipucundan sonra bakarsa “Kurmadı” olarak
+                  işaretleyin.
                 </p>
-                <p>
-                  • Bakmazsa, tekrar veya yardımla bakarsa “Bakmadı”yı seçin.
-                </p>
-                <p>• Üç durumu sırayla yapmak zorunda değilsiniz.</p>
+                <p>• Başarı ölçütü en az 8/10 doğru tepkidir.</p>
               </div>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-2 text-xs">
-              {CONDITIONS.map((condition) => (
-                <span
-                  key={condition.id}
-                  className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-amber-200"
-                >
-                  {condition.material}
-                </span>
-              ))}
+            <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-200">
+              <PackageOpen className="h-5 w-5 shrink-0" />
+              <span>
+                Öğrencinin sevdiği 2–3 basit nesneyi hazır bulundurun.
+              </span>
             </div>
 
             <button
@@ -292,12 +279,15 @@ export default function OrtakDikkat1({
         )}
 
         {phase === "assessment" && (
-          <div className="max-h-full w-full max-w-5xl space-y-4 overflow-y-auto pb-4 animate-in slide-in-from-right-6 duration-300">
+          <div className="max-h-full w-full max-w-4xl space-y-4 overflow-y-auto pb-4 animate-in slide-in-from-right-6 duration-300">
             <div className="rounded-2xl border border-slate-700 bg-slate-900/70 p-4 text-center">
-              <h1 className="text-xl font-black">Doğal fırsatı işaretleyin</h1>
-              <p className="mx-auto mt-1 max-w-2xl text-sm text-slate-400">
-                Hangisi denk gelirse ilgili karttan “Baktı” veya “Bakmadı”yı
-                seçin.
+              <h1 className="text-xl font-black">
+                Doğal fırsatı değerlendirin
+              </h1>
+              <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
+                Oyun içinde hangisi doğal olarak gerçekleşirse ilgili karttan
+                işaretleyin. Önce bütün “alırken” denemelerini yapmanız
+                gerekmez.
               </p>
             </div>
 
@@ -307,15 +297,15 @@ export default function OrtakDikkat1({
               </div>
             )}
 
-            <div className="grid gap-4 md:grid-cols-3">
-              {CONDITIONS.map((condition) => {
-                const Icon = condition.icon;
-                const count = counts[condition.id];
-                const completed = count >= TRIALS_PER_CONDITION;
+            <div className="grid gap-4 sm:grid-cols-2">
+              {EXCHANGES.map((exchange) => {
+                const Icon = exchange.icon;
+                const count = counts[exchange.id];
+                const completed = count >= TRIALS_PER_EXCHANGE;
 
                 return (
                   <section
-                    key={condition.id}
+                    key={exchange.id}
                     className={`rounded-3xl border p-5 shadow-xl transition-all ${
                       completed
                         ? "border-green-500/20 bg-green-950/15 opacity-45"
@@ -325,16 +315,16 @@ export default function OrtakDikkat1({
                     <div className="mb-4 flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3">
                         <span
-                          className={`rounded-xl border p-2.5 ${condition.color}`}
+                          className={`rounded-xl border p-2.5 ${exchange.color}`}
                         >
                           <Icon className="h-6 w-6" />
                         </span>
                         <div>
                           <h2 className="font-black text-slate-100">
-                            {condition.title}
+                            {exchange.title}
                           </h2>
                           <p className="mt-1 text-xs leading-relaxed text-slate-400">
-                            {condition.instruction}
+                            {exchange.instruction}
                           </p>
                         </div>
                       </div>
@@ -345,7 +335,7 @@ export default function OrtakDikkat1({
                             : "bg-slate-800 text-slate-300"
                         }`}
                       >
-                        {count}/{TRIALS_PER_CONDITION}
+                        {count}/{TRIALS_PER_EXCHANGE}
                       </span>
                     </div>
 
@@ -357,24 +347,24 @@ export default function OrtakDikkat1({
                       <div className="grid grid-cols-2 gap-3">
                         <button
                           type="button"
-                          onClick={() => handleAssessment(condition.id, false)}
+                          onClick={() => handleAssessment(exchange.id, false)}
                           disabled={locked}
                           className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-red-400 transition-all hover:bg-red-500/20 active:scale-95 disabled:opacity-40"
                         >
                           <X className="h-7 w-7" />
                           <span className="text-xs font-bold uppercase tracking-wider">
-                            Bakmadı
+                            Kurmadı
                           </span>
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleAssessment(condition.id, true)}
+                          onClick={() => handleAssessment(exchange.id, true)}
                           disabled={locked}
                           className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-green-400 transition-all hover:bg-green-500/20 active:scale-95 disabled:opacity-40"
                         >
                           <Eye className="h-7 w-7" />
                           <span className="text-xs font-bold uppercase tracking-wider">
-                            Baktı
+                            Kurdu
                           </span>
                         </button>
                       </div>
@@ -383,6 +373,11 @@ export default function OrtakDikkat1({
                 );
               })}
             </div>
+
+            <p className="text-center text-xs leading-relaxed text-slate-500">
+              Denemeleri öğrencinin doğal oyun ve etkileşim anlarına
+              serpiştirin.
+            </p>
           </div>
         )}
 
@@ -403,20 +398,20 @@ export default function OrtakDikkat1({
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              {CONDITIONS.map((condition) => {
-                const Icon = condition.icon;
+            <div className="grid grid-cols-2 gap-3">
+              {EXCHANGES.map((exchange) => {
+                const Icon = exchange.icon;
                 return (
                   <div
-                    key={condition.id}
+                    key={exchange.id}
                     className="rounded-2xl border border-slate-700 bg-slate-950/50 p-4 text-left"
                   >
                     <Icon className="mb-3 h-6 w-6 text-cyan-400" />
                     <p className="text-xs font-bold text-slate-300">
-                      {condition.title}
+                      {exchange.title}
                     </p>
                     <p className="mt-1 text-xl font-black text-white">
-                      {correctCounts[condition.id]}/{TRIALS_PER_CONDITION}
+                      {correctCounts[exchange.id]}/{TRIALS_PER_EXCHANGE}
                     </p>
                   </div>
                 );
@@ -432,6 +427,11 @@ export default function OrtakDikkat1({
                 <X size={22} /> Henüz yeterli bağımsızlık düzeyinde değil.
               </div>
             )}
+
+            <p className="rounded-xl border border-slate-700 bg-slate-950/40 p-3 text-xs leading-relaxed text-slate-400">
+              Kişiler arası genelleme için değerlendirmeyi daha sonra farklı bir
+              yetişkinle doğal etkileşim içinde tekrarlayın.
+            </p>
 
             <button
               type="button"
@@ -452,9 +452,10 @@ export default function OrtakDikkat1({
               Denemeler arası süre çok kısa
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-red-100/85">
-              “Bana bak” yönergesini doğal oyun ve etkileşim anlarına
-              serpiştirin. Çok sık tekrarlamak yönergenin sıradanlaşmasına ve
-              öğrencinin gerçek tepkisinin etkilenmesine neden olabilir.
+              Göz kontağını doğal oyun ve etkileşim sırasında oluşan nesne
+              alışverişlerinde değerlendirin. Denemeleri çok sık tekrarlamak
+              öğrencinin durumu önceden tahmin etmesine ve verdiği tepkinin
+              doğallığının azalmasına neden olabilir.
             </p>
             <button
               type="button"
