@@ -26,8 +26,8 @@ interface TrialResult {
 interface ConditionCard {
   id: ConditionId;
   title: string;
+  description: string;
   instruction: string;
-  material: string;
   icon: typeof PackageOpen;
   color: string;
 }
@@ -43,27 +43,29 @@ const CONDITIONS: ConditionCard[] = [
   {
     id: "materyalsiz",
     title: "Materyalsiz",
+    description:
+      "Öğrencinin önünde dikkatini çeken herhangi bir nesne bulunmaz.",
     instruction:
       "Önünde nesne yokken doğal bir anda yalnızca bir kez “Bana bak” deyin.",
-    material: "Malzeme gerekmiyor",
     icon: PackageOpen,
     color: "border-sky-500/35 bg-sky-500/10 text-sky-300",
   },
   {
     id: "materyalli",
     title: "Nesne veya resim varken",
+    description:
+      "Öğrencinin önünde dikkatini çekebilecek bir nesne ya da resim bulunur.",
     instruction:
       "Önüne bir nesne ya da resim koyup uygun anda yalnızca bir kez “Bana bak” deyin.",
-    material: "Bir nesne veya resim",
     icon: ImageIcon,
     color: "border-violet-500/35 bg-violet-500/10 text-violet-300",
   },
   {
     id: "mesgul",
     title: "Etkinlikle meşgulken",
+    description: "Öğrenci sevdiği bir oyun veya etkinlikle ilgilenmektedir.",
     instruction:
       "Sevdiği etkinlikle uğraşırken doğal bir anda yalnızca bir kez “Bana bak” deyin.",
-    material: "Sevdiği bir etkinlik materyali",
     icon: Puzzle,
     color: "border-amber-500/35 bg-amber-500/10 text-amber-300",
   },
@@ -246,7 +248,9 @@ export default function OrtakDikkat1({
                     <h3 className="font-bold text-slate-100">
                       {condition.title}
                     </h3>
-                    <p className="mt-1 text-xs text-slate-400">4 deneme</p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                      {condition.description}
+                    </p>
                   </div>
                 );
               })}
@@ -268,17 +272,6 @@ export default function OrtakDikkat1({
                 </p>
                 <p>• Üç durumu sırayla yapmak zorunda değilsiniz.</p>
               </div>
-            </div>
-
-            <div className="flex flex-wrap justify-center gap-2 text-xs">
-              {CONDITIONS.map((condition) => (
-                <span
-                  key={condition.id}
-                  className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-amber-200"
-                >
-                  {condition.material}
-                </span>
-              ))}
             </div>
 
             <button

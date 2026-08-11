@@ -1,11 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  ArrowLeft,
-  ArrowRight,
   Check,
   Eye,
   Images,
-  PackageOpen,
   PlayCircle,
   Trophy,
   X,
@@ -19,21 +16,11 @@ import basla3 from "./ortakdikkatsesgorsel/1_3basla3.jpg";
 import basla4 from "./ortakdikkatsesgorsel/1_3basla4.jpg";
 import basla5 from "./ortakdikkatsesgorsel/1_3basla5.jpg";
 
-type TargetSide = "sol" | "sag";
 type Phase = "intro" | "assessment" | "result";
 
 interface TrialResult {
   id: number;
-  targetSide: TargetSide;
   followed: boolean;
-}
-
-interface TargetCard {
-  id: TargetSide;
-  title: string;
-  instruction: string;
-  icon: typeof ArrowLeft;
-  color: string;
 }
 
 interface GuideStep {
@@ -80,27 +67,7 @@ const GUIDE_STEPS: GuideStep[] = [
   },
 ];
 
-const TARGETS: TargetCard[] = [
-  {
-    id: "sol",
-    title: "Soldaki hedef",
-    instruction:
-      "Çocuk yüzünüze bakarken açık avucunuzu uzatın ve soldaki nesneye doğal biçimde bakın.",
-    icon: ArrowLeft,
-    color: "border-sky-500/35 bg-sky-500/10 text-sky-300",
-  },
-  {
-    id: "sag",
-    title: "Sağdaki hedef",
-    instruction:
-      "Çocuk yüzünüze bakarken açık avucunuzu uzatın ve sağdaki nesneye doğal biçimde bakın.",
-    icon: ArrowRight,
-    color: "border-violet-500/35 bg-violet-500/10 text-violet-300",
-  },
-];
-
-const GUIDE_INTERVAL_MS = 1000;
-const TRIALS_PER_TARGET = 5;
+const GUIDE_INTERVAL_MS = 2000;
 const TOTAL_TRIALS = 10;
 const PASS_SCORE = 8;
 
@@ -118,6 +85,8 @@ export default function OrtakDikkat3({
 
   const displayItemCode = itemCode.trim() === "OD" ? "OD 1.3" : itemCode;
   const displayItemText = itemText.replace(/^1\.3\.\s*/, "");
+  const score = results.filter((result) => result.followed).length;
+  const success = results.length === TOTAL_TRIALS && score >= PASS_SCORE;
 
   useEffect(() => {
     if (phase !== "intro") return;
@@ -131,29 +100,6 @@ export default function OrtakDikkat3({
 
   const guideStep = GUIDE_STEPS[guideStepIndex];
 
-  const counts = useMemo(
-    () => ({
-      sol: results.filter((result) => result.targetSide === "sol").length,
-      sag: results.filter((result) => result.targetSide === "sag").length,
-    }),
-    [results],
-  );
-
-  const correctCounts = useMemo(
-    () => ({
-      sol: results.filter(
-        (result) => result.targetSide === "sol" && result.followed,
-      ).length,
-      sag: results.filter(
-        (result) => result.targetSide === "sag" && result.followed,
-      ).length,
-    }),
-    [results],
-  );
-
-  const score = results.filter((result) => result.followed).length;
-  const success = results.length === TOTAL_TRIALS && score >= PASS_SCORE;
-
   const startAssessment = () => {
     setResults([]);
     setLocked(false);
@@ -161,18 +107,11 @@ export default function OrtakDikkat3({
     setPhase("assessment");
   };
 
-  const handleAssessment = (targetSide: TargetSide, followed: boolean) => {
-    if (locked || counts[targetSide] >= TRIALS_PER_TARGET) return;
+  const handleAssessment = (followed: boolean) => {
+    if (locked || results.length >= TOTAL_TRIALS) return;
     setLocked(true);
 
-    const updatedResults = [
-      ...results,
-      {
-        id: results.length + 1,
-        targetSide,
-        followed,
-      },
-    ];
+    const updatedResults = [...results, { id: results.length + 1, followed }];
     const finalScore = updatedResults.filter(
       (result) => result.followed,
     ).length;
@@ -180,9 +119,7 @@ export default function OrtakDikkat3({
 
     setResults(updatedResults);
     setFeedback(
-      `${targetSide === "sol" ? "Sol" : "Sağ"} hedef · ${
-        followed ? "Takip etti" : "Takip etmedi"
-      } kaydedildi`,
+      `${followed ? "Bakışı takip etti" : "Bakışı takip etmedi"} kaydedildi`,
     );
     window.setTimeout(() => setFeedback(null), 1400);
 
@@ -236,8 +173,9 @@ export default function OrtakDikkat3({
                 İletişim Ortağının Bakışını Takip Etme
               </h1>
               <p className="mx-auto max-w-2xl px-2 text-sm leading-relaxed text-slate-400">
-                Öğrencinin, öğretmenin baktığı nesneyi herhangi bir sözel veya
-                işaret etme yardımı olmadan bulması değerlendirilir.
+                Öğrencinin, öğretmenin baktığı nesne veya duruma herhangi bir
+                sözel ya da işaret etme yardımı olmadan yönelmesi
+                değerlendirilir.
               </p>
             </div>
 
@@ -250,7 +188,7 @@ export default function OrtakDikkat3({
                       Öğretmen nasıl uygulayacak?
                     </h2>
                     <p className="mt-0.5 text-[11px] text-slate-400">
-                      Görseller birer saniye arayla ilerler
+                      Görseller ikişer saniye arayla ilerler
                     </p>
                   </div>
                 </div>
@@ -296,30 +234,8 @@ export default function OrtakDikkat3({
 
             <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-sm leading-relaxed text-emerald-100">
               <strong className="text-emerald-300">Temel ölçüt:</strong> Çocuk
-              3–5 saniye içinde öğretmenin baktığı doğru nesneye yönelirse
-              başarılı sayılır. Nesneye uzanması veya nesneyi vermesi zorunlu
-              değildir.
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              {TARGETS.map((target) => {
-                const Icon = target.icon;
-                return (
-                  <div
-                    key={target.id}
-                    className={`rounded-2xl border p-4 ${target.color}`}
-                  >
-                    <Icon className="mb-3 h-7 w-7" />
-                    <h3 className="font-bold text-slate-100">{target.title}</h3>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-400">
-                      {target.instruction}
-                    </p>
-                    <p className="mt-3 text-[11px] font-semibold text-slate-300">
-                      5 deneme
-                    </p>
-                  </div>
-                );
-              })}
+              3–5 saniye içinde öğretmenin baktığı hedefe yönelirse başarılı
+              sayılır. Hedefe uzanması veya hedefi vermesi zorunlu değildir.
             </div>
 
             <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
@@ -327,27 +243,18 @@ export default function OrtakDikkat3({
                 Değerlendirme kuralları
               </h3>
               <div className="space-y-2 text-sm leading-relaxed text-slate-400">
-                <p>
-                  • İki nesneyi masanın sağına ve soluna eşit uzaklıkta koyun.
-                </p>
                 <p>• Denemeye çocuk yüzünüze bakarken başlayın.</p>
                 <p>
-                  • Hedefe doğal biçimde bakıp açık avucunuzu uzatın;
-                  konuşmayın, nesnenin adını söylemeyin ve işaret etmeyin.
+                  • Çevredeki uygun bir nesneye veya duruma doğal biçimde bakın;
+                  konuşmayın, hedefin adını söylemeyin ve işaret etmeyin.
                 </p>
                 <p>
-                  • Doğru nesneye bağımsız bakarsa “Takip etti”, yanlış nesneye
-                  bakar veya tepki vermezse “Takip etmedi”yi seçin.
+                  • Baktığınız hedefe bağımsız yönelirse “Takip etti”, başka bir
+                  yere bakar veya tepki vermezse “Takip etmedi”yi seçin.
                 </p>
-                <p>• Sol ve sağ hedefleri karışık sırada değerlendirin.</p>
+                <p>• Denemelerde farklı hedefler ve konumlar kullanın.</p>
+                <p>• Toplam 10 doğal fırsatı değerlendirin.</p>
               </div>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-200">
-              <PackageOpen className="h-5 w-5 shrink-0" />
-              <span>
-                Masa ve birbirinden kolay ayırt edilen iki basit nesne.
-              </span>
             </div>
 
             <button
@@ -361,16 +268,31 @@ export default function OrtakDikkat3({
         )}
 
         {phase === "assessment" && (
-          <div className="max-h-full w-full max-w-4xl space-y-4 overflow-y-auto pb-4 animate-in slide-in-from-right-6 duration-300">
-            <div className="rounded-2xl border border-slate-700 bg-slate-900/70 p-4 text-center">
-              <h1 className="text-xl font-black">
-                Bakış denemesini işaretleyin
-              </h1>
-              <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
-                Sol ve sağ hedefleri karışık kullanın. Çocuk baktığınız doğru
-                nesneye 3–5 saniye içinde yönelirse “Takip etti”yi seçin.
+          <div className="w-full max-w-2xl space-y-4 animate-in slide-in-from-right-6 duration-300">
+            <section className="rounded-3xl border border-slate-700 bg-slate-900/85 p-6 text-center shadow-xl">
+              <Eye className="mx-auto mb-3 h-12 w-12 text-cyan-400" />
+              <h1 className="text-2xl font-black">Bakış denemesini gözleyin</h1>
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-slate-400">
+                Çocuk, baktığınız hedefe 3–5 saniye içinde bağımsız olarak
+                yöneldi mi?
               </p>
-            </div>
+              <div className="mx-auto mt-4 max-w-md">
+                <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-400">
+                  <span>İlerleme</span>
+                  <span>
+                    {results.length}/{TOTAL_TRIALS}
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                  <div
+                    className="h-full bg-cyan-500 transition-all duration-300"
+                    style={{
+                      width: `${(results.length / TOTAL_TRIALS) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </section>
 
             {feedback && (
               <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-center text-sm font-semibold text-emerald-300 animate-in fade-in duration-200">
@@ -378,87 +300,35 @@ export default function OrtakDikkat3({
               </div>
             )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              {TARGETS.map((target) => {
-                const Icon = target.icon;
-                const count = counts[target.id];
-                const completed = count >= TRIALS_PER_TARGET;
-
-                return (
-                  <section
-                    key={target.id}
-                    className={`rounded-3xl border p-5 shadow-xl transition-all ${
-                      completed
-                        ? "border-green-500/20 bg-green-950/15 opacity-45"
-                        : "border-slate-700 bg-slate-900/85"
-                    }`}
-                  >
-                    <div className="mb-4 flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <span
-                          className={`rounded-xl border p-2.5 ${target.color}`}
-                        >
-                          <Icon className="h-6 w-6" />
-                        </span>
-                        <div>
-                          <h2 className="font-black text-slate-100">
-                            {target.title}
-                          </h2>
-                          <p className="mt-1 text-xs leading-relaxed text-slate-400">
-                            {target.instruction}
-                          </p>
-                        </div>
-                      </div>
-                      <span
-                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${
-                          completed
-                            ? "bg-green-500/15 text-green-300"
-                            : "bg-slate-800 text-slate-300"
-                        }`}
-                      >
-                        {count}/{TRIALS_PER_TARGET}
-                      </span>
-                    </div>
-
-                    {completed ? (
-                      <div className="flex items-center justify-center gap-2 rounded-2xl border border-green-500/20 bg-green-500/10 p-4 font-bold text-green-400">
-                        <Check size={21} /> Bu hedef tamamlandı
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() => handleAssessment(target.id, false)}
-                          disabled={locked}
-                          className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-red-400 transition-all hover:bg-red-500/20 active:scale-95 disabled:opacity-40"
-                        >
-                          <X className="h-7 w-7" />
-                          <span className="text-xs font-bold uppercase tracking-wider">
-                            Takip etmedi
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleAssessment(target.id, true)}
-                          disabled={locked}
-                          className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-green-400 transition-all hover:bg-green-500/20 active:scale-95 disabled:opacity-40"
-                        >
-                          <Eye className="h-7 w-7" />
-                          <span className="text-xs font-bold uppercase tracking-wider">
-                            Takip etti
-                          </span>
-                        </button>
-                      </div>
-                    )}
-                  </section>
-                );
-              })}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => handleAssessment(false)}
+                disabled={locked}
+                className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-red-400 transition-all hover:bg-red-500/20 active:scale-95 disabled:opacity-40"
+              >
+                <X className="h-8 w-8" />
+                <span className="text-sm font-bold uppercase tracking-wider">
+                  Takip etmedi
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAssessment(true)}
+                disabled={locked}
+                className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-green-500/30 bg-green-500/10 p-5 text-green-400 transition-all hover:bg-green-500/20 active:scale-95 disabled:opacity-40"
+              >
+                <Eye className="h-8 w-8" />
+                <span className="text-sm font-bold uppercase tracking-wider">
+                  Takip etti
+                </span>
+              </button>
             </div>
           </div>
         )}
 
         {phase === "result" && (
-          <div className="max-h-full w-full max-w-2xl space-y-5 overflow-y-auto rounded-3xl border border-slate-700 bg-slate-900/90 p-6 text-center shadow-2xl animate-in zoom-in-95 duration-500 sm:p-8">
+          <div className="w-full max-w-xl space-y-5 rounded-3xl border border-slate-700 bg-slate-900/90 p-6 text-center shadow-2xl animate-in zoom-in-95 duration-500 sm:p-8">
             <Trophy
               className={`mx-auto h-16 w-16 ${
                 success ? "text-yellow-400" : "text-slate-500"
@@ -474,26 +344,6 @@ export default function OrtakDikkat3({
               <p className="mt-1 text-sm text-slate-500">
                 Geçme ölçütü: {PASS_SCORE}/{TOTAL_TRIALS}
               </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              {TARGETS.map((target) => {
-                const Icon = target.icon;
-                return (
-                  <div
-                    key={target.id}
-                    className="rounded-2xl border border-slate-700 bg-slate-950/50 p-4 text-left"
-                  >
-                    <Icon className="mb-3 h-6 w-6 text-cyan-400" />
-                    <p className="text-xs font-bold text-slate-300">
-                      {target.title}
-                    </p>
-                    <p className="mt-1 text-xl font-black text-white">
-                      {correctCounts[target.id]}/{TRIALS_PER_TARGET}
-                    </p>
-                  </div>
-                );
-              })}
             </div>
 
             {success ? (
