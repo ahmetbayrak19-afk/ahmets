@@ -16,6 +16,7 @@ import { twMerge } from "tailwind-merge";
 import { ABA_MODULES } from "@/shared/abaData";
 import OrtakDikkat1 from "@/aba/ortakdikkat/ortakdikkat1";
 import OrtakDikkat2 from "@/aba/ortakdikkat/ortakdikkat2";
+import OrtakDikkat3 from "@/aba/ortakdikkat/ortakdikkat3";
 
 interface OrtakDikkatPageProps {
   studentId: string;
@@ -175,6 +176,16 @@ export default function OrtakDikkatPage({
         />
       );
     }
+    if (activeItem.includes("1.3")) {
+      return (
+        <OrtakDikkat3
+          itemCode={code}
+          itemText={text}
+          onClose={() => setActiveItem(null)}
+          onComplete={handleSessionSave}
+        />
+      );
+    }
   }
 
   return (
@@ -295,7 +306,10 @@ export default function OrtakDikkatPage({
 
           const isPassed = status === true;
           const isFailed = status === false;
-          const hasTest = item.includes("1.1") || item.includes("1.2");
+          const hasTest =
+            item.includes("1.1") ||
+            item.includes("1.2") ||
+            item.includes("1.3");
 
           return (
             <div
