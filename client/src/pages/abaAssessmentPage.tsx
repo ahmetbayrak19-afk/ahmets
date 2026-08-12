@@ -16,7 +16,7 @@ import TaklitPage from './taklitPage';
 import SozelTaklitPage from './sozeltaklitPage';
 import IfadeEdiciDilPage from './ifadeedicidilPage';
 import OrtakDikkatPage from './ortakdikkatPage';
-import Pekistirec from '@/aba/ortakdikkat/pekiştireç';
+import Pekistirec from '@/aba/ortakdikkat/pekistirec';
 
 interface ReinforcerProfile {
   rankings?: Array<{
