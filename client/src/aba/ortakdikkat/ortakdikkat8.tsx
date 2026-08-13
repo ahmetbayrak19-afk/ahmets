@@ -194,28 +194,25 @@ export default function OrtakDikkat8({
   const score = results.filter((r) => r.showed).length;
   const success = score >= PASS_COUNT;
 
-  const reshuffleTrials = () => {
-    setTrials(buildTrials(reinforcers));
-    setResults([]);
-    setFeedback(null);
-    setLocked(false);
-  };
-
-  const swapObject = (trialIdx: number, objectId: string) => {
-    const obj = reinforcers.find((r) => r.id === objectId);
-    if (!obj) return;
-    setTrials((prev) =>
-      prev.map((t, i) =>
+  
+  const changeOne = (trialIdx: number) => {
+    setTrials((prev) => {
+      const current = prev[trialIdx];
+      if (!current || !reinforcers.length) return prev;
+      const others = reinforcers.filter((r) => r.id !== current.objectId);
+      const pool = others.length ? others : reinforcers;
+      const obj = pool[Math.floor(Math.random() * pool.length)];
+      return prev.map((slot, i) =>
         i === trialIdx
           ? {
-              ...t,
+              ...slot,
               objectId: obj.id,
               objectName: obj.name,
               prompt: pickPrompt(obj.name, i),
             }
-          : t,
-      ),
-    );
+          : slot,
+      );
+    });
   };
 
   const startAssessment = () => {
@@ -345,10 +342,11 @@ export default function OrtakDikkat8({
                   <PackageCheck size={30} />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black">İlgi nesnelerini hazırlayın</h2>
+                  <h2 className="text-xl font-black">10 nesneyi hazırlayın</h2>
                   <p className="mt-1 text-sm leading-relaxed text-slate-300">
-                    Aşağıdaki pekiştireçler çocuğun ilgisindeki nesnelerdir. Öğretmen yönergeyi verir;
-                    çocuk nesneyi <span className="font-semibold text-white">uzatarak gösterir</span>.
+                    Nesneler çocuğun pekiştireçlerinden seçildi. Sağdaki ikonla tek tek
+                    değiştirebilirsiniz. Yönergeyi verin; çocuk nesneyi{" "}
+                    <span className="font-semibold text-white">uzatarak göstersin</span>.
                   </p>
                 </div>
               </div>
@@ -362,70 +360,36 @@ export default function OrtakDikkat8({
                 <li>Çocuk nesneyle ilgilenirken veya elindeyken yönergeyi verin.</li>
                 <li>
                   Örnek: <span className="text-slate-200">“Elindekini göster.”</span>,{" "}
-                  <span className="text-slate-200">“Elindeki ne?”</span>,{" "}
-                  <span className="text-slate-200">“Topu göster.”</span>
+                  <span className="text-slate-200">“Elindeki ne?”</span>
                 </li>
                 <li>3–5 saniye içinde nesneyi size uzatırsa doğru.</li>
-                <li>Değerlendirmede fiziksel yardım / ipucu kullanmayın.</li>
+                <li>Değerlendirmede ipucu / fiziksel yardım kullanmayın.</li>
               </ul>
             </div>
 
-            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-3">
-              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-emerald-400/90">
-                6 pekiştireç (ilgi nesneleri)
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {reinforcers.map((r) => (
-                  <span
-                    key={r.id}
-                    className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-200"
-                  >
-                    {r.rank}. {r.name}
-                  </span>
-                ))}
-              </div>
-            </div>
-
             <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-3">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Bu set ({TRIAL_COUNT} deneme)
-                </p>
-                <button
-                  type="button"
-                  onClick={reshuffleTrials}
-                  className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2 py-1 text-[11px] font-semibold text-slate-300 active:scale-95"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" /> Karıştır
-                </button>
-              </div>
-              <div className="space-y-2">
-                {trials.map((t, idx) => (
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+                Bu set — {TRIAL_COUNT} nesne
+              </p>
+              <div className="space-y-1.5">
+                {trials.map((slot, idx) => (
                   <div
-                    key={t.id}
-                    className="rounded-xl border border-slate-800 bg-slate-900/70 p-2.5 space-y-1.5"
+                    key={slot.id}
+                    className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/80 px-3 py-2.5"
                   >
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                      <span className="font-bold text-cyan-500">{idx + 1}.</span>
-                      <span className="font-semibold text-slate-200">{t.prompt}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {reinforcers.map((r) => (
-                        <button
-                          key={r.id}
-                          type="button"
-                          onClick={() => swapObject(idx, r.id)}
-                          className={twMerge(
-                            "rounded-lg border px-2 py-1 text-[11px] font-semibold transition-all active:scale-95",
-                            t.objectId === r.id
-                              ? "border-cyan-400 bg-cyan-500/20 text-cyan-200"
-                              : "border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-500",
-                          )}
-                        >
-                          {r.name}
-                        </button>
-                      ))}
-                    </div>
+                    <span className="w-6 shrink-0 text-sm font-bold text-cyan-500">{idx + 1}.</span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
+                      {slot.objectName}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => changeOne(idx)}
+                      className="shrink-0 rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-300 transition-all hover:border-cyan-500/50 hover:text-cyan-300 active:scale-95"
+                      title="Nesneyi değiştir"
+                      aria-label="Nesneyi değiştir"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </button>
                   </div>
                 ))}
               </div>
