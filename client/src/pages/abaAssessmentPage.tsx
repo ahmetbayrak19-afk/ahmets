@@ -158,7 +158,16 @@ export default function AbaAssessmentPage() {
          content = <IfadeEdiciDilPage studentId={studentId} onBack={() => setActiveModuleIndex(null)} />;
     }
     else if (moduleName.includes("ORTAK DİKKAT BECERİLERİ")) {
-         content = <OrtakDikkatPage studentId={studentId} onBack={() => setActiveModuleIndex(null)} />;
+         content = (
+           <OrtakDikkatPage
+             studentId={studentId}
+             onBack={() => setActiveModuleIndex(null)}
+             onOpenReinforcers={() => {
+               setActiveModuleIndex(null);
+               setShowReinforcerPage(true);
+             }}
+           />
+         );
     }
     else {
         // Eşleşme olmazsa burası çalışır
