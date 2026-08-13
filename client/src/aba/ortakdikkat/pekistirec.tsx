@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDoc, collection, doc, endAt, getDoc, getDocs, limit, orderBy,
   query, serverTimestamp, setDoc, startAt,
@@ -61,6 +61,8 @@ const normalize = (value: string) => value
   .trim().toLocaleLowerCase("tr-TR").normalize("NFD")
   .replace(/[\u0300-\u036f]/g, "").replace(/ı/g, "i").replace(/\s+/g, " ");
 
+const EXCLUDED_NAMES = new Set(["balik", "yag"]);
+
 const DISPLAY_NAMES: Record<string, string> = {
   biskuvi: "Bisküvi", cikolata: "Çikolata", cips: "Cips", dondurma: "Dondurma",
   kaydirak: "Kaydırak", oyunhamuru: "Oyun hamuru", salincak: "Salıncak", seker: "Şeker",
@@ -71,9 +73,9 @@ const DISPLAY_NAMES: Record<string, string> = {
   kivi: "Kivi", limon: "Limon", muz: "Muz", nar: "Nar", portakal: "Portakal",
   seftali: "Şeftali", uzum: "Üzüm", ayran: "Ayran", cay: "Çay", kahva: "Kahve",
   kola: "Kola", limonata: "Limonata", meyvesuyu: "Meyve suyu", soda: "Soda", su: "Su",
-  sut: "Süt", tursusuyu: "Turşu suyu", bal: "Bal", balik: "Balık", corba: "Çorba",
+  sut: "Süt", tursusuyu: "Turşu suyu", bal: "Bal", corba: "Çorba",
   ekmek: "Ekmek", et: "Et", kuruyemis: "Kuru yemiş", makarna: "Makarna",
-  peynir: "Peynir", pilav: "Pilav", recel: "Reçel", tavuk: "Tavuk", yag: "Yağ",
+  peynir: "Peynir", pilav: "Pilav", recel: "Reçel", tavuk: "Tavuk",
   yogurt: "Yoğurt", yumurta: "Yumurta", zeytin: "Zeytin",
 };
 
@@ -86,6 +88,7 @@ const YONERGE_FILES = new Set(["top", "araba", "bebek", "kirmizibalon", "kitap"]
 const READY_ITEMS: Reinforcer[] = Object.entries(imageModules)
   .filter(([path]) => {
     const file = path.split("/").pop()?.replace(/\.(png|jpe?g|webp)$/i, "") || "";
+    if (EXCLUDED_NAMES.has(normalize(file))) return false;
     if (path.includes("/ortakdikkatsesgorsel/")) return OD_FILES.has(file);
     if (path.includes("/yonerge/sesgorsel/")) return YONERGE_FILES.has(file);
     return true;
@@ -121,7 +124,7 @@ const buildTwentyTrials = (tenItems: Reinforcer[]) => {
   return shuffle(trials);
 };
 
-/** Yüklenen fotoğrafı küçük ve hafif bir 384x384 WebP dosyasına çevirir. */
+/** Yüklenen fotoğrafı depolama öncesinde optimize eder. */
 const resizeImage = async (file: File): Promise<Blob> => {
   const bitmap = await createImageBitmap(file);
   const size = 384;
@@ -166,7 +169,9 @@ export default function Pekistirec({ studentId, studentName, onBack }: Props) {
   const [selected, setSelected] = useState<Reinforcer[]>([]);
   const [searchText, setSearchText] = useState("");
   const [communityResults, setCommunityResults] = useState<Reinforcer[]>([]);
+  const [duplicateResults, setDuplicateResults] = useState<Reinforcer[]>([]);
   const [searching, setSearching] = useState(false);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [newImage, setNewImage] = useState<File | null>(null);
@@ -177,6 +182,8 @@ export default function Pekistirec({ studentId, studentName, onBack }: Props) {
   const [choiceCounts, setChoiceCounts] = useState<Record<string, number>>({});
   const [roundChoice, setRoundChoice] = useState<string | null>(null);
   const [ranking, setRanking] = useState<RankedReinforcer[]>([]);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -215,7 +222,7 @@ export default function Pekistirec({ studentId, studentName, onBack }: Props) {
             name: String(data.name || "Pekiştireç"), image: String(data.imageUrl || ""),
             source: "community" as const,
           };
-        }).filter((item) => Boolean(item.image)));
+        }).filter((item) => Boolean(item.image) && !EXCLUDED_NAMES.has(normalize(item.name))));
       } catch (error) {
         console.error(error);
         setCommunityResults([]);
@@ -223,6 +230,40 @@ export default function Pekistirec({ studentId, studentName, onBack }: Props) {
     }, 300);
     return () => window.clearTimeout(timer);
   }, [searchText]);
+
+  useEffect(() => {
+    const term = normalize(newName);
+    if (!showAddForm || term.length < 2) { setDuplicateResults([]); return; }
+    const timer = window.setTimeout(async () => {
+      setCheckingDuplicates(true);
+      try {
+        const snapshot = await getDocs(query(
+          collection(db, "reinforcerCatalog"), orderBy("normalizedName"),
+          startAt(term), endAt(`${term}\uf8ff`), limit(8),
+        ));
+        const sharedItems = snapshot.docs.map((catalogDoc) => {
+          const data = catalogDoc.data();
+          return {
+            id: `community:${catalogDoc.id}`, catalogId: catalogDoc.id,
+            name: String(data.name || "Pekiştireç"), image: String(data.imageUrl || ""),
+            source: "community" as const,
+          };
+        }).filter((item) => Boolean(item.image) && !EXCLUDED_NAMES.has(normalize(item.name)));
+        const builtInItems = READY_ITEMS.filter((item) => normalize(item.name).includes(term));
+        const seen = new Set<string>();
+        setDuplicateResults([...builtInItems, ...sharedItems].filter((item) => {
+          const key = `${normalize(item.name)}:${item.image}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }).slice(0, 8));
+      } catch (error) {
+        console.error(error);
+        setDuplicateResults(READY_ITEMS.filter((item) => normalize(item.name).includes(term)).slice(0, 8));
+      } finally { setCheckingDuplicates(false); }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [newName, showAddForm]);
 
   const visibleItems = useMemo(() => {
     const term = normalize(searchText);
@@ -275,7 +316,7 @@ export default function Pekistirec({ studentId, studentName, onBack }: Props) {
       setSelected((current) => [...current, item]);
       setCommunityResults((current) => [item, ...current]);
       setSearchText(""); setNewName(""); setNewImage(null); setShowAddForm(false);
-      toast.success("Fotoğraf küçültülerek kaydedildi.");
+      toast.success("Pekiştireç eklendi.");
     } catch (error) {
       console.error(error); toast.error("Nesne eklenemedi.");
     } finally { setAdding(false); }
@@ -350,6 +391,27 @@ export default function Pekistirec({ studentId, studentName, onBack }: Props) {
     setTrialIndex(0); setChoiceCounts({}); setRoundChoice(null); setStep("select");
   };
 
+  const openAddForm = () => {
+    if (selected.length >= 10) { toast.error("Önce seçili adaylardan birini çıkarın."); return; }
+    setNewName(""); setNewImage(null); setDuplicateResults([]); setShowAddForm(true);
+  };
+
+  const closeAddForm = () => {
+    setShowAddForm(false); setNewName(""); setNewImage(null); setDuplicateResults([]);
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+    if (galleryInputRef.current) galleryInputRef.current.value = "";
+  };
+
+  const selectExistingItem = (item: Reinforcer) => {
+    if (!selectedIds.has(item.id)) toggleItem(item);
+    closeAddForm();
+  };
+
+  const handleImageSelection = (file: File | undefined, input: HTMLInputElement) => {
+    setNewImage(file || null);
+    input.value = "";
+  };
+
   if (loading) return <div className="flex min-h-[420px] items-center justify-center"><Loader2 className="animate-spin text-cyan-400" size={36} /></div>;
 
   return <div className="min-h-screen bg-[#020617] px-4 py-4 pb-24 text-slate-100">
@@ -371,13 +433,21 @@ export default function Pekistirec({ studentId, studentName, onBack }: Props) {
       {step === "select" && <section className="space-y-4">
         <div className="rounded-2xl border border-cyan-500/25 bg-cyan-500/10 p-4"><h2 className="text-xl font-black">10 aday seçin</h2><p className="mt-1 text-sm text-slate-300">Ailenin söylediği veya öğretmenin sevdiğini bildiği seçeneklerden tam 10 tane seçin.</p><div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full bg-cyan-400" style={{ width: `${selected.length * 10}%` }} /></div><p className="mt-2 text-right font-black text-cyan-300">{selected.length}/10</p></div>
         {selected.length > 0 && <div className="flex gap-2 overflow-x-auto pb-1">{selected.map((item, index) => <button key={item.id} type="button" onClick={() => toggleItem(item)} className="flex shrink-0 items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 py-2 pl-3 pr-2 text-xs font-bold">{index + 1}. {item.name}<X size={14} /></button>)}</div>}
-        <div className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} /><input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Listede ara veya yeni nesne yaz…" className="w-full rounded-2xl border border-slate-700 bg-slate-900 py-4 pl-11 pr-10 outline-none focus:border-cyan-500" />{searching && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-cyan-400" size={18} />}</div>
-        {searchText.trim().length >= 2 && selected.length < 10 && <button type="button" onClick={() => { setNewName(searchText.trim()); setShowAddForm(true); }} className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-violet-400/50 bg-violet-500/10 p-4 text-left font-bold text-violet-200"><Plus /> “{searchText.trim()}” için kendi fotoğrafını ekle</button>}
+        <div className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} /><input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Listede ara…" className="w-full rounded-2xl border border-slate-700 bg-slate-900 py-4 pl-11 pr-10 outline-none focus:border-cyan-500" />{searching && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-cyan-400" size={18} />}</div>
+        {!showAddForm && <button type="button" onClick={openAddForm} className="flex w-full items-center justify-center gap-2 rounded-2xl border border-violet-400/50 bg-violet-500/10 p-4 font-black text-violet-200"><Plus size={20} /> Pekiştireç Ekle</button>}
         {showAddForm && <div className="rounded-2xl border border-violet-500/30 bg-slate-900 p-4">
-          <div className="flex items-center justify-between"><h3 className="font-black">Yeni nesne ekle</h3><button type="button" onClick={() => setShowAddForm(false)}><X /></button></div>
+          <div className="flex items-center justify-between"><h3 className="font-black">Pekiştireç Ekle</h3><button type="button" onClick={closeAddForm}><X /></button></div>
           <input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="Nesnenin adı" className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" />
-          <div className="mt-3 grid grid-cols-2 gap-2"><label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm font-bold"><Camera className="text-violet-400" size={18} /> Kamera<input type="file" accept="image/*" capture="environment" className="hidden" onChange={(event) => setNewImage(event.target.files?.[0] || null)} /></label><label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm font-bold"><ImagePlus className="text-violet-400" size={18} /> Galeri<input type="file" accept="image/*" className="hidden" onChange={(event) => setNewImage(event.target.files?.[0] || null)} /></label></div>
-          {newImage && <p className="mt-2 truncate text-xs text-emerald-300">Seçildi: {newImage.name}</p>}<p className="mt-2 text-xs text-slate-500">Fotoğraf otomatik olarak 384×384 WebP boyutuna küçültülür.</p>
+          {checkingDuplicates && <div className="mt-3 flex items-center gap-2 text-xs text-slate-400"><Loader2 className="animate-spin" size={14} /> Listede kontrol ediliyor…</div>}
+          {duplicateResults.length > 0 && <div className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3">
+            <p className="text-sm font-bold text-amber-200">Listede buna benzer pekiştireçler var</p>
+            <p className="mt-1 text-xs text-slate-300">İsterseniz var olan görseli seçin veya kendi fotoğrafınızı ekleyin.</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">{duplicateResults.map((item) => <button key={item.id} type="button" onClick={() => selectExistingItem(item)} className="rounded-xl border border-slate-700 bg-slate-950 p-2 text-left"><div className="h-20 overflow-hidden rounded-lg bg-white"><img src={item.image} alt={item.name} className="h-full w-full object-contain p-1" /></div><p className="mt-2 truncate text-xs font-bold">{item.name}</p></button>)}</div>
+          </div>}
+          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} onChange={(event) => handleImageSelection(event.target.files?.[0], event.currentTarget)} />
+          <input ref={galleryInputRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} onChange={(event) => handleImageSelection(event.target.files?.[0], event.currentTarget)} />
+          <div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => cameraInputRef.current?.click()} className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm font-bold"><Camera className="text-violet-400" size={18} /> Kamera</button><button type="button" onClick={() => galleryInputRef.current?.click()} className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm font-bold"><ImagePlus className="text-violet-400" size={18} /> Galeri</button></div>
+          {newImage && <p className="mt-2 truncate text-xs text-emerald-300">Seçildi: {newImage.name}</p>}
           <button type="button" disabled={adding || !newName.trim() || !newImage} onClick={addNewItem} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-violet-500 p-3 font-black disabled:opacity-40">{adding ? <Loader2 className="animate-spin" /> : <Save size={18} />} Ekle ve Seç</button>
         </div>}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{visibleItems.map((item) => { const checked = selectedIds.has(item.id); return <button key={item.id} type="button" onClick={() => toggleItem(item)} className={twMerge("rounded-2xl border p-2 text-left active:scale-[0.98]", checked ? "border-cyan-400 bg-cyan-500/15" : "border-slate-800 bg-slate-900")}><Picture item={item} /><div className="flex items-center justify-between gap-2 px-2 py-3"><span className="truncate text-sm font-bold">{item.name}</span><span className={twMerge("flex h-6 w-6 items-center justify-center rounded-full border", checked ? "border-cyan-300 bg-cyan-400 text-slate-950" : "border-slate-600")}>{checked && <Check size={14} />}</span></div></button>; })}</div>
