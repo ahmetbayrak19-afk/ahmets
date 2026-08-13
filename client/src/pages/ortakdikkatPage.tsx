@@ -12,6 +12,8 @@ import OrtakDikkat3 from '@/aba/ortakdikkat/ortakdikkat3';
 import OrtakDikkat4 from '@/aba/ortakdikkat/ortakdikkat4';
 import OrtakDikkat5 from '@/aba/ortakdikkat/ortakdikkat5';
 import OrtakDikkat6 from '@/aba/ortakdikkat/ortakdikkat6';
+import OrtakDikkat7 from '@/aba/ortakdikkat/ortakdikkat7';
+import OrtakDikkat8 from '@/aba/ortakdikkat/ortakdikkat8';
 
 interface OrtakDikkatPageProps {
   studentId: string;
@@ -157,6 +159,34 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
           itemText={itemText}
           onClose={() => setActiveItem(null)}
           onComplete={(success) => handleAssessmentComplete(activeItem, success)}
+        />
+      );
+    }
+
+    if (activeItem.startsWith("OD 2.1")) {
+      return (
+        <OrtakDikkat7
+          studentId={studentId}
+          itemCode={itemCode}
+          itemText={itemText}
+          onClose={() => setActiveItem(null)}
+          onComplete={(success) => handleAssessmentComplete(activeItem, success)}
+        />
+      );
+    }
+
+    if (activeItem.startsWith("OD 2.2")) {
+      return (
+        <OrtakDikkat8
+          studentId={studentId}
+          itemCode={itemCode}
+          itemText={itemText}
+          onClose={() => setActiveItem(null)}
+          onComplete={(success) => handleAssessmentComplete(activeItem, success)}
+          onOpenReinforcers={() => {
+            setActiveItem(null);
+            onOpenReinforcers();
+          }}
         />
       );
     }
