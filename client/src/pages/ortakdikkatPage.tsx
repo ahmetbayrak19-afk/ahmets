@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, PlayCircle } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
+import OrtakDikkat1 from '@/aba/ortakdikkat/ortakdikkat1';
+import OrtakDikkat2 from '@/aba/ortakdikkat/ortakdikkat2';
+import OrtakDikkat3 from '@/aba/ortakdikkat/ortakdikkat3';
 import OrtakDikkat4 from '@/aba/ortakdikkat/ortakdikkat4';
 import OrtakDikkat5 from '@/aba/ortakdikkat/ortakdikkat5';
 
@@ -85,6 +88,39 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
     const itemCode = codeMatch?.[0].slice(0, -1) || "OD";
     const itemText = activeItem.slice(codeMatch?.[0].length || 0).trim();
 
+    if (activeItem.startsWith("OD 1.1.")) {
+      return (
+        <OrtakDikkat1
+          itemCode={itemCode}
+          itemText={itemText}
+          onClose={() => setActiveItem(null)}
+          onComplete={(success) => handleAssessmentComplete(activeItem, success)}
+        />
+      );
+    }
+
+    if (activeItem.startsWith("OD 1.2.")) {
+      return (
+        <OrtakDikkat2
+          itemCode={itemCode}
+          itemText={itemText}
+          onClose={() => setActiveItem(null)}
+          onComplete={(success) => handleAssessmentComplete(activeItem, success)}
+        />
+      );
+    }
+
+    if (activeItem.startsWith("OD 1.3.")) {
+      return (
+        <OrtakDikkat3
+          itemCode={itemCode}
+          itemText={itemText}
+          onClose={() => setActiveItem(null)}
+          onComplete={(success) => handleAssessmentComplete(activeItem, success)}
+        />
+      );
+    }
+
     if (activeItem.startsWith("OD 1.4.")) {
       return (
         <OrtakDikkat4
@@ -141,48 +177,76 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
       <div className="grid gap-3 animate-in slide-in-from-bottom-4 duration-500 pb-20">
         {items.map((item) => {
             const status = formData[item];
-            const hasAssessment = item.startsWith("OD 1.4.") || item.startsWith("OD 1.5.");
+            const hasAssessment = /^OD 1\.[1-5]\./.test(item);
             
             // Kod ve Metin Ayırma
             const firstSpaceIndex = item.indexOf(' ');
             const code = item.substring(0, firstSpaceIndex);
             const text = item.substring(firstSpaceIndex + 1);
 
-            const isCompleted = status === true;
+            const isPassed = status === true;
+            const isFailed = status === false;
 
             return (
                 <div 
                     key={item} 
                     className={twMerge(
                         "group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4",
-                        isCompleted 
-                            ? "bg-green-950/10 border-green-500/20" 
-                            : "bg-slate-900/40 border-slate-800 hover:bg-slate-800 hover:border-slate-700"
+                        isPassed &&
+                          "bg-green-950/15 border-green-500/15 opacity-45 hover:opacity-80",
+                        isFailed &&
+                          "bg-red-950/30 border-red-500/50 shadow-[0_0_0_1px_rgba(239,68,68,0.15)] hover:border-red-400/70 hover:bg-red-950/40",
+                        !isPassed &&
+                          !isFailed &&
+                          "bg-slate-900/40 border-slate-800 hover:bg-slate-800 hover:border-slate-700"
                     )}
                 >
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-4 flex-1 min-w-0">
                         <div className={twMerge(
-                            "min-w-[48px] h-10 rounded-lg flex items-center justify-center text-[10px] font-bold font-mono border mt-0.5 px-1 text-center",
-                            isCompleted ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-700 text-slate-500"
+                            "min-w-[48px] h-10 rounded-lg flex items-center justify-center text-[10px] font-bold font-mono border mt-0.5 px-1 text-center shrink-0",
+                            isPassed && "bg-green-500/15 border-green-500/40 text-green-400/80",
+                            isFailed && "bg-red-500/25 border-red-500 text-red-300",
+                            !isPassed && !isFailed && "bg-slate-950 border-slate-700 text-slate-500"
                         )}>
-                            {isCompleted ? <Trophy size={18} /> : code}
+                            {isPassed ? <Trophy size={18} /> : isFailed ? <XCircle size={18} /> : code}
                         </div>
-                        <div>
-                            <p className={twMerge("font-medium text-sm leading-relaxed", isCompleted ? "text-green-100" : "text-slate-200")}>
+                        <div className="min-w-0">
+                            <p className={twMerge(
+                              "font-medium text-sm leading-relaxed",
+                              isPassed && "text-green-100/70",
+                              isFailed && "text-red-100",
+                              !isPassed && !isFailed && "text-slate-200"
+                            )}>
                                 {text}
                             </p>
+                            {isPassed && (
+                              <span className="text-[10px] text-green-500/60 font-semibold uppercase tracking-wider">
+                                Geçti · tekrar değerlendirilebilir
+                              </span>
+                            )}
+                            {isFailed && (
+                              <span className="text-[10px] text-red-400/90 font-semibold uppercase tracking-wider">
+                                Geçemedi · öncelikli
+                              </span>
+                            )}
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-center">
+                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
                         {hasAssessment && (
                           <button
                             type="button"
                             onClick={() => setActiveItem(item)}
-                            className="flex h-9 items-center justify-center gap-2 rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-3 text-xs font-bold text-cyan-300 transition hover:bg-cyan-500/20 active:scale-95"
+                            className={twMerge(
+                              "h-9 px-3 mr-2 rounded-lg text-white text-[10px] font-bold flex items-center gap-1.5 border shadow-sm transition-all active:scale-95",
+                              isPassed && "bg-blue-600/50 border-blue-400/40 hover:bg-blue-600/80",
+                              isFailed && "bg-blue-600 border-blue-400 hover:bg-blue-500 ring-1 ring-blue-400/30",
+                              !isPassed && !isFailed && "bg-blue-600/90 border-blue-400 hover:bg-blue-500"
+                            )}
                             title="Değerlendirmeyi aç"
                           >
-                            <PlayCircle size={17} /> Değerlendir
+                            <ClipboardCheck size={16} />
+                            <span className="hidden sm:inline">DEĞERLENDİR</span>
                           </button>
                         )}
                         <button 
