@@ -11,6 +11,7 @@ import OrtakDikkat2 from '@/aba/ortakdikkat/ortakdikkat2';
 import OrtakDikkat3 from '@/aba/ortakdikkat/ortakdikkat3';
 import OrtakDikkat4 from '@/aba/ortakdikkat/ortakdikkat4';
 import OrtakDikkat5 from '@/aba/ortakdikkat/ortakdikkat5';
+import OrtakDikkat6 from '@/aba/ortakdikkat/ortakdikkat6';
 
 interface OrtakDikkatPageProps {
   studentId: string;
@@ -145,6 +146,17 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
             setActiveItem(null);
             onOpenReinforcers();
           }}
+        />
+      );
+    }
+
+    if (activeItem.startsWith("OD 1.6")) {
+      return (
+        <OrtakDikkat6
+          itemCode={itemCode}
+          itemText={itemText}
+          onClose={() => setActiveItem(null)}
+          onComplete={(success) => handleAssessmentComplete(activeItem, success)}
         />
       );
     }
