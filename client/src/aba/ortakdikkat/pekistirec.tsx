@@ -1,43 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  addDoc,
-  collection,
-  doc,
-  endAt,
-  getDoc,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-  startAt,
+  addDoc, collection, doc, endAt, getDoc, getDocs, limit, orderBy,
+  query, serverTimestamp, setDoc, startAt,
 } from "firebase/firestore";
 import { getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
 import {
-  ArrowDown,
-  ArrowLeft,
-  ArrowUp,
-  Camera,
-  Check,
-  CirclePlus,
-  Gift,
-  ImagePlus,
-  Loader2,
-  MonitorSmartphone,
-  PackageOpen,
-  PencilLine,
-  RefreshCw,
-  Save,
-  Search,
-  Sparkles,
-  Trash2,
+  ArrowDown, ArrowLeft, ArrowUp, Camera, Check, CheckCircle2, ChevronRight,
+  Gift, ImagePlus, Loader2, MonitorSmartphone, PencilLine, Plus, RefreshCw,
+  Save, Search, Trash2, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { twMerge } from "tailwind-merge";
 import { db, storage } from "@/firebase";
 
-const assetModules = import.meta.glob(
+const imageModules = import.meta.glob(
   [
     "./ortakdikkatsesgorsel/*.{png,jpg,jpeg,webp}",
     "../yonerge/sesgorsel/*.{png,jpg,jpeg,webp}",
@@ -50,153 +26,82 @@ const assetModules = import.meta.glob(
   { eager: true, import: "default", query: "?url" },
 ) as Record<string, string>;
 
-type CategoryId = "oyun" | "meyve" | "icecek" | "temel-gida" | "ozel";
-type SourceType = "built-in" | "community";
-type MethodType = "digital" | "physical" | "teacher";
-type StepType = "summary" | "intro" | "candidates" | "method" | "assessment" | "review";
+type Method = "digital" | "teacher";
+type Step = "summary" | "select" | "method" | "digital" | "teacher" | "result";
+type Source = "built-in" | "community";
 
-interface ReinforcerItem {
+interface Reinforcer {
   id: string;
-  catalogId?: string;
   name: string;
-  image?: string;
-  category: CategoryId;
-  source: SourceType;
-  physicalOnly?: boolean;
+  image: string;
+  source: Source;
+  catalogId?: string;
 }
 
-interface RankedItem extends ReinforcerItem {
+interface RankedReinforcer extends Reinforcer {
   rank: number;
-  score?: number;
-  shownCount?: number;
   selectedCount?: number;
+  shownCount?: number;
+  score?: number;
 }
-
-interface ItemStat {
-  shown: number;
-  selected: number;
-}
-
-type AssessmentStats = Record<string, ItemStat>;
 
 interface SavedProfile {
-  rankings: RankedItem[];
-  method: MethodType;
-  teacherAdjusted?: boolean;
+  rankings?: RankedReinforcer[];
+  method?: Method;
   updatedAt?: { toDate?: () => Date } | Date | string | null;
 }
 
-interface ReinforcerPageProps {
+interface Props {
   studentId: string;
   studentName?: string;
   onBack?: () => void;
 }
 
-const CATEGORIES: Array<{ id: "all" | CategoryId; label: string }> = [
-  { id: "all", label: "Tümü" },
-  { id: "oyun", label: "Oyun ve etkinlik" },
-  { id: "meyve", label: "Meyveler" },
-  { id: "icecek", label: "İçecekler" },
-  { id: "temel-gida", label: "Temel gıdalar" },
-  { id: "ozel", label: "Öğretmenlerin ekledikleri" },
-];
+const normalize = (value: string) => value
+  .trim().toLocaleLowerCase("tr-TR").normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "").replace(/ı/g, "i").replace(/\s+/g, " ");
 
-const pathImage = (path: string) => assetModules[path];
+const DISPLAY_NAMES: Record<string, string> = {
+  biskuvi: "Bisküvi", cikolata: "Çikolata", cips: "Cips", dondurma: "Dondurma",
+  kaydirak: "Kaydırak", oyunhamuru: "Oyun hamuru", salincak: "Salıncak", seker: "Şeker",
+  tablet: "Tablet", trombolin: "Trambolin", yapboz: "Yapboz", top: "Top",
+  araba: "Oyuncak araba", bebek: "Oyuncak bebek", kirmizibalon: "Balon", kitap: "Kitap",
+  gitar: "Gitar", suluboya: "Sulu boya", ananas: "Ananas", armut: "Armut", cilek: "Çilek",
+  elma: "Elma", erik: "Erik", karpuz: "Karpuz", kavun: "Kavun", kiraz: "Kiraz",
+  kivi: "Kivi", limon: "Limon", muz: "Muz", nar: "Nar", portakal: "Portakal",
+  seftali: "Şeftali", uzum: "Üzüm", ayran: "Ayran", cay: "Çay", kahva: "Kahve",
+  kola: "Kola", limonata: "Limonata", meyvesuyu: "Meyve suyu", soda: "Soda", su: "Su",
+  sut: "Süt", tursusuyu: "Turşu suyu", bal: "Bal", balik: "Balık", corba: "Çorba",
+  ekmek: "Ekmek", et: "Et", kuruyemis: "Kuru yemiş", makarna: "Makarna",
+  peynir: "Peynir", pilav: "Pilav", recel: "Reçel", tavuk: "Tavuk", yag: "Yağ",
+  yogurt: "Yoğurt", yumurta: "Yumurta", zeytin: "Zeytin",
+};
 
-const makeItems = (
-  category: CategoryId,
-  directory: string,
-  entries: Array<[string, string, string]>,
-): ReinforcerItem[] =>
-  entries.map(([id, name, file]) => ({
-    id: `ready:${id}`,
-    name,
-    image: pathImage(`${directory}/${file}`),
-    category,
-    source: "built-in",
-  }));
+const OD_FILES = new Set([
+  "biskuvi", "cikolata", "cips", "dondurma", "kaydirak", "oyunhamuru",
+  "salincak", "seker", "tablet", "trombolin", "yapboz",
+]);
+const YONERGE_FILES = new Set(["top", "araba", "bebek", "kirmizibalon", "kitap"]);
 
-const BUILT_IN_ITEMS: ReinforcerItem[] = [
-  ...makeItems("oyun", "./ortakdikkatsesgorsel", [
-    ["biskuvi", "Bisküvi", "biskuvi.png"],
-    ["cikolata", "Çikolata", "cikolata.png"],
-    ["cips", "Cips", "cips.png"],
-    ["dondurma", "Dondurma", "dondurma.png"],
-    ["kaydirak", "Kaydırak", "kaydirak.png"],
-    ["oyun-hamuru", "Oyun hamuru", "oyunhamuru.png"],
-    ["salincak", "Salıncak", "salincak.png"],
-    ["seker", "Şeker", "seker.png"],
-    ["tablet", "Tablet", "tablet.png"],
-    ["trambolin", "Trambolin", "trombolin.png"],
-    ["yapboz", "Yapboz", "yapboz.png"],
-  ]),
-  ...makeItems("oyun", "../yonerge/sesgorsel", [
-    ["top", "Top", "top.png"],
-    ["oyuncak-araba", "Oyuncak araba", "araba.png"],
-    ["oyuncak-bebek", "Oyuncak bebek", "bebek.png"],
-    ["balon", "Balon", "kirmizibalon.png"],
-    ["kitap", "Kitap", "kitap.png"],
-  ]),
-  ...makeItems("oyun", "../esle", [["gitar", "Gitar", "gitar.png"]]),
-  ...makeItems("oyun", "../../okulmalzemeleri", [["sulu-boya", "Sulu boya", "suluboya.png"]]),
-  ...makeItems("meyve", "../../fruits", [
-    ["ananas", "Ananas", "ananas.jpg"],
-    ["armut", "Armut", "armut.jpg"],
-    ["cilek", "Çilek", "cilek.jpg"],
-    ["elma", "Elma", "elma.jpg"],
-    ["erik", "Erik", "erik.png"],
-    ["karpuz", "Karpuz", "karpuz.jpg"],
-    ["kavun", "Kavun", "kavun.png"],
-    ["kiraz", "Kiraz", "kiraz.jpg"],
-    ["kivi", "Kivi", "kivi.png"],
-    ["limon", "Limon", "limon.png"],
-    ["muz", "Muz", "muz.jpg"],
-    ["nar", "Nar", "nar.jpg"],
-    ["portakal", "Portakal", "portakal.jpg"],
-    ["seftali", "Şeftali", "seftali.png"],
-    ["uzum", "Üzüm", "uzum.jpg"],
-  ]),
-  ...makeItems("icecek", "../../icecekler", [
-    ["ayran", "Ayran", "ayran.png"],
-    ["cay", "Çay", "cay.png"],
-    ["kahve", "Kahve", "kahva.png"],
-    ["kola", "Kola", "kola.png"],
-    ["limonata", "Limonata", "limonata.png"],
-    ["meyve-suyu", "Meyve suyu", "meyvesuyu.png"],
-    ["soda", "Soda", "soda.png"],
-    ["su", "Su", "su.png"],
-    ["sut", "Süt", "sut.png"],
-    ["tursu-suyu", "Turşu suyu", "tursusuyu.png"],
-  ]),
-  ...makeItems("temel-gida", "../../temelgidalar", [
-    ["bal", "Bal", "bal.png"],
-    ["balik", "Balık", "balik.png"],
-    ["corba", "Çorba", "corba.png"],
-    ["ekmek", "Ekmek", "ekmek.png"],
-    ["et", "Et", "et.png"],
-    ["kuruyemis", "Kuru yemiş", "kuruyemis.png"],
-    ["makarna", "Makarna", "makarna.png"],
-    ["peynir", "Peynir", "peynir.png"],
-    ["pilav", "Pilav", "pilav.png"],
-    ["recel", "Reçel", "recel.png"],
-    ["tavuk", "Tavuk", "tavuk.png"],
-    ["yag", "Yağ", "yag.png"],
-    ["yogurt", "Yoğurt", "yogurt.png"],
-    ["yumurta", "Yumurta", "yumurta.png"],
-    ["zeytin", "Zeytin", "zeytin.png"],
-  ]),
-];
+const READY_ITEMS: Reinforcer[] = Object.entries(imageModules)
+  .filter(([path]) => {
+    const file = path.split("/").pop()?.replace(/\.(png|jpe?g|webp)$/i, "") || "";
+    if (path.includes("/ortakdikkatsesgorsel/")) return OD_FILES.has(file);
+    if (path.includes("/yonerge/sesgorsel/")) return YONERGE_FILES.has(file);
+    return true;
+  })
+  .map(([path, image]) => {
+    const file = path.split("/").pop()?.replace(/\.(png|jpe?g|webp)$/i, "") || path;
+    return {
+      id: `ready:${path}`,
+      name: DISPLAY_NAMES[file] || file,
+      image,
+      source: "built-in" as const,
+    };
+  })
+  .sort((a, b) => a.name.localeCompare(b.name, "tr"));
 
-const normalizeName = (value: string) =>
-  value
-    .trim()
-    .toLocaleLowerCase("tr-TR")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/ı/g, "i")
-    .replace(/\s+/g, " ");
-
-const shuffle = <T,>(items: T[]): T[] => {
+const shuffle = <T,>(items: T[]) => {
   const copy = [...items];
   for (let i = copy.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -205,904 +110,295 @@ const shuffle = <T,>(items: T[]): T[] => {
   return copy;
 };
 
-const buildBalancedTrials = (items: ReinforcerItem[]): ReinforcerItem[][] => {
-  const exposure = Object.fromEntries(items.map((item) => [item.id, 0])) as Record<string, number>;
-  const trials: ReinforcerItem[][] = [];
-
-  while (Math.min(...Object.values(exposure)) < 3) {
-    const group = shuffle(items)
-      .sort((a, b) => exposure[a.id] - exposure[b.id])
-      .slice(0, 3);
-
-    group.forEach((item) => {
-      exposure[item.id] += 1;
-    });
-    trials.push(shuffle(group));
+/** Tam 20 farklı üçlü üretir; 10 adayın her biri tam 6 kez görünür. */
+const buildTwentyTrials = (tenItems: Reinforcer[]) => {
+  const items = shuffle(tenItems);
+  const trials: Reinforcer[][] = [];
+  for (let i = 0; i < 10; i += 1) {
+    trials.push(shuffle([items[i], items[(i + 1) % 10], items[(i + 3) % 10]]));
+    trials.push(shuffle([items[i], items[(i + 4) % 10], items[(i + 7) % 10]]));
   }
-
-  return trials;
+  return shuffle(trials);
 };
 
-const resizeToWebp = async (file: File): Promise<Blob> => {
+/** Yüklenen fotoğrafı küçük ve hafif bir 384x384 WebP dosyasına çevirir. */
+const resizeImage = async (file: File): Promise<Blob> => {
   const bitmap = await createImageBitmap(file);
-  const size = 512;
+  const size = 384;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Görsel işlenemedi.");
-
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, size, size);
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Görsel işlenemedi.");
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, size, size);
   const scale = Math.min(size / bitmap.width, size / bitmap.height);
   const width = bitmap.width * scale;
   const height = bitmap.height * scale;
-  ctx.drawImage(bitmap, (size - width) / 2, (size - height) / 2, width, height);
+  context.drawImage(bitmap, (size - width) / 2, (size - height) / 2, width, height);
   bitmap.close();
-
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error("Görsel dönüştürülemedi."))),
-      "image/webp",
-      0.82,
-    );
-  });
+  return new Promise((resolve, reject) => canvas.toBlob(
+    (blob) => blob ? resolve(blob) : reject(new Error("Görsel küçültülemedi.")),
+    "image/webp", 0.76,
+  ));
 };
 
-const formatUpdatedAt = (value: SavedProfile["updatedAt"]) => {
+const formatDate = (value: SavedProfile["updatedAt"]) => {
   if (!value) return "";
   try {
-    const date =
-      typeof value === "object" && "toDate" in value && typeof value.toDate === "function"
-        ? value.toDate()
-        : new Date(value as string | Date);
-    return new Intl.DateTimeFormat("tr-TR", { dateStyle: "long", timeStyle: "short" }).format(date);
-  } catch {
-    return "";
-  }
+    const date = typeof value === "object" && "toDate" in value && typeof value.toDate === "function"
+      ? value.toDate() : new Date(value as string | Date);
+    return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(date);
+  } catch { return ""; }
 };
 
-function ItemVisual({ item, large = false }: { item: ReinforcerItem; large?: boolean }) {
-  return (
-    <div
-      className={twMerge(
-        "relative overflow-hidden rounded-2xl bg-white flex items-center justify-center",
-        large ? "h-44 sm:h-56" : "h-28 sm:h-36",
-      )}
-    >
-      {item.image ? (
-        <img src={item.image} alt={item.name} className="h-full w-full object-contain p-2" />
-      ) : (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-slate-100 px-3 text-center text-slate-600">
-          <PackageOpen size={large ? 44 : 30} />
-          <span className="text-xs font-semibold">Gerçek nesne/etkinlik</span>
-        </div>
-      )}
-    </div>
-  );
+function Picture({ item, large = false }: { item: Reinforcer; large?: boolean }) {
+  return <div className={twMerge("overflow-hidden rounded-xl bg-white", large ? "h-36 sm:h-52" : "h-28 sm:h-36")}>
+    <img src={item.image} alt={item.name} className="h-full w-full object-contain p-2" />
+  </div>;
 }
 
-export default function Pekistirec({ studentId, studentName, onBack }: ReinforcerPageProps) {
+export default function Pekistirec({ studentId, studentName, onBack }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [step, setStep] = useState<StepType>("intro");
+  const [step, setStep] = useState<Step>("select");
   const [savedProfile, setSavedProfile] = useState<SavedProfile | null>(null);
-
-  const [selected, setSelected] = useState<ReinforcerItem[]>([]);
-  const [activeCategory, setActiveCategory] = useState<"all" | CategoryId>("all");
+  const [selected, setSelected] = useState<Reinforcer[]>([]);
   const [searchText, setSearchText] = useState("");
-  const [communityItems, setCommunityItems] = useState<ReinforcerItem[]>([]);
-  const [searchingCommunity, setSearchingCommunity] = useState(false);
-  const [showCustomForm, setShowCustomForm] = useState(false);
-  const [customName, setCustomName] = useState("");
-  const [customImage, setCustomImage] = useState<File | null>(null);
-  const [addingCustom, setAddingCustom] = useState(false);
-
-  const [method, setMethod] = useState<MethodType>("teacher");
-  const [trials, setTrials] = useState<ReinforcerItem[][]>([]);
+  const [communityResults, setCommunityResults] = useState<Reinforcer[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newImage, setNewImage] = useState<File | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [method, setMethod] = useState<Method>("digital");
+  const [trials, setTrials] = useState<Reinforcer[][]>([]);
   const [trialIndex, setTrialIndex] = useState(0);
-  const [stats, setStats] = useState<AssessmentStats>({});
-  const [positionSelections, setPositionSelections] = useState([0, 0, 0]);
-  const [recordedChoice, setRecordedChoice] = useState<{
-    choiceId: string | null;
-    nextStats: AssessmentStats;
-    nextPositions: number[];
-  } | null>(null);
-  const [ranking, setRanking] = useState<RankedItem[]>([]);
-  const [teacherAdjusted, setTeacherAdjusted] = useState(false);
+  const [choiceCounts, setChoiceCounts] = useState<Record<string, number>>({});
+  const [roundChoice, setRoundChoice] = useState<string | null>(null);
+  const [ranking, setRanking] = useState<RankedReinforcer[]>([]);
 
   useEffect(() => {
-    const loadProfile = async () => {
+    const load = async () => {
       const institutionId = localStorage.getItem("kazanim-takip-institution-id");
-      if (!institutionId || !studentId) {
-        setLoading(false);
-        return;
-      }
-
+      if (!institutionId || !studentId) return setLoading(false);
       try {
-        const snapshot = await getDoc(
-          doc(db, "institutions", institutionId, "students", studentId, "profiles", "abaReinforcers"),
-        );
+        const snapshot = await getDoc(doc(
+          db, "institutions", institutionId, "students", studentId, "profiles", "abaReinforcers",
+        ));
         if (snapshot.exists()) {
-          const profile = snapshot.data() as SavedProfile;
-          setSavedProfile(profile);
+          setSavedProfile(snapshot.data() as SavedProfile);
           setStep("summary");
         }
       } catch (error) {
         console.error(error);
-        toast.error("Pekiştireç profili yüklenemedi.");
-      } finally {
-        setLoading(false);
-      }
+        toast.error("Pekiştireç bilgileri yüklenemedi.");
+      } finally { setLoading(false); }
     };
-
-    loadProfile();
+    load();
   }, [studentId]);
 
   useEffect(() => {
-    const normalized = normalizeName(searchText);
-    if (normalized.length < 2) {
-      setCommunityItems([]);
-      setSearchingCommunity(false);
-      return;
-    }
-
+    const term = normalize(searchText);
+    if (term.length < 2) { setCommunityResults([]); return; }
     const timer = window.setTimeout(async () => {
-      setSearchingCommunity(true);
+      setSearching(true);
       try {
-        const snapshot = await getDocs(
-          query(
-            collection(db, "reinforcerCatalog"),
-            orderBy("normalizedName"),
-            startAt(normalized),
-            endAt(`${normalized}\uf8ff`),
-            limit(24),
-          ),
-        );
-        setCommunityItems(
-          snapshot.docs.map((catalogDoc) => {
-            const data = catalogDoc.data();
-            return {
-              id: `community:${catalogDoc.id}`,
-              catalogId: catalogDoc.id,
-              name: String(data.name || "Adsız pekiştireç"),
-              image: data.imageUrl ? String(data.imageUrl) : undefined,
-              category: "ozel" as const,
-              source: "community" as const,
-              physicalOnly: !data.imageUrl,
-            };
-          }),
-        );
+        const snapshot = await getDocs(query(
+          collection(db, "reinforcerCatalog"), orderBy("normalizedName"),
+          startAt(term), endAt(`${term}\uf8ff`), limit(12),
+        ));
+        setCommunityResults(snapshot.docs.map((catalogDoc) => {
+          const data = catalogDoc.data();
+          return {
+            id: `community:${catalogDoc.id}`, catalogId: catalogDoc.id,
+            name: String(data.name || "Pekiştireç"), image: String(data.imageUrl || ""),
+            source: "community" as const,
+          };
+        }).filter((item) => Boolean(item.image)));
       } catch (error) {
         console.error(error);
-        setCommunityItems([]);
-      } finally {
-        setSearchingCommunity(false);
-      }
-    }, 350);
-
+        setCommunityResults([]);
+      } finally { setSearching(false); }
+    }, 300);
     return () => window.clearTimeout(timer);
   }, [searchText]);
 
-  const allVisibleItems = useMemo(() => {
-    const normalized = normalizeName(searchText);
-    const ready = BUILT_IN_ITEMS.filter((item) => {
-      const categoryMatches = activeCategory === "all" || item.category === activeCategory;
-      const searchMatches = !normalized || normalizeName(item.name).includes(normalized);
-      return categoryMatches && searchMatches;
-    });
-
-    const community = communityItems.filter(
-      (item) => activeCategory === "all" || activeCategory === "ozel",
-    );
-    return [...ready, ...community];
-  }, [activeCategory, communityItems, searchText]);
+  const visibleItems = useMemo(() => {
+    const term = normalize(searchText);
+    return [
+      ...READY_ITEMS.filter((item) => !term || normalize(item.name).includes(term)),
+      ...communityResults,
+    ];
+  }, [communityResults, searchText]);
 
   const selectedIds = useMemo(() => new Set(selected.map((item) => item.id)), [selected]);
+  const savedRanking = useMemo(() => [...(savedProfile?.rankings || [])].map((item) => ({
+    ...item,
+    image: item.source === "built-in"
+      ? READY_ITEMS.find((ready) => ready.id === item.id)?.image || item.image
+      : item.image,
+  })).sort((a, b) => a.rank - b.rank).slice(0, 6), [savedProfile]);
 
-  const resetDraft = () => {
-    setSelected([]);
-    setRanking([]);
-    setSearchText("");
-    setActiveCategory("all");
-    setTrials([]);
-    setTrialIndex(0);
-    setStats({});
-    setPositionSelections([0, 0, 0]);
-    setRecordedChoice(null);
-    setTeacherAdjusted(false);
-    setStep("intro");
+  const toggleItem = (item: Reinforcer) => {
+    if (selectedIds.has(item.id)) {
+      setSelected((current) => current.filter((candidate) => candidate.id !== item.id));
+    } else if (selected.length >= 10) {
+      toast.error("En fazla 10 aday seçebilirsiniz.");
+    } else {
+      setSelected((current) => [...current, item]);
+    }
   };
 
-  const toggleCandidate = (item: ReinforcerItem) => {
-    setSelected((current) =>
-      current.some((candidate) => candidate.id === item.id)
-        ? current.filter((candidate) => candidate.id !== item.id)
-        : [...current, item],
-    );
-  };
-
-  const addCustomReinforcer = async () => {
-    const name = customName.trim();
+  const addNewItem = async () => {
     const institutionId = localStorage.getItem("kazanim-takip-institution-id");
     const teacherName = localStorage.getItem("kazanim-takip-teacher-name") || "";
-    if (!name || !institutionId) {
-      toast.error("Pekiştirecin adını yazın.");
-      return;
+    if (!newName.trim() || !newImage || !institutionId) {
+      toast.error("Nesnenin adını yazın ve bir fotoğraf seçin."); return;
     }
-
-    setAddingCustom(true);
+    if (selected.length >= 10) { toast.error("Önce seçili adaylardan birini çıkarın."); return; }
+    setAdding(true);
     try {
-      let imageUrl: string | undefined;
-      if (customImage) {
-        const blob = await resizeToWebp(customImage);
-        const uniqueId = crypto.randomUUID();
-        const imageRef = storageRef(storage, `reinforcer_catalog/${uniqueId}.webp`);
-        await uploadBytes(imageRef, blob, { contentType: "image/webp" });
-        imageUrl = await getDownloadURL(imageRef);
-      }
-
-      const newDocument = await addDoc(collection(db, "reinforcerCatalog"), {
-        name,
-        normalizedName: normalizeName(name),
-        imageUrl: imageUrl || null,
-        physicalOnly: !imageUrl,
-        createdByInstitutionId: institutionId,
-        createdByTeacher: teacherName,
-        createdAt: serverTimestamp(),
-        status: "active",
+      const smallImage = await resizeImage(newImage);
+      const imageReference = storageRef(storage, `reinforcer_catalog/${crypto.randomUUID()}.webp`);
+      await uploadBytes(imageReference, smallImage, { contentType: "image/webp" });
+      const imageUrl = await getDownloadURL(imageReference);
+      const catalogDocument = await addDoc(collection(db, "reinforcerCatalog"), {
+        name: newName.trim(), normalizedName: normalize(newName), imageUrl,
+        createdByInstitutionId: institutionId, createdByTeacher: teacherName,
+        createdAt: serverTimestamp(), status: "active",
       });
-
-      const newItem: ReinforcerItem = {
-        id: `community:${newDocument.id}`,
-        catalogId: newDocument.id,
-        name,
-        image: imageUrl,
-        category: "ozel",
-        source: "community",
-        physicalOnly: !imageUrl,
+      const item: Reinforcer = {
+        id: `community:${catalogDocument.id}`, catalogId: catalogDocument.id,
+        name: newName.trim(), image: imageUrl, source: "community",
       };
-      setCommunityItems((current) => [newItem, ...current]);
-      setSelected((current) => [...current, newItem]);
-      setCustomName("");
-      setCustomImage(null);
-      setShowCustomForm(false);
-      toast.success("Yeni pekiştireç ortak kataloğa eklendi.");
+      setSelected((current) => [...current, item]);
+      setCommunityResults((current) => [item, ...current]);
+      setSearchText(""); setNewName(""); setNewImage(null); setShowAddForm(false);
+      toast.success("Fotoğraf küçültülerek kaydedildi.");
     } catch (error) {
-      console.error(error);
-      toast.error("Pekiştireç eklenemedi.");
-    } finally {
-      setAddingCustom(false);
+      console.error(error); toast.error("Nesne eklenemedi.");
+    } finally { setAdding(false); }
+  };
+
+  const startDigital = () => {
+    setMethod("digital"); setTrials(buildTwentyTrials(selected)); setTrialIndex(0);
+    setChoiceCounts(Object.fromEntries(selected.map((item) => [item.id, 0])));
+    setRoundChoice(null); setStep("digital");
+  };
+
+  const finishDigital = (counts: Record<string, number>) => {
+    setRanking(selected.map((item) => ({
+      ...item, rank: 0, selectedCount: counts[item.id] || 0,
+      shownCount: 6, score: (counts[item.id] || 0) / 6,
+    })).sort((a, b) => (b.selectedCount || 0) - (a.selectedCount || 0)
+      || a.name.localeCompare(b.name, "tr"))
+      .slice(0, 6).map((item, index) => ({ ...item, rank: index + 1 })));
+    setStep("result");
+  };
+
+  const chooseDigital = (itemId: string) => {
+    if (roundChoice) return;
+    const next = { ...choiceCounts, [itemId]: (choiceCounts[itemId] || 0) + 1 };
+    setChoiceCounts(next); setRoundChoice(itemId);
+    window.setTimeout(() => {
+      if (trialIndex === 19) finishDigital(next);
+      else { setTrialIndex((current) => current + 1); setRoundChoice(null); }
+    }, 550);
+  };
+
+  const startTeacher = () => { setMethod("teacher"); setRanking([]); setStep("teacher"); };
+  const addTeacherChoice = (item: Reinforcer) => {
+    if (ranking.length < 6 && !ranking.some((ranked) => ranked.id === item.id)) {
+      setRanking((current) => [...current, { ...item, rank: current.length + 1 }]);
     }
   };
-
-  const beginAutomaticAssessment = (selectedMethod: "digital" | "physical") => {
-    const usable =
-      selectedMethod === "digital" ? selected.filter((item) => Boolean(item.image)) : selected;
-
-    if (usable.length < 6) {
-      toast.error(
-        selectedMethod === "digital"
-          ? "Ekrandan değerlendirme için en az 6 görselli aday seçin."
-          : "Değerlendirme için en az 6 aday seçin.",
-      );
-      return;
-    }
-
-    const nextTrials = buildBalancedTrials(usable);
-    setMethod(selectedMethod);
-    setTrials(nextTrials);
-    setTrialIndex(0);
-    setStats(Object.fromEntries(usable.map((item) => [item.id, { shown: 0, selected: 0 }])));
-    setPositionSelections([0, 0, 0]);
-    setRecordedChoice(null);
-    setStep("assessment");
-  };
-
-  const beginTeacherRanking = () => {
-    setMethod("teacher");
-    setRanking([]);
-    setTeacherAdjusted(false);
-    setStep("review");
-  };
-
-  const rankFromStats = (finalStats: AssessmentStats) => {
-    const evaluatedItems = trials.flat();
-    const uniqueItems = Array.from(new Map(evaluatedItems.map((item) => [item.id, item])).values());
-
-    const calculated = uniqueItems
-      .map((item) => {
-        const itemStats = finalStats[item.id] || { shown: 0, selected: 0 };
-        const score = itemStats.shown ? itemStats.selected / itemStats.shown : 0;
-        return {
-          ...item,
-          rank: 0,
-          score,
-          shownCount: itemStats.shown,
-          selectedCount: itemStats.selected,
-        };
-      })
-      .sort(
-        (a, b) =>
-          (b.score || 0) - (a.score || 0) ||
-          (b.selectedCount || 0) - (a.selectedCount || 0) ||
-          a.name.localeCompare(b.name, "tr"),
-      )
-      .slice(0, 6)
-      .map((item, index) => ({ ...item, rank: index + 1 }));
-
-    setRanking(calculated);
-    setTeacherAdjusted(false);
-    setStep("review");
-  };
-
-  const recordChoice = (choiceId: string | null, position?: number) => {
-    if (recordedChoice) return;
-    const currentTrial = trials[trialIndex];
-    const nextStats: AssessmentStats = Object.fromEntries(
-      Object.entries(stats).map(([id, itemStats]) => [id, { ...itemStats }]),
-    );
-
-    currentTrial.forEach((item) => {
-      nextStats[item.id] = nextStats[item.id] || { shown: 0, selected: 0 };
-      nextStats[item.id].shown += 1;
-    });
-    if (choiceId) nextStats[choiceId].selected += 1;
-
-    const nextPositions = [...positionSelections];
-    if (typeof position === "number") nextPositions[position] += 1;
-
-    setStats(nextStats);
-    setPositionSelections(nextPositions);
-    setRecordedChoice({ choiceId, nextStats, nextPositions });
-  };
-
-  const advanceTrial = () => {
-    if (!recordedChoice) return;
-    if (trialIndex === trials.length - 1) {
-      rankFromStats(recordedChoice.nextStats);
-      setRecordedChoice(null);
-      return;
-    }
-    setTrialIndex((current) => current + 1);
-    setRecordedChoice(null);
-  };
-
-  const reindexRanking = (items: RankedItem[]) => items.map((item, index) => ({ ...item, rank: index + 1 }));
-
-  const moveRankedItem = (index: number, direction: -1 | 1) => {
+  const reindex = (items: RankedReinforcer[]) => items.map((item, index) => ({ ...item, rank: index + 1 }));
+  const removeRanked = (id: string) => setRanking((current) => reindex(current.filter((item) => item.id !== id)));
+  const moveRanked = (index: number, direction: -1 | 1) => {
     const target = index + direction;
     if (target < 0 || target >= ranking.length) return;
-    const next = [...ranking];
-    [next[index], next[target]] = [next[target], next[index]];
-    setRanking(reindexRanking(next));
-    setTeacherAdjusted(true);
+    const next = [...ranking]; [next[index], next[target]] = [next[target], next[index]];
+    setRanking(reindex(next));
   };
 
-  const removeRankedItem = (id: string) => {
-    setRanking((current) => reindexRanking(current.filter((item) => item.id !== id)));
-    setTeacherAdjusted(true);
-  };
-
-  const addToRanking = (item: ReinforcerItem) => {
-    if (ranking.length >= 6 || ranking.some((ranked) => ranked.id === item.id)) return;
-    setRanking((current) => [...current, { ...item, rank: current.length + 1 }]);
-    setTeacherAdjusted(true);
-  };
-
-  const saveProfile = async () => {
-    if (ranking.length !== 6) {
-      toast.error("Kaydetmek için 6 pekiştireci sıraya yerleştirin.");
-      return;
-    }
+  const saveRanking = async () => {
+    if (ranking.length !== 6) { toast.error("Önce 6 pekiştireci sıralayın."); return; }
     const institutionId = localStorage.getItem("kazanim-takip-institution-id");
     const teacherName = localStorage.getItem("kazanim-takip-teacher-name") || "";
     if (!institutionId || !studentId) return;
-
     setSaving(true);
     try {
-      const cleanedRanking = ranking.map((item, index) => ({
-        id: item.id,
-        catalogId: item.catalogId || null,
-        name: item.name,
-        image: item.source === "community" ? item.image || null : null,
-        category: item.category,
-        source: item.source,
-        physicalOnly: Boolean(item.physicalOnly),
-        rank: index + 1,
-        score: typeof item.score === "number" ? item.score : null,
-        shownCount: item.shownCount ?? null,
-        selectedCount: item.selectedCount ?? null,
+      const toSave = ranking.map((item, index) => ({
+        id: item.id, catalogId: item.catalogId || null, name: item.name,
+        image: item.source === "community" ? item.image : null, source: item.source,
+        rank: index + 1, selectedCount: item.selectedCount ?? null,
+        shownCount: item.shownCount ?? null, score: item.score ?? null,
       }));
-
-      await setDoc(
-        doc(db, "institutions", institutionId, "students", studentId, "profiles", "abaReinforcers"),
-        {
-          version: 1,
-          rankings: cleanedRanking,
-          method,
-          teacherAdjusted: method !== "teacher" && teacherAdjusted,
-          updatedBy: teacherName,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      );
-
-      const localProfile: SavedProfile = {
-        rankings: cleanedRanking.map((item) => ({
-          ...item,
-          catalogId: item.catalogId || undefined,
-          image:
-            item.source === "built-in"
-              ? BUILT_IN_ITEMS.find((ready) => ready.id === item.id)?.image
-              : item.image || undefined,
-          score: item.score ?? undefined,
-          shownCount: item.shownCount ?? undefined,
-          selectedCount: item.selectedCount ?? undefined,
-        })),
-        method,
-        teacherAdjusted: method !== "teacher" && teacherAdjusted,
-        updatedAt: new Date(),
-      };
-      setSavedProfile(localProfile);
-      setStep("summary");
-      toast.success("Pekiştireç sıralaması kaydedildi.");
+      await setDoc(doc(
+        db, "institutions", institutionId, "students", studentId, "profiles", "abaReinforcers",
+      ), { version: 2, rankings: toSave, method, updatedBy: teacherName, updatedAt: serverTimestamp() }, { merge: true });
+      setSavedProfile({ rankings: ranking, method, updatedAt: new Date() });
+      setStep("summary"); toast.success("Pekiştireç sıralaması kaydedildi.");
     } catch (error) {
-      console.error(error);
-      toast.error("Pekiştireç sıralaması kaydedilemedi.");
-    } finally {
-      setSaving(false);
-    }
+      console.error(error); toast.error("Sıralama kaydedilemedi.");
+    } finally { setSaving(false); }
   };
 
-  const resolvedSavedRanking = useMemo(() => {
-    if (!savedProfile) return [];
-    return savedProfile.rankings
-      .map((item) => ({
-        ...item,
-        image:
-          item.source === "built-in"
-            ? BUILT_IN_ITEMS.find((ready) => ready.id === item.id)?.image
-            : item.image,
-      }))
-      .sort((a, b) => a.rank - b.rank);
-  }, [savedProfile]);
+  const restart = () => {
+    setSelected([]); setSearchText(""); setRanking([]); setTrials([]);
+    setTrialIndex(0); setChoiceCounts({}); setRoundChoice(null); setStep("select");
+  };
 
-  const chosenCount = positionSelections.reduce((sum, count) => sum + count, 0);
-  const hasPositionBias = chosenCount >= 5 && Math.max(...positionSelections) / chosenCount >= 0.7;
-  const digitalCandidateCount = selected.filter((item) => Boolean(item.image)).length;
+  if (loading) return <div className="flex min-h-[420px] items-center justify-center"><Loader2 className="animate-spin text-cyan-400" size={36} /></div>;
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[420px] items-center justify-center rounded-3xl bg-[#020617] text-cyan-400">
-        <Loader2 className="animate-spin" size={38} />
-      </div>
-    );
-  }
+  return <div className="min-h-screen bg-[#020617] px-4 py-4 pb-24 text-slate-100">
+    <div className="mx-auto max-w-4xl">
+      <header className="sticky top-0 z-30 mb-5 flex items-center gap-3 border-b border-white/10 bg-[#020617]/95 py-3 backdrop-blur">
+        {onBack && <button type="button" onClick={onBack} className="rounded-full border border-slate-700 bg-slate-900 p-2 text-slate-400"><ArrowLeft size={20} /></button>}
+        <div className="min-w-0 flex-1"><h1 className="truncate text-lg font-black">Pekiştireç Belirleme</h1><p className="truncate text-xs text-slate-400">{studentName || "Öğrenciye özel"}</p></div>
+        <Gift className="text-amber-400" />
+      </header>
 
-  return (
-    <div className="min-h-screen bg-[#020617] px-4 py-5 pb-24 text-slate-100">
-      <div className="mx-auto max-w-4xl">
-        <header className="sticky top-0 z-30 mb-5 flex items-center justify-between border-b border-white/10 bg-[#020617]/95 py-3 backdrop-blur">
-          <div className="flex items-center gap-3">
-            {onBack && (
-              <button
-                type="button"
-                onClick={onBack}
-                className="rounded-full border border-slate-700 bg-slate-900 p-2 text-slate-400 active:scale-95"
-                aria-label="Geri dön"
-              >
-                <ArrowLeft size={21} />
-              </button>
-            )}
-            <div>
-              <h1 className="text-lg font-black sm:text-xl">Pekiştireç Belirleme</h1>
-              <p className="text-xs text-slate-400">{studentName || "Öğrenciye özel ABA tercih profili"}</p>
-            </div>
-          </div>
-          <Gift className="text-amber-400" />
-        </header>
+      {step === "summary" && <section className="space-y-4">
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+          <div className="flex items-center gap-3"><CheckCircle2 className="text-emerald-400" /><div><h2 className="font-black">Pekiştireçler belirlendi</h2><p className="text-sm text-slate-300">Tercihler değiştiğinde yeniden belirleyebilirsiniz.</p>{formatDate(savedProfile?.updatedAt) && <p className="mt-1 text-xs text-emerald-300">Son güncelleme: {formatDate(savedProfile?.updatedAt)}</p>}</div></div>
+        </div>
+        <div className="space-y-2">{savedRanking.map((item, index) => <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-3"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-400 font-black text-slate-950">{index + 1}</div><div className="h-14 w-14 overflow-hidden rounded-xl bg-white"><img src={item.image} alt="" className="h-full w-full object-contain p-1" /></div><span className="font-bold">{item.name}</span></div>)}</div>
+        <button type="button" onClick={restart} className="flex w-full items-center justify-center gap-2 rounded-2xl border border-amber-400/40 bg-amber-400/10 p-4 font-bold text-amber-300"><RefreshCw size={18} /> Yeniden Belirle</button>
+      </section>}
 
-        {step === "summary" && savedProfile && (
-          <section className="space-y-5">
-            <div className="rounded-3xl border border-emerald-500/25 bg-emerald-500/10 p-5">
-              <div className="flex items-start gap-3">
-                <div className="rounded-2xl bg-emerald-500/20 p-3 text-emerald-300"><Check /></div>
-                <div>
-                  <h2 className="text-xl font-black">Güncel pekiştireç sıralaması</h2>
-                  <p className="mt-1 text-sm text-slate-300">
-                    Tercihler değişebilir. Sıralamayı ihtiyaç duyduğunuz her zaman yeniden belirleyebilirsiniz.
-                  </p>
-                  {formatUpdatedAt(savedProfile.updatedAt) && (
-                    <p className="mt-2 text-xs text-emerald-300/80">
-                      Son güncelleme: {formatUpdatedAt(savedProfile.updatedAt)}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+      {step === "select" && <section className="space-y-4">
+        <div className="rounded-2xl border border-cyan-500/25 bg-cyan-500/10 p-4"><h2 className="text-xl font-black">10 aday seçin</h2><p className="mt-1 text-sm text-slate-300">Ailenin söylediği veya öğretmenin sevdiğini bildiği seçeneklerden tam 10 tane seçin.</p><div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full bg-cyan-400" style={{ width: `${selected.length * 10}%` }} /></div><p className="mt-2 text-right font-black text-cyan-300">{selected.length}/10</p></div>
+        {selected.length > 0 && <div className="flex gap-2 overflow-x-auto pb-1">{selected.map((item, index) => <button key={item.id} type="button" onClick={() => toggleItem(item)} className="flex shrink-0 items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 py-2 pl-3 pr-2 text-xs font-bold">{index + 1}. {item.name}<X size={14} /></button>)}</div>}
+        <div className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} /><input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Listede ara veya yeni nesne yaz…" className="w-full rounded-2xl border border-slate-700 bg-slate-900 py-4 pl-11 pr-10 outline-none focus:border-cyan-500" />{searching && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-cyan-400" size={18} />}</div>
+        {searchText.trim().length >= 2 && selected.length < 10 && <button type="button" onClick={() => { setNewName(searchText.trim()); setShowAddForm(true); }} className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-violet-400/50 bg-violet-500/10 p-4 text-left font-bold text-violet-200"><Plus /> “{searchText.trim()}” için kendi fotoğrafını ekle</button>}
+        {showAddForm && <div className="rounded-2xl border border-violet-500/30 bg-slate-900 p-4">
+          <div className="flex items-center justify-between"><h3 className="font-black">Yeni nesne ekle</h3><button type="button" onClick={() => setShowAddForm(false)}><X /></button></div>
+          <input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="Nesnenin adı" className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" />
+          <div className="mt-3 grid grid-cols-2 gap-2"><label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm font-bold"><Camera className="text-violet-400" size={18} /> Kamera<input type="file" accept="image/*" capture="environment" className="hidden" onChange={(event) => setNewImage(event.target.files?.[0] || null)} /></label><label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm font-bold"><ImagePlus className="text-violet-400" size={18} /> Galeri<input type="file" accept="image/*" className="hidden" onChange={(event) => setNewImage(event.target.files?.[0] || null)} /></label></div>
+          {newImage && <p className="mt-2 truncate text-xs text-emerald-300">Seçildi: {newImage.name}</p>}<p className="mt-2 text-xs text-slate-500">Fotoğraf otomatik olarak 384×384 WebP boyutuna küçültülür.</p>
+          <button type="button" disabled={adding || !newName.trim() || !newImage} onClick={addNewItem} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-violet-500 p-3 font-black disabled:opacity-40">{adding ? <Loader2 className="animate-spin" /> : <Save size={18} />} Ekle ve Seç</button>
+        </div>}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{visibleItems.map((item) => { const checked = selectedIds.has(item.id); return <button key={item.id} type="button" onClick={() => toggleItem(item)} className={twMerge("rounded-2xl border p-2 text-left active:scale-[0.98]", checked ? "border-cyan-400 bg-cyan-500/15" : "border-slate-800 bg-slate-900")}><Picture item={item} /><div className="flex items-center justify-between gap-2 px-2 py-3"><span className="truncate text-sm font-bold">{item.name}</span><span className={twMerge("flex h-6 w-6 items-center justify-center rounded-full border", checked ? "border-cyan-300 bg-cyan-400 text-slate-950" : "border-slate-600")}>{checked && <Check size={14} />}</span></div></button>; })}</div>
+        <button type="button" disabled={selected.length !== 10} onClick={() => setStep("method")} className="sticky bottom-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-500 p-4 font-black text-slate-950 shadow-2xl disabled:bg-slate-800 disabled:text-slate-500">Devam Et <ChevronRight /></button>
+      </section>}
 
-            <div className="space-y-3">
-              {resolvedSavedRanking.map((item, index) => (
-                <div key={item.id} className="flex items-center gap-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-400 text-lg font-black text-slate-950">
-                    {index + 1}
-                  </div>
-                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-white">
-                    {item.image ? (
-                      <img src={item.image} alt="" className="h-full w-full object-contain p-1" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-slate-500"><PackageOpen /></div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-bold">{item.name}</p>
-                    <p className="text-xs text-slate-500">{index === 0 ? "En güçlü pekiştireç" : `${index + 1}. tercih`}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+      {step === "method" && <section className="space-y-4"><button type="button" onClick={() => setStep("select")} className="flex items-center gap-2 text-sm text-slate-400"><ArrowLeft size={17} /> Adaylara dön</button><h2 className="text-xl font-black">Nasıl belirlenecek?</h2><button type="button" onClick={startDigital} className="w-full rounded-2xl border border-blue-500/30 bg-blue-500/10 p-5 text-left"><MonitorSmartphone className="mb-3 text-blue-400" /><h3 className="font-black">Çocuk ekrandan seçsin</h3><p className="mt-1 text-sm text-slate-300">20 tur boyunca üçer görsel çıkar. Uygulama en çok seçilen 6 taneyi sıralar.</p></button><button type="button" onClick={startTeacher} className="w-full rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-left"><PencilLine className="mb-3 text-amber-400" /><h3 className="font-black">Öğretmen kendisi sıralasın</h3><p className="mt-1 text-sm text-slate-300">Gerçek nesneleri çocuğun önüne koyup dener ve en sevdiği 6 taneyi seçer.</p></button></section>}
 
-            <button
-              type="button"
-              onClick={resetDraft}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-5 py-4 font-bold text-amber-300 active:scale-[0.99]"
-            >
-              <RefreshCw size={19} /> Yeniden Belirle
-            </button>
-          </section>
-        )}
+      {step === "digital" && trials[trialIndex] && <section className="space-y-5"><div className="flex items-center justify-between text-sm"><span className="font-black text-cyan-300">Seçim {trialIndex + 1}/20</span><span className="text-slate-500">Birine dokun</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full bg-cyan-400" style={{ width: `${(trialIndex + 1) * 5}%` }} /></div><h2 className="text-center text-xl font-black">Hangisini istiyorsun?</h2><div className="grid grid-cols-3 gap-2 sm:gap-4">{trials[trialIndex].map((item) => <button key={item.id} type="button" disabled={Boolean(roundChoice)} onClick={() => chooseDigital(item.id)} className={twMerge("rounded-2xl border p-2 active:scale-95", roundChoice === item.id ? "border-emerald-400 bg-emerald-500/20" : "border-slate-700 bg-slate-900")}><Picture item={item} large /><p className="mt-3 break-words text-center text-xs font-black sm:text-base">{item.name}</p></button>)}</div></section>}
 
-        {step === "intro" && (
-          <section className="space-y-5">
-            <div className="rounded-3xl border border-cyan-500/25 bg-gradient-to-br from-cyan-500/15 to-blue-500/5 p-6">
-              <Sparkles className="mb-4 text-cyan-300" size={32} />
-              <h2 className="text-2xl font-black">Önce olası pekiştireçleri belirleyin</h2>
-              <p className="mt-3 leading-relaxed text-slate-300">
-                Aileden bilgi alın, öğrenciyi serbest zamanda gözlemleyin ve elde etmek için çaba gösterdiği yiyecek, nesne veya etkinlikleri aday listeye ekleyin.
-              </p>
-            </div>
+      {step === "teacher" && <section className="space-y-4"><div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4"><h2 className="font-black">En sevdiğinden başlayarak 6 tanesini seçin</h2><p className="mt-1 text-sm text-slate-300">Gerçek nesneleri deneyerek çocuğun tercih sırasını belirleyin.</p></div><RankingList ranking={ranking} move={moveRanked} remove={removeRanked} />{ranking.length < 6 && <CandidateButtons items={selected} ranking={ranking} add={addTeacherChoice} />}<button type="button" disabled={ranking.length !== 6} onClick={() => setStep("result")} className="w-full rounded-2xl bg-amber-400 p-4 font-black text-slate-950 disabled:bg-slate-800 disabled:text-slate-500">Sıralamayı Onayla</button></section>}
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-                <MonitorSmartphone className="mb-3 text-blue-400" />
-                <h3 className="font-bold">Ekrandan seçebilir</h3>
-                <p className="mt-1 text-sm text-slate-400">Öğrenci üçlü görseller arasından dokunarak seçer.</p>
-              </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-                <PackageOpen className="mb-3 text-violet-400" />
-                <h3 className="font-bold">Gerçek nesneyi alabilir</h3>
-                <p className="mt-1 text-sm text-slate-400">Öğretmen çocuğun aldığı/yediği seçeneği uygulamaya işler.</p>
-              </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-                <PencilLine className="mb-3 text-amber-400" />
-                <h3 className="font-bold">Öğretmen sıralayabilir</h3>
-                <p className="mt-1 text-sm text-slate-400">Bilinen tercihler doğrudan en güçlüden en aza sıralanır.</p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm leading-relaxed text-amber-100">
-              Yiyecekleri küçük miktarlarda, etkinlikleri kısa süreli sunun. Seçilen pekiştireci mümkün olduğunca hemen verin.
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setStep("candidates")}
-              className="w-full rounded-2xl bg-cyan-500 px-5 py-4 font-black text-slate-950 active:scale-[0.99]"
-            >
-              Aday Pekiştireçleri Seç
-            </button>
-          </section>
-        )}
-
-        {step === "candidates" && (
-          <section className="space-y-4">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-              <h2 className="font-black">Öğrencinin sevdiği düşünülenleri seçin</h2>
-              <p className="mt-1 text-sm text-slate-400">Değerlendirme için en az 6 aday gerekir. İstediğiniz kadar aday ekleyebilirsiniz.</p>
-              <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-950 px-4 py-3">
-                <span className="text-sm text-slate-400">Seçilen aday</span>
-                <span className="text-lg font-black text-cyan-300">{selected.length}</span>
-              </div>
-            </div>
-
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={19} />
-              <input
-                value={searchText}
-                onChange={(event) => setSearchText(event.target.value)}
-                placeholder="Pekiştireç ara veya yenisini yaz…"
-                className="w-full rounded-2xl border border-slate-700 bg-slate-900 py-4 pl-12 pr-4 outline-none focus:border-cyan-500"
-              />
-              {searchingCommunity && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-cyan-400" size={18} />}
-            </div>
-
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {CATEGORIES.map((category) => (
-                <button
-                  key={category.id}
-                  type="button"
-                  onClick={() => setActiveCategory(category.id)}
-                  className={twMerge(
-                    "shrink-0 rounded-full border px-4 py-2 text-xs font-bold",
-                    activeCategory === category.id
-                      ? "border-cyan-400 bg-cyan-400/15 text-cyan-300"
-                      : "border-slate-800 bg-slate-900 text-slate-400",
-                  )}
-                >
-                  {category.label}
-                </button>
-              ))}
-            </div>
-
-            {searchText.trim().length >= 2 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setCustomName(searchText.trim());
-                  setShowCustomForm(true);
-                }}
-                className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-violet-400/50 bg-violet-500/10 p-4 text-left text-violet-200"
-              >
-                <CirclePlus />
-                <span className="font-bold">“{searchText.trim()}” adıyla yeni bir seçenek ekle</span>
-              </button>
-            )}
-
-            {showCustomForm && (
-              <div className="rounded-3xl border border-violet-500/30 bg-slate-900 p-5">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-black">Yeni pekiştireç ekle</h3>
-                  <button type="button" onClick={() => setShowCustomForm(false)} className="text-sm text-slate-400">Vazgeç</button>
-                </div>
-                <p className="mt-2 text-sm text-slate-400">
-                  Aynı isimde sonuç bulunsa bile kendi fotoğrafınızı ekleyebilirsiniz. Çocuk yüzü veya kişisel bilgi içeren fotoğraf yüklemeyin.
-                </p>
-                <input
-                  value={customName}
-                  onChange={(event) => setCustomName(event.target.value)}
-                  placeholder="Pekiştirecin adı"
-                  className="mt-4 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 outline-none focus:border-violet-400"
-                />
-                <label className="mt-3 flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">
-                  {customImage ? <Camera className="text-emerald-400" /> : <ImagePlus className="text-violet-400" />}
-                  <span>{customImage ? customImage.name : "Fotoğraf çek veya galeriden seç (isteğe bağlı)"}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={(event) => setCustomImage(event.target.files?.[0] || null)}
-                  />
-                </label>
-                {!customImage && (
-                  <p className="mt-2 text-xs text-amber-300">Fotoğrafsız eklenirse gerçek nesneyle veya öğretmen sıralamasıyla kullanılabilir.</p>
-                )}
-                <button
-                  type="button"
-                  disabled={addingCustom || !customName.trim()}
-                  onClick={addCustomReinforcer}
-                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-violet-500 px-4 py-3 font-bold disabled:opacity-40"
-                >
-                  {addingCustom ? <Loader2 className="animate-spin" /> : <CirclePlus />} Ortak Kataloğa Ekle
-                </button>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {allVisibleItems.map((item) => {
-                const isSelected = selectedIds.has(item.id);
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => toggleCandidate(item)}
-                    className={twMerge(
-                      "relative rounded-2xl border p-2 text-left transition active:scale-[0.98]",
-                      isSelected
-                        ? "border-cyan-400 bg-cyan-500/15 ring-2 ring-cyan-400/20"
-                        : "border-slate-800 bg-slate-900/70",
-                    )}
-                  >
-                    <ItemVisual item={item} />
-                    <div className="flex items-center justify-between gap-2 px-2 py-3">
-                      <span className="truncate text-sm font-bold">{item.name}</span>
-                      <span className={twMerge("flex h-6 w-6 shrink-0 items-center justify-center rounded-full border", isSelected ? "border-cyan-300 bg-cyan-400 text-slate-950" : "border-slate-600")}>{isSelected && <Check size={15} />}</span>
-                    </div>
-                    {item.source === "community" && <span className="absolute left-3 top-3 rounded-full bg-violet-600 px-2 py-1 text-[10px] font-bold">Topluluk</span>}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="sticky bottom-3 rounded-2xl border border-slate-700 bg-slate-950/95 p-3 shadow-2xl backdrop-blur">
-              <button
-                type="button"
-                disabled={selected.length < 6}
-                onClick={() => setStep("method")}
-                className="w-full rounded-xl bg-cyan-500 px-4 py-4 font-black text-slate-950 disabled:bg-slate-800 disabled:text-slate-500"
-              >
-                Yöntemi Seç ({selected.length} aday)
-              </button>
-            </div>
-          </section>
-        )}
-
-        {step === "method" && (
-          <section className="space-y-4">
-            <button type="button" onClick={() => setStep("candidates")} className="flex items-center gap-2 text-sm text-slate-400"><ArrowLeft size={17} /> Adaylara dön</button>
-            <div>
-              <h2 className="text-2xl font-black">Belirleme yöntemini seçin</h2>
-              <p className="mt-1 text-sm text-slate-400">Üç yöntem de aynı öğrenci profilinde 6 sıralı pekiştireç oluşturur.</p>
-            </div>
-
-            <button
-              type="button"
-              disabled={digitalCandidateCount < 6}
-              onClick={() => beginAutomaticAssessment("digital")}
-              className="w-full rounded-3xl border border-blue-500/30 bg-blue-500/10 p-5 text-left disabled:opacity-40"
-            >
-              <MonitorSmartphone className="mb-3 text-blue-400" size={30} />
-              <h3 className="text-lg font-black">Öğrenci ekrandan seçsin</h3>
-              <p className="mt-1 text-sm text-slate-300">Her denemede üç görsel çıkar. Öğrenci doğrudan istediğine dokunur.</p>
-              <p className="mt-3 text-xs text-blue-300">{digitalCandidateCount} görselli aday kullanılabilir</p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => beginAutomaticAssessment("physical")}
-              className="w-full rounded-3xl border border-violet-500/30 bg-violet-500/10 p-5 text-left"
-            >
-              <PackageOpen className="mb-3 text-violet-400" size={30} />
-              <h3 className="text-lg font-black">Gerçek nesnelerle seçsin</h3>
-              <p className="mt-1 text-sm text-slate-300">Uygulama üç nesneyi söyler; öğretmen öğrencinin aldığı/yediği seçeneği işaretler.</p>
-            </button>
-
-            <button
-              type="button"
-              onClick={beginTeacherRanking}
-              className="w-full rounded-3xl border border-amber-500/30 bg-amber-500/10 p-5 text-left"
-            >
-              <PencilLine className="mb-3 text-amber-400" size={30} />
-              <h3 className="text-lg font-black">Öğretmen doğrudan sıralasın</h3>
-              <p className="mt-1 text-sm text-slate-300">Aile bilgisi ve gözleme göre 6 seçenek en güçlüden en aza sıralanır.</p>
-            </button>
-          </section>
-        )}
-
-        {step === "assessment" && trials[trialIndex] && (
-          <section className="space-y-5">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-bold text-cyan-300">Deneme {trialIndex + 1}/{trials.length}</span>
-              <span className="text-slate-500">Her aday en az 3 kez gösterilir</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-800">
-              <div className="h-full bg-cyan-400 transition-all" style={{ width: `${((trialIndex + 1) / trials.length) * 100}%` }} />
-            </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-center">
-              <h2 className="text-xl font-black">Hangisini istiyorsun?</h2>
-              <p className="mt-1 text-sm text-slate-400">
-                {method === "digital"
-                  ? "Tableti öğrencinin önüne koyun ve seçmesine izin verin."
-                  : "Bu üç gerçek seçeneği öğrencinin önüne yerleştirin; aldığını aşağıdan kaydedin."}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 sm:gap-4">
-              {trials[trialIndex].map((item, position) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  disabled={Boolean(recordedChoice)}
-                  onClick={() => recordChoice(item.id, position)}
-                  className={twMerge(
-                    "rounded-2xl border p-2 transition active:scale-95 disabled:cursor-default",
-                    recordedChoice?.choiceId === item.id
-                      ? "border-emerald-400 bg-emerald-500/20 ring-2 ring-emerald-400/30"
-                      : "border-slate-700 bg-slate-900",
-                  )}
-                >
-                  <ItemVisual item={item} large />
-                  <p className="mt-3 break-words text-center text-xs font-black sm:text-base">{item.name}</p>
-                </button>
-              ))}
-            </div>
-
-            {!recordedChoice ? (
-              <button
-                type="button"
-                onClick={() => recordChoice(null)}
-                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-bold text-slate-400"
-              >
-                Seçim yapmadı
-              </button>
-            ) : (
-              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center">
-                <p className="font-bold text-emerald-200">
-                  {recordedChoice.choiceId
-                    ? `${trials[trialIndex].find((item) => item.id === recordedChoice.choiceId)?.name} seçildi.`
-                    : "Seçim yapılmadı olarak kaydedildi."}
-                </p>
-                {recordedChoice.choiceId && method === "digital" && (
-                  <p className="mt-1 text-sm text-slate-300">Seçtiği pekiştireci kısa süreli sunun.</p>
-                )}
-                <button type="button" onClick={advanceTrial} className="mt-4 w-full rounded-xl bg-emerald-500 px-4 py-3 font-black text-slate-950">
-                  {trialIndex === trials.length - 1 ? "Sonucu Hesapla" : "Sonraki Üçlü"}
-                </button>
-              </div>
-            )}
-          </section>
-        )}
-
-        {step === "review" && (
-          <section className="space-y-5">
-            <div className="rounded-3xl border border-amber-500/25 bg-amber-500/10 p-5">
-              <h2 className="text-xl font-black">İlk 6 pekiştireci onaylayın</h2>
-              <p className="mt-1 text-sm text-slate-300">
-                {method === "teacher"
-                  ? "Aşağıdaki adaylardan 6 tanesini sıraya ekleyin."
-                  : "Uygulama seçilme/gösterilme oranına göre sıraladı. Gerekirse öğretmen değiştirebilir."}
-              </p>
-              {hasPositionBias && method !== "teacher" && (
-                <p className="mt-3 rounded-xl bg-red-500/15 p-3 text-sm font-bold text-red-300">
-                  Konum tercihi olabilir: seçimlerin çoğu aynı konumdan yapıldı. Sonucu gözleminizle birlikte değerlendirin.
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              {ranking.map((item, index) => (
-                <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-400 font-black text-slate-950">{index + 1}</div>
-                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-white">
-                    {item.image ? <img src={item.image} alt="" className="h-full w-full object-contain p-1" /> : <div className="flex h-full items-center justify-center text-slate-500"><PackageOpen /></div>}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-bold">{item.name}</p>
-                    {typeof item.score === "number" && (
-                      <p className="text-xs text-slate-500">{item.selectedCount}/{item.shownCount} seçim · %{Math.round(item.score * 100)}</p>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-1">
-                    <button type="button" onClick={() => moveRankedItem(index, -1)} disabled={index === 0} className="rounded-lg border border-slate-700 p-2 text-slate-400 disabled:opacity-20"><ArrowUp size={16} /></button>
-                    <button type="button" onClick={() => moveRankedItem(index, 1)} disabled={index === ranking.length - 1} className="rounded-lg border border-slate-700 p-2 text-slate-400 disabled:opacity-20"><ArrowDown size={16} /></button>
-                    <button type="button" onClick={() => removeRankedItem(item.id)} className="col-span-2 rounded-lg border border-red-500/20 p-2 text-red-400"><Trash2 size={16} className="mx-auto" /></button>
-                  </div>
-                </div>
-              ))}
-              {Array.from({ length: Math.max(0, 6 - ranking.length) }).map((_, index) => (
-                <div key={`empty-${index}`} className="flex h-20 items-center justify-center rounded-2xl border border-dashed border-slate-700 text-sm text-slate-500">{ranking.length + index + 1}. sıra boş</div>
-              ))}
-            </div>
-
-            {ranking.length < 6 && (
-              <div>
-                <h3 className="mb-3 font-bold text-slate-300">Sıraya eklenebilecek adaylar</h3>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {selected
-                    .filter((item) => !ranking.some((ranked) => ranked.id === item.id))
-                    .map((item) => (
-                      <button key={item.id} type="button" onClick={() => addToRanking(item)} className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900 p-3 text-left">
-                        <CirclePlus className="shrink-0 text-cyan-400" size={18} />
-                        <span className="truncate text-sm font-bold">{item.name}</span>
-                      </button>
-                    ))}
-                </div>
-              </div>
-            )}
-
-            <button
-              type="button"
-              disabled={saving || ranking.length !== 6}
-              onClick={saveProfile}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-5 py-4 font-black text-slate-950 disabled:bg-slate-800 disabled:text-slate-500"
-            >
-              {saving ? <Loader2 className="animate-spin" /> : <Save />} Sıralamayı Kaydet
-            </button>
-          </section>
-        )}
-      </div>
+      {step === "result" && <section className="space-y-4"><div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4"><h2 className="text-xl font-black">İlk 6 pekiştireç</h2><p className="mt-1 text-sm text-slate-300">Gerekirse sıralamayı değiştirip kaydedin.</p></div><RankingList ranking={ranking} move={moveRanked} remove={removeRanked} showScores={method === "digital"} />{ranking.length < 6 && <CandidateButtons items={selected} ranking={ranking} add={addTeacherChoice} />}<button type="button" disabled={saving || ranking.length !== 6} onClick={saveRanking} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 p-4 font-black text-slate-950 disabled:opacity-40">{saving ? <Loader2 className="animate-spin" /> : <Save />} Kaydet</button></section>}
     </div>
-  );
+  </div>;
+}
+
+function CandidateButtons({ items, ranking, add }: { items: Reinforcer[]; ranking: RankedReinforcer[]; add: (item: Reinforcer) => void }) {
+  return <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{items.filter((item) => !ranking.some((ranked) => ranked.id === item.id)).map((item) => <button key={item.id} type="button" onClick={() => add(item)} className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900 p-3 text-left"><Plus className="shrink-0 text-amber-400" size={17} /><span className="truncate text-sm font-bold">{item.name}</span></button>)}</div>;
+}
+
+function RankingList({ ranking, move, remove, showScores = false }: { ranking: RankedReinforcer[]; move: (index: number, direction: -1 | 1) => void; remove: (id: string) => void; showScores?: boolean }) {
+  return <div className="space-y-2">{ranking.map((item, index) => <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-400 font-black text-slate-950">{index + 1}</div><div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-white"><img src={item.image} alt="" className="h-full w-full object-contain p-1" /></div><div className="min-w-0 flex-1"><p className="truncate font-bold">{item.name}</p>{showScores && <p className="text-xs text-slate-500">6 gösterim · {item.selectedCount || 0} seçim</p>}</div><div className="flex gap-1"><button type="button" disabled={index === 0} onClick={() => move(index, -1)} className="rounded-lg border border-slate-700 p-2 text-slate-400 disabled:opacity-20"><ArrowUp size={15} /></button><button type="button" disabled={index === ranking.length - 1} onClick={() => move(index, 1)} className="rounded-lg border border-slate-700 p-2 text-slate-400 disabled:opacity-20"><ArrowDown size={15} /></button><button type="button" onClick={() => remove(item.id)} className="rounded-lg border border-red-500/20 p-2 text-red-400"><Trash2 size={15} /></button></div></div>)}{Array.from({ length: Math.max(0, 6 - ranking.length) }).map((_, index) => <div key={`empty-${index}`} className="flex h-16 items-center justify-center rounded-2xl border border-dashed border-slate-700 text-sm text-slate-500">{ranking.length + index + 1}. sıra boş</div>)}</div>;
 }
