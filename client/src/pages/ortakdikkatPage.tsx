@@ -219,7 +219,7 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
       <div className="grid gap-3 animate-in slide-in-from-bottom-4 duration-500 pb-20">
         {items.map((item) => {
             const status = formData[item];
-            const hasAssessment = /^OD 1\.[1-5]\./.test(item);
+            const hasAssessment = /^(OD 1\.[1-6]\.|OD 2\.[12]\.)/.test(item);
             
             // Kod ve Metin Ayırma
             const firstSpaceIndex = item.indexOf(' ');
