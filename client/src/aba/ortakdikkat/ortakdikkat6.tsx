@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   Check,
   Eye,
+  Pencil,
   RefreshCw,
   Sparkles,
   Trophy,
@@ -11,17 +12,20 @@ import {
 import confetti from "canvas-confetti";
 
 type Phase = "intro" | "assessment" | "result";
+type SituationSource = "pool" | "custom";
 
 interface Situation {
   id: string;
   text: string;
   hint: string;
+  source: SituationSource;
 }
 
 interface TrialResult {
   id: number;
   situationId: string;
   situationText: string;
+  source: SituationSource;
   looked: boolean;
   timestamp: number;
 }
@@ -33,8 +37,8 @@ interface OrtakDikkat6Props {
   onComplete: (success: boolean) => void;
 }
 
-/** Öğretmen sınıfta kendi güvenli versiyonunu uygular */
-const SITUATION_POOL: Situation[] = [
+/** Hazır durum havuzu — öğretmen tek tek değiştirebilir veya özel yazabilir */
+const SITUATION_POOL: Omit<Situation, "source">[] = [
   {
     id: "s01",
     text: "Baloncuk çıkarma",
@@ -124,6 +128,12 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+function initialSituations(): Situation[] {
+  return shuffle(SITUATION_POOL)
+    .slice(0, TRIAL_COUNT)
+    .map((s) => ({ ...s, source: "pool" as const }));
+}
+
 export default function OrtakDikkat6({
   itemCode = "OD 1.6",
   itemText = "Gösterilen İlginç Nesne/Durumlara Bakma",
@@ -131,29 +141,74 @@ export default function OrtakDikkat6({
   onComplete,
 }: OrtakDikkat6Props) {
   const [phase, setPhase] = useState<Phase>("intro");
-  const [situations, setSituations] = useState<Situation[]>(() =>
-    shuffle(SITUATION_POOL).slice(0, TRIAL_COUNT),
-  );
+  const [situations, setSituations] = useState<Situation[]>(initialSituations);
   const [results, setResults] = useState<TrialResult[]>([]);
   const [locked, setLocked] = useState(false);
   const [feedback, setFeedback] = useState<"looked" | "not" | null>(null);
+
+  /** Özel yazı paneli: hangi satır düzenleniyor */
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [editError, setEditError] = useState(false);
 
   const trialIndex = results.length;
   const current = situations[trialIndex];
   const score = results.filter((r) => r.looked).length;
   const success = score >= PASS_SCORE;
 
-  const reshuffle = () => {
-    setSituations(shuffle(SITUATION_POOL).slice(0, TRIAL_COUNT));
-    setResults([]);
-    setFeedback(null);
-    setLocked(false);
+  /** Havuzdan bu satıra farklı bir durum koy */
+  const changeFromPool = (index: number) => {
+    const usedIds = new Set(situations.map((s) => s.id));
+    const currentId = situations[index]?.id;
+    let candidates = SITUATION_POOL.filter((s) => s.id !== currentId && !usedIds.has(s.id));
+    if (!candidates.length) {
+      candidates = SITUATION_POOL.filter((s) => s.id !== currentId);
+    }
+    if (!candidates.length) candidates = [...SITUATION_POOL];
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    setSituations((prev) =>
+      prev.map((s, i) =>
+        i === index ? { ...pick, source: "pool" as const } : s,
+      ),
+    );
+  };
+
+  const openCustomEditor = (index: number) => {
+    const s = situations[index];
+    setEditIndex(index);
+    setEditDraft(s.source === "custom" ? s.text : "");
+    setEditError(false);
+  };
+
+  const saveCustom = () => {
+    if (editIndex === null) return;
+    const text = editDraft.trim();
+    if (!text) {
+      setEditError(true);
+      return;
+    }
+    setSituations((prev) =>
+      prev.map((s, i) =>
+        i === editIndex
+          ? {
+              id: `custom-${editIndex}-${Date.now()}`,
+              text,
+              hint: "Kendi uyguladığınız durumu kaydettiniz.",
+              source: "custom" as const,
+            }
+          : s,
+      ),
+    );
+    setEditIndex(null);
+    setEditDraft("");
+    setEditError(false);
   };
 
   const startAssessment = () => {
     setResults([]);
     setFeedback(null);
     setLocked(false);
+    setEditIndex(null);
     setPhase("assessment");
   };
 
@@ -166,6 +221,7 @@ export default function OrtakDikkat6({
       id: trialIndex + 1,
       situationId: current.id,
       situationText: current.text,
+      source: current.source,
       looked,
       timestamp: Date.now(),
     };
@@ -240,34 +296,53 @@ export default function OrtakDikkat6({
                 <Sparkles className="h-4 w-4 text-amber-400" /> Değerlendirme kuralları
               </p>
               <ul className="list-disc space-y-1 pl-5 text-slate-400">
-                <li>10 farklı durum · en az 8 doğru (yetişkine bakış)</li>
+                <li>10 durum · en az 8 doğru (yetişkine bakış)</li>
                 <li>Sözlü yönerge yok · tepki kendiliğinden olmalı</li>
-                <li>Durumları sınıfta güvenli ve basit uygulayın</li>
-                <li>Öğretimde ipucu kullanılabilir; burada kullanılmaz</li>
+                <li>
+                  Listedeki metin <span className="text-slate-200">öneridir</span>; kendi
+                  durumunuzu da yazabilirsiniz
+                </li>
+                <li>Her denemede durum metni kayda geçer (veri için)</li>
               </ul>
             </div>
 
             <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Bu set ({TRIAL_COUNT} durum)
-                </p>
-                <button
-                  type="button"
-                  onClick={reshuffle}
-                  className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2 py-1 text-[11px] font-semibold text-slate-300 active:scale-95"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" /> Değiştir
-                </button>
-              </div>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+                Bu set ({TRIAL_COUNT} durum) — satır satır değiştirin
+              </p>
               <ol className="space-y-1.5">
                 {situations.map((s, i) => (
                   <li
-                    key={s.id}
-                    className="flex gap-2 rounded-lg border border-slate-800/80 bg-slate-900/60 px-2.5 py-1.5 text-sm"
+                    key={`${s.id}-${i}`}
+                    className="flex items-center gap-2 rounded-lg border border-slate-800/80 bg-slate-900/60 px-2 py-1.5"
                   >
-                    <span className="w-5 shrink-0 font-bold text-cyan-500/90">{i + 1}.</span>
-                    <span className="text-slate-200">{s.text}</span>
+                    <span className="w-5 shrink-0 text-sm font-bold text-cyan-500/90">
+                      {i + 1}.
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-100">{s.text}</p>
+                      {s.source === "custom" && (
+                        <p className="text-[10px] font-medium text-amber-400/90">Özel durum</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => changeFromPool(i)}
+                      className="shrink-0 rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300 active:scale-95"
+                      title="Havuzdan değiştir"
+                      aria-label="Havuzdan değiştir"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openCustomEditor(i)}
+                      className="shrink-0 rounded-lg border border-slate-700 bg-slate-800 p-2 text-slate-300 hover:border-amber-500/50 hover:text-amber-300 active:scale-95"
+                      title="Özel durum yaz"
+                      aria-label="Özel durum yaz"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
                   </li>
                 ))}
               </ol>
@@ -289,10 +364,17 @@ export default function OrtakDikkat6({
               <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-cyan-400/90">
                 Durum {trialIndex + 1} / {TRIAL_COUNT}
               </p>
+              {current.source === "custom" && (
+                <span className="mb-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
+                  Özel durum
+                </span>
+              )}
               <h1 className="text-2xl font-black leading-snug text-white sm:text-3xl">
                 {current.text}
               </h1>
-              <p className="mt-3 max-w-sm text-sm text-slate-400">{current.hint}</p>
+              {current.source === "pool" && current.hint && (
+                <p className="mt-3 max-w-sm text-sm text-slate-400">{current.hint}</p>
+              )}
               <p className="mt-4 rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-[11px] text-slate-400">
                 3–5 sn · kendiliğinden yetişkine baktı mı?
               </p>
@@ -358,16 +440,21 @@ export default function OrtakDikkat6({
               </div>
             )}
 
-            <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-800 bg-slate-900/60 p-2 text-left text-xs">
+            <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-800 bg-slate-900/60 p-2 text-left text-xs">
               {results.map((r) => (
                 <div
                   key={r.id}
-                  className="flex items-center justify-between gap-2 border-b border-slate-800/80 px-2 py-1.5 last:border-0"
+                  className="flex items-start justify-between gap-2 border-b border-slate-800/80 px-2 py-1.5 last:border-0"
                 >
-                  <span className="truncate text-slate-300">
-                    {r.id}. {r.situationText}
+                  <span className="min-w-0 text-slate-300">
+                    <span className="font-bold text-slate-500">{r.id}.</span> {r.situationText}
+                    {r.source === "custom" && (
+                      <span className="ml-1 text-[10px] text-amber-400/80">(özel)</span>
+                    )}
                   </span>
-                  <span className={r.looked ? "font-bold text-green-400" : "font-bold text-red-400"}>
+                  <span
+                    className={`shrink-0 font-bold ${r.looked ? "text-green-400" : "text-red-400"}`}
+                  >
                     {r.looked ? "Baktı" : "Bakmadı"}
                   </span>
                 </div>
@@ -384,6 +471,67 @@ export default function OrtakDikkat6({
           </div>
         )}
       </main>
+
+      {/* Özel durum yazı paneli */}
+      {editIndex !== null && (
+        <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/65"
+            aria-label="Kapat"
+            onClick={() => {
+              setEditIndex(null);
+              setEditDraft("");
+              setEditError(false);
+            }}
+          />
+          <div className="relative w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl border border-slate-700 bg-slate-900 p-5 shadow-2xl space-y-3 animate-in slide-in-from-bottom-4 duration-200">
+            <h3 className="text-lg font-black text-white">Özel durum yazın</h3>
+            <p className="text-xs text-slate-400">
+              Ne yaptığınızı kısaca yazın. Bu metin deneme kaydına işlenir (öğrencinin neye
+              bakıp bakmadığı için).
+            </p>
+            <input
+              type="text"
+              value={editDraft}
+              onChange={(e) => {
+                setEditDraft(e.target.value);
+                if (e.target.value.trim()) setEditError(false);
+              }}
+              placeholder="Örn: Kapıyı çaldım ve içeri girdim"
+              className={`w-full rounded-xl border bg-slate-950 px-3 py-3 text-sm text-white placeholder:text-slate-600 outline-none focus:ring-2 focus:ring-cyan-500/40 ${
+                editError ? "border-red-500" : "border-slate-700"
+              }`}
+              // touchAction pan for keyboard
+              style={{ touchAction: "manipulation" }}
+              autoFocus
+            />
+            {editError && (
+              <p className="text-xs font-semibold text-red-400">Durum metni boş olamaz.</p>
+            )}
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditIndex(null);
+                  setEditDraft("");
+                  setEditError(false);
+                }}
+                className="flex-1 rounded-xl border border-slate-700 bg-slate-800 py-3 text-sm font-bold text-slate-300"
+              >
+                Vazgeç
+              </button>
+              <button
+                type="button"
+                onClick={saveCustom}
+                className="flex-1 rounded-xl bg-cyan-600 py-3 text-sm font-bold text-white"
+              >
+                Kaydet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

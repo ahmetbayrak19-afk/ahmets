@@ -20,7 +20,7 @@ import {
 import confetti from "canvas-confetti";
 import etkinlikleMesgulGorsel from "./ortakdikkatsesgorsel/etkinliklemesgul.jpg";
 import materyalsizGorsel from "./ortakdikkatsesgorsel/materyalsiz.jpg";
-import materyalVeResimGorsel from "./ortakdikkatsesgorsel/materyalveresim.jpg";
+import materyalVeResimGorsel from "./ortakdikkatsesgorsel/nesneveresim.jpg";
 
 type ConditionId = "materyalsiz" | "materyalli" | "mesgul";
 type Phase = "intro" | "assessment" | "result";
@@ -597,4 +597,3 @@ export default function OrtakDikkat1({
     </div>
   );
 }
-
