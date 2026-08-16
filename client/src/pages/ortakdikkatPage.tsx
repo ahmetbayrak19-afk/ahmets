@@ -13,14 +13,12 @@ import OrtakDikkat4 from '@/aba/ortakdikkat/ortakdikkat4';
 import OrtakDikkat5 from '@/aba/ortakdikkat/ortakdikkat5';
 import OrtakDikkat6 from '@/aba/ortakdikkat/ortakdikkat6';
 import OrtakDikkat7 from '@/aba/ortakdikkat/ortakdikkat7';
-import OrtakDikkat8 from '@/aba/ortakdikkat/ortakdikkat8';
 
 interface OrtakDikkatPageProps {
   studentId: string;
   onBack: () => void;
   onOpenReinforcers: () => void;
 }
-
 export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }: OrtakDikkatPageProps) {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -163,7 +161,7 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
       );
     }
 
-    if (activeItem.startsWith("OD 2.1")) {
+    if (activeItem.startsWith("OD 2.1.")) {
       return (
         <OrtakDikkat7
           studentId={studentId}
@@ -171,22 +169,6 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
           itemText={itemText}
           onClose={() => setActiveItem(null)}
           onComplete={(success) => handleAssessmentComplete(activeItem, success)}
-        />
-      );
-    }
-
-    if (activeItem.startsWith("OD 2.2")) {
-      return (
-        <OrtakDikkat8
-          studentId={studentId}
-          itemCode={itemCode}
-          itemText={itemText}
-          onClose={() => setActiveItem(null)}
-          onComplete={(success) => handleAssessmentComplete(activeItem, success)}
-          onOpenReinforcers={() => {
-            setActiveItem(null);
-            onOpenReinforcers();
-          }}
         />
       );
     }
@@ -219,7 +201,7 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
       <div className="grid gap-3 animate-in slide-in-from-bottom-4 duration-500 pb-20">
         {items.map((item) => {
             const status = formData[item];
-            const hasAssessment = /^(OD 1\.[1-6]\.|OD 2\.[12]\.)/.test(item);
+            const hasAssessment = /^OD 1\.[1-6]\./.test(item) || item.startsWith("OD 2.1.");
             
             // Kod ve Metin Ayırma
             const firstSpaceIndex = item.indexOf(' ');
