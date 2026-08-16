@@ -162,6 +162,10 @@ export default function OrtakDikkat7({
   const addOpportunity = (value = entryText) => {
     const clean = value.trim();
     if (!clean) return;
+    if (opportunities.length >= TRIAL_COUNT) {
+      toast.info("10 fırsat tamamlandı.");
+      return;
+    }
     if (isDuplicate(clean)) {
       toast.info("Bu fırsat listede zaten bulunuyor.");
       return;
@@ -190,7 +194,16 @@ export default function OrtakDikkat7({
       return;
     }
 
+    if (opportunities.length >= TRIAL_COUNT) {
+      toast.info("10 fırsat tamamlandı.");
+      return;
+    }
+
     addOpportunity(idea);
+    if (opportunities.length + 1 === TRIAL_COUNT) {
+      setShowIdeas(false);
+      toast.success("10 fırsat tamamlandı.");
+    }
   };
 
   const submitEntry = () => {
@@ -228,8 +241,8 @@ export default function OrtakDikkat7({
   };
 
   const startAssessment = () => {
-    if (opportunities.length < TRIAL_COUNT) {
-      toast.info("Başlamak için en az 10 farklı fırsat planlayın.");
+    if (opportunities.length !== TRIAL_COUNT) {
+      toast.info("Başlamak için toplam 10 farklı fırsat planlayın.");
       return;
     }
     stopIntro();
@@ -380,22 +393,23 @@ export default function OrtakDikkat7({
             <section className="space-y-4">
               <div className="rounded-2xl border border-slate-700 bg-slate-900 p-4">
                 <h2 className="text-lg font-black">Fırsatlarını Planla</h2>
-                <p className="mt-1 text-xs leading-relaxed text-slate-400">Öğrencinin ilgisini çekebilecek en az 10 farklı nesne, oyun veya durum ekleyin.</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-400">Öğrencinin ilgisini çekebilecek toplam 10 farklı nesne, oyun veya durum ekleyin.</p>
 
                 <div className="mt-4 flex gap-2">
                   <input
                     value={entryText}
                     onChange={(event) => setEntryText(event.target.value)}
                     onKeyDown={(event) => { if (event.key === "Enter") addOpportunity(); }}
+                    disabled={opportunities.length >= TRIAL_COUNT}
                     placeholder="Örneğin: Komik ses çıkaran oyuncak"
-                    className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm outline-none focus:border-cyan-500"
+                    className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm outline-none focus:border-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
                   />
-                  <button type="button" onClick={() => addOpportunity()} className="flex w-12 items-center justify-center rounded-xl bg-cyan-500 text-slate-950" aria-label="Fırsat ekle">
+                  <button type="button" onClick={() => addOpportunity()} disabled={opportunities.length >= TRIAL_COUNT} className="flex w-12 items-center justify-center rounded-xl bg-cyan-500 text-slate-950 disabled:cursor-not-allowed disabled:opacity-35" aria-label="Fırsat ekle">
                     <Plus size={22} />
                   </button>
                 </div>
 
-                <button type="button" onClick={() => { setEntryMode("add"); setShowIdeas(true); }} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-amber-500/35 bg-amber-500/10 p-3 text-sm font-black text-amber-300">
+                <button type="button" disabled={opportunities.length >= TRIAL_COUNT} onClick={() => { setEntryMode("add"); setShowIdeas(true); }} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-amber-500/35 bg-amber-500/10 p-3 text-sm font-black text-amber-300 disabled:cursor-not-allowed disabled:opacity-35">
                   <Lightbulb size={19} /> Örnek Fikirleri Gör
                 </button>
               </div>
@@ -403,7 +417,7 @@ export default function OrtakDikkat7({
               <div className="rounded-2xl border border-slate-700 bg-slate-900/70 p-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-black">Planlanan Fırsatlar</h3>
-                  <span className={twMerge("rounded-full px-3 py-1 text-xs font-black", opportunities.length >= TRIAL_COUNT ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400")}>{opportunities.length}/10</span>
+                  <span className={twMerge("rounded-full px-3 py-1 text-xs font-black", opportunities.length === TRIAL_COUNT ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-800 text-slate-400")}>{opportunities.length}/10</span>
                 </div>
                 {opportunities.length === 0 ? (
                   <p className="py-8 text-center text-sm text-slate-500">Henüz fırsat eklenmedi.</p>
@@ -420,7 +434,7 @@ export default function OrtakDikkat7({
                 )}
               </div>
 
-              <button type="button" disabled={opportunities.length < TRIAL_COUNT} onClick={startAssessment} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 p-4 font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-35">
+              <button type="button" disabled={opportunities.length !== TRIAL_COUNT} onClick={startAssessment} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 p-4 font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-35">
                 Değerlendirmeyi Başlat <ChevronRight size={21} />
               </button>
             </section>
@@ -490,11 +504,70 @@ export default function OrtakDikkat7({
       {showIdeas && (
         <div className="fixed inset-0 z-[130] flex items-end justify-center bg-black/70 p-3 sm:items-center">
           <div className="max-h-[82vh] w-full max-w-xl overflow-y-auto rounded-3xl border border-slate-700 bg-slate-900 p-4 shadow-2xl">
-            <div className="flex items-center justify-between"><div><h3 className="font-black">Örnek Fikirler</h3><p className="mt-1 text-xs text-slate-400">Kullanmak istediğiniz fikre dokunun.</p></div><button type="button" onClick={() => setShowIdeas(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-800"><X size={21} /></button></div>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="font-black">Örnek Fikirler</h3>
+                <p className="mt-1 text-xs text-slate-400">
+                  Kullanmak istediğiniz fikre dokunun.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={twMerge(
+                  "rounded-full px-3 py-1 text-xs font-black",
+                  opportunities.length === TRIAL_COUNT
+                    ? "bg-emerald-500/15 text-emerald-300"
+                    : "bg-slate-800 text-slate-300",
+                )}>
+                  {opportunities.length}/{TRIAL_COUNT}
+                </span>
+                <button type="button" onClick={() => setShowIdeas(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-800"><X size={21} /></button>
+              </div>
+            </div>
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {EXAMPLE_IDEAS.map((idea) => {
-                const unavailable = entryMode !== "replace" && opportunities.some((item) => normalize(item) === normalize(idea));
-                return <button key={idea} type="button" disabled={unavailable} onClick={() => chooseIdea(idea)} className="rounded-xl border border-slate-700 bg-slate-950 p-3 text-left text-sm font-bold transition hover:border-amber-500/50 disabled:opacity-25">{idea}</button>;
+                const selectedIndex = opportunities.findIndex(
+                  (item) => normalize(item) === normalize(idea),
+                );
+                const selected = selectedIndex >= 0;
+                const full = opportunities.length >= TRIAL_COUNT;
+                const unavailable =
+                  entryMode !== "replace" && (selected || full);
+                const displayedNumber =
+                  entryMode === "replace"
+                    ? currentIndex + 1
+                    : selected
+                      ? selectedIndex + 1
+                      : !full
+                        ? opportunities.length + 1
+                        : null;
+
+                return (
+                  <button
+                    key={idea}
+                    type="button"
+                    disabled={unavailable}
+                    onClick={() => chooseIdea(idea)}
+                    className={twMerge(
+                      "flex items-center gap-3 rounded-xl border bg-slate-950 p-3 text-left text-sm font-bold transition hover:border-amber-500/50 disabled:cursor-not-allowed",
+                      selected
+                        ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-200 disabled:opacity-100"
+                        : "border-slate-700 disabled:opacity-25",
+                    )}
+                  >
+                    {displayedNumber !== null && (
+                      <span className={twMerge(
+                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black",
+                        selected
+                          ? "bg-emerald-500/20 text-emerald-300"
+                          : "bg-amber-500/15 text-amber-300",
+                      )}>
+                        {displayedNumber}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1">{idea}</span>
+                    {selected && <Check className="shrink-0 text-emerald-400" size={18} />}
+                  </button>
+                );
               })}
             </div>
           </div>
