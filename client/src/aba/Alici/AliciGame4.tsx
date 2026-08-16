@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Upload, Trash2, ArrowLeft, Check, Play, Settings, User, Users, GraduationCap, Heart, X, RotateCcw } from 'lucide-react';
+import { Camera, Upload, Trash2, ArrowLeft, Check, Play, Settings, User, Users, GraduationCap, Heart, X, RotateCcw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
+import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
+import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
+import { db, storage } from '@/firebase';
 
 // --- SES DOSYALARI ---
 import aferin1 from '../esle/ses/aferin1.mp3';
@@ -38,6 +41,7 @@ interface PersonProfile {
   name: string;
   category: Category;
   imageUrl: string;
+  storagePath?: string;
   isDummy?: boolean;
 }
 
@@ -74,23 +78,18 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 interface GameProps {
+  studentId: string;
   onClose: () => void;
 }
 
-export default function AliciGame4({ onClose }: GameProps) {
+export default function AliciGame4({ studentId, onClose }: GameProps) {
   const [view, setView] = useState<'menu' | 'edit' | 'game'>('menu');
   const [selectedCategory, setSelectedCategory] = useState<Category>('ogretmen');
   const [selectedLevel, setSelectedLevel] = useState<1 | 2 | 3>(1);
-
-  const [profiles, setProfiles] = useState<PersonProfile[]>(() => {
-    try {
-      if (typeof window !== 'undefined') {
-          const saved = localStorage.getItem('insan-tanima-v5');
-          return saved ? JSON.parse(saved) : [];
-      }
-      return [];
-    } catch { return []; }
-  });
+  const [profiles, setProfiles] = useState<PersonProfile[]>([]);
+  const [profilesLoading, setProfilesLoading] = useState(true);
+  const [savingPerson, setSavingPerson] = useState(false);
+  const [deletingPersonId, setDeletingPersonId] = useState<string | null>(null);
 
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [newPersonName, setNewPersonName] = useState('');
@@ -133,10 +132,58 @@ export default function AliciGame4({ onClose }: GameProps) {
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-        localStorage.setItem('insan-tanima-v5', JSON.stringify(profiles));
+    const institutionId = localStorage.getItem('kazanim-takip-institution-id');
+    if (!institutionId || !studentId) {
+      setProfilesLoading(false);
+      toast.error('Öğrenci veya kurum bilgisi bulunamadı.');
+      return;
     }
-  }, [profiles]);
+
+    const peopleCollection = collection(
+      db,
+      'institutions',
+      institutionId,
+      'students',
+      studentId,
+      'knownPeople',
+    );
+
+    return onSnapshot(
+      peopleCollection,
+      (snapshot) => {
+        const nextProfiles = snapshot.docs
+          .map((personDocument) => {
+            const data = personDocument.data();
+            return {
+              id: personDocument.id,
+              name: String(data.name || ''),
+              category: data.category as Category,
+              imageUrl: String(data.imageUrl || ''),
+              storagePath: data.storagePath ? String(data.storagePath) : undefined,
+              isDummy: false,
+            };
+          })
+          .filter(
+            (profile) =>
+              Boolean(profile.name) &&
+              Boolean(profile.imageUrl) &&
+              CATEGORIES.some((category) => category.id === profile.category),
+          )
+          .sort((first, second) =>
+            first.category.localeCompare(second.category, 'tr-TR') ||
+            first.name.localeCompare(second.name, 'tr-TR'),
+          );
+
+        setProfiles(nextProfiles);
+        setProfilesLoading(false);
+      },
+      (error) => {
+        console.error('Kişiler yüklenemedi:', error);
+        setProfilesLoading(false);
+        toast.error('Kişi kayıtları yüklenemedi.');
+      },
+    );
+  }, [studentId]);
 
   const resetEditor = () => {
       stopCameraStream();
@@ -360,10 +407,155 @@ export default function AliciGame4({ onClose }: GameProps) {
   const stopCameraStream=()=>{ const v=document.querySelector('video'); if(v&&v.srcObject){ (v.srcObject as MediaStream).getTracks().forEach(t=>t.stop()); } };
   const capturePhoto=()=>{ if(!videoRef.current)return; setTempImage(processImage(videoRef.current)); stopCameraStream(); setIsCameraActive(false); };
   const handleFileUpload=(e:any)=>{ const f=e.target.files?.[0]; if(!f)return; const r=new FileReader(); r.onload=(ev)=>{ const i=new Image(); i.onload=()=>{ setTempImage(processImage(i)); setIsCameraActive(false); }; i.src=ev.target?.result as string; }; r.readAsDataURL(f); e.target.value=''; };
-  const savePerson=()=>{ if(profiles.filter(p=>p.category===selectedCategory).length>=10){toast.error("Dolu");return;} if(!newPersonName||!tempImage){toast.warning("Eksik bilgi");return;} setProfiles([...profiles,{id:Date.now().toString(),name:newPersonName,category:selectedCategory,imageUrl:tempImage,isDummy:false}]); setNewPersonName(''); setTempImage(null); stopCameraStream(); setIsCameraActive(false); toast.success("Eklendi"); };
 
+  const uploadPersonToCloud = async (
+    person: Pick<PersonProfile, 'id' | 'name' | 'category' | 'imageUrl'>,
+  ) => {
+    const institutionId = localStorage.getItem('kazanim-takip-institution-id');
+    if (!institutionId || !studentId) {
+      throw new Error('Öğrenci veya kurum bilgisi bulunamadı.');
+    }
+
+    const safePersonId = person.id.replace(/[^a-zA-Z0-9_-]/g, '-');
+    const photoPath =
+      `institutions/${institutionId}/students/${studentId}/knownPeople/${safePersonId}.jpg`;
+    const photoReference = storageRef(storage, photoPath);
+    const response = await fetch(person.imageUrl);
+    const photoBlob = await response.blob();
+
+    await uploadBytes(photoReference, photoBlob, {
+      contentType: 'image/jpeg',
+      customMetadata: { institutionId, studentId },
+    });
+
+    try {
+      const imageUrl = await getDownloadURL(photoReference);
+      await setDoc(
+        doc(
+          db,
+          'institutions',
+          institutionId,
+          'students',
+          studentId,
+          'knownPeople',
+          safePersonId,
+        ),
+        {
+          name: person.name.trim(),
+          category: person.category,
+          imageUrl,
+          storagePath: photoPath,
+          updatedAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    } catch (error) {
+      await deleteObject(photoReference).catch(() => {});
+      throw error;
+    }
+  };
+
+  const savePerson = async () => {
+    const cleanName = newPersonName.trim();
+    if (profiles.filter((profile) => profile.category === selectedCategory).length >= 10) {
+      toast.error('Bu bölümde en fazla 10 kişi olabilir.');
+      return;
+    }
+    if (!cleanName || !tempImage) {
+      toast.warning('İsim ve fotoğraf ekleyin.');
+      return;
+    }
+    if (
+      profiles.some(
+        (profile) =>
+          profile.category === selectedCategory &&
+          profile.name.trim().toLocaleLowerCase('tr-TR') ===
+            cleanName.toLocaleLowerCase('tr-TR'),
+      )
+    ) {
+      toast.info('Bu kişi ilgili bölümde zaten kayıtlı.');
+      return;
+    }
+
+    setSavingPerson(true);
+    try {
+      await uploadPersonToCloud({
+        id: crypto.randomUUID(),
+        name: cleanName,
+        category: selectedCategory,
+        imageUrl: tempImage,
+      });
+      setNewPersonName('');
+      setTempImage(null);
+      stopCameraStream();
+      setIsCameraActive(false);
+      toast.success('Kişi kuruma kaydedildi.');
+    } catch (error) {
+      console.error('Kişi kaydedilemedi:', error);
+      toast.error('Kişi kaydedilemedi.');
+    } finally {
+      setSavingPerson(false);
+    }
+  };
+
+  const deletePerson = async (person: PersonProfile) => {
+    const institutionId = localStorage.getItem('kazanim-takip-institution-id');
+    if (!institutionId || !studentId) {
+      toast.error('Öğrenci veya kurum bilgisi bulunamadı.');
+      return;
+    }
+
+    setDeletingPersonId(person.id);
+    try {
+      await deleteDoc(
+        doc(
+          db,
+          'institutions',
+          institutionId,
+          'students',
+          studentId,
+          'knownPeople',
+          person.id,
+        ),
+      );
+      if (person.storagePath) {
+        await deleteObject(storageRef(storage, person.storagePath)).catch((error) => {
+          console.error('Kişi fotoğrafı silinemedi:', error);
+        });
+      }
+      toast.success('Kişi silindi.');
+    } catch (error) {
+      console.error('Kişi silinemedi:', error);
+      toast.error('Kişi silinemedi.');
+    } finally {
+      setDeletingPersonId(null);
+    }
+  };
 
   // --- RENDER ---
+  if (profilesLoading) {
+    return (
+      <div className="fixed inset-0 z-[500] flex flex-col bg-slate-950 text-slate-100">
+        <div className="flex items-center border-b border-slate-800 bg-slate-900 p-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full bg-slate-800 p-2 text-slate-300"
+            aria-label="Kapat"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="ml-3 text-lg font-bold">İnsan Tanıma</h1>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-slate-400">
+          <Loader2 className="animate-spin text-blue-400" size={36} />
+          <p className="text-sm font-bold">Kişiler yükleniyor…</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[500] bg-slate-950 flex flex-col font-sans text-slate-100">
       
@@ -449,11 +641,11 @@ export default function AliciGame4({ onClose }: GameProps) {
                               </div>
                           </div>
                       )}
-                      {!isCameraActive && <div className="flex flex-col gap-2"><input type="text" value={newPersonName} onChange={e=>setNewPersonName(e.target.value)} placeholder="İsim" className="w-full bg-slate-950 border border-slate-700 rounded p-1 text-center"/><Button onClick={savePerson} size="sm" className="bg-green-600 font-bold">KAYDET</Button></div>}
+                      {!isCameraActive && <div className="flex flex-col gap-2"><input type="text" value={newPersonName} onChange={e=>setNewPersonName(e.target.value)} disabled={savingPerson} placeholder="İsim" className="w-full bg-slate-950 border border-slate-700 rounded p-1 text-center disabled:opacity-50"/><Button onClick={savePerson} disabled={savingPerson} size="sm" className="bg-green-600 font-bold disabled:opacity-50">{savingPerson ? <Loader2 className="animate-spin" size={16} /> : 'KAYDET'}</Button></div>}
                       {isCameraActive && <Button variant="ghost" size="sm" onClick={()=>{stopCameraStream();setIsCameraActive(false);}} className="text-red-400 text-xs">İptal</Button>}
                   </div>
                   {profiles.filter(p=>p.category===selectedCategory).map(p=>(
-                      <div key={p.id} className="relative bg-slate-900 p-2 rounded-xl border border-slate-800"><img src={p.imageUrl} className="w-full aspect-square object-cover rounded-lg"/><p className="text-center text-xs mt-1 font-bold">{p.name}</p><button onClick={()=>setProfiles(profiles.filter(x=>x.id!==p.id))} className="absolute -top-2 -right-2 bg-red-600 text-white p-1.5 rounded-full"><Trash2 size={12}/></button></div>
+                      <div key={p.id} className="relative bg-slate-900 p-2 rounded-xl border border-slate-800"><img src={p.imageUrl} className="w-full aspect-square object-cover rounded-lg"/><p className="text-center text-xs mt-1 font-bold">{p.name}</p><button type="button" disabled={deletingPersonId === p.id} onClick={()=>deletePerson(p)} className="absolute -top-2 -right-2 bg-red-600 text-white p-1.5 rounded-full disabled:opacity-50" aria-label={`${p.name} kişisini sil`}>{deletingPersonId === p.id ? <Loader2 className="animate-spin" size={12} /> : <Trash2 size={12}/>}</button></div>
                   ))}
              </div>
           </div>
