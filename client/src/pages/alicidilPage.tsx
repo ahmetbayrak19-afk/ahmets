@@ -87,7 +87,7 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
              
              {/* OYUN 1: ADB 2.1 İnsan Tanıma */}
              {(activeGameItem.includes("2.1") || activeGameItem.includes("İnsan Tanıma")) && (
-                 <AliciGame4 onClose={() => setActiveGameItem(null)} />
+                 <AliciGame4 studentId={studentId} onClose={() => setActiveGameItem(null)} />
              )}
 
              {/* OYUN 2: ADB 2.4 Büyük, Karmaşık Bir Resimdeki Nesneleri Ayırt Etme (YENİ DEDEKTİF OYUNU) */}
