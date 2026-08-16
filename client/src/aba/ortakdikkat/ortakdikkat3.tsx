@@ -1,4 +1,9 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import {
   Check,
   Eye,
@@ -22,7 +27,6 @@ interface TrialResult {
   id: number;
   followed: boolean;
 }
-
 interface GuideStep {
   image: string;
   title: string;
@@ -67,7 +71,8 @@ const GUIDE_STEPS: GuideStep[] = [
   },
 ];
 
-const GUIDE_INTERVAL_MS = 2000;
+const GUIDE_INTERVAL_MS = 2500;
+const GUIDE_SWIPE_THRESHOLD_PX = 40;
 const TOTAL_TRIALS = 10;
 const PASS_SCORE = 8;
 
@@ -82,6 +87,10 @@ export default function OrtakDikkat3({
   const [locked, setLocked] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [guideStepIndex, setGuideStepIndex] = useState(0);
+  const [guideAutoPlay, setGuideAutoPlay] = useState(true);
+  const [guideDragOffset, setGuideDragOffset] = useState(0);
+  const guideDragStartX = useRef<number | null>(null);
+  const guideDragCurrentX = useRef<number | null>(null);
 
   const displayItemCode = itemCode.trim() === "OD" ? "OD 1.3" : itemCode;
   const displayItemText = itemText.replace(/^1\.3\.\s*/, "");
@@ -89,22 +98,71 @@ export default function OrtakDikkat3({
   const success = results.length === TOTAL_TRIALS && score >= PASS_SCORE;
 
   useEffect(() => {
-    if (phase !== "intro") return;
+    if (phase !== "intro" || !guideAutoPlay) return;
 
-    const intervalId = window.setInterval(() => {
+    const timer = window.setTimeout(() => {
       setGuideStepIndex((current) => (current + 1) % GUIDE_STEPS.length);
     }, GUIDE_INTERVAL_MS);
 
-    return () => window.clearInterval(intervalId);
-  }, [phase]);
-
-  const guideStep = GUIDE_STEPS[guideStepIndex];
+    return () => window.clearTimeout(timer);
+  }, [phase, guideStepIndex, guideAutoPlay]);
 
   const startAssessment = () => {
     setResults([]);
     setLocked(false);
     setFeedback(null);
     setPhase("assessment");
+  };
+
+  const selectGuideStep = (index: number) => {
+    setGuideAutoPlay(false);
+    setGuideStepIndex(index);
+    setGuideDragOffset(0);
+  };
+
+  const handleGuidePointerDown = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    guideDragStartX.current = event.clientX;
+    guideDragCurrentX.current = event.clientX;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleGuidePointerMove = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (guideDragStartX.current === null) return;
+    guideDragCurrentX.current = event.clientX;
+    setGuideDragOffset(event.clientX - guideDragStartX.current);
+  };
+
+  const finishGuideSwipe = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (guideDragStartX.current === null) return;
+
+    const currentX = guideDragCurrentX.current ?? event.clientX;
+    const difference = currentX - guideDragStartX.current;
+
+    if (Math.abs(difference) >= GUIDE_SWIPE_THRESHOLD_PX) {
+      setGuideAutoPlay(false);
+      setGuideStepIndex((current) =>
+        difference < 0
+          ? (current + 1) % GUIDE_STEPS.length
+          : (current - 1 + GUIDE_STEPS.length) % GUIDE_STEPS.length,
+      );
+    }
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    guideDragStartX.current = null;
+    guideDragCurrentX.current = null;
+    setGuideDragOffset(0);
+  };
+
+  const cancelGuideSwipe = () => {
+    guideDragStartX.current = null;
+    guideDragCurrentX.current = null;
+    setGuideDragOffset(0);
   };
 
   const handleAssessment = (followed: boolean) => {
@@ -188,7 +246,7 @@ export default function OrtakDikkat3({
                       Öğretmen nasıl uygulayacak?
                     </h2>
                     <p className="mt-0.5 text-[11px] text-slate-400">
-                      Görseller ikişer saniye arayla ilerler
+                      Görseller 2,5 saniye arayla ilerler
                     </p>
                   </div>
                 </div>
@@ -197,38 +255,73 @@ export default function OrtakDikkat3({
                 </span>
               </div>
 
-              <div className="bg-slate-950/70 p-2 sm:p-3">
-                <div className="aspect-[3/2] w-full overflow-hidden rounded-2xl border border-slate-700 bg-black">
-                  <img
-                    key={guideStep.image}
-                    src={guideStep.image}
-                    alt={`${guideStepIndex + 1}. adım: ${guideStep.title}`}
-                    className="h-full w-full object-contain animate-in fade-in duration-300"
-                    draggable={false}
-                  />
+              <div
+                className="overflow-hidden"
+                style={{ touchAction: "pan-y" }}
+                onPointerDown={handleGuidePointerDown}
+                onPointerMove={handleGuidePointerMove}
+                onPointerUp={finishGuideSwipe}
+                onPointerCancel={cancelGuideSwipe}
+              >
+                <div
+                  className={`flex ${
+                    guideDragOffset === 0
+                      ? "transition-transform duration-500 ease-out"
+                      : ""
+                  }`}
+                  style={{
+                    transform: `translateX(calc(-${
+                      guideStepIndex * 100
+                    }% + ${guideDragOffset}px))`,
+                  }}
+                >
+                  {GUIDE_STEPS.map((step, index) => (
+                    <article
+                      key={step.image}
+                      className="w-full shrink-0"
+                      aria-hidden={index !== guideStepIndex}
+                    >
+                      <div className="bg-slate-950/70 p-2 sm:p-3">
+                        <div className="aspect-[3/2] w-full overflow-hidden rounded-2xl border border-slate-700 bg-black">
+                          <img
+                            src={step.image}
+                            alt={`${index + 1}. adım: ${step.title}`}
+                            className="h-full w-full object-contain"
+                            draggable={false}
+                          />
+                        </div>
+                      </div>
+                      <div className="border-t border-slate-700/70 px-4 py-3 text-center">
+                        <h3 className="font-black text-cyan-300">
+                          {step.title}
+                        </h3>
+                        <p className="mx-auto mt-1 max-w-2xl text-sm leading-relaxed text-slate-300">
+                          {step.description}
+                        </p>
+                      </div>
+                    </article>
+                  ))}
                 </div>
               </div>
 
-              <div className="px-4 pb-4 pt-3 text-center">
-                <h3 className="font-black text-cyan-300">{guideStep.title}</h3>
-                <p className="mx-auto mt-1 max-w-2xl text-sm leading-relaxed text-slate-300">
-                  {guideStep.description}
-                </p>
-                <div className="mt-3 flex justify-center gap-2">
-                  {GUIDE_STEPS.map((step, index) => (
-                    <button
-                      key={step.image}
-                      type="button"
-                      onClick={() => setGuideStepIndex(index)}
-                      aria-label={`${index + 1}. adımı göster`}
-                      className={`h-2.5 rounded-full transition-all ${
-                        index === guideStepIndex
-                          ? "w-7 bg-cyan-400"
-                          : "w-2.5 bg-slate-600 hover:bg-slate-500"
-                      }`}
-                    />
-                  ))}
-                </div>
+              <div
+                className="flex justify-center gap-2 px-4 pb-4 pt-1"
+                aria-label="Öğretici görseller"
+              >
+                {GUIDE_STEPS.map((step, index) => (
+                  <button
+                    key={step.image}
+                    type="button"
+                    onClick={() => selectGuideStep(index)}
+                    aria-label={`${index + 1}. adımı göster`}
+                    aria-current={index === guideStepIndex ? "true" : undefined}
+                    className={`h-2.5 rounded-full transition-all ${
+                      index === guideStepIndex
+                        ? "w-7 bg-cyan-400"
+                        : "w-2.5 bg-slate-600 hover:bg-slate-500"
+                    }`}
+                  />
+                ))}
               </div>
             </section>
 

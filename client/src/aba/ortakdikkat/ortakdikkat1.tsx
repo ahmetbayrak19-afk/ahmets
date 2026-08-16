@@ -1,4 +1,10 @@
-import { useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import {
   AlertTriangle,
   Check,
@@ -12,6 +18,9 @@ import {
   XCircle,
 } from "lucide-react";
 import confetti from "canvas-confetti";
+import etkinlikleMesgulGorsel from "./ortakdikkatsesgorsel/etkinliklemesgul.jpg";
+import materyalsizGorsel from "./ortakdikkatsesgorsel/materyalsiz.jpg";
+import materyalVeResimGorsel from "./ortakdikkatsesgorsel/materyalveresim.jpg";
 
 type ConditionId = "materyalsiz" | "materyalli" | "mesgul";
 type Phase = "intro" | "assessment" | "result";
@@ -28,6 +37,7 @@ interface ConditionCard {
   title: string;
   description: string;
   instruction: string;
+  image: string;
   icon: typeof PackageOpen;
   color: string;
 }
@@ -47,6 +57,7 @@ const CONDITIONS: ConditionCard[] = [
       "Öğrencinin önünde dikkatini çeken herhangi bir nesne bulunmaz.",
     instruction:
       "Önünde nesne yokken doğal bir anda yalnızca bir kez “Bana bak” deyin.",
+    image: materyalsizGorsel,
     icon: PackageOpen,
     color: "border-sky-500/35 bg-sky-500/10 text-sky-300",
   },
@@ -57,20 +68,25 @@ const CONDITIONS: ConditionCard[] = [
       "Öğrencinin önünde dikkatini çekebilecek bir nesne ya da resim bulunur.",
     instruction:
       "Önüne bir nesne ya da resim koyup uygun anda yalnızca bir kez “Bana bak” deyin.",
+    image: materyalVeResimGorsel,
     icon: ImageIcon,
     color: "border-violet-500/35 bg-violet-500/10 text-violet-300",
   },
   {
     id: "mesgul",
     title: "Etkinlikle meşgulken",
-    description: "Öğrenci sevdiği bir oyun veya etkinlikle ilgilenmektedir.",
+    description:
+      "Öğrenci sevdiği bir oyun veya etkinlikle ilgilenirken değerlendirilir.",
     instruction:
       "Sevdiği etkinlikle uğraşırken doğal bir anda yalnızca bir kez “Bana bak” deyin.",
+    image: etkinlikleMesgulGorsel,
     icon: Puzzle,
     color: "border-amber-500/35 bg-amber-500/10 text-amber-300",
   },
 ];
 
+const INTRO_SLIDE_DURATION_MS = 2500;
+const INTRO_SWIPE_THRESHOLD_PX = 40;
 const TRIALS_PER_CONDITION = 4;
 const TOTAL_TRIALS = 12;
 const PASS_SCORE = 10;
@@ -89,6 +105,21 @@ export default function OrtakDikkat1({
   const [showResultAfterWarning, setShowResultAfterWarning] = useState(false);
   const [locked, setLocked] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [introSlide, setIntroSlide] = useState(0);
+  const [introAutoPlay, setIntroAutoPlay] = useState(true);
+  const [introDragOffset, setIntroDragOffset] = useState(0);
+  const introDragStartX = useRef<number | null>(null);
+  const introDragCurrentX = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (phase !== "intro" || !introAutoPlay) return;
+
+    const timer = window.setTimeout(() => {
+      setIntroSlide((current) => (current + 1) % CONDITIONS.length);
+    }, INTRO_SLIDE_DURATION_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [phase, introSlide, introAutoPlay]);
 
   const displayItemCode = itemCode.trim() === "OD" ? "OD 1.1" : itemCode;
   const displayItemText = itemText.replace(/^1\.1\.\s*/, "");
@@ -195,6 +226,57 @@ export default function OrtakDikkat1({
     setLocked(false);
   };
 
+  const selectIntroSlide = (index: number) => {
+    setIntroAutoPlay(false);
+    setIntroSlide(index);
+    setIntroDragOffset(0);
+  };
+
+  const handleIntroPointerDown = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    introDragStartX.current = event.clientX;
+    introDragCurrentX.current = event.clientX;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleIntroPointerMove = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (introDragStartX.current === null) return;
+    introDragCurrentX.current = event.clientX;
+    setIntroDragOffset(event.clientX - introDragStartX.current);
+  };
+
+  const finishIntroSwipe = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (introDragStartX.current === null) return;
+
+    const currentX = introDragCurrentX.current ?? event.clientX;
+    const difference = currentX - introDragStartX.current;
+
+    if (Math.abs(difference) >= INTRO_SWIPE_THRESHOLD_PX) {
+      setIntroAutoPlay(false);
+      setIntroSlide((current) =>
+        difference < 0
+          ? (current + 1) % CONDITIONS.length
+          : (current - 1 + CONDITIONS.length) % CONDITIONS.length,
+      );
+    }
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    introDragStartX.current = null;
+    introDragCurrentX.current = null;
+    setIntroDragOffset(0);
+  };
+
+  const cancelIntroSwipe = () => {
+    introDragStartX.current = null;
+    introDragCurrentX.current = null;
+    setIntroDragOffset(0);
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex h-[100dvh] w-screen select-none flex-col bg-slate-950 font-sans text-white">
       <header className="relative z-10 flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-900/80 p-4 backdrop-blur-md landscape:px-4 landscape:py-2">
@@ -236,24 +318,77 @@ export default function OrtakDikkat1({
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              {CONDITIONS.map((condition) => {
-                const Icon = condition.icon;
-                return (
-                  <div
+            <div>
+              <div
+                className="overflow-hidden rounded-3xl border border-slate-700 bg-slate-900/80 shadow-2xl shadow-black/20"
+                style={{ touchAction: "pan-y" }}
+                onPointerDown={handleIntroPointerDown}
+                onPointerMove={handleIntroPointerMove}
+                onPointerUp={finishIntroSwipe}
+                onPointerCancel={cancelIntroSwipe}
+              >
+                <div
+                  className={`flex ${introDragOffset === 0 ? "transition-transform duration-500 ease-out" : ""}`}
+                  style={{
+                    transform: `translateX(calc(-${introSlide * 100}% + ${introDragOffset}px))`,
+                  }}
+                >
+                  {CONDITIONS.map((condition) => {
+                    const Icon = condition.icon;
+                    return (
+                      <article
+                        key={condition.id}
+                        className="w-full shrink-0"
+                        aria-hidden={CONDITIONS[introSlide].id !== condition.id}
+                      >
+                        <div className="flex h-52 items-center justify-center bg-slate-950/55 p-2 sm:h-72">
+                          <img
+                            src={condition.image}
+                            alt={condition.title}
+                            className="h-full w-full rounded-2xl object-contain"
+                            draggable={false}
+                          />
+                        </div>
+                        <div className="flex items-start gap-3 border-t border-slate-700/70 px-4 py-3 sm:px-5">
+                          <span
+                            className={`mt-0.5 shrink-0 rounded-xl border p-2 ${condition.color}`}
+                          >
+                            <Icon className="h-5 w-5" />
+                          </span>
+                          <div className="min-w-0">
+                            <h3 className="font-bold text-slate-100">
+                              {condition.title}
+                            </h3>
+                            <p className="mt-0.5 text-xs leading-relaxed text-slate-400 sm:text-sm">
+                              {condition.description}
+                            </p>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div
+                className="mt-3 flex items-center justify-center gap-2"
+                aria-label="Hazırlık görselleri"
+              >
+                {CONDITIONS.map((condition, index) => (
+                  <button
                     key={condition.id}
-                    className={`rounded-2xl border p-4 ${condition.color}`}
-                  >
-                    <Icon className="mb-2 h-6 w-6" />
-                    <h3 className="font-bold text-slate-100">
-                      {condition.title}
-                    </h3>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-400">
-                      {condition.description}
-                    </p>
-                  </div>
-                );
-              })}
+                    type="button"
+                    onClick={() => selectIntroSlide(index)}
+                    className={`h-2.5 rounded-full transition-all ${
+                      introSlide === index
+                        ? "w-8 bg-cyan-400"
+                        : "w-2.5 bg-slate-600 hover:bg-slate-500"
+                    }`}
+                    aria-label={`${condition.title} görselini göster`}
+                    aria-current={introSlide === index ? "true" : undefined}
+                  />
+                ))}
+              </div>
             </div>
 
             <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
@@ -462,3 +597,4 @@ export default function OrtakDikkat1({
     </div>
   );
 }
+
