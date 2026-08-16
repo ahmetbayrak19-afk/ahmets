@@ -13,6 +13,8 @@ import OrtakDikkat4 from '@/aba/ortakdikkat/ortakdikkat4';
 import OrtakDikkat5 from '@/aba/ortakdikkat/ortakdikkat5';
 import OrtakDikkat6 from '@/aba/ortakdikkat/ortakdikkat6';
 import OrtakDikkat7 from '@/aba/ortakdikkat/ortakdikkat7';
+import OrtakDikkat8 from '@/aba/ortakdikkat/ortakdikkat8';
+import OrtakDikkat9 from '@/aba/ortakdikkat/ortakdikkat9';
 
 interface OrtakDikkatPageProps {
   studentId: string;
@@ -172,6 +174,30 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
         />
       );
     }
+
+    if (activeItem.startsWith("OD 2.2.")) {
+      return (
+        <OrtakDikkat8
+          studentId={studentId}
+          itemCode={itemCode}
+          itemText={itemText}
+          onClose={() => setActiveItem(null)}
+          onComplete={(success) => handleAssessmentComplete(activeItem, success)}
+        />
+      );
+    }
+
+    if (activeItem.startsWith("OD 2.3.")) {
+      return (
+        <OrtakDikkat9
+          studentId={studentId}
+          itemCode={itemCode}
+          itemText={itemText}
+          onClose={() => setActiveItem(null)}
+          onComplete={(success) => handleAssessmentComplete(activeItem, success)}
+        />
+      );
+    }
   }
 
   return (
@@ -201,7 +227,7 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
       <div className="grid gap-3 animate-in slide-in-from-bottom-4 duration-500 pb-20">
         {items.map((item) => {
             const status = formData[item];
-            const hasAssessment = /^OD 1\.[1-6]\./.test(item) || item.startsWith("OD 2.1.");
+            const hasAssessment = /^OD 1\.[1-6]\./.test(item) || /^OD 2\.[1-3]\./.test(item);
             
             // Kod ve Metin Ayırma
             const firstSpaceIndex = item.indexOf(' ');
