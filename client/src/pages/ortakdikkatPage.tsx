@@ -25,6 +25,10 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [activeItem, setActiveItem] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveBanner, setSaveBanner] = useState<'ok' | 'err' | null>(null);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
 
   // --- MODÜL SEÇİMİ (GARANTİLİ YÖNTEM) ---
   // "ORTAK DİKKAT" kelimesi geçen modülü bulur
@@ -39,6 +43,7 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
         const docSnap = await getDoc(doc(db, "institutions", instId!, "students", studentId, "assessments", "aba"));
         if (docSnap.exists()) {
             setFormData(docSnap.data());
+            setDirty(false);
         }
       } catch (error) {
         console.error("Veri çekme hatası:", error);
@@ -50,21 +55,45 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
     load();
   }, [studentId]);
 
-  const handleSave = async (data = formData, showMessage = true) => {
+  useEffect(() => {
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!dirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [dirty]);
+
+  const handleSave = async (newData?: Record<string, any>, showMessage = true) => {
+    setIsSaving(true);
+    setSaveBanner(null);
     try {
       const instId = localStorage.getItem("kazanim-takip-institution-id");
       if (!instId) throw new Error("Kurum bilgisi bulunamadı.");
-      await setDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"), data, { merge: true });
+      const dataToSave = newData || formData;
+      await setDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"), dataToSave, { merge: true });
+      setDirty(false);
+      setSaveBanner('ok');
+      window.setTimeout(() => setSaveBanner(null), 1500);
       if (showMessage) toast.success("Ortak Dikkat becerileri kaydedildi!");
+      return true;
     } catch (error) {
       console.error("Ortak dikkat kaydetme hatası:", error);
+      setSaveBanner('err');
+      window.setTimeout(() => setSaveBanner(null), 2500);
       toast.error("Kaydetme hatası oluştu.");
+      return false;
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleAssessmentComplete = async (item: string, success: boolean) => {
     const nextData = { ...formData, [item]: success };
     setFormData(nextData);
+    setDirty(true);
     await handleSave(nextData, false);
     setActiveItem(null);
   };
@@ -74,6 +103,7 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
         ...prev, 
         [itemCode]: prev[itemCode] === status ? null : status 
     }));
+    setDirty(true);
   };
 
   const calculateProgress = () => {
@@ -145,8 +175,15 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
           onClose={() => setActiveItem(null)}
           onComplete={(success) => handleAssessmentComplete(activeItem, success)}
           onOpenReinforcers={() => {
-            setActiveItem(null);
-            onOpenReinforcers();
+            const openReinforcers = async () => {
+              if (dirty) {
+                const saved = await handleSave();
+                if (!saved) return;
+              }
+              setActiveItem(null);
+              onOpenReinforcers();
+            };
+            void openReinforcers();
           }}
         />
       );
@@ -201,11 +238,19 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       {/* HEADER */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex items-center justify-between sticky top-0 backdrop-blur-md z-10 shadow-lg">
         <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={onBack} className="text-slate-400 hover:text-white">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (dirty) setShowLeaveDialog(true);
+                else onBack();
+              }}
+              className="text-slate-400 hover:text-white"
+            >
                 <ArrowLeft size={20} />
             </Button>
             <div>
@@ -218,10 +263,74 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
                 </div>
             </div>
         </div>
-        <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 h-8 text-xs shadow-lg shadow-green-900/20">
-            <Save className="mr-2 h-3.5 w-3.5" /> Kaydet
-        </Button>
+        <div className="flex min-w-[7.5rem] flex-col items-end gap-1">
+          <Button
+            onClick={() => handleSave()}
+            disabled={isSaving}
+            className="bg-green-600 hover:bg-green-700 h-8 text-xs shadow-lg shadow-green-900/20 disabled:opacity-60"
+          >
+            {isSaving ? (
+              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-3.5 w-3.5" />
+            )}
+            {isSaving ? 'Kaydediliyor…' : 'Kaydet'}
+          </Button>
+          {saveBanner === 'ok' && (
+            <span className="text-[11px] font-semibold text-emerald-400">✓ Kaydedildi</span>
+          )}
+          {saveBanner === 'err' && (
+            <span className="text-[11px] font-semibold text-red-400">✕ Kaydedilemedi</span>
+          )}
+          {dirty && !saveBanner && !isSaving && (
+            <span className="text-[10px] text-amber-400/90">Kaydedilmedi</span>
+          )}
+        </div>
       </div>
+
+      {showLeaveDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+            <h3 className="text-base font-bold text-white">Kaydedilmemiş değişiklikler</h3>
+            <p className="text-sm leading-relaxed text-slate-300">
+              Yaptığınız değişiklikler kaydedilmedi. Çıkarsanız bu işaretlemeler kaybolur.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="ghost"
+                className="flex-1 text-slate-300 hover:text-white"
+                onClick={() => setShowLeaveDialog(false)}
+              >
+                Hayır, kal
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 text-white hover:bg-red-500"
+                onClick={() => {
+                  setShowLeaveDialog(false);
+                  setDirty(false);
+                  onBack();
+                }}
+              >
+                Evet, çık
+              </Button>
+            </div>
+            <Button
+              className="w-full bg-green-600 text-white hover:bg-green-500"
+              disabled={isSaving}
+              onClick={async () => {
+                const saved = await handleSave();
+                if (saved) {
+                  setShowLeaveDialog(false);
+                  onBack();
+                }
+              }}
+            >
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {isSaving ? 'Kaydediliyor…' : 'Kaydet ve çık'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* LISTE */}
       <div className="grid gap-3 animate-in slide-in-from-bottom-4 duration-500 pb-20">
