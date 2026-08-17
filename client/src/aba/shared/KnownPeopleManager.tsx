@@ -5,6 +5,7 @@ import {
   GraduationCap,
   Heart,
   Loader2,
+  Settings,
   Trash2,
   Upload,
   User,
@@ -147,6 +148,7 @@ export default function KnownPeopleManager({
   returnLabel,
   onReturn,
 }: KnownPeopleManagerProps) {
+  const [view, setView] = useState<'menu' | 'edit'>('menu');
   const [selectedCategory, setSelectedCategory] = useState<KnownPersonCategory>(initialCategory);
   const [personName, setPersonName] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -176,8 +178,10 @@ export default function KnownPeopleManager({
     setCameraActive(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
       if (!videoRef.current) {
         stream.getTracks().forEach((track) => track.stop());
+        setCameraActive(false);
         return;
       }
       videoRef.current.srcObject = stream;
@@ -324,102 +328,134 @@ export default function KnownPeopleManager({
   };
 
   const visibleProfiles = profiles.filter((profile) => profile.category === selectedCategory);
+  const selectedCategoryInfo = KNOWN_PERSON_CATEGORIES.find(
+    (category) => category.id === selectedCategory,
+  );
+
+  const resetEditor = () => {
+    stopCamera();
+    setPersonName('');
+    setPreviewImage(null);
+  };
+
+  const openCategory = (category: KnownPersonCategory) => {
+    resetEditor();
+    setSelectedCategory(category);
+    setView('edit');
+  };
+
+  const handleBack = () => {
+    if (view === 'edit') {
+      resetEditor();
+      setView('menu');
+      return;
+    }
+    onBack?.();
+  };
+
+  const showInternalHeader = showBackButton || Boolean(title);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-slate-950 text-slate-100">
-      {(showBackButton || title) && (
+      {showInternalHeader && (
         <div className="flex items-center gap-3 border-b border-slate-800 bg-slate-900 p-3">
-          {showBackButton && (
+          {(showBackButton || view === 'edit') && (
             <button
               type="button"
-              onClick={onBack}
+              onClick={handleBack}
               className="rounded-full bg-slate-800 p-2 text-slate-300 active:scale-95"
               aria-label="Geri dön"
             >
               <ArrowLeft size={20} />
             </button>
           )}
-          <div>
-            <h1 className="text-lg font-bold">{title}</h1>
-            <p className="text-xs text-slate-400">Eklenen kişiler iki kazanımda da kullanılır.</p>
-          </div>
+          <h1 className="text-lg font-bold">{view === 'menu' ? 'İnsan Tanıma' : 'Kişi Ekle'}</h1>
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="mx-auto max-w-2xl space-y-4">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {view === 'menu' && (
+        <div className="flex flex-1 flex-col overflow-y-auto p-4">
+          <div className="mx-auto grid w-full max-w-md flex-1 grid-cols-2 content-start gap-4">
             {KNOWN_PERSON_CATEGORIES.map((category) => {
               const Icon = category.icon;
               const count = profiles.filter((profile) => profile.category === category.id).length;
               return (
-                <button
+                <div
                   key={category.id}
-                  type="button"
-                  onClick={() => setSelectedCategory(category.id)}
-                  className={`rounded-xl border p-3 text-left transition-all active:scale-[0.98] ${
-                    selectedCategory === category.id
-                      ? `${category.color} ring-1 ring-white/20`
-                      : 'border-slate-800 bg-slate-900/70'
-                  }`}
+                  className={`flex aspect-square flex-col items-center justify-center gap-3 rounded-2xl border-2 bg-slate-900/60 p-4 shadow-lg ${category.color}`}
                 >
-                  <Icon size={20} className={category.iconColor} />
-                  <p className="mt-2 text-xs font-bold text-slate-200">{category.label}</p>
-                  <p className="text-[11px] text-slate-500">{count}/10 kişi</p>
-                </button>
+                  <div className={`rounded-full border border-slate-800 bg-slate-900 p-3 ${category.iconColor}`}>
+                    <Icon size={32} />
+                  </div>
+                  <div className="text-center">
+                    <span className="block text-3xl font-black text-white">{count}/10</span>
+                    <span className="text-xs font-bold uppercase tracking-wide text-slate-400">{category.label}</span>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => openCategory(category.id)}
+                    className="mt-2 h-8 rounded-full border border-slate-700 bg-slate-800 px-4 text-xs hover:bg-slate-700"
+                  >
+                    <Settings size={14} className="mr-1" /> DÜZENLE
+                  </Button>
+                </div>
               );
             })}
           </div>
 
-          <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
-            <h2 className="mb-3 text-sm font-bold text-slate-200">Yeni kişi</h2>
-            <div className="grid grid-cols-[112px_1fr] gap-3">
-              <div className="aspect-square overflow-hidden rounded-xl border border-dashed border-slate-700 bg-slate-950">
-                {cameraActive ? (
-                  <div className="relative h-full w-full">
-                    <video ref={videoRef} autoPlay playsInline className="h-full w-full scale-x-[-1] object-cover" />
-                    <button
-                      type="button"
-                      onClick={capturePhoto}
-                      className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-white p-2"
-                      aria-label="Fotoğraf çek"
-                    >
-                      <span className="block h-5 w-5 rounded-full border-2 border-white bg-red-600" />
-                    </button>
-                  </div>
-                ) : previewImage ? (
-                  <div className="relative h-full w-full">
-                    <img src={previewImage} alt="Yeni kişi önizlemesi" className="h-full w-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => setPreviewImage(null)}
-                      className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white"
-                      aria-label="Fotoğrafı kaldır"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex h-full items-center justify-center text-slate-600">
-                    <User size={34} />
-                  </div>
-                )}
-              </div>
+          {loading && (
+            <div className="flex justify-center py-4"><Loader2 className="animate-spin text-blue-400" /></div>
+          )}
 
-              <div className="flex min-w-0 flex-col gap-2">
-                <input
-                  value={personName}
-                  onChange={(event) => setPersonName(event.target.value)}
-                  disabled={saving}
-                  placeholder="Kişinin adı"
-                  className="h-11 rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm outline-none focus:border-blue-500 disabled:opacity-50"
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <Button type="button" variant="outline" onClick={startCamera} disabled={saving} className="border-slate-700 bg-slate-800 text-slate-200">
-                    <Camera size={16} className="mr-1.5" /> Kamera
+          {returnLabel && onReturn && profiles.length > 0 && (
+            <Button type="button" onClick={onReturn} className="mx-auto mt-4 w-full max-w-md bg-blue-600 py-6 font-bold hover:bg-blue-500">
+              {returnLabel}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {view === 'edit' && (
+        <div className="flex-1 overflow-y-auto bg-slate-950 p-4">
+          <div className="mx-auto mb-4 max-w-md rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-center">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Seçilen bölüm</p>
+            <p className={`mt-1 font-black ${selectedCategoryInfo?.iconColor}`}>{selectedCategoryInfo?.label}</p>
+          </div>
+
+          <div className="mx-auto grid max-w-md grid-cols-2 gap-3 sm:max-w-2xl sm:grid-cols-3">
+            <div className="flex min-h-[180px] flex-col gap-2 rounded-xl border-2 border-dashed border-slate-800 bg-slate-900 p-2">
+              {cameraActive ? (
+                <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-black">
+                  <video ref={videoRef} autoPlay playsInline className="h-full w-full scale-x-[-1] object-cover" />
+                  <button
+                    type="button"
+                    onClick={capturePhoto}
+                    className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-white p-2"
+                    aria-label="Fotoğraf çek"
+                  >
+                    <span className="block h-6 w-6 rounded-full border-2 border-white bg-red-600" />
+                  </button>
+                </div>
+              ) : previewImage ? (
+                <div className="relative aspect-square w-full">
+                  <img src={previewImage} alt="Yeni kişi önizlemesi" className="h-full w-full rounded-lg object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setPreviewImage(null)}
+                    className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white"
+                    aria-label="Fotoğrafı kaldır"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div className="relative flex flex-1 flex-col justify-center gap-2">
+                  <Button type="button" onClick={startCamera} variant="outline" disabled={saving} className="h-10 bg-slate-800 text-slate-300">
+                    <Camera size={16} className="mr-2" /> Kamera
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={saving} className="border-slate-700 bg-slate-800 text-slate-200">
-                    <Upload size={16} className="mr-1.5" /> Galeri
+                  <Button type="button" onClick={() => fileInputRef.current?.click()} variant="outline" disabled={saving} className="h-10 bg-slate-800 text-slate-300">
+                    <Upload size={16} className="mr-2" /> Yükle
                   </Button>
                   <input
                     ref={fileInputRef}
@@ -429,59 +465,44 @@ export default function KnownPeopleManager({
                     className="hidden"
                   />
                 </div>
-                {cameraActive ? (
-                  <Button type="button" variant="ghost" onClick={stopCamera} className="h-9 text-red-400">Kamerayı kapat</Button>
-                ) : (
-                  <Button type="button" onClick={savePerson} disabled={saving} className="h-10 bg-emerald-600 font-bold hover:bg-emerald-500">
-                    {saving ? <Loader2 size={18} className="animate-spin" /> : 'KİŞİYİ KAYDET'}
+              )}
+
+              {!cameraActive ? (
+                <div className="flex flex-col gap-2">
+                  <input
+                    value={personName}
+                    onChange={(event) => setPersonName(event.target.value)}
+                    disabled={saving}
+                    placeholder="İsim"
+                    className="w-full rounded border border-slate-700 bg-slate-950 p-1 text-center disabled:opacity-50"
+                  />
+                  <Button type="button" onClick={savePerson} disabled={saving} size="sm" className="bg-green-600 font-bold disabled:opacity-50">
+                    {saving ? <Loader2 className="animate-spin" size={16} /> : 'KAYDET'}
                   </Button>
-                )}
-              </div>
-            </div>
-          </section>
-
-          <section>
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-slate-300">
-                {KNOWN_PERSON_CATEGORIES.find((category) => category.id === selectedCategory)?.label}
-              </h2>
-              <span className="text-xs text-slate-500">{visibleProfiles.length} kişi</span>
+                </div>
+              ) : (
+                <Button type="button" variant="ghost" size="sm" onClick={stopCamera} className="text-xs text-red-400">İptal</Button>
+              )}
             </div>
 
-            {loading ? (
-              <div className="flex justify-center py-12"><Loader2 className="animate-spin text-blue-400" /></div>
-            ) : visibleProfiles.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-800 py-10 text-center text-sm text-slate-500">
-                Bu bölüme henüz kişi eklenmedi.
+            {visibleProfiles.map((profile) => (
+              <div key={profile.id} className="relative rounded-xl border border-slate-800 bg-slate-900 p-2">
+                <img src={profile.imageUrl} alt={profile.name} className="aspect-square w-full rounded-lg object-cover" />
+                <p className="mt-1 truncate text-center text-xs font-bold">{profile.name}</p>
+                <button
+                  type="button"
+                  disabled={deletingId === profile.id}
+                  onClick={() => removePerson(profile)}
+                  className="absolute -right-2 -top-2 rounded-full bg-red-600 p-1.5 text-white disabled:opacity-50"
+                  aria-label={`${profile.name} kişisini sil`}
+                >
+                  {deletingId === profile.id ? <Loader2 className="animate-spin" size={12} /> : <Trash2 size={12} />}
+                </button>
               </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {visibleProfiles.map((profile) => (
-                  <div key={profile.id} className="relative rounded-xl border border-slate-800 bg-slate-900 p-2">
-                    <img src={profile.imageUrl} alt={profile.name} className="aspect-square w-full rounded-lg object-cover" />
-                    <p className="mt-2 truncate text-center text-xs font-bold">{profile.name}</p>
-                    <button
-                      type="button"
-                      disabled={deletingId === profile.id}
-                      onClick={() => removePerson(profile)}
-                      className="absolute -right-2 -top-2 rounded-full bg-red-600 p-1.5 text-white disabled:opacity-50"
-                      aria-label={`${profile.name} kişisini sil`}
-                    >
-                      {deletingId === profile.id ? <Loader2 className="animate-spin" size={13} /> : <Trash2 size={13} />}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {returnLabel && onReturn && profiles.length > 0 && (
-            <Button type="button" onClick={onReturn} className="w-full bg-blue-600 py-6 font-bold hover:bg-blue-500">
-              {returnLabel}
-            </Button>
-          )}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
