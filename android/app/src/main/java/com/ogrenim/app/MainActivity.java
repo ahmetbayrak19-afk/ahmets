@@ -23,6 +23,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.activity.OnBackPressedCallback;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.webkit.WebViewAssetLoader;
@@ -170,6 +171,32 @@ public class MainActivity extends AppCompatActivity {
                 });
             }
         }, "AndroidOrientation");
+
+        // React tarafında geri düğmesi bulunmayan ana ekranlarda uygulamayı
+        // Android'in normal davranışıyla arka plana alabilmek için kullanılır.
+        webView.addJavascriptInterface(new Object() {
+            @JavascriptInterface
+            public void moveToBackground() {
+                runOnUiThread(() -> moveTaskToBack(true));
+            }
+        }, "AndroidNavigation");
+
+        // Telefonun geri tuşunu React'e bildir. React mevcut ekrandaki üst geri
+        // düğmesini çalıştırdığı için kayıt uyarıları ve ekran içi geri adımları korunur.
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (webView == null) {
+                    moveTaskToBack(true);
+                    return;
+                }
+
+                webView.evaluateJavascript(
+                        "window.dispatchEvent(new Event('androidBackButton'))",
+                        null
+                );
+            }
+        });
 
         // 🔥 Artık file:// değil
         webView.loadUrl(
