@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { useLocation, useRoute } from 'wouter';
 import { useStudentData } from '@/hooks/useStudentData';
 import { db } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Loader2, ClipboardList, LayoutGrid, Construction, Gift, CheckCircle2, AlertCircle, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Loader2, ClipboardList, LayoutGrid, Construction, Gift, CheckCircle2, AlertCircle, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { ABA_MODULES } from '@/shared/abaData';
 
@@ -82,12 +82,28 @@ export default function AbaAssessmentPage() {
     } catch (error) {
       console.error("Pekiştireç profili yenilenemedi:", error);
     }
+
+    void refreshAssessmentData();
   };
 
-  const handleSave = async () => {
+  const refreshAssessmentData = async () => {
     const instId = localStorage.getItem("kazanim-takip-institution-id");
-    await setDoc(doc(db, "institutions", instId!, "students", studentId!, "assessments", "aba"), formData);
-    toast.success("Genel ilerleme kaydedildi!");
+    if (!instId || !studentId) return;
+
+    try {
+      const assessmentSnap = await getDoc(
+        doc(db, "institutions", instId, "students", studentId, "assessments", "aba")
+      );
+      setFormData(assessmentSnap.exists() ? assessmentSnap.data() : {});
+    } catch (error) {
+      console.error("ABA ilerleme bilgisi yenilenemedi:", error);
+      toast.error("Modül ilerlemesi yenilenemedi.");
+    }
+  };
+
+  const handleModuleBack = () => {
+    setActiveModuleIndex(null);
+    void refreshAssessmentData();
   };
 
   if (loading) return <div className="h-screen bg-[#020617] flex items-center justify-center text-blue-500"><Loader2 className="animate-spin" size={40}/></div>;
@@ -100,28 +116,65 @@ export default function AbaAssessmentPage() {
   // --- 1. MENÜ ---
   const renderModuleMenu = () => (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {ABA_MODULES.map((module, index) => (
-        <div 
-          key={module.name}
-          onClick={() => setActiveModuleIndex(index)}
-          className="group relative bg-slate-900/40 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/30 rounded-2xl p-6 cursor-pointer transition-all duration-300 active:scale-[0.98] flex items-center gap-4 min-h-[120px]"
-        >
-          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 group-hover:border-blue-500/50 transition-colors">
-            <ClipboardList size={28} className="text-blue-400" />
+      {ABA_MODULES.map((module, index) => {
+        const totalCount = module.achievements.length;
+        const passedCount = module.achievements.filter((item) => formData[item] === true).length;
+        const assessedCount = module.achievements.filter(
+          (item) => formData[item] === true || formData[item] === false
+        ).length;
+        const percentage = totalCount === 0 ? 0 : Math.round((passedCount / totalCount) * 100);
+        const isCompleted = totalCount > 0 && passedCount === totalCount;
+
+        const tone = assessedCount === 0
+          ? {
+              card: 'border-slate-800 bg-slate-900/40 hover:border-slate-700 hover:bg-slate-800/70',
+              icon: 'border-slate-800 bg-slate-950 text-blue-400',
+              value: 'text-slate-400',
+            }
+          : percentage >= 80
+            ? {
+                card: 'border-emerald-500/25 bg-emerald-950/10 hover:border-emerald-500/40 hover:bg-emerald-950/15',
+                icon: 'border-emerald-500/25 bg-emerald-500/[0.08] text-emerald-400',
+                value: 'text-emerald-400',
+              }
+            : percentage >= 50
+              ? {
+                  card: 'border-amber-500/25 bg-amber-950/10 hover:border-amber-500/40 hover:bg-amber-950/15',
+                  icon: 'border-amber-500/25 bg-amber-500/[0.08] text-amber-400',
+                  value: 'text-amber-400',
+                }
+              : {
+                  card: 'border-red-500/25 bg-red-950/10 hover:border-red-500/40 hover:bg-red-950/15',
+                  icon: 'border-red-500/25 bg-red-500/[0.08] text-red-400',
+                  value: 'text-red-400',
+                };
+
+        return (
+          <div
+            key={module.name}
+            onClick={() => setActiveModuleIndex(index)}
+            className={`group relative cursor-pointer rounded-2xl border p-6 transition-all duration-300 active:scale-[0.98] flex items-center gap-4 min-h-[120px] ${tone.card}`}
+          >
+            <div className={`rounded-xl border p-4 transition-colors ${tone.icon}`}>
+              <ClipboardList size={28} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-bold text-slate-100 text-lg leading-snug">
+                {module.name}
+              </h3>
+              <p className={`mt-1 text-sm font-bold ${tone.value}`}>
+                Toplam %{percentage}
+              </p>
+              {isCompleted && (
+                <p className="mt-1 text-xs font-semibold text-emerald-300/80">
+                  Modül tamamlandı
+                </p>
+              )}
+            </div>
+            <ChevronRight size={21} className={`shrink-0 opacity-70 transition-transform group-hover:translate-x-1 ${tone.value}`} />
           </div>
-          <div>
-            <h3 className="font-bold text-slate-100 text-lg group-hover:text-blue-400 transition-colors">
-              {module.name}
-            </h3>
-            <p className="text-sm text-slate-500 mt-1">
-              {module.achievements.length} Kazanım
-            </p>
-          </div>
-          <div className="absolute right-6 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500">
-              ➔
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 
@@ -138,30 +191,30 @@ export default function AbaAssessmentPage() {
     // Sözel Taklit kontrolü, normal Taklit kontrolünden ÖNCE olmalı.
     
     if (moduleName.includes("EŞLEME BECERİLERİ")) {
-        content = <EslemePage studentId={studentId} onBack={() => setActiveModuleIndex(null)} />;
+        content = <EslemePage studentId={studentId} onBack={handleModuleBack} />;
     } 
     else if (moduleName.includes("ALICI DİL BECERİLERİ")) {
-        content = <AliciDilPage studentId={studentId} onBack={() => setActiveModuleIndex(null)} />;
+        content = <AliciDilPage studentId={studentId} onBack={handleModuleBack} />;
     }
     else if (moduleName.includes("YÖNERGE TAKİP BECERİLERİ")) {
-        content = <YonergeTakipPage studentId={studentId} onBack={() => setActiveModuleIndex(null)} />;
+        content = <YonergeTakipPage studentId={studentId} onBack={handleModuleBack} />;
     }
     // DİKKAT: Sözel Taklit önce kontrol ediliyor!
     else if (moduleName.includes("SÖZEL TAKLİT BECERİLERİ")) {
-         content = <SozelTaklitPage studentId={studentId} onBack={() => setActiveModuleIndex(null)} />;
+         content = <SozelTaklitPage studentId={studentId} onBack={handleModuleBack} />;
     }
     // Sonra Motor Taklit (Normal Taklit) kontrol ediliyor
     else if (moduleName.includes("TAKLİT BECERİLERİ")) {
-         content = <TaklitPage studentId={studentId} onBack={() => setActiveModuleIndex(null)} />;
+         content = <TaklitPage studentId={studentId} onBack={handleModuleBack} />;
     }
     else if (moduleName.includes("İFADE EDİCİ DİL BECERİLERİ")) {
-         content = <IfadeEdiciDilPage studentId={studentId} onBack={() => setActiveModuleIndex(null)} />;
+         content = <IfadeEdiciDilPage studentId={studentId} onBack={handleModuleBack} />;
     }
     else if (moduleName.includes("ORTAK DİKKAT BECERİLERİ")) {
          content = (
            <OrtakDikkatPage
              studentId={studentId}
-             onBack={() => setActiveModuleIndex(null)}
+             onBack={handleModuleBack}
              onOpenReinforcers={() => {
                setActiveModuleIndex(null);
                setShowReinforcerPage(true);
@@ -205,9 +258,6 @@ export default function AbaAssessmentPage() {
                 <p className="text-xs text-slate-400 font-medium">{student?.name}</p>
             </div>
             </div>
-            <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 h-9 px-4 text-xs shadow-lg shadow-green-900/20 transition-all active:scale-95">
-                <Save className="mr-2 h-4 w-4" /> Kaydet
-            </Button>
         </header>
       )}
 

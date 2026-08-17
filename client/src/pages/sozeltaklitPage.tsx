@@ -172,7 +172,8 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
       <div className="grid gap-3 animate-in slide-in-from-bottom-4 duration-500 pb-20">
         {items.map((item) => {
             const status = formData[item];
-            const isCompleted = status === true;
+            const isPassed = status === true;
+            const isFailed = status === false;
             
             // "ST 1.1. " kısmını ayıklama
             const firstSpaceIndex = item.indexOf(' ');
@@ -188,15 +189,32 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
             const isTolkidoItem = item.includes("TOLKİDO");
             
             return (
-                <div key={item} className={twMerge("group p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4", isCompleted ? "bg-green-950/10 border-green-500/20" : "bg-slate-900/40 border-slate-800 hover:bg-slate-800")}>
+                <div key={item} className={twMerge(
+                    "group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4",
+                    isPassed && "bg-green-950/15 border-green-500/15 opacity-45 hover:opacity-80",
+                    isFailed && "bg-red-950/30 border-red-500/50 shadow-[0_0_0_1px_rgba(239,68,68,0.15)] hover:border-red-400/70 hover:bg-red-950/40",
+                    !isPassed && !isFailed && "bg-slate-900/40 border-slate-800 hover:bg-slate-800 hover:border-slate-700"
+                )}>
                     <div className="flex items-start gap-4 flex-1">
-                        <div className={twMerge("min-w-[60px] h-10 rounded-lg flex items-center justify-center text-[10px] font-bold font-mono border", isCompleted ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-700 text-slate-500")}>
-                            {isCompleted ? <Trophy size={18} /> : codePart}
+                        <div className={twMerge(
+                            "min-w-[60px] h-10 rounded-lg flex items-center justify-center text-[10px] font-bold font-mono border shrink-0",
+                            isPassed && "bg-green-500/15 border-green-500/40 text-green-400/80",
+                            isFailed && "bg-red-500/25 border-red-500 text-red-300",
+                            !isPassed && !isFailed && "bg-slate-950 border-slate-700 text-slate-500"
+                        )}>
+                            {isPassed ? <Trophy size={18} /> : isFailed ? <XCircle size={18} /> : codePart}
                         </div>
                         <div>
-                            <p className={twMerge("font-medium text-sm leading-relaxed", isCompleted ? "text-green-100" : "text-slate-200")}>
+                            <p className={twMerge(
+                                "font-medium text-sm leading-relaxed",
+                                isPassed && "text-green-100/70",
+                                isFailed && "text-red-100",
+                                !isPassed && !isFailed && "text-slate-200"
+                            )}>
                                 {textPart || item} {/* Eğer parse edemezse düz item'ı bas */}
                             </p>
+                            {isPassed && <span className="block text-[10px] text-green-500/60 font-semibold uppercase tracking-wider">Geçti · tekrar değerlendirilebilir</span>}
+                            {isFailed && <span className="block text-[10px] text-red-400/90 font-semibold uppercase tracking-wider">Geçemedi · öncelikli</span>}
                         </div>
                     </div>
                     

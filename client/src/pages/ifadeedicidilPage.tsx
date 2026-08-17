@@ -253,7 +253,8 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
           const firstSpaceIndex = item.indexOf(' ');
           const code = item.substring(0, firstSpaceIndex);
           const text = item.substring(firstSpaceIndex + 1);
-          const isCompleted = status === true;
+          const isPassed = status === true;
+          const isFailed = status === false;
 
           const isTolkidoItem = item.includes("TOLKİDO");
           
@@ -265,24 +266,33 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
               key={item}
               className={twMerge(
                 "group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4",
-                isCompleted
-                  ? "bg-green-950/10 border-green-500/20"
-                  : "bg-slate-950 border-slate-800 hover:bg-slate-800 hover:border-slate-700"
+                isPassed && "bg-green-950/15 border-green-500/15 opacity-45 hover:opacity-80",
+                isFailed && "bg-red-950/30 border-red-500/50 shadow-[0_0_0_1px_rgba(239,68,68,0.15)] hover:border-red-400/70 hover:bg-red-950/40",
+                !isPassed && !isFailed && "bg-slate-950 border-slate-800 hover:bg-slate-800 hover:border-slate-700"
               )}
             >
               <div className="flex items-start gap-4 flex-1">
                 <div
                   className={twMerge(
                     "min-w-[48px] h-10 rounded-lg flex items-center justify-center text-[10px] font-bold font-mono border mt-0.5 px-1 text-center",
-                    isCompleted ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-700 text-slate-500"
+                    isPassed && "bg-green-500/15 border-green-500/40 text-green-400/80",
+                    isFailed && "bg-red-500/25 border-red-500 text-red-300",
+                    !isPassed && !isFailed && "bg-slate-950 border-slate-700 text-slate-500"
                   )}
                 >
-                  {isCompleted ? <Trophy size={18} /> : code}
+                  {isPassed ? <Trophy size={18} /> : isFailed ? <XCircle size={18} /> : code}
                 </div>
                 <div>
-                  <p className={twMerge("font-medium text-sm leading-relaxed", isCompleted ? "text-green-100" : "text-slate-200")}>
+                  <p className={twMerge(
+                    "font-medium text-sm leading-relaxed",
+                    isPassed && "text-green-100/70",
+                    isFailed && "text-red-100",
+                    !isPassed && !isFailed && "text-slate-200"
+                  )}>
                     {text}
                   </p>
+                  {isPassed && <span className="block text-[10px] text-green-500/60 font-semibold uppercase tracking-wider">Geçti · tekrar değerlendirilebilir</span>}
+                  {isFailed && <span className="block text-[10px] text-red-400/90 font-semibold uppercase tracking-wider">Geçemedi · öncelikli</span>}
                   {hasGame && (
                     <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
                       <Gamepad2 size={12} /> İnteraktif

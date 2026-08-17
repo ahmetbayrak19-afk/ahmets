@@ -20,6 +20,10 @@ interface AliciDilPageProps {
 export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
+  const [dirty, setDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveBanner, setSaveBanner] = useState<'ok' | 'err' | null>(null);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
    
   // Hangi oyunun açık olduğunu tutan state
   const [activeGameItem, setActiveGameItem] = useState<string | null>(null);
@@ -38,6 +42,7 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
             if (docSnap.exists()) {
                 setFormData(docSnap.data());
             }
+            setDirty(false);
         }
       } catch (error) {
         console.error("Veri çekme hatası:", error);
@@ -49,15 +54,37 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
     load();
   }, [studentId]);
 
+  useEffect(() => {
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!dirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [dirty]);
+
   const handleSave = async () => {
+    setIsSaving(true);
+    setSaveBanner(null);
     try {
       const instId = localStorage.getItem("kazanim-takip-institution-id");
-      if (instId) {
-          await setDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"), formData, { merge: true });
-          toast.success("Alıcı Dil becerileri kaydedildi!");
-      }
+      if (!instId) throw new Error("Kurum bilgisi bulunamadı.");
+      await setDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"), formData, { merge: true });
+      setDirty(false);
+      setSaveBanner('ok');
+      window.setTimeout(() => setSaveBanner(null), 1500);
+      toast.success("Alıcı Dil becerileri kaydedildi!");
+      return true;
     } catch (error) {
+      console.error("Alıcı dil kaydetme hatası:", error);
+      setSaveBanner('err');
+      window.setTimeout(() => setSaveBanner(null), 2500);
       toast.error("Kaydetme hatası oluştu.");
+      return false;
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -66,6 +93,8 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
         ...prev, 
         [itemCode]: prev[itemCode] === status ? null : status 
     }));
+    setDirty(true);
+    setSaveBanner(null);
   };
 
   const calculateProgress = () => {
@@ -106,7 +135,15 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
       {/* HEADER */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex items-center justify-between sticky top-0 backdrop-blur-md z-10 shadow-lg">
         <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={onBack} className="text-slate-400 hover:text-white">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (dirty) setShowLeaveDialog(true);
+                else onBack();
+              }}
+              className="text-slate-400 hover:text-white"
+            >
                 <ArrowLeft size={20} />
             </Button>
             <div>
@@ -119,10 +156,43 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
                 </div>
             </div>
         </div>
-        <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 h-8 text-xs shadow-lg shadow-green-900/20">
-            <Save className="mr-2 h-3.5 w-3.5" /> Kaydet
-        </Button>
+        <div className="flex min-w-[7.5rem] flex-col items-end gap-1">
+          <Button onClick={handleSave} disabled={isSaving} className="bg-green-600 hover:bg-green-700 h-8 text-xs shadow-lg shadow-green-900/20 disabled:opacity-60">
+            {isSaving ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-2 h-3.5 w-3.5" />}
+            {isSaving ? 'Kaydediliyor…' : 'Kaydet'}
+          </Button>
+          {saveBanner === 'ok' && <span className="text-[11px] font-semibold text-emerald-400">✓ Kaydedildi</span>}
+          {saveBanner === 'err' && <span className="text-[11px] font-semibold text-red-400">✕ Kaydedilemedi</span>}
+          {dirty && !saveBanner && !isSaving && <span className="text-[10px] text-amber-400/90">Kaydedilmedi</span>}
+        </div>
       </div>
+
+      {showLeaveDialog && (
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[600] flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+            <h3 className="text-base font-bold text-white">Kaydedilmemiş değişiklikler</h3>
+            <p className="text-sm leading-relaxed text-slate-300">Yaptığınız değişiklikler kaydedilmedi. Çıkarsanız bu işaretlemeler kaybolur.</p>
+            <div className="flex gap-2 pt-1">
+              <Button data-android-back variant="ghost" className="flex-1 text-slate-300 hover:text-white" onClick={() => setShowLeaveDialog(false)}>Hayır, kal</Button>
+              <Button className="flex-1 bg-red-600 text-white hover:bg-red-500" onClick={() => { setShowLeaveDialog(false); setDirty(false); onBack(); }}>Evet, çık</Button>
+            </div>
+            <Button
+              className="w-full bg-green-600 text-white hover:bg-green-500"
+              disabled={isSaving}
+              onClick={async () => {
+                const saved = await handleSave();
+                if (saved) {
+                  setShowLeaveDialog(false);
+                  onBack();
+                }
+              }}
+            >
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {isSaving ? 'Kaydediliyor…' : 'Kaydet ve çık'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* LISTE */}
       <div className="grid gap-3 animate-in slide-in-from-bottom-4 duration-500 pb-20">
@@ -134,7 +204,8 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
             const code = item.substring(0, firstSpaceIndex); 
             const text = item.substring(firstSpaceIndex + 1);
 
-            const isCompleted = status === true;
+            const isPassed = status === true;
+            const isFailed = status === false;
 
             // --- OYUN KONTROLÜ (GÜNCELLENDİ) ---
             const hasGame = 
@@ -147,22 +218,31 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
                     key={item} 
                     className={twMerge(
                         "group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4",
-                        isCompleted 
-                            ? "bg-green-950/10 border-green-500/20" 
-                            : "bg-slate-900/40 border-slate-800 hover:bg-slate-800 hover:border-slate-700"
+                        isPassed && "bg-green-950/15 border-green-500/15 opacity-45 hover:opacity-80",
+                        isFailed && "bg-red-950/30 border-red-500/50 shadow-[0_0_0_1px_rgba(239,68,68,0.15)] hover:border-red-400/70 hover:bg-red-950/40",
+                        !isPassed && !isFailed && "bg-slate-900/40 border-slate-800 hover:bg-slate-800 hover:border-slate-700"
                     )}
                 >
                     <div className="flex items-start gap-4 flex-1">
                         <div className={twMerge(
                             "min-w-[48px] h-10 rounded-lg flex items-center justify-center text-[10px] font-bold font-mono border mt-0.5 px-1 text-center",
-                            isCompleted ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-700 text-slate-500"
+                            isPassed && "bg-green-500/15 border-green-500/40 text-green-400/80",
+                            isFailed && "bg-red-500/25 border-red-500 text-red-300",
+                            !isPassed && !isFailed && "bg-slate-950 border-slate-700 text-slate-500"
                         )}>
-                            {isCompleted ? <Trophy size={18} /> : code}
+                            {isPassed ? <Trophy size={18} /> : isFailed ? <XCircle size={18} /> : code}
                         </div>
                         <div>
-                            <p className={twMerge("font-medium text-sm leading-relaxed", isCompleted ? "text-green-100" : "text-slate-200")}>
+                            <p className={twMerge(
+                                "font-medium text-sm leading-relaxed",
+                                isPassed && "text-green-100/70",
+                                isFailed && "text-red-100",
+                                !isPassed && !isFailed && "text-slate-200"
+                            )}>
                                 {text}
                             </p>
+                            {isPassed && <span className="block text-[10px] text-green-500/60 font-semibold uppercase tracking-wider">Geçti · tekrar değerlendirilebilir</span>}
+                            {isFailed && <span className="block text-[10px] text-red-400/90 font-semibold uppercase tracking-wider">Geçemedi · öncelikli</span>}
                             {/* İnteraktif Rozeti */}
                             {hasGame && (
                                 <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">
