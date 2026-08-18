@@ -6,14 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, LogOut, Trash2, UserCircle2, ShieldCheck, Loader2, Users, AlertTriangle, Baby, Stethoscope, ClipboardCheck, BookOpen, AlertCircle, Lock, CheckCircle, UserX, ShieldAlert, Camera, X, BellRing, Archive, RotateCcw } from 'lucide-react';
+import { Search, LogOut, Trash2, UserCircle2, ShieldCheck, Loader2, Users, AlertTriangle, Baby, Stethoscope, ClipboardCheck, BookOpen, AlertCircle, Lock, CheckCircle, UserX, ShieldAlert, Camera, X, BellRing, Archive, RotateCcw, Menu, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger, AlertDialogDescription
 } from "@/components/ui/alert-dialog";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle
 } from "@/components/ui/dialog";
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
@@ -50,6 +50,8 @@ export default function Home() {
   const [leaveStudentTarget, setLeaveStudentTarget] = useState<any | null>(null);
   const [deletionRequestsOpen, setDeletionRequestsOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+  const [personnelDialogOpen, setPersonnelDialogOpen] = useState(false);
   const [archivedDuplicateStudent, setArchivedDuplicateStudent] = useState<any | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const lastPendingRequestKey = useRef('');
@@ -147,6 +149,21 @@ export default function Home() {
 
   const normalizeNameForMatch = (value: string) =>
     value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('tr-TR');
+
+  const clearStudentForm = () => {
+    setName('');
+    setAge('');
+    setDiagnosis('');
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setMissingFieldsWarning(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const closeArchivedDuplicateWarning = () => {
+    setArchivedDuplicateStudent(null);
+    clearStudentForm();
+  };
 
   // --- DAHİLİ KAMERA FONKSİYONLARI ---
   const startCamera = async () => {
@@ -293,9 +310,7 @@ export default function Home() {
       return;
     }
 
-    setName(''); setAge(''); setDiagnosis('');
-    setPhotoFile(null); 
-    setPhotoPreview(null); 
+    clearStudentForm();
     toast.success("Öğrenci başarıyla eklendi"); 
   };
 
@@ -605,6 +620,105 @@ export default function Home() {
         )}
       </AnimatePresence>
 
+      {/* --- ADMİN YÖNETİM MENÜSÜ --- */}
+      <AnimatePresence>
+        {isAdmin && adminMenuOpen && (
+          <>
+            <motion.button
+              type="button"
+              aria-label="Yönetim menüsünü kapat"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setAdminMenuOpen(false)}
+              className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm"
+            />
+            <motion.aside
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+              className="fixed inset-y-0 right-0 z-[90] w-[86vw] max-w-sm border-l border-slate-700 bg-slate-950 p-5 shadow-2xl"
+            >
+              <div className="mb-6 flex items-center justify-between border-b border-white/10 pb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Yönetim Menüsü</h2>
+                  <p className="mt-1 text-xs text-slate-500">Kurum yönetim seçenekleri</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setAdminMenuOpen(false)}
+                  className="text-slate-400 hover:bg-slate-800 hover:text-white"
+                >
+                  <X size={21} />
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setAdminMenuOpen(false);
+                    setArchiveOpen(true);
+                  }}
+                  className="h-14 w-full justify-start border-orange-500/30 bg-orange-500/5 text-orange-300 hover:bg-orange-500/15 hover:text-orange-200"
+                >
+                  <Archive className="mr-3 h-5 w-5" />
+                  <span className="flex-1 text-left">Öğrenci Arşivi</span>
+                  <span className="mr-2 rounded-full bg-orange-500/15 px-2 py-0.5 text-xs">{archivedStudents.length}</span>
+                  <ChevronRight size={17} />
+                </Button>
+
+                <Button
+                  variant="outline"
+                  disabled={pendingDeletionRequests.length === 0}
+                  onClick={() => {
+                    setAdminMenuOpen(false);
+                    setDeletionRequestsOpen(true);
+                  }}
+                  className="h-14 w-full justify-start border-red-500/30 bg-red-500/5 text-red-300 hover:bg-red-500/15 hover:text-red-200 disabled:opacity-45"
+                >
+                  <BellRing className="mr-3 h-5 w-5" />
+                  <span className="flex-1 text-left">Silme Talepleri</span>
+                  <span className="mr-2 rounded-full bg-red-500/15 px-2 py-0.5 text-xs">{pendingDeletionRequests.length}</span>
+                  <ChevronRight size={17} />
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setAdminMenuOpen(false);
+                    setPersonnelDialogOpen(true);
+                  }}
+                  className="h-14 w-full justify-start border-purple-500/30 bg-purple-500/5 text-purple-300 hover:bg-purple-500/15 hover:text-purple-200"
+                >
+                  <Users className="mr-3 h-5 w-5" />
+                  <span className="flex-1 text-left">Öğretmenler</span>
+                  {teachers.some(t => t.isApproved === false) && (
+                    <span className="mr-2 h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
+                  )}
+                  <ChevronRight size={17} />
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setAdminMenuOpen(false);
+                    setLocation('/admin');
+                  }}
+                  className="h-14 w-full justify-start border-blue-500/30 bg-blue-500/5 text-blue-300 hover:bg-blue-500/15 hover:text-blue-200"
+                >
+                  <ShieldCheck className="mr-3 h-5 w-5" />
+                  <span className="flex-1 text-left">Müfredat</span>
+                  <ChevronRight size={17} />
+                </Button>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* --- DAHİLİ KAMERA PENCERESİ (MODAL) --- */}
       <AnimatePresence>
         {isCameraModalOpen && (
@@ -657,7 +771,7 @@ export default function Home() {
 
       <AlertDialog
         open={Boolean(archivedDuplicateStudent)}
-        onOpenChange={(open) => !open && setArchivedDuplicateStudent(null)}
+        onOpenChange={(open) => !open && closeArchivedDuplicateWarning()}
       >
         <AlertDialogContent className="bg-slate-900 border-orange-500/30 text-white">
           <AlertDialogHeader>
@@ -672,11 +786,16 @@ export default function Home() {
           <AlertDialogFooter>
             {isAdmin ? (
               <>
-                <AlertDialogCancel className="bg-slate-800 text-white">Kapat</AlertDialogCancel>
+                <AlertDialogCancel
+                  className="bg-slate-800 text-white"
+                  onClick={closeArchivedDuplicateWarning}
+                >
+                  Tamam
+                </AlertDialogCancel>
                 <AlertDialogAction
                   className="bg-orange-600 hover:bg-orange-700 text-white"
                   onClick={() => {
-                    setArchivedDuplicateStudent(null);
+                    closeArchivedDuplicateWarning();
                     setArchiveOpen(true);
                   }}
                 >
@@ -685,7 +804,7 @@ export default function Home() {
               </>
             ) : (
               <AlertDialogAction
-                onClick={() => setArchivedDuplicateStudent(null)}
+                onClick={closeArchivedDuplicateWarning}
                 className="bg-orange-600 hover:bg-orange-700 text-white"
               >
                 Tamam
@@ -812,6 +931,84 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={personnelDialogOpen} onOpenChange={setPersonnelDialogOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <ShieldAlert className="text-blue-500" /> Personel Yönetimi
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-4">
+            {teachers.filter(t => t.name.toLowerCase() !== 'admin').map(t => (
+              <div key={t.id} className="flex flex-col sm:flex-row items-center justify-between p-4 bg-slate-950 rounded-lg border border-white/5 gap-4">
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold shrink-0 ${t.isApproved === false ? 'bg-orange-900/50 text-orange-500' : 'bg-green-900/50 text-green-500'}`}>
+                    {t.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-white font-medium truncate">{t.name}</h3>
+                    <p className={`text-xs ${t.isApproved === false ? 'text-orange-400' : 'text-green-400'}`}>
+                      {t.isApproved === false ? 'Onay Bekliyor' : 'Aktif Personel'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  {t.isApproved === false ? (
+                    <Button
+                      onClick={() => toggleTeacherApproval(t.id, true)}
+                      className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white h-9 text-xs"
+                    >
+                      <CheckCircle size={14} className="mr-2" /> Onayla
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => toggleTeacherApproval(t.id, false)}
+                      variant="outline"
+                      className="flex-1 sm:flex-none border-orange-500/50 text-orange-400 hover:bg-orange-900/20 h-9 text-xs"
+                    >
+                      <UserX size={14} className="mr-2" /> Dondur
+                    </Button>
+                  )}
+
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-red-500 hover:bg-red-500/10 shrink-0">
+                        <Trash2 size={16} />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-slate-900 border-slate-800 text-white">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Personeli Sil?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-slate-400">
+                          Bu işlem geri alınamaz. Öğretmen, görevli olduğu bütün öğrenci kadrolarından da çıkarılacaktır.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-slate-800 text-white">Vazgeç</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={async () => {
+                            const success = await deleteTeacher(t.id);
+                            success ? toast.success('Personel silindi.') : toast.error('Personel silinemedi.');
+                          }}
+                          className="bg-red-600"
+                        >
+                          Sil
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            ))}
+            {teachers.filter(t => t.name.toLowerCase() !== 'admin').length === 0 && (
+              <p className="text-center text-slate-500 py-4">Kayıtlı personel bulunamadı.</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
         <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -923,98 +1120,16 @@ export default function Home() {
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {isAdmin && (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => setArchiveOpen(true)}
-                  className="border-orange-500/60 text-orange-300 hover:bg-orange-500 hover:text-white"
-                >
-                  <Archive className="mr-2 h-4 w-4" /> Arşiv ({archivedStudents.length})
-                </Button>
-                {pendingDeletionRequests.length > 0 && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setDeletionRequestsOpen(true)}
-                    className="border-orange-500/60 text-orange-300 hover:bg-orange-500 hover:text-white"
-                  >
-                    <BellRing className="mr-2 h-4 w-4" /> Silme Talepleri ({pendingDeletionRequests.length})
-                  </Button>
+              <Button
+                variant="outline"
+                onClick={() => setAdminMenuOpen(true)}
+                className="relative border-blue-500/60 bg-blue-500/5 text-blue-300 hover:bg-blue-500 hover:text-white"
+              >
+                <Menu className="mr-2 h-4 w-4" /> Yönetim
+                {(pendingDeletionRequests.length > 0 || teachers.some(t => t.isApproved === false)) && (
+                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-slate-950 animate-pulse" />
                 )}
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white">
-                      <Users className="mr-2 h-4 w-4" /> Öğretmenler {teachers.some(t => t.isApproved === false) && <span className="ml-2 flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-2xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-xl"><ShieldAlert className="text-blue-500" /> Personel Yönetimi</DialogTitle>
-                    </DialogHeader>
-                    
-                    <div className="space-y-4 mt-4">
-                      {teachers.filter(t => t.name.toLowerCase() !== 'admin').map(t => (
-                         <div key={t.id} className="flex flex-col sm:flex-row items-center justify-between p-4 bg-slate-950 rounded-lg border border-white/5 gap-4">
-                            <div className="flex items-center gap-3 w-full sm:w-auto">
-                                <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold shrink-0 ${t.isApproved === false ? 'bg-orange-900/50 text-orange-500' : 'bg-green-900/50 text-green-500'}`}>
-                                    {t.name.charAt(0).toUpperCase()}
-                                </div>
-                                <div className="min-w-0">
-                                    <h3 className="text-white font-medium truncate">{t.name}</h3>
-                                    <p className={`text-xs ${t.isApproved === false ? 'text-orange-400' : 'text-green-400'}`}>
-                                        {t.isApproved === false ? 'Onay Bekliyor' : 'Aktif Personel'}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 w-full sm:w-auto">
-                                {t.isApproved === false ? (
-                                    <Button 
-                                        onClick={() => toggleTeacherApproval(t.id, true)} 
-                                        className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white h-9 text-xs"
-                                    >
-                                        <CheckCircle size={14} className="mr-2" /> Onayla
-                                    </Button>
-                                ) : (
-                                    <Button 
-                                        onClick={() => toggleTeacherApproval(t.id, false)} 
-                                        variant="outline"
-                                        className="flex-1 sm:flex-none border-orange-500/50 text-orange-400 hover:bg-orange-900/20 h-9 text-xs"
-                                    >
-                                        <UserX size={14} className="mr-2" /> Dondur
-                                    </Button>
-                                )}
-
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-red-500 hover:bg-red-500/10 shrink-0">
-                                          <Trash2 size={16} />
-                                      </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent className="bg-slate-900 border-slate-800 text-white">
-                                    <AlertDialogHeader><AlertDialogTitle>Personeli Sil?</AlertDialogTitle><AlertDialogDescription className="text-slate-400">Bu işlem geri alınamaz. Öğretmen, görevli olduğu bütün öğrenci kadrolarından da çıkarılacaktır.</AlertDialogDescription></AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel className="bg-slate-800 text-white">Vazgeç</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={async () => {
-                                          const success = await deleteTeacher(t.id);
-                                          success ? toast.success('Personel silindi.') : toast.error('Personel silinemedi.');
-                                        }}
-                                        className="bg-red-600"
-                                      >
-                                        Sil
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                            </div>
-                         </div>
-                      ))}
-                      {teachers.filter(t => t.name.toLowerCase() !== 'admin').length === 0 && <p className="text-center text-slate-500 py-4">Kayıtlı personel bulunamadı.</p>}
-                    </div>
-                  </DialogContent>
-                </Dialog>
-                <Button variant="outline" onClick={() => setLocation('/admin')} className="border-blue-500 text-blue-400 hover:bg-blue-500 hover:text-white"><ShieldCheck className="mr-2 h-4 w-4" /> Müfredat</Button>
-              </>
+              </Button>
             )}
             <Button variant="ghost" onClick={handleLogout} className="text-slate-400 border border-white/5"><LogOut className="mr-2 h-4 w-4" />Çıkış</Button>
           </div>
