@@ -1,6 +1,19 @@
 import { useState, useEffect } from 'react';
 import { db, auth, storage } from '../firebase'; 
-import { collection, onSnapshot, doc, addDoc, deleteDoc, query, orderBy, getDoc, updateDoc } from 'firebase/firestore';
+import {
+  collection,
+  onSnapshot,
+  doc,
+  addDoc,
+  deleteDoc,
+  deleteField,
+  query,
+  orderBy,
+  getDoc,
+  getDocs,
+  serverTimestamp,
+  updateDoc,
+} from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'; // 🔥 deleteObject eklendi
 
 export function useStudentData() {
@@ -84,36 +97,194 @@ export function useStudentData() {
     }
   };
 
-  // 🔥 YENİ: Hem Firestore kaydını hem de Storage'daki fotoğrafı silen fonksiyon
-  const deleteStudent = async (id: string) => {
-    const instId = localStorage.getItem("kazanim-takip-institution-id");
-    if (!instId) return;
+  const getSession = () => ({
+    instId: localStorage.getItem("kazanim-takip-institution-id"),
+    teacherName: localStorage.getItem("kazanim-takip-teacher-name"),
+  });
+
+  const getStudentRef = (instId: string, studentId: string) =>
+    doc(db, "institutions", instId, "students", studentId);
+
+  const updateStudentTeachers = async (studentId: string, teacherNames: string[]) => {
+    const { instId, teacherName } = getSession();
+    if (!instId || teacherName?.toLocaleLowerCase('tr-TR') !== 'admin') return false;
 
     try {
-      // 1. Fotoğraf URL'sini bulmak için öğrenci verisini çek
-      const studentDocRef = doc(db, "institutions", instId, "students", id);
+      const studentDocRef = getStudentRef(instId, studentId);
       const studentSnap = await getDoc(studentDocRef);
+      if (!studentSnap.exists()) return false;
 
-      if (studentSnap.exists()) {
-        const studentData = studentSnap.data();
+      const cleanTeacherNames = Array.from(new Set(
+        teacherNames.map(name => name.trim()).filter(Boolean),
+      ));
+      const existingCreatedBy = studentSnap.data().createdBy;
 
-        // 2. Önce Firestore'dan metin verilerini sil
-        await deleteDoc(studentDocRef);
-
-        // 3. Eğer kayıtlı bir fotoğraf URL'si varsa, Firebase Storage'dan dosyayı sil
-        if (studentData.photoUrl) {
-          const photoRef = ref(storage, studentData.photoUrl);
-          await deleteObject(photoRef).catch(err => console.error("Fotoğraf silinemedi:", err));
-        }
-      }
+      await updateDoc(studentDocRef, {
+        associatedTeacherIds: cleanTeacherNames,
+        createdBy: existingCreatedBy && cleanTeacherNames.includes(existingCreatedBy)
+          ? existingCreatedBy
+          : null,
+        lastUpdatedBy: teacherName,
+        lastUpdatedAt: serverTimestamp(),
+      });
+      return true;
     } catch (error) {
-      console.error("Öğrenci silinirken hata oluştu:", error);
+      console.error("Öğretmen kadrosu güncellenirken hata oluştu:", error);
+      return false;
     }
   };
 
+  const leaveStudent = async (studentId: string) => {
+    const { instId, teacherName } = getSession();
+    if (!instId || !teacherName) return false;
+
+    try {
+      const studentDocRef = getStudentRef(instId, studentId);
+      const studentSnap = await getDoc(studentDocRef);
+      if (!studentSnap.exists()) return false;
+
+      const studentData = studentSnap.data();
+      const remainingTeachers = (studentData.associatedTeacherIds || [])
+        .filter((name: string) => name !== teacherName);
+
+      await updateDoc(studentDocRef, {
+        associatedTeacherIds: remainingTeachers,
+        createdBy: studentData.createdBy === teacherName ? null : (studentData.createdBy || null),
+        lastUpdatedBy: teacherName,
+        lastUpdatedAt: serverTimestamp(),
+      });
+      return true;
+    } catch (error) {
+      console.error("Öğrenci kadrosundan ayrılırken hata oluştu:", error);
+      return false;
+    }
+  };
+
+  const requestStudentDeletion = async (studentId: string) => {
+    const { instId, teacherName } = getSession();
+    if (!instId || !teacherName || teacherName.toLocaleLowerCase('tr-TR') === 'admin') return false;
+
+    try {
+      const studentDocRef = getStudentRef(instId, studentId);
+      const studentSnap = await getDoc(studentDocRef);
+      if (!studentSnap.exists()) return false;
+
+      const studentData = studentSnap.data();
+      if (!(studentData.associatedTeacherIds || []).includes(teacherName)
+        || studentData.deletionStatus === 'pending') return false;
+
+      await updateDoc(studentDocRef, {
+        deletionStatus: 'pending',
+        deletionRequestedBy: teacherName,
+        deletionRequestedAt: serverTimestamp(),
+        lastUpdatedBy: teacherName,
+        lastUpdatedAt: serverTimestamp(),
+      });
+      return true;
+    } catch (error) {
+      console.error("Öğrenci silme talebi oluşturulurken hata oluştu:", error);
+      return false;
+    }
+  };
+
+  const rejectStudentDeletion = async (studentId: string) => {
+    const { instId, teacherName } = getSession();
+    if (!instId || teacherName?.toLocaleLowerCase('tr-TR') !== 'admin') return false;
+
+    try {
+      await updateDoc(getStudentRef(instId, studentId), {
+        deletionStatus: deleteField(),
+        deletionRequestedBy: deleteField(),
+        deletionRequestedAt: deleteField(),
+        deletionReviewedBy: teacherName,
+        deletionReviewedAt: serverTimestamp(),
+        lastUpdatedBy: teacherName,
+        lastUpdatedAt: serverTimestamp(),
+      });
+      return true;
+    } catch (error) {
+      console.error("Öğrenci silme talebi reddedilirken hata oluştu:", error);
+      return false;
+    }
+  };
+
+  // Yalnızca Admin kullanır. Alt koleksiyonlar ve öğrenciye ait Storage dosyaları da temizlenir.
+  const deleteStudent = async (id: string) => {
+    const { instId, teacherName } = getSession();
+    if (!instId || teacherName?.toLocaleLowerCase('tr-TR') !== 'admin') return false;
+
+    try {
+      const studentDocRef = getStudentRef(instId, id);
+      const studentSnap = await getDoc(studentDocRef);
+      if (!studentSnap.exists()) return false;
+
+      const studentData = studentSnap.data();
+      const childCollectionNames = ['assessments', 'profiles', 'knownPeople', 'talk_cards', 'ifade'];
+
+      for (const collectionName of childCollectionNames) {
+        const childSnapshot = await getDocs(collection(studentDocRef, collectionName));
+        for (const childDoc of childSnapshot.docs) {
+          const childData = childDoc.data();
+          if (childData.storagePath) {
+            await deleteObject(ref(storage, childData.storagePath)).catch(error => {
+              console.error(`${collectionName} dosyası silinemedi:`, error);
+            });
+          }
+          await deleteDoc(childDoc.ref);
+        }
+      }
+
+      await deleteDoc(studentDocRef);
+
+      if (studentData.photoUrl) {
+        await deleteObject(ref(storage, studentData.photoUrl)).catch(err => {
+          console.error("Fotoğraf silinemedi:", err);
+        });
+      }
+      return true;
+    } catch (error) {
+      console.error("Öğrenci silinirken hata oluştu:", error);
+      return false;
+    }
+  };
+
+  const approveStudentDeletion = async (studentId: string) => deleteStudent(studentId);
+
   const deleteTeacher = async (teacherId: string) => {
-    const instId = localStorage.getItem("kazanim-takip-institution-id");
-    if (instId) await deleteDoc(doc(db, "institutions", instId, "teachers", teacherId));
+    const { instId, teacherName } = getSession();
+    if (!instId || teacherName?.toLocaleLowerCase('tr-TR') !== 'admin') return false;
+
+    try {
+      const teacherDocRef = doc(db, "institutions", instId, "teachers", teacherId);
+      const teacherSnap = await getDoc(teacherDocRef);
+      const deletedTeacherName = teacherSnap.exists()
+        ? String(teacherSnap.data().name || teacherSnap.id)
+        : teacherId;
+
+      const studentSnapshot = await getDocs(collection(db, "institutions", instId, "students"));
+      const affectedStudents = studentSnapshot.docs.filter(studentDoc => {
+        const data = studentDoc.data();
+        return data.createdBy === deletedTeacherName
+          || (data.associatedTeacherIds || []).includes(deletedTeacherName);
+      });
+
+      await Promise.all(affectedStudents.map(studentDoc => {
+        const data = studentDoc.data();
+        return updateDoc(studentDoc.ref, {
+          associatedTeacherIds: (data.associatedTeacherIds || [])
+            .filter((name: string) => name !== deletedTeacherName),
+          createdBy: data.createdBy === deletedTeacherName ? null : (data.createdBy || null),
+          lastUpdatedBy: teacherName,
+          lastUpdatedAt: serverTimestamp(),
+        });
+      }));
+
+      await deleteDoc(teacherDocRef);
+      return true;
+    } catch (error) {
+      console.error("Öğretmen silinirken hata oluştu:", error);
+      return false;
+    }
   };
 
   const toggleTeacherApproval = async (teacherId: string, isApproved: boolean) => {
@@ -138,6 +309,11 @@ export function useStudentData() {
     isLoading, 
     addStudent, 
     deleteStudent, 
+    approveStudentDeletion,
+    rejectStudentDeletion,
+    requestStudentDeletion,
+    updateStudentTeachers,
+    leaveStudent,
     deleteTeacher, 
     toggleTeacherApproval,
     logoutTeacher 
