@@ -4,15 +4,16 @@ import { useStudentData } from '@/hooks/useStudentData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, LogOut, Trash2, UserCircle2, ShieldCheck, Loader2, Users, AlertTriangle, Baby, Stethoscope, ClipboardCheck, BookOpen, AlertCircle, Lock, CheckCircle, UserX, ShieldAlert, Camera, X } from 'lucide-react';
+import { Search, LogOut, Trash2, UserCircle2, ShieldCheck, Loader2, Users, AlertTriangle, Baby, Stethoscope, ClipboardCheck, BookOpen, AlertCircle, Lock, CheckCircle, UserX, ShieldAlert, Camera, X, BellRing } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger, AlertDialogDescription
 } from "@/components/ui/alert-dialog";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger
 } from "@/components/ui/dialog";
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
@@ -42,10 +43,51 @@ export default function Home() {
 
   // --- INSTAGRAM TARZI BÜYÜK FOTOĞRAF GÖSTERİCİ STATE'İ ---
   const [viewingStudentPhoto, setViewingStudentPhoto] = useState<{url: string, name: string} | null>(null);
+
+  // --- ÖĞRENCİ KADROSU VE SİLME ONAYI STATE'LERİ ---
+  const [teacherAssignmentStudent, setTeacherAssignmentStudent] = useState<any | null>(null);
+  const [selectedTeacherNames, setSelectedTeacherNames] = useState<string[]>([]);
+  const [leaveStudentTarget, setLeaveStudentTarget] = useState<any | null>(null);
+  const [deletionRequestsOpen, setDeletionRequestsOpen] = useState(false);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const lastPendingRequestKey = useRef('');
   
   const [_, setLocation] = useLocation();
 
-  const { students, teachers, addStudent, deleteStudent, deleteTeacher, toggleTeacherApproval, currentTeacher, isLoading } = useStudentData();
+  const {
+    students,
+    teachers,
+    addStudent,
+    deleteStudent,
+    approveStudentDeletion,
+    rejectStudentDeletion,
+    requestStudentDeletion,
+    updateStudentTeachers,
+    leaveStudent,
+    deleteTeacher,
+    toggleTeacherApproval,
+    currentTeacher,
+    isLoading,
+  } = useStudentData();
+  const isAdmin = currentTeacher?.name?.toLocaleLowerCase('tr-TR') === 'admin';
+  const pendingDeletionRequests = students.filter(student => student.deletionStatus === 'pending');
+  const pendingRequestKey = pendingDeletionRequests
+    .map(student => `${student.id}:${student.deletionRequestedBy || ''}`)
+    .sort()
+    .join('|');
+
+  useEffect(() => {
+    if (!isAdmin || !pendingRequestKey) {
+      lastPendingRequestKey.current = '';
+      setDeletionRequestsOpen(false);
+      return;
+    }
+
+    if (lastPendingRequestKey.current !== pendingRequestKey) {
+      lastPendingRequestKey.current = pendingRequestKey;
+      setDeletionRequestsOpen(true);
+    }
+  }, [isAdmin, pendingRequestKey]);
 
   // --- GÜVENLİK KONTROLÜ ---
   useEffect(() => {
@@ -221,13 +263,82 @@ export default function Home() {
     toast.success("Öğrenci başarıyla eklendi"); 
   };
 
+  const openTeacherAssignment = (student: any) => {
+    setTeacherAssignmentStudent(student);
+    setSelectedTeacherNames(Array.from(new Set(student.associatedTeacherIds || [])) as string[]);
+  };
+
+  const toggleTeacherSelection = (teacherName: string) => {
+    setSelectedTeacherNames(current => current.includes(teacherName)
+      ? current.filter(name => name !== teacherName)
+      : [...current, teacherName]);
+  };
+
+  const saveTeacherAssignment = async () => {
+    if (!teacherAssignmentStudent) return;
+    setBusyAction(`assign-${teacherAssignmentStudent.id}`);
+    const success = await updateStudentTeachers(teacherAssignmentStudent.id, selectedTeacherNames);
+    setBusyAction(null);
+
+    if (success) {
+      toast.success('Öğretmen kadrosu güncellendi.');
+      setTeacherAssignmentStudent(null);
+    } else {
+      toast.error('Öğretmen kadrosu güncellenemedi.');
+    }
+  };
+
+  const confirmLeaveStudent = async () => {
+    if (!leaveStudentTarget) return;
+    setBusyAction(`leave-${leaveStudentTarget.id}`);
+    const success = await leaveStudent(leaveStudentTarget.id);
+    setBusyAction(null);
+
+    if (success) {
+      toast.success(`${leaveStudentTarget.name} öğrenci listenizden çıkarıldı.`);
+      setLeaveStudentTarget(null);
+    } else {
+      toast.error('Öğrenci listenizden çıkarılamadı.');
+    }
+  };
+
+  const sendDeletionRequest = async (student: any) => {
+    setBusyAction(`request-delete-${student.id}`);
+    const success = await requestStudentDeletion(student.id);
+    setBusyAction(null);
+    success
+      ? toast.success('Silme talebi Admin onayına gönderildi.')
+      : toast.error('Silme talebi gönderilemedi.');
+  };
+
+  const handleDeletionDecision = async (studentId: string, approve: boolean) => {
+    setBusyAction(`${approve ? 'approve' : 'reject'}-${studentId}`);
+    const success = approve
+      ? await approveStudentDeletion(studentId)
+      : await rejectStudentDeletion(studentId);
+    setBusyAction(null);
+
+    if (success) {
+      toast.success(approve ? 'Öğrenci kalıcı olarak silindi.' : 'Silme talebi reddedildi. Öğrenci yeniden aktif.');
+    } else {
+      toast.error('İşlem tamamlanamadı.');
+    }
+  };
+
+  const handleAdminDelete = async (studentId: string) => {
+    setBusyAction(`delete-${studentId}`);
+    const success = await deleteStudent(studentId);
+    setBusyAction(null);
+    success ? toast.success('Öğrenci silindi.') : toast.error('Öğrenci silinemedi.');
+  };
+
   const searchedStudents = students.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const isStudentMine = (s: any) => {
     const tName = currentTeacher?.name;
-    return s.createdBy === tName || (s.associatedTeacherIds && s.associatedTeacherIds.includes(tName));
+    return Boolean(tName && s.associatedTeacherIds?.includes(tName));
   };
 
   const allStudents = [...searchedStudents].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
@@ -237,11 +348,14 @@ export default function Home() {
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-4">
       {studentList.map((student) => {
         const isMyStudent = isStudentMine(student);
-        const rawTeacherIds = Array.from(new Set(
-          [student.createdBy, ...(student.associatedTeacherIds || [])].filter(Boolean),
+        const assignedTeacherNames = Array.from(new Set(
+          (student.associatedTeacherIds || []).filter(Boolean),
         )) as string[];
-        const activeTeachers = rawTeacherIds.filter((tid: string) => teachers.some(t => t.name === tid));
+        const activeTeachers = assignedTeacherNames.filter((teacherName: string) =>
+          teachers.some(teacher => teacher.name === teacherName),
+        );
         const hasValidTeacher = activeTeachers.length > 0;
+        const isDeletionPending = student.deletionStatus === 'pending';
         
         const displayName = formatName(student.name);
 
@@ -253,7 +367,9 @@ export default function Home() {
             animate={{ opacity: 1, scale: 1 }}
             className={twMerge(
               "group relative overflow-hidden rounded-xl border transition-all p-4 flex flex-col justify-between gap-3",
-              !hasValidTeacher 
+              isDeletionPending
+                ? "border-orange-500/50 bg-orange-950/10 opacity-60 grayscale-[35%]"
+                : !hasValidTeacher
                 ? "border-red-600/60 bg-red-900/10" 
                 : isMyStudent 
                   ? "border-green-500/50 bg-green-500/5" 
@@ -289,6 +405,9 @@ export default function Home() {
                       <h3 className="font-bold text-base text-white leading-tight line-clamp-2 break-words" title={student.name}>
                         {displayName}
                       </h3>
+                      {isDeletionPending && (
+                        <p className="mt-1 text-[10px] font-semibold text-orange-300">Silme onayı bekliyor</p>
+                      )}
                     </div>
                 </div>
 
@@ -315,27 +434,62 @@ export default function Home() {
                 {!hasValidTeacher && <span className="text-[10px] text-red-500 font-bold bg-red-900/20 px-1.5 py-0.5 rounded">Atama Bekliyor</span>}
             </div>
 
+            {!isDeletionPending && isAdmin && (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-8 w-full border-purple-500/30 bg-purple-500/5 text-[11px] text-purple-300 hover:bg-purple-500/15 hover:text-purple-200"
+                onClick={() => openTeacherAssignment(student)}
+              >
+                <Users size={14} className="mr-2" /> Öğretmen Kadrosunu Düzenle
+              </Button>
+            )}
+
+            {!isDeletionPending && !isAdmin && isMyStudent && (
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-8 w-full border border-slate-700/70 text-[11px] text-slate-400 hover:bg-slate-800 hover:text-white"
+                onClick={() => setLeaveStudentTarget(student)}
+              >
+                <UserX size={14} className="mr-2" /> Artık Benim Öğrencim Değil
+              </Button>
+            )}
+
             <div className="flex items-center gap-2 mt-1">
-                <Button variant="outline" className="flex-1 border-slate-700 bg-slate-950 hover:bg-slate-800 text-slate-300 h-10 text-xs font-semibold px-2" onClick={() => setLocation(`/assessment/${student.id}`)}>
+                <Button disabled={isDeletionPending} variant="outline" className="flex-1 border-slate-700 bg-slate-950 hover:bg-slate-800 text-slate-300 h-10 text-xs font-semibold px-2 disabled:cursor-not-allowed" onClick={() => setLocation(`/assessment/${student.id}`)}>
                     <ClipboardCheck size={16} className="mr-2 text-orange-500"/> Değerlendirme
                 </Button>
-                <Button className="flex-1 bg-blue-600 hover:bg-blue-700 h-10 text-xs font-semibold text-white px-2" onClick={() => setLocation(`/student/${student.id}`)}>
+                <Button disabled={isDeletionPending} className="flex-1 bg-blue-600 hover:bg-blue-700 h-10 text-xs font-semibold text-white px-2 disabled:cursor-not-allowed" onClick={() => setLocation(`/student/${student.id}`)}>
                     <BookOpen size={16} className="mr-2"/> Çalışma
                 </Button>
-                <AlertDialog>
+                {!isDeletionPending && (isAdmin || isMyStudent) && <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-500 hover:text-red-500 hover:bg-red-500/10 border border-white/5 bg-slate-900 shrink-0">
                         <Trash2 className="h-5 w-5" />
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent className="bg-slate-900 border-slate-800 text-white">
-                      <AlertDialogHeader><AlertDialogTitle>Öğrenci Silinsin mi?</AlertDialogTitle></AlertDialogHeader>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{isAdmin ? 'Öğrenci kalıcı olarak silinsin mi?' : 'Silme talebi gönderilsin mi?'}</AlertDialogTitle>
+                        <AlertDialogDescription className="text-slate-400">
+                          {isAdmin
+                            ? `${student.name} ve öğrenciye ait kayıtlar kalıcı olarak silinecek.`
+                            : `${student.name} pasif duruma alınacak ve işlem Admin onayına gönderilecek.`}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel className="bg-slate-800 text-white">İptal</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => { deleteStudent(student.id); toast.success('Silindi'); }} className="bg-red-600">Sil</AlertDialogAction>
+                        <AlertDialogAction
+                          onClick={() => isAdmin ? handleAdminDelete(student.id) : sendDeletionRequest(student)}
+                          className="bg-red-600"
+                          disabled={busyAction !== null}
+                        >
+                          {isAdmin ? 'Kalıcı Olarak Sil' : 'Talebi Gönder'}
+                        </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
-                  </AlertDialog>
+                  </AlertDialog>}
             </div>
           </motion.div>
         );
@@ -369,8 +523,6 @@ export default function Home() {
   );
 
   if (!currentTeacher) return null;
-
-  const isAdmin = currentTeacher?.name?.toLowerCase() === 'admin';
 
   return (
     <div className="min-h-screen bg-[#020617] p-4 md:p-8 text-white font-sans">
@@ -475,6 +627,153 @@ export default function Home() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog
+        open={Boolean(leaveStudentTarget)}
+        onOpenChange={(open) => !open && busyAction === null && setLeaveStudentTarget(null)}
+      >
+        <AlertDialogContent className="bg-slate-900 border-slate-800 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Öğrenci listenizden çıkarılsın mı?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-300 text-base">
+              <strong>{leaveStudentTarget?.name}</strong> artık benim öğrencim değil.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-slate-800 text-white">İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmLeaveStudent}
+              disabled={busyAction !== null}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {busyAction?.startsWith('leave-') && <Loader2 size={15} className="mr-2 animate-spin" />}
+              Artık Benim Öğrencim Değil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog
+        open={Boolean(teacherAssignmentStudent)}
+        onOpenChange={(open) => !open && busyAction === null && setTeacherAssignmentStudent(null)}
+      >
+        <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="text-purple-400" size={20} /> Öğretmen Kadrosu
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              {teacherAssignmentStudent?.name} için görevli öğretmenleri seçin. Admin dahil herkes kadrodan çıkarılabilir.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[50vh] space-y-2 overflow-y-auto py-2">
+            {[...teachers]
+              .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
+              .map(teacher => {
+                const selected = selectedTeacherNames.includes(teacher.name);
+                const inactive = teacher.isApproved === false;
+                return (
+                  <label
+                    key={teacher.id}
+                    className={twMerge(
+                      "flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors",
+                      selected
+                        ? "border-purple-500/50 bg-purple-500/10"
+                        : "border-slate-800 bg-slate-950 hover:border-slate-700",
+                      inactive && !selected ? "cursor-not-allowed opacity-45" : "",
+                    )}
+                  >
+                    <Checkbox
+                      checked={selected}
+                      disabled={inactive && !selected}
+                      onCheckedChange={() => toggleTeacherSelection(teacher.name)}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{teacher.name}</span>
+                    <span className={twMerge(
+                      "text-[10px] font-semibold",
+                      inactive ? "text-orange-400" : "text-green-400",
+                    )}>
+                      {inactive ? 'Pasif' : 'Aktif'}
+                    </span>
+                  </label>
+                );
+              })}
+          </div>
+
+          {selectedTeacherNames.length === 0 && (
+            <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-3 text-xs text-orange-300">
+              Kaydedildiğinde öğrenci “Atama Bekliyor” durumuna geçer.
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              className="border-slate-700 bg-slate-800 text-white"
+              onClick={() => setTeacherAssignmentStudent(null)}
+              disabled={busyAction !== null}
+            >
+              İptal
+            </Button>
+            <Button
+              className="bg-purple-600 hover:bg-purple-700"
+              onClick={saveTeacherAssignment}
+              disabled={busyAction !== null}
+            >
+              {busyAction?.startsWith('assign-') && <Loader2 size={15} className="mr-2 animate-spin" />}
+              Kadroyu Kaydet
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deletionRequestsOpen} onOpenChange={setDeletionRequestsOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BellRing className="text-orange-400" size={21} /> Öğrenci Silme Talepleri
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Onaylanan öğrenci ve kayıtları kalıcı olarak silinir. Reddedilen öğrenci yeniden aktif olur.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            {pendingDeletionRequests.map(student => {
+              const isBusy = busyAction?.endsWith(`-${student.id}`);
+              return (
+                <div key={student.id} className="rounded-xl border border-orange-500/20 bg-orange-950/10 p-4">
+                  <div className="mb-3">
+                    <p className="font-semibold text-white">{student.name}</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Talep eden: <span className="text-orange-300">{student.deletionRequestedBy || 'Bilinmiyor'}</span>
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 border-slate-700 bg-slate-950 text-slate-300 hover:bg-slate-800"
+                      onClick={() => handleDeletionDecision(student.id, false)}
+                      disabled={Boolean(isBusy)}
+                    >
+                      Reddet
+                    </Button>
+                    <Button
+                      className="flex-1 bg-red-600 text-white hover:bg-red-700"
+                      onClick={() => handleDeletionDecision(student.id, true)}
+                      disabled={Boolean(isBusy)}
+                    >
+                      {isBusy && <Loader2 size={15} className="mr-2 animate-spin" />}
+                      Silmeyi Onayla
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="max-w-6xl mx-auto space-y-8">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/5">
           <div>
@@ -483,9 +782,18 @@ export default function Home() {
               <UserCircle2 className="h-4 w-4 text-blue-500" /> Hoş geldin, {currentTeacher.name}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {isAdmin && (
               <>
+                {pendingDeletionRequests.length > 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setDeletionRequestsOpen(true)}
+                    className="border-orange-500/60 text-orange-300 hover:bg-orange-500 hover:text-white"
+                  >
+                    <BellRing className="mr-2 h-4 w-4" /> Silme Talepleri ({pendingDeletionRequests.length})
+                  </Button>
+                )}
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button variant="outline" className="border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white">
@@ -537,8 +845,19 @@ export default function Home() {
                                       </Button>
                                   </AlertDialogTrigger>
                                   <AlertDialogContent className="bg-slate-900 border-slate-800 text-white">
-                                    <AlertDialogHeader><AlertDialogTitle>Personeli Sil?</AlertDialogTitle><AlertDialogDescription className="text-slate-400">Bu işlem geri alınamaz. Silinen öğretmene ait öğrenciler "Atama Bekliyor" durumuna düşecektir.</AlertDialogDescription></AlertDialogHeader>
-                                    <AlertDialogFooter><AlertDialogCancel className="bg-slate-800 text-white">Vazgeç</AlertDialogCancel><AlertDialogAction onClick={() => { deleteTeacher(t.id); toast.success('Silindi'); }} className="bg-red-600">Sil</AlertDialogAction></AlertDialogFooter>
+                                    <AlertDialogHeader><AlertDialogTitle>Personeli Sil?</AlertDialogTitle><AlertDialogDescription className="text-slate-400">Bu işlem geri alınamaz. Öğretmen, görevli olduğu bütün öğrenci kadrolarından da çıkarılacaktır.</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel className="bg-slate-800 text-white">Vazgeç</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={async () => {
+                                          const success = await deleteTeacher(t.id);
+                                          success ? toast.success('Personel silindi.') : toast.error('Personel silinemedi.');
+                                        }}
+                                        className="bg-red-600"
+                                      >
+                                        Sil
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
                                   </AlertDialogContent>
                                 </AlertDialog>
                             </div>
