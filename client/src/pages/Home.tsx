@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, LogOut, Trash2, UserCircle2, ShieldCheck, Loader2, Users, AlertTriangle, Baby, Stethoscope, ClipboardCheck, BookOpen, AlertCircle, Lock, CheckCircle, UserX, ShieldAlert, Camera, X, BellRing } from 'lucide-react';
+import { Search, LogOut, Trash2, UserCircle2, ShieldCheck, Loader2, Users, AlertTriangle, Baby, Stethoscope, ClipboardCheck, BookOpen, AlertCircle, Lock, CheckCircle, UserX, ShieldAlert, Camera, X, BellRing, Archive, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
@@ -49,6 +49,8 @@ export default function Home() {
   const [selectedTeacherNames, setSelectedTeacherNames] = useState<string[]>([]);
   const [leaveStudentTarget, setLeaveStudentTarget] = useState<any | null>(null);
   const [deletionRequestsOpen, setDeletionRequestsOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archivedDuplicateStudent, setArchivedDuplicateStudent] = useState<any | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const lastPendingRequestKey = useRef('');
   
@@ -56,10 +58,13 @@ export default function Home() {
 
   const {
     students,
+    archivedStudents,
     teachers,
     addStudent,
+    findArchivedStudentByName,
     deleteStudent,
     approveStudentDeletion,
+    restoreArchivedStudent,
     rejectStudentDeletion,
     requestStudentDeletion,
     updateStudentTeachers,
@@ -139,6 +144,9 @@ export default function Home() {
     }
     return fullName;
   };
+
+  const normalizeNameForMatch = (value: string) =>
+    value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('tr-TR');
 
   // --- DAHİLİ KAMERA FONKSİYONLARI ---
   const startCamera = async () => {
@@ -224,11 +232,28 @@ export default function Home() {
         return;
     }
 
-    const normalizedName = name.trim().toLocaleLowerCase('tr');
-    const isDuplicate = students.some(s => s.name.trim().toLocaleLowerCase('tr') === normalizedName);
+    const normalizedName = normalizeNameForMatch(name);
+    const isDuplicate = students.some(s => normalizeNameForMatch(s.name) === normalizedName);
     if (isDuplicate) {
       setDuplicateError(true); 
       return; 
+    }
+
+    let archivedMatch = archivedStudents.find(student =>
+      normalizeNameForMatch(student.name || '') === normalizedName,
+    );
+    if (!archivedMatch) {
+      try {
+        archivedMatch = await findArchivedStudentByName(name);
+      } catch (error) {
+        console.error('Arşiv kontrolü yapılamadı:', error);
+        toast.error('Arşiv kontrolü yapılamadı. Lütfen tekrar deneyin.');
+        return;
+      }
+    }
+    if (archivedMatch) {
+      setArchivedDuplicateStudent(archivedMatch);
+      return;
     }
 
     const isDiagnosisMissing = !diagnosis.trim();
@@ -253,13 +278,24 @@ export default function Home() {
     setMissingFieldsWarning(false); 
     
     const loadingToast = toast.loading("Öğrenci kaydediliyor...");
-    await addStudent(name, age, diagnosis, photoFile); 
-    
+    const result = await addStudent(name, age, diagnosis, photoFile);
+    toast.dismiss(loadingToast);
+
+    if (!result.success) {
+      if ('reason' in result && result.reason === 'archived') {
+        const archivedMatch = archivedStudents.find(student =>
+          normalizeNameForMatch(student.name || '') === normalizeNameForMatch(name),
+        );
+        setArchivedDuplicateStudent(archivedMatch || { name: name.trim() });
+      } else {
+        toast.error(result.message || 'Öğrenci kaydedilemedi.');
+      }
+      return;
+    }
+
     setName(''); setAge(''); setDiagnosis('');
     setPhotoFile(null); 
     setPhotoPreview(null); 
-    
-    toast.dismiss(loadingToast);
     toast.success("Öğrenci başarıyla eklendi"); 
   };
 
@@ -319,7 +355,7 @@ export default function Home() {
     setBusyAction(null);
 
     if (success) {
-      toast.success(approve ? 'Öğrenci kalıcı olarak silindi.' : 'Silme talebi reddedildi. Öğrenci yeniden aktif.');
+      toast.success(approve ? 'Öğrenci arşive alındı.' : 'Silme talebi reddedildi. Öğrenci yeniden aktif.');
     } else {
       toast.error('İşlem tamamlanamadı.');
     }
@@ -329,7 +365,16 @@ export default function Home() {
     setBusyAction(`delete-${studentId}`);
     const success = await deleteStudent(studentId);
     setBusyAction(null);
-    success ? toast.success('Öğrenci silindi.') : toast.error('Öğrenci silinemedi.');
+    success ? toast.success('Öğrenci arşive alındı.') : toast.error('Öğrenci arşive alınamadı.');
+  };
+
+  const handleRestoreArchivedStudent = async (student: any) => {
+    setBusyAction(`restore-${student.id}`);
+    const success = await restoreArchivedStudent(student.id);
+    setBusyAction(null);
+    success
+      ? toast.success(`${student.name} aktif öğrenci listesine geri getirildi.`)
+      : toast.error('Öğrenci geri getirilemedi. Aynı isimde aktif bir kayıt olabilir.');
   };
 
   const searchedStudents = students.filter(s => 
@@ -471,10 +516,10 @@ export default function Home() {
                     </AlertDialogTrigger>
                     <AlertDialogContent className="bg-slate-900 border-slate-800 text-white">
                       <AlertDialogHeader>
-                        <AlertDialogTitle>{isAdmin ? 'Öğrenci kalıcı olarak silinsin mi?' : 'Silme talebi gönderilsin mi?'}</AlertDialogTitle>
+                        <AlertDialogTitle>{isAdmin ? 'Öğrenci arşive alınsın mı?' : 'Silme talebi gönderilsin mi?'}</AlertDialogTitle>
                         <AlertDialogDescription className="text-slate-400">
                           {isAdmin
-                            ? `${student.name} ve öğrenciye ait kayıtlar kalıcı olarak silinecek.`
+                            ? `${student.name} için çalışma ve değerlendirme kayıtları silinecek; arşivde yalnızca adı ve varsa fotoğrafı kalacak.`
                             : `${student.name} pasif duruma alınacak ve işlem Admin onayına gönderilecek.`}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
@@ -485,7 +530,7 @@ export default function Home() {
                           className="bg-red-600"
                           disabled={busyAction !== null}
                         >
-                          {isAdmin ? 'Kalıcı Olarak Sil' : 'Talebi Gönder'}
+                          {isAdmin ? 'Arşive Al' : 'Talebi Gönder'}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -610,6 +655,46 @@ export default function Home() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog
+        open={Boolean(archivedDuplicateStudent)}
+        onOpenChange={(open) => !open && setArchivedDuplicateStudent(null)}
+      >
+        <AlertDialogContent className="bg-slate-900 border-orange-500/30 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-orange-400">
+              <Archive className="h-6 w-6" /> Öğrenci Arşivde Bulundu
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-300 text-base mt-2">
+              <strong>{archivedDuplicateStudent?.name}</strong> kurumun eski öğrencisidir ve arşiv kaydında bulunmaktadır.
+              {!isAdmin && ' Lütfen Admin’e danışınız.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {isAdmin ? (
+              <>
+                <AlertDialogCancel className="bg-slate-800 text-white">Kapat</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-orange-600 hover:bg-orange-700 text-white"
+                  onClick={() => {
+                    setArchivedDuplicateStudent(null);
+                    setArchiveOpen(true);
+                  }}
+                >
+                  Beni Arşive Yönlendir
+                </AlertDialogAction>
+              </>
+            ) : (
+              <AlertDialogAction
+                onClick={() => setArchivedDuplicateStudent(null)}
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+              >
+                Tamam
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={missingFieldsWarning} onOpenChange={setMissingFieldsWarning}>
         <AlertDialogContent className="bg-slate-900 border-slate-800 text-white">
           <AlertDialogHeader>
@@ -727,6 +812,60 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Archive className="text-orange-400" size={21} /> Öğrenci Arşivi
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Arşivde yalnızca öğrencinin adı ve varsa fotoğrafı saklanır. Eski çalışma kayıtları görüntülenemez.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            {[...archivedStudents]
+              .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'tr'))
+              .map(student => {
+                const isRestoring = busyAction === `restore-${student.id}`;
+                return (
+                  <div
+                    key={student.id}
+                    className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950 p-3"
+                  >
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-orange-500/30 bg-orange-500/10 flex items-center justify-center font-bold text-orange-300">
+                      {student.photoUrl ? (
+                        <img src={student.photoUrl} alt={student.name} className="h-full w-full object-cover" />
+                      ) : (
+                        String(student.name || '?').charAt(0).toUpperCase()
+                      )}
+                    </div>
+                    <p className="min-w-0 flex-1 truncate font-semibold text-white">{student.name}</p>
+                    <Button
+                      className="h-9 shrink-0 bg-green-600 px-3 text-xs text-white hover:bg-green-700"
+                      onClick={() => handleRestoreArchivedStudent(student)}
+                      disabled={busyAction !== null}
+                    >
+                      {isRestoring ? (
+                        <Loader2 size={14} className="mr-2 animate-spin" />
+                      ) : (
+                        <RotateCcw size={14} className="mr-2" />
+                      )}
+                      Öğrenci Geri Geldi
+                    </Button>
+                  </div>
+                );
+              })}
+
+            {archivedStudents.length === 0 && (
+              <div className="rounded-xl border border-dashed border-slate-700 p-8 text-center text-sm text-slate-500">
+                Arşivde öğrenci bulunmuyor.
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={deletionRequestsOpen} onOpenChange={setDeletionRequestsOpen}>
         <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -734,7 +873,7 @@ export default function Home() {
               <BellRing className="text-orange-400" size={21} /> Öğrenci Silme Talepleri
             </DialogTitle>
             <DialogDescription className="text-slate-400">
-              Onaylanan öğrenci ve kayıtları kalıcı olarak silinir. Reddedilen öğrenci yeniden aktif olur.
+              Onaylanan öğrencinin çalışma kayıtları silinir; adı ve varsa fotoğrafı arşive alınır. Reddedilen öğrenci yeniden aktif olur.
             </DialogDescription>
           </DialogHeader>
 
@@ -764,7 +903,7 @@ export default function Home() {
                       disabled={Boolean(isBusy)}
                     >
                       {isBusy && <Loader2 size={15} className="mr-2 animate-spin" />}
-                      Silmeyi Onayla
+                      Arşive Almayı Onayla
                     </Button>
                   </div>
                 </div>
@@ -785,6 +924,13 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-end gap-2">
             {isAdmin && (
               <>
+                <Button
+                  variant="outline"
+                  onClick={() => setArchiveOpen(true)}
+                  className="border-orange-500/60 text-orange-300 hover:bg-orange-500 hover:text-white"
+                >
+                  <Archive className="mr-2 h-4 w-4" /> Arşiv ({archivedStudents.length})
+                </Button>
                 {pendingDeletionRequests.length > 0 && (
                   <Button
                     variant="outline"
