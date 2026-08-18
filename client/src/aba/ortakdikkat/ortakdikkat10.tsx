@@ -10,7 +10,6 @@ import {
   RotateCcw,
   Save,
   Speaker,
-  Timer,
   UserRound,
   Users,
   X,
@@ -27,7 +26,7 @@ import girisSes from './ortakdikkatsesgorsel/2-4girisses.mp3';
 
 const TRIAL_COUNT = 10;
 const PASS_COUNT = 8;
-const PEOPLE_GOAL = 4;
+const PEOPLE_GOAL = 3;
 
 const INITIATIONS = [
   'Merhaba, seni gördüğüme sevindim.',
@@ -116,8 +115,6 @@ export default function OrtakDikkat10({
   const [trials, setTrials] = useState<AssessmentTrial[]>([]);
   const [results, setResults] = useState<TrialResult[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [timerStarted, setTimerStarted] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [showExitDialog, setShowExitDialog] = useState(false);
 
   useEffect(() => {
@@ -166,18 +163,9 @@ export default function OrtakDikkat10({
     void loadProfile();
   }, [studentId]);
 
-  useEffect(() => {
-    if (!timerStarted || secondsLeft === null || secondsLeft <= 0) return;
-    const timeout = window.setTimeout(() => {
-      setSecondsLeft((seconds) => Math.max(0, (seconds || 0) - 1));
-    }, 1000);
-    return () => window.clearTimeout(timeout);
-  }, [secondsLeft, timerStarted]);
-
   const correctCount = results.filter((result) => result.correct).length;
   const passed = results.length === TRIAL_COUNT && correctCount >= PASS_COUNT;
   const currentTrial = trials[currentIndex];
-  const timedOut = timerStarted && secondsLeft === 0;
   const programCompleted = passed && previousPeople.length >= PEOPLE_GOAL;
 
   const successfulPeopleThisSet = useMemo(() => {
@@ -214,7 +202,7 @@ export default function OrtakDikkat10({
       return;
     }
     if (partners.length >= PEOPLE_GOAL) {
-      toast.info('Bir sette en fazla 4 kişi kullanılabilir.');
+      toast.info(`Bir sette en fazla ${PEOPLE_GOAL} kişi kullanılabilir.`);
       return;
     }
     setPartners((current) => [...current, cleanName]);
@@ -227,7 +215,7 @@ export default function OrtakDikkat10({
 
   const startAssessment = () => {
     if (partners.length !== PEOPLE_GOAL) {
-      toast.info('Değerlendirmeye başlamak için 4 farklı kişi ekleyin.');
+      toast.info(`Değerlendirmeye başlamak için ${PEOPLE_GOAL} farklı kişi ekleyin.`);
       return;
     }
 
@@ -239,8 +227,6 @@ export default function OrtakDikkat10({
     })));
     setResults([]);
     setCurrentIndex(0);
-    setTimerStarted(false);
-    setSecondsLeft(null);
     setSaved(false);
     stopIntro();
     setStage('assessment');
@@ -257,13 +243,6 @@ export default function OrtakDikkat10({
     setTrials((current) => current.map((trial, index) => (
       index === currentIndex ? { ...trial, initiation: replacement } : trial
     )));
-    setTimerStarted(false);
-    setSecondsLeft(null);
-  };
-
-  const startTimer = () => {
-    setTimerStarted(true);
-    setSecondsLeft(5);
   };
 
   const mergeSuccessfulPeople = (finalResults: TrialResult[]) => {
@@ -330,8 +309,7 @@ export default function OrtakDikkat10({
   };
 
   const recordResponse = (response: ResponseType) => {
-    if (!currentTrial || !timerStarted || saving) return;
-    if (timedOut && response !== 'no-response') return;
+    if (!currentTrial || saving) return;
 
     const nextResults: TrialResult[] = [
       ...results,
@@ -343,8 +321,6 @@ export default function OrtakDikkat10({
     ];
 
     setResults(nextResults);
-    setTimerStarted(false);
-    setSecondsLeft(null);
 
     if (currentIndex + 1 >= TRIAL_COUNT) {
       setStage('result');
@@ -363,8 +339,6 @@ export default function OrtakDikkat10({
     setTrials([]);
     setResults([]);
     setCurrentIndex(0);
-    setTimerStarted(false);
-    setSecondsLeft(null);
     setSaved(false);
     setStage('planning');
   };
@@ -420,7 +394,7 @@ export default function OrtakDikkat10({
               <div className="text-center">
                 <h2 className="text-2xl font-black">Sosyal etkileşime tepki</h2>
                 <p className="mt-3 text-sm leading-6 text-slate-300">
-                  Farklı kişiler ekrandaki cümleyi doğal biçimde söyler. Öğrencinin 5 saniye içinde bakarak, konuşarak veya iletişim aracıyla verdiği bağımsız tepki kaydedilir.
+                  Farklı kişiler ekrandaki cümleyi doğal biçimde söyler. Öğrencinin bakarak, konuşarak veya iletişim aracıyla verdiği bağımsız tepki kaydedilir.
                 </p>
               </div>
 
@@ -454,7 +428,7 @@ export default function OrtakDikkat10({
               <div className="pt-2 text-center">
                 <UserRound className="mx-auto text-cyan-300" size={40} />
                 <h2 className="mt-3 text-xl font-black">Etkileşimi başlatacak kişiler</h2>
-                <p className="mt-1 text-xs leading-5 text-slate-400">10 denemeyi uygulayacak 4 farklı kişinin adını yazın.</p>
+                <p className="mt-1 text-xs leading-5 text-slate-400">10 denemeyi uygulayacak {PEOPLE_GOAL} farklı kişinin adını yazın.</p>
               </div>
 
               <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
@@ -489,7 +463,7 @@ export default function OrtakDikkat10({
               </section>
 
               <div className="rounded-2xl border border-blue-500/25 bg-blue-500/10 p-4 text-center text-xs leading-5 text-blue-100/80">
-                {partners.length} / {PEOPLE_GOAL} kişi hazır. Uygulama 10 denemeyi bu 4 kişiye dağıtacak.
+                {partners.length} / {PEOPLE_GOAL} kişi hazır. Uygulama 10 denemeyi bu {PEOPLE_GOAL} kişiye dağıtacak.
               </div>
 
               <Button type="button" onClick={startAssessment} disabled={partners.length !== PEOPLE_GOAL} className="h-14 w-full bg-emerald-600 text-base font-black hover:bg-emerald-500 disabled:opacity-40">
@@ -516,35 +490,23 @@ export default function OrtakDikkat10({
                   <p className="text-xl font-black leading-8 text-white">“{currentTrial.initiation}”</p>
                 </div>
 
-                {!timerStarted ? (
-                  <Button type="button" onClick={startTimer} className="h-12 w-full bg-cyan-600 font-black hover:bg-cyan-500">
-                    <Timer size={19} className="mr-2" /> CÜMLEYİ SÖYLEDİM
-                  </Button>
-                ) : (
-                  <div className={`rounded-2xl border px-4 py-3 ${timedOut ? 'border-red-500/35 bg-red-500/10 text-red-300' : 'border-amber-500/35 bg-amber-500/10 text-amber-200'}`}>
-                    <p className="text-2xl font-black">{secondsLeft}</p>
-                    <p className="text-xs">{timedOut ? 'Süre doldu' : 'Öğrencinin tepkisini gözlemleyin'}</p>
-                  </div>
-                )}
-
-                {!timerStarted && (
-                  <button type="button" onClick={replaceCurrentInitiation} className="mt-3 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-800 hover:text-white">
-                    <RefreshCw size={15} /> Bu cümleyi değiştir
-                  </button>
-                )}
+                <p className="text-xs text-slate-400">Cümleyi doğal biçimde söyleyin ve öğrencinin tepkisini kaydedin.</p>
+                <button type="button" onClick={replaceCurrentInitiation} className="mt-3 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-slate-400 hover:bg-slate-800 hover:text-white">
+                  <RefreshCw size={15} /> Bu cümleyi değiştir
+                </button>
               </section>
 
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Button type="button" disabled={!timerStarted || timedOut} onClick={() => recordResponse('looked')} className="h-14 rounded-2xl border border-emerald-500/35 bg-emerald-500/15 font-black text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-35">
+                <Button type="button" disabled={saving} onClick={() => recordResponse('looked')} className="h-14 rounded-2xl border border-emerald-500/35 bg-emerald-500/15 font-black text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-35">
                   <Eye size={20} className="mr-2" /> BAKTI
                 </Button>
-                <Button type="button" disabled={!timerStarted || timedOut} onClick={() => recordResponse('spoke')} className="h-14 rounded-2xl border border-emerald-500/35 bg-emerald-500/15 font-black text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-35">
+                <Button type="button" disabled={saving} onClick={() => recordResponse('spoke')} className="h-14 rounded-2xl border border-emerald-500/35 bg-emerald-500/15 font-black text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-35">
                   <MessageCircle size={20} className="mr-2" /> KONUŞTU / AAC
                 </Button>
-                <Button type="button" disabled={!timerStarted || timedOut} onClick={() => recordResponse('both')} className="h-14 rounded-2xl border border-emerald-500/35 bg-emerald-500/15 font-black text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-35 sm:col-span-2">
+                <Button type="button" disabled={saving} onClick={() => recordResponse('both')} className="h-14 rounded-2xl border border-emerald-500/35 bg-emerald-500/15 font-black text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-35 sm:col-span-2">
                   <CheckCircle2 size={20} className="mr-2" /> BAKTI VE KONUŞTU
                 </Button>
-                <Button type="button" disabled={!timerStarted} onClick={() => recordResponse('no-response')} className="h-14 rounded-2xl border border-red-500/35 bg-red-500/15 font-black text-red-200 hover:bg-red-500/25 disabled:opacity-35 sm:col-span-2">
+                <Button type="button" disabled={saving} onClick={() => recordResponse('no-response')} className="h-14 rounded-2xl border border-red-500/35 bg-red-500/15 font-black text-red-200 hover:bg-red-500/25 disabled:opacity-35 sm:col-span-2">
                   <XCircle size={20} className="mr-2" /> TEPKİ VERMEDİ / İPUCU ALDI
                 </Button>
               </div>
