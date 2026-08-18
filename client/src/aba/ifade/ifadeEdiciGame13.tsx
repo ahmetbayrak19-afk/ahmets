@@ -11,6 +11,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 
 // ✅ Öğrenci hook'u (varsa)
 import { useStudentData } from "@/hooks/useStudentData";
+import { associateCurrentTeacherWithStudent } from "@/lib/studentTeacherAssociation";
 
 // --- GERİBİLDİRİM SESLERİ ---
 import aferin1 from "../esle/ses/aferin1.mp3";
@@ -497,6 +498,7 @@ export default function IfadeEdiciGame13({ onClose, onComplete, mode, studentId:
     }
     try {
       await setDoc(calibDocPath, { map: savedMapRef.current, updatedAt: Date.now() }, { merge: true });
+      await associateCurrentTeacherWithStudent(String(studentId));
     } catch {}
     setPhase("init");
   };
