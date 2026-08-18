@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 import Talk from './talk';
+import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 
 interface SozelTaklitPageProps {
   studentId: string;
@@ -62,6 +63,7 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
       const instId = localStorage.getItem("kazanim-takip-institution-id");
       if (!instId) throw new Error("Kurum bilgisi bulunamadı.");
       await setDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"), formData, { merge: true });
+      await associateCurrentTeacherWithStudent(studentId);
       setDirty(false);
       setSaveBanner('ok');
       window.setTimeout(() => setSaveBanner(null), 1500);

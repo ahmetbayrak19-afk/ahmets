@@ -6,6 +6,7 @@ import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Gamepad2, Play
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
+import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 
 // --- OYUN IMPORTLARI ---
 import AliciGame4 from '@/aba/Alici/AliciGame4';   // ADB 2.1 - İnsan Tanıma
@@ -72,6 +73,7 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
       const instId = localStorage.getItem("kazanim-takip-institution-id");
       if (!instId) throw new Error("Kurum bilgisi bulunamadı.");
       await setDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"), formData, { merge: true });
+      await associateCurrentTeacherWithStudent(studentId);
       setDirty(false);
       setSaveBanner('ok');
       window.setTimeout(() => setSaveBanner(null), 1500);

@@ -6,6 +6,7 @@ import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Gamepad2, Grad
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
+import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 
 // --- MEVCUT OYUN DOSYALARI ---
 import NesneEslemeGame1 from '@/aba/esle/NesneEslemeGame1';   // EB.1.1
@@ -95,6 +96,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
       if (!instId) throw new Error("Kurum bilgisi bulunamadı.");
       const dataToSave = newData || formData;
       await setDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"), dataToSave, { merge: true });
+      await associateCurrentTeacherWithStudent(studentId);
       setDirty(false);
       setSaveBanner('ok');
       window.setTimeout(() => setSaveBanner(null), 1500);

@@ -12,6 +12,7 @@ import {
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
+import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 
 // --- KAVRAM OYUN SESLERİ ---
 import bosSes from '@/kavram/bos.mp3';
@@ -763,6 +764,7 @@ export default function KavramAssessmentPage() {
   const handleSave = async () => {
     const instId = localStorage.getItem("kazanim-takip-institution-id");
     await setDoc(doc(db, "institutions", instId!, "students", studentId!, "assessments", "kavram"), formData);
+    await associateCurrentTeacherWithStudent(studentId!);
     toast.success("Kavramlar kaydedildi!");
   };
 

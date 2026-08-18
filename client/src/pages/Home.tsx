@@ -237,7 +237,9 @@ export default function Home() {
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-4">
       {studentList.map((student) => {
         const isMyStudent = isStudentMine(student);
-        const rawTeacherIds = student.associatedTeacherIds || [student.createdBy];
+        const rawTeacherIds = Array.from(new Set(
+          [student.createdBy, ...(student.associatedTeacherIds || [])].filter(Boolean),
+        )) as string[];
         const activeTeachers = rawTeacherIds.filter((tid: string) => teachers.some(t => t.name === tid));
         const hasValidTeacher = activeTeachers.length > 0;
         
@@ -305,12 +307,11 @@ export default function Home() {
             </div>
 
             <div className="flex flex-wrap gap-1 pl-1">
-                {activeTeachers.slice(0, 3).map((tid: string, idx: number) => (
+                {activeTeachers.map((tid: string, idx: number) => (
                   <span key={idx} className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-white/5 truncate">
                     {tid}
                   </span>
                 ))}
-                {activeTeachers.length > 3 && <span className="text-[10px] text-slate-500">+{activeTeachers.length - 3}</span>}
                 {!hasValidTeacher && <span className="text-[10px] text-red-500 font-bold bg-red-900/20 px-1.5 py-0.5 rounded">Atama Bekliyor</span>}
             </div>
 
