@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 import Talk from './talk';
+import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 
 // --- OYUN IMPORT ---
 import IfadeEdiciGame15 from '@/aba/ifade/ifadeEdiciGame15';
@@ -86,6 +87,7 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
         dataToSave,
         { merge: true }
       );
+      await associateCurrentTeacherWithStudent(studentId);
       setDirty(false);
       setSaveBanner('ok');
       window.setTimeout(() => setSaveBanner(null), 1500);

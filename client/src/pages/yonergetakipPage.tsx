@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 import { useStudentData } from '@/hooks/useStudentData';
+import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 
 import Yonerge1 from '@/aba/yonerge/yonerge1';
 import Yonerge2 from '@/aba/yonerge/yonerge2';
@@ -73,6 +74,7 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
       if (!instId) throw new Error("Kurum bilgisi bulunamadı");
       const dataToSave = newData || formData;
       await setDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"), dataToSave, { merge: true });
+      await associateCurrentTeacherWithStudent(studentId);
       setDirty(false);
       setSaveBanner('ok');
       window.setTimeout(() => setSaveBanner(null), 1500);
@@ -234,7 +236,7 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
 
 
       {showLeaveDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl space-y-4">
             <h3 className="text-base font-bold text-white">Kaydedilmemiş değişiklikler</h3>
             <p className="text-sm text-slate-300 leading-relaxed">
@@ -242,6 +244,7 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
             </p>
             <div className="flex gap-2 pt-1">
               <Button
+                data-android-back
                 variant="ghost"
                 className="flex-1 text-slate-300 hover:text-white"
                 onClick={() => setShowLeaveDialog(false)}

@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { twMerge } from "tailwind-merge";
 
 import { db } from "@/firebase";
+import { associateCurrentTeacherWithStudent } from "@/lib/studentTeacherAssociation";
 import girisSes from "./ortakdikkatsesgorsel/od2_1girisses.mp3";
 
 const TRIAL_COUNT = 10;
@@ -329,6 +330,7 @@ export default function OrtakDikkat7({
         },
         { merge: true },
       );
+      await associateCurrentTeacherWithStudent(studentId);
       toast.success("OD 2.1 değerlendirmesi kaydedildi.");
       onComplete(passed);
     } catch (error) {

@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { twMerge } from "tailwind-merge";
 
 import { db } from "@/firebase";
+import { associateCurrentTeacherWithStudent } from "@/lib/studentTeacherAssociation";
 
 const imageModules = import.meta.glob(
   [
@@ -396,6 +397,7 @@ export default function OrtakDikkat5({
         },
         { merge: true },
       );
+      await associateCurrentTeacherWithStudent(studentId);
 
       toast.success("1.5 değerlendirmesi kaydedildi.");
       onComplete(setPassed);

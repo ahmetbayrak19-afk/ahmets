@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { db } from '../firebase';
-import { doc, onSnapshot, updateDoc, collection, query, arrayUnion, orderBy } from 'firebase/firestore'; 
+import { doc, onSnapshot, updateDoc, collection, query, orderBy } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Target, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { clsx } from 'clsx';
+import { getCurrentTeacherAssociationUpdate } from '@/lib/studentTeacherAssociation';
 
 const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
@@ -112,7 +113,7 @@ export default function StudentDashboard() {
 
       await updateDoc(studentRef, { 
         monthlyProgress: updatedProgress,
-        associatedTeacherIds: arrayUnion(currentTeacherName) 
+        ...getCurrentTeacherAssociationUpdate(),
       });
 
       toast.success("Kazanım güncellendi");

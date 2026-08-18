@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 import { twMerge } from "tailwind-merge";
 import { db, storage } from "@/firebase";
+import { associateCurrentTeacherWithStudent } from "@/lib/studentTeacherAssociation";
 
 const imageModules = import.meta.glob(
   [
@@ -379,6 +380,7 @@ export default function Pekistirec({ studentId, studentName, onBack }: Props) {
       await setDoc(doc(
         db, "institutions", institutionId, "students", studentId, "profiles", "abaReinforcers",
       ), { version: 2, rankings: toSave, method, updatedBy: teacherName, updatedAt: serverTimestamp() }, { merge: true });
+      await associateCurrentTeacherWithStudent(studentId);
       setSavedProfile({ rankings: ranking, method, updatedAt: new Date() });
       setStep("summary"); toast.success("Pekiştireç sıralaması kaydedildi.");
     } catch (error) {

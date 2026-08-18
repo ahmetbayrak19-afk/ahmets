@@ -15,6 +15,8 @@ import OrtakDikkat6 from '@/aba/ortakdikkat/ortakdikkat6';
 import OrtakDikkat7 from '@/aba/ortakdikkat/ortakdikkat7';
 import OrtakDikkat8 from '@/aba/ortakdikkat/ortakdikkat8';
 import OrtakDikkat9 from '@/aba/ortakdikkat/ortakdikkat9';
+import OrtakDikkat10 from '@/aba/ortakdikkat/ortakdikkat10';
+import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 
 interface OrtakDikkatPageProps {
   studentId: string;
@@ -74,6 +76,7 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
       if (!instId) throw new Error("Kurum bilgisi bulunamadı.");
       const dataToSave = newData || formData;
       await setDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"), dataToSave, { merge: true });
+      await associateCurrentTeacherWithStudent(studentId);
       setDirty(false);
       setSaveBanner('ok');
       window.setTimeout(() => setSaveBanner(null), 1500);
@@ -235,6 +238,18 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
         />
       );
     }
+
+    if (activeItem.startsWith("OD 2.4.")) {
+      return (
+        <OrtakDikkat10
+          studentId={studentId}
+          itemCode={itemCode}
+          itemText={itemText}
+          onClose={() => setActiveItem(null)}
+          onComplete={(success) => handleAssessmentComplete(activeItem, success)}
+        />
+      );
+    }
   }
 
   return (
@@ -289,7 +304,7 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
       </div>
 
       {showLeaveDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-sm space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
             <h3 className="text-base font-bold text-white">Kaydedilmemiş değişiklikler</h3>
             <p className="text-sm leading-relaxed text-slate-300">
@@ -297,6 +312,7 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
             </p>
             <div className="flex gap-2 pt-1">
               <Button
+                data-android-back
                 variant="ghost"
                 className="flex-1 text-slate-300 hover:text-white"
                 onClick={() => setShowLeaveDialog(false)}
@@ -336,7 +352,7 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
       <div className="grid gap-3 animate-in slide-in-from-bottom-4 duration-500 pb-20">
         {items.map((item) => {
             const status = formData[item];
-            const hasAssessment = /^OD 1\.[1-6]\./.test(item) || /^OD 2\.[1-3]\./.test(item);
+            const hasAssessment = /^OD 1\.[1-6]\./.test(item) || /^OD 2\.[1-4]\./.test(item);
             
             // Kod ve Metin Ayırma
             const firstSpaceIndex = item.indexOf(' ');

@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { db, storage } from '../firebase'; // storage'ın export edildiğinden emin ol!
 import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 
 // --- TİP TANIMLAMALARI ---
 interface Card {
@@ -192,6 +193,7 @@ export default function Talk({ onBack, studentId }: TalkProps) {
         storagePath: filename, // Silmek için yolu tutuyoruz
         createdAt: serverTimestamp()
       });
+      await associateCurrentTeacherWithStudent(studentId);
 
       toast.dismiss(toastId);
       toast.success("Kart ve Ses Başarıyla Kaydedildi!");
@@ -227,6 +229,7 @@ export default function Talk({ onBack, studentId }: TalkProps) {
         }
       } catch (e) { console.log("Ses dosyası silinemedi veya zaten yok", e); }
 
+      await associateCurrentTeacherWithStudent(studentId);
       toast.success("Kart silindi.");
     } catch (e) {
       toast.error("Silme işlemi başarısız.");

@@ -305,7 +305,7 @@ await new Promise<void>((resolve, reject) => {
       const institutionId = req.session.institutionId!;
       const teacherId = req.session.teacherId!;
 
-      // First get the current student to check if they have no teachers
+      // Mevcut öğretmenleri koruyarak işlemi yapan öğretmeni ilişkilendir.
       const existingStudent = await storage.getStudent(id, institutionId);
       if (!existingStudent) {
         return res.status(404).json({ error: "Öğrenci bulunamadı veya erişim yetkiniz yok" });
@@ -313,13 +313,12 @@ await new Promise<void>((resolve, reject) => {
 
       const updates: Record<string, unknown> = {
         ...req.body,
-        lastUpdatedBy: teacherId
+        lastUpdatedBy: teacherId,
+        associatedTeacherIds: Array.from(new Set([
+          ...(existingStudent.associatedTeacherIds || []),
+          teacherId,
+        ])),
       };
-
-      // If student has no associated teachers, auto-assign the current teacher
-      if (!existingStudent.associatedTeacherIds || existingStudent.associatedTeacherIds.length === 0) {
-        updates.associatedTeacherIds = [teacherId];
-      }
 
       const student = await storage.updateStudent(id, institutionId, updates);
       
