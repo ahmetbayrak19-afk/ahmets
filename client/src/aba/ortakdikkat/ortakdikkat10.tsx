@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { db } from '@/firebase';
+import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 import girisSes from './ortakdikkatsesgorsel/2-4girisses.mp3';
 
 const TRIAL_COUNT = 10;
@@ -312,6 +313,7 @@ export default function OrtakDikkat10({
         programCompleted: finalPassed && nextPeople.length >= PEOPLE_GOAL,
         updatedAt: serverTimestamp(),
       }, { merge: true });
+      await associateCurrentTeacherWithStudent(studentId);
 
       setSessionCount((count) => count + 1);
       setPreviousPeople(nextPeople);

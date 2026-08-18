@@ -24,6 +24,7 @@ import KnownPeopleManager, {
 } from '@/aba/shared/KnownPeopleManager';
 import { Button } from '@/components/ui/button';
 import { db } from '@/firebase';
+import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 
 const TRIAL_COUNT = 10;
 const PASS_COUNT = 8;
@@ -276,6 +277,7 @@ export default function OrtakDikkat9({
         programCompleted: nextCorrectTargets.length >= 20,
         updatedAt: serverTimestamp(),
       }, { merge: true });
+      await associateCurrentTeacherWithStudent(studentId);
       setSessionCount((count) => count + 1);
       setPreviousCorrectTargets(nextCorrectTargets);
       toast.success('Değerlendirme kaydedildi.');
