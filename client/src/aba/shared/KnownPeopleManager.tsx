@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { db, storage } from '@/firebase';
+import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 
 export type KnownPersonCategory = 'ogretmen' | 'aile' | 'tanidik' | 'arkadas';
 
@@ -282,6 +283,7 @@ export default function KnownPeopleManager({
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      await associateCurrentTeacherWithStudent(studentId);
 
       setPersonName('');
       setPreviewImage(null);
@@ -318,6 +320,7 @@ export default function KnownPeopleManager({
           console.error('Kişi fotoğrafı silinemedi:', error);
         });
       }
+      await associateCurrentTeacherWithStudent(studentId);
       toast.success('Kişi silindi.');
     } catch (error) {
       console.error('Kişi silinemedi:', error);
