@@ -9,6 +9,8 @@ declare global {
 }
 
 const ROOT_PATHS = new Set(["/", "/login", "/home"]);
+const HOME_EXIT_CONFIRMATION_MS = 2000;
+let lastHomeBackPressAt = 0;
 
 function isVisible(element: HTMLElement) {
   const style = window.getComputedStyle(element);
@@ -63,7 +65,7 @@ function findBackButton() {
   );
   const topCloseButtons = clickables.filter((element) => {
     const hasCloseIcon = Boolean(
-      element.querySelector(".lucide-x-circle, .lucide-circle-x"),
+      element.querySelector(".lucide-x, .lucide-x-circle, .lucide-circle-x"),
     );
     return hasCloseIcon && element.getBoundingClientRect().top < 140;
   });
@@ -101,7 +103,23 @@ export function useAndroidBack() {
         return;
       }
 
-      if (ROOT_PATHS.has(currentPath())) {
+      const path = currentPath();
+
+      if (path === "/home") {
+        const now = Date.now();
+        if (now - lastHomeBackPressAt <= HOME_EXIT_CONFIRMATION_MS) {
+          lastHomeBackPressAt = 0;
+          window.AndroidNavigation?.moveToBackground();
+          return;
+        }
+
+        lastHomeBackPressAt = now;
+        window.dispatchEvent(new CustomEvent("androidExitWarning"));
+        return;
+      }
+
+      lastHomeBackPressAt = 0;
+      if (ROOT_PATHS.has(path)) {
         window.AndroidNavigation?.moveToBackground();
         return;
       }
