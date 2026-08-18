@@ -54,7 +54,13 @@ export default function Home() {
   const [personnelDialogOpen, setPersonnelDialogOpen] = useState(false);
   const [archivedDuplicateStudent, setArchivedDuplicateStudent] = useState<any | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [exitWarningVisible, setExitWarningVisible] = useState(false);
+  const [studentLeaveHintId, setStudentLeaveHintId] = useState<string | null>(null);
   const lastPendingRequestKey = useRef('');
+  const exitWarningTimerRef = useRef<number | null>(null);
+  const leaveHintPressTimerRef = useRef<number | null>(null);
+  const leaveHintHideTimerRef = useRef<number | null>(null);
+  const leaveHintTriggeredRef = useRef(false);
   
   const [_, setLocation] = useLocation();
 
@@ -131,6 +137,26 @@ export default function Home() {
     return () => stopCameraStream();
   }, []);
 
+  useEffect(() => {
+    const showExitWarning = () => {
+      setExitWarningVisible(true);
+      if (exitWarningTimerRef.current !== null) {
+        window.clearTimeout(exitWarningTimerRef.current);
+      }
+      exitWarningTimerRef.current = window.setTimeout(() => {
+        setExitWarningVisible(false);
+      }, 2000);
+    };
+
+    window.addEventListener('androidExitWarning', showExitWarning);
+    return () => {
+      window.removeEventListener('androidExitWarning', showExitWarning);
+      if (exitWarningTimerRef.current !== null) window.clearTimeout(exitWarningTimerRef.current);
+      if (leaveHintPressTimerRef.current !== null) window.clearTimeout(leaveHintPressTimerRef.current);
+      if (leaveHintHideTimerRef.current !== null) window.clearTimeout(leaveHintHideTimerRef.current);
+    };
+  }, []);
+
   const handleLogout = async () => {
     localStorage.removeItem("kazanim-takip-teacher-name");
     setLocation('/login');
@@ -163,6 +189,38 @@ export default function Home() {
   const closeArchivedDuplicateWarning = () => {
     setArchivedDuplicateStudent(null);
     clearStudentForm();
+  };
+
+  const startStudentLeaveLongPress = (studentId: string) => {
+    if (leaveHintPressTimerRef.current !== null) {
+      window.clearTimeout(leaveHintPressTimerRef.current);
+    }
+    leaveHintTriggeredRef.current = false;
+    leaveHintPressTimerRef.current = window.setTimeout(() => {
+      leaveHintTriggeredRef.current = true;
+      setStudentLeaveHintId(studentId);
+      if (leaveHintHideTimerRef.current !== null) {
+        window.clearTimeout(leaveHintHideTimerRef.current);
+      }
+      leaveHintHideTimerRef.current = window.setTimeout(() => {
+        setStudentLeaveHintId(null);
+      }, 1500);
+    }, 500);
+  };
+
+  const cancelStudentLeaveLongPress = () => {
+    if (leaveHintPressTimerRef.current !== null) {
+      window.clearTimeout(leaveHintPressTimerRef.current);
+      leaveHintPressTimerRef.current = null;
+    }
+  };
+
+  const handleStudentLeaveButtonClick = (student: any) => {
+    if (leaveHintTriggeredRef.current) {
+      leaveHintTriggeredRef.current = false;
+      return;
+    }
+    setLeaveStudentTarget(student);
   };
 
   // --- DAHİLİ KAMERA FONKSİYONLARI ---
@@ -392,9 +450,14 @@ export default function Home() {
       : toast.error('Öğrenci geri getirilemedi. Aynı isimde aktif bir kayıt olabilir.');
   };
 
-  const searchedStudents = students.filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const normalizedSearchTerm = searchTerm.trim().toLocaleLowerCase('tr-TR');
+  const searchedStudents = students.filter(student => {
+    if (!normalizedSearchTerm) return true;
+
+    return [student.name, student.diagnosis, student.age].some(value =>
+      String(value ?? '').toLocaleLowerCase('tr-TR').includes(normalizedSearchTerm),
+    );
+  });
 
   const isStudentMine = (s: any) => {
     const tName = currentTeacher?.name;
@@ -485,13 +548,47 @@ export default function Home() {
                 </div>
             </div>
 
-            <div className="flex flex-wrap gap-1 pl-1">
-                {activeTeachers.map((tid: string, idx: number) => (
-                  <span key={idx} className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-white/5 truncate">
-                    {tid}
-                  </span>
-                ))}
-                {!hasValidTeacher && <span className="text-[10px] text-red-500 font-bold bg-red-900/20 px-1.5 py-0.5 rounded">Atama Bekliyor</span>}
+            <div className="flex items-center gap-2 pl-1">
+                <div className="flex min-w-0 flex-1 flex-wrap gap-1">
+                  {activeTeachers.map((tid: string, idx: number) => (
+                    <span key={idx} className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-white/5 truncate">
+                      {tid}
+                    </span>
+                  ))}
+                  {!hasValidTeacher && <span className="text-[10px] text-red-500 font-bold bg-red-900/20 px-1.5 py-0.5 rounded">Atama Bekliyor</span>}
+                </div>
+
+                {!isDeletionPending && !isAdmin && isMyStudent && (
+                  <div className="relative ml-auto shrink-0">
+                    <AnimatePresence>
+                      {studentLeaveHintId === student.id && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 4, scale: 0.96 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                          className="pointer-events-none absolute bottom-full right-0 z-20 mb-2 whitespace-nowrap rounded-md border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-xl"
+                        >
+                          Artık benim öğrencim değil
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Artık benim öğrencim değil"
+                      className="h-8 w-8 select-none border border-slate-700/70 bg-slate-950 text-slate-500 hover:bg-orange-500/10 hover:text-orange-400"
+                      onPointerDown={() => startStudentLeaveLongPress(student.id)}
+                      onPointerUp={cancelStudentLeaveLongPress}
+                      onPointerLeave={cancelStudentLeaveLongPress}
+                      onPointerCancel={cancelStudentLeaveLongPress}
+                      onContextMenu={(event) => event.preventDefault()}
+                      onClick={() => handleStudentLeaveButtonClick(student)}
+                    >
+                      <UserX size={15} />
+                    </Button>
+                  </div>
+                )}
             </div>
 
             {!isDeletionPending && isAdmin && (
@@ -502,17 +599,6 @@ export default function Home() {
                 onClick={() => openTeacherAssignment(student)}
               >
                 <Users size={14} className="mr-2" /> Öğretmen Kadrosunu Düzenle
-              </Button>
-            )}
-
-            {!isDeletionPending && !isAdmin && isMyStudent && (
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-8 w-full border border-slate-700/70 text-[11px] text-slate-400 hover:bg-slate-800 hover:text-white"
-                onClick={() => setLeaveStudentTarget(student)}
-              >
-                <UserX size={14} className="mr-2" /> Artık Benim Öğrencim Değil
               </Button>
             )}
 
@@ -610,12 +696,26 @@ export default function Home() {
               <h2 className="text-white text-3xl font-bold mt-8 text-center">{viewingStudentPhoto.name}</h2>
               
               <button 
+                data-android-back
                 onClick={() => setViewingStudentPhoto(null)}
                 className="mt-8 bg-slate-800 text-white p-4 rounded-full hover:bg-slate-700 hover:scale-105 active:scale-95 transition-all shadow-lg"
               >
                 <X size={28} />
               </button>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {exitWarningVisible && (
+          <motion.div
+            initial={{ opacity: 0, y: 18, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.96 }}
+            className="pointer-events-none fixed bottom-6 left-1/2 z-[120] -translate-x-1/2 whitespace-nowrap rounded-full border border-slate-700 bg-slate-950/95 px-4 py-2.5 text-sm font-medium text-white shadow-2xl"
+          >
+            Çıkmak için geri tuşuna tekrar basın
           </motion.div>
         )}
       </AnimatePresence>
@@ -634,11 +734,11 @@ export default function Home() {
               className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm"
             />
             <motion.aside
-              initial={{ x: '100%' }}
+              initial={{ x: '-100%' }}
               animate={{ x: 0 }}
-              exit={{ x: '100%' }}
+              exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-              className="fixed inset-y-0 right-0 z-[90] w-[86vw] max-w-sm border-l border-slate-700 bg-slate-950 p-5 shadow-2xl"
+              className="fixed inset-y-0 left-0 z-[90] w-[86vw] max-w-sm border-r border-slate-700 bg-slate-950 p-5 shadow-2xl"
             >
               <div className="mb-6 flex items-center justify-between border-b border-white/10 pb-4">
                 <div>
@@ -646,6 +746,7 @@ export default function Home() {
                   <p className="mt-1 text-xs text-slate-500">Kurum yönetim seçenekleri</p>
                 </div>
                 <Button
+                  data-android-back
                   variant="ghost"
                   size="icon"
                   onClick={() => setAdminMenuOpen(false)}
@@ -1111,28 +1212,46 @@ export default function Home() {
       </Dialog>
 
       <div className="max-w-6xl mx-auto space-y-8">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/5">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tighter uppercase">Öğrenci Listesi</h1>
-            <p className="text-slate-400 flex items-center gap-2 mt-1">
-              <UserCircle2 className="h-4 w-4 text-blue-500" /> Hoş geldin, {currentTeacher.name}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {isAdmin && (
+        <header className="border-b border-white/5 py-2">
+          {isAdmin ? (
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+              <p className="min-w-0 truncate text-sm text-slate-400">
+                <UserCircle2 className="mr-1.5 inline h-4 w-4 text-blue-500" />
+                Hoş geldin, {currentTeacher.name}
+              </p>
               <Button
                 variant="outline"
                 onClick={() => setAdminMenuOpen(true)}
-                className="relative border-blue-500/60 bg-blue-500/5 text-blue-300 hover:bg-blue-500 hover:text-white"
+                className="relative h-9 justify-self-center border-blue-500/60 bg-blue-500/5 px-3 text-blue-300 hover:bg-blue-500 hover:text-white"
               >
-                <Menu className="mr-2 h-4 w-4" /> Yönetim
+                <Menu className="mr-2 h-4 w-4" /> Yönetim Paneli
                 {(pendingDeletionRequests.length > 0 || teachers.some(t => t.isApproved === false)) && (
                   <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-slate-950 animate-pulse" />
                 )}
               </Button>
-            )}
-            <Button variant="ghost" onClick={handleLogout} className="text-slate-400 border border-white/5"><LogOut className="mr-2 h-4 w-4" />Çıkış</Button>
-          </div>
+              <Button
+                variant="ghost"
+                onClick={handleLogout}
+                className="h-9 justify-self-end border border-white/5 px-3 text-slate-400"
+              >
+                <LogOut className="mr-2 h-4 w-4" /> Çıkış
+              </Button>
+            </div>
+          ) : (
+            <div className="flex min-w-0 items-center gap-2">
+              <p className="min-w-0 truncate text-sm text-slate-400">
+                <UserCircle2 className="mr-1.5 inline h-4 w-4 text-blue-500" />
+                Hoş geldin, {currentTeacher.name}
+              </p>
+              <Button
+                variant="ghost"
+                onClick={handleLogout}
+                className="h-9 shrink-0 border border-white/5 px-3 text-slate-400"
+              >
+                <LogOut className="mr-2 h-4 w-4" /> Çıkış
+              </Button>
+            </div>
+          )}
         </header>
 
         <div className="grid md:grid-cols-3 gap-6">
