@@ -3,6 +3,7 @@ import {
   doc, query, where, getDoc 
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
+import { getCurrentTeacherAssociationUpdate } from "./studentTeacherAssociation";
 
 // YARDIMCI: Kurum ID'sini güvenli şekilde al
 const getInstitutionId = () => {
@@ -87,11 +88,13 @@ export async function fetchStudents() {
 export async function createStudent(student: { name: string }) {
   const instId = getInstitutionId();
   if (!instId) throw new Error("Oturum bulunamadı");
+  const teacherName = localStorage.getItem('kazanim-takip-teacher-name')?.trim() || null;
   
   // DÜZELTİLDİ: Kurumun altına ekliyor
   const d = await addDoc(collection(db, "institutions", instId, "students"), { 
     ...student, 
-    createdBy: localStorage.getItem('kazanim-takip-teacher-name'), // Hangi hoca ekledi
+    createdBy: teacherName,
+    associatedTeacherIds: teacherName ? [teacherName] : [],
     institutionId: instId, 
     monthlyProgress: {},
     createdAt: new Date().toISOString()
@@ -104,7 +107,10 @@ export async function updateStudent(id: string, updates: any) {
   if (!instId) return;
 
   // DÜZELTİLDİ: Kurumun altındaki öğrenciyi güncelliyor
-  await updateDoc(doc(db, "institutions", instId, "students", id), updates);
+  await updateDoc(doc(db, "institutions", instId, "students", id), {
+    ...updates,
+    ...getCurrentTeacherAssociationUpdate(),
+  });
   return { id, ...updates };
 }
 
