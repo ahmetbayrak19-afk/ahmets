@@ -7,23 +7,33 @@ import {
   addDoc,
   deleteDoc,
   deleteField,
+  setDoc,
   query,
+  where,
+  limit,
   orderBy,
   getDoc,
   getDocs,
   serverTimestamp,
   updateDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'; // 🔥 deleteObject eklendi
 
 export function useStudentData() {
   const [students, setStudents] = useState<any[]>([]);
+  const [archivedStudents, setArchivedStudents] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [currentTeacher, setCurrentTeacher] = useState<any>(null);
   const [currentInstitution, setCurrentInstitution] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let isActive = true;
+    let unsubStudents: (() => void) | undefined;
+    let unsubTeachers: (() => void) | undefined;
+    let unsubArchive: (() => void) | undefined;
+
     const loadData = async () => {
       const instId = localStorage.getItem("kazanim-takip-institution-id");
       const teacherName = localStorage.getItem("kazanim-takip-teacher-name"); 
@@ -36,6 +46,7 @@ export function useStudentData() {
       try {
         const teacherRef = doc(db, "institutions", instId, "teachers", teacherName);
         const docSnap = await getDoc(teacherRef);
+        if (!isActive) return;
         
         if (docSnap.exists()) {
           setCurrentTeacher({ id: docSnap.id, ...docSnap.data() });
@@ -43,17 +54,23 @@ export function useStudentData() {
           
           const studentsRef = collection(db, "institutions", instId, "students");
           const qStudents = query(studentsRef, orderBy("createdAt", "desc"));
-          const unsubStudents = onSnapshot(qStudents, (snapshot) => {
+          unsubStudents = onSnapshot(qStudents, (snapshot) => {
             setStudents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
           });
 
           const teachersRef = collection(db, "institutions", instId, "teachers");
-          const unsubTeachers = onSnapshot(teachersRef, (snapshot) => {
+          unsubTeachers = onSnapshot(teachersRef, (snapshot) => {
             setTeachers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
           });
 
+          if (teacherName.toLocaleLowerCase('tr-TR') === 'admin') {
+            const archiveRef = collection(db, "institutions", instId, "archivedStudents");
+            unsubArchive = onSnapshot(archiveRef, (snapshot) => {
+              setArchivedStudents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            });
+          }
+
           setIsLoading(false);
-          return () => { unsubStudents(); unsubTeachers(); };
         } else {
           setIsLoading(false);
         }
@@ -63,7 +80,30 @@ export function useStudentData() {
       }
     };
     loadData();
+
+    return () => {
+      isActive = false;
+      unsubStudents?.();
+      unsubTeachers?.();
+      unsubArchive?.();
+    };
   }, []);
+
+  const normalizeStudentName = (name: string) =>
+    name.trim().replace(/\s+/g, ' ').toLocaleLowerCase('tr-TR');
+
+  const findArchivedStudentByName = async (name: string) => {
+    const instId = localStorage.getItem("kazanim-takip-institution-id");
+    if (!instId || !name.trim()) return null;
+
+    const archiveMatch = await getDocs(query(
+      collection(db, "institutions", instId, "archivedStudents"),
+      where("normalizedName", "==", normalizeStudentName(name)),
+      limit(1),
+    ));
+    const match = archiveMatch.docs[0];
+    return match ? { id: match.id, ...match.data() } : null;
+  };
 
   const addStudent = async (name: string, age: string, diagnosis: string, photoFile: File | null = null) => {
     const instId = localStorage.getItem("kazanim-takip-institution-id");
@@ -71,6 +111,16 @@ export function useStudentData() {
     if (!instId || !name.trim()) return { success: false, message: "Hata" };
     
     try {
+      const normalizedName = normalizeStudentName(name);
+      const archiveMatch = await findArchivedStudentByName(name);
+      if (archiveMatch) {
+        return {
+          success: false,
+          reason: "archived",
+          message: "Bu öğrenci kurumun eski öğrencisi ve arşiv kaydında bulunuyor.",
+        };
+      }
+
       let photoUrl = null;
 
       if (photoFile) {
@@ -83,6 +133,7 @@ export function useStudentData() {
 
       await addDoc(collection(db, "institutions", instId, "students"), {
         name: name.trim(),
+        normalizedName,
         age: age.trim(),
         diagnosis: diagnosis.trim(),
         photoUrl: photoUrl, 
@@ -208,17 +259,32 @@ export function useStudentData() {
     }
   };
 
-  // Yalnızca Admin kullanır. Alt koleksiyonlar ve öğrenciye ait Storage dosyaları da temizlenir.
+  // Yalnızca Admin kullanır. Ad ve fotoğraf arşive taşınır; öğrenciye ait çalışma kayıtları temizlenir.
   const deleteStudent = async (id: string) => {
     const { instId, teacherName } = getSession();
     if (!instId || teacherName?.toLocaleLowerCase('tr-TR') !== 'admin') return false;
 
+    const studentDocRef = getStudentRef(instId, id);
+    const archivedStudentRef = doc(db, "institutions", instId, "archivedStudents", id);
+    let archiveCreated = false;
+
     try {
-      const studentDocRef = getStudentRef(instId, id);
       const studentSnap = await getDoc(studentDocRef);
       if (!studentSnap.exists()) return false;
 
       const studentData = studentSnap.data();
+      await setDoc(archivedStudentRef, {
+        name: String(studentData.name || "İsimsiz Öğrenci"),
+        normalizedName: String(studentData.name || "")
+          .trim()
+          .replace(/\s+/g, ' ')
+          .toLocaleLowerCase('tr-TR'),
+        photoUrl: studentData.photoUrl || null,
+        archivedBy: teacherName,
+        archivedAt: serverTimestamp(),
+      });
+      archiveCreated = true;
+
       const childCollectionNames = ['assessments', 'profiles', 'knownPeople', 'talk_cards', 'ifade'];
 
       for (const collectionName of childCollectionNames) {
@@ -235,20 +301,67 @@ export function useStudentData() {
       }
 
       await deleteDoc(studentDocRef);
-
-      if (studentData.photoUrl) {
-        await deleteObject(ref(storage, studentData.photoUrl)).catch(err => {
-          console.error("Fotoğraf silinemedi:", err);
-        });
-      }
       return true;
     } catch (error) {
       console.error("Öğrenci silinirken hata oluştu:", error);
+      if (archiveCreated) {
+        const activeStudent = await getDoc(studentDocRef).catch(() => null);
+        if (activeStudent?.exists()) {
+          await deleteDoc(archivedStudentRef).catch(() => {});
+        }
+      }
       return false;
     }
   };
 
   const approveStudentDeletion = async (studentId: string) => deleteStudent(studentId);
+
+  const restoreArchivedStudent = async (studentId: string) => {
+    const { instId, teacherName } = getSession();
+    if (!instId || teacherName?.toLocaleLowerCase('tr-TR') !== 'admin') return false;
+
+    try {
+      const archivedStudentRef = doc(db, "institutions", instId, "archivedStudents", studentId);
+      const archivedStudentSnap = await getDoc(archivedStudentRef);
+      if (!archivedStudentSnap.exists()) return false;
+
+      const archivedStudent = archivedStudentSnap.data();
+      const normalizedName = String(archivedStudent.normalizedName || archivedStudent.name || '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .toLocaleLowerCase('tr-TR');
+      const activeStudents = await getDocs(collection(db, "institutions", instId, "students"));
+      const hasActiveNameMatch = activeStudents.docs.some(studentDoc => {
+        const activeName = String(studentDoc.data().name || '')
+          .trim()
+          .replace(/\s+/g, ' ')
+          .toLocaleLowerCase('tr-TR');
+        return activeName === normalizedName;
+      });
+      if (hasActiveNameMatch) return false;
+
+      const restoreBatch = writeBatch(db);
+      restoreBatch.set(getStudentRef(instId, studentId), {
+        name: String(archivedStudent.name || "İsimsiz Öğrenci"),
+        normalizedName,
+        age: "",
+        diagnosis: "",
+        photoUrl: archivedStudent.photoUrl || null,
+        createdBy: null,
+        associatedTeacherIds: [],
+        createdAt: new Date().toISOString(),
+        restoredFromArchive: true,
+        restoredBy: teacherName,
+        restoredAt: serverTimestamp(),
+      });
+      restoreBatch.delete(archivedStudentRef);
+      await restoreBatch.commit();
+      return true;
+    } catch (error) {
+      console.error("Öğrenci arşivden geri getirilirken hata oluştu:", error);
+      return false;
+    }
+  };
 
   const deleteTeacher = async (teacherId: string) => {
     const { instId, teacherName } = getSession();
@@ -303,13 +416,16 @@ export function useStudentData() {
 
   return { 
     students, 
+    archivedStudents,
     teachers, 
     currentTeacher, 
     currentInstitution, 
     isLoading, 
     addStudent, 
+    findArchivedStudentByName,
     deleteStudent, 
     approveStudentDeletion,
+    restoreArchivedStudent,
     rejectStudentDeletion,
     requestStudentDeletion,
     updateStudentTeachers,
