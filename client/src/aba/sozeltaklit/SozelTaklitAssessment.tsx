@@ -4,7 +4,9 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Loader2,
+  Play,
   RefreshCw,
+  RotateCcw,
   Volume2,
   XCircle,
 } from 'lucide-react';
@@ -486,15 +488,22 @@ export default function SozelTaklitAssessment({
                   }}
                 />
               </button>
-              <p className="mt-3 text-center text-xs font-semibold text-slate-400">
-                {isPlaying
-                  ? 'Video oynatılıyor.'
-                  : playCount === 0
-                    ? 'Başlatmak için videoya dokunun.'
-                    : playCount === 1
-                      ? 'Gerekirse videoya dokunup bir kez daha oynatabilirsiniz.'
-                      : 'Tekrar hakkı kullanıldı.'}
-              </p>
+              <button
+                type="button"
+                onClick={playDigitalTrial}
+                disabled={isPlaying || playCount >= 2}
+                className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-blue-400/30 bg-blue-500/10 px-5 py-2 text-sm font-bold text-blue-200 transition hover:bg-blue-500/20 active:scale-95 disabled:cursor-default disabled:border-slate-700 disabled:bg-slate-800/60 disabled:text-slate-500"
+              >
+                {isPlaying ? (
+                  <><Loader2 className="animate-spin" size={17} /> Oynatılıyor</>
+                ) : playCount === 0 ? (
+                  <><Play size={17} /> Oynat</>
+                ) : playCount === 1 ? (
+                  <><RotateCcw size={16} /> Bir kez daha oynat</>
+                ) : (
+                  <><CheckCircle2 size={16} /> Tekrar kullanıldı</>
+                )}
+              </button>
             </div>
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-purple-500/20 bg-slate-900/70 p-6 text-center shadow-xl">
