@@ -191,7 +191,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             {/* EB.4.9 - Öykü Eşleme */}
             {activeGameItem.startsWith("EB.4.9") && (
                <div className="fixed inset-0 z-[100] bg-white">
-                 <NesneEslemeGame23 onClose={() => setActiveGameMode(null)} />
+                 <NesneEslemeGame23 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
                </div>
             )}
           </>
