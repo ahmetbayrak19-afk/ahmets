@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
+  AlertTriangle,
   Box,
   Check,
+  EyeOff,
   PackageCheck,
   PlayCircle,
   Trophy,
@@ -10,7 +12,6 @@ import {
 } from "lucide-react";
 import confetti from "canvas-confetti";
 
-import girisSes from "./sesgorsel/girisses.mp3";
 import arabaImg from "./sesgorsel/araba.png";
 import kalemImg from "./sesgorsel/kalem.png";
 import elmaImg from "./sesgorsel/elma.png";
@@ -220,6 +221,15 @@ const MIN_SELECTED_OBJECTS = 3;
 const TRIAL_COUNT = 10;
 const PASS_SCORE = 8;
 
+const OBJECT_WARNING_NAMES: Record<ObjectId, string> = {
+  araba: "oyuncak arabayı",
+  kalem: "kalemi",
+  elma: "elmayı",
+  top: "topu",
+  kitap: "kitabı",
+  bebek: "oyuncak bebeği",
+};
+
 function shuffle<T>(items: T[]): T[] {
   const copy = [...items];
   for (let i = copy.length - 1; i > 0; i--) {
@@ -300,32 +310,8 @@ export default function Yonerge14({
   const [score, setScore] = useState(0);
   const [locked, setLocked] = useState(false);
 
-  const introRef = useRef<HTMLAudioElement | null>(null);
-
   const displayItemCode = itemCode.trim() === "YTB" ? "YTB 4.3" : itemCode;
   const displayItemText = itemText.replace(/^4\.3\.\s*/, "");
-
-  useEffect(() => {
-    if (phase !== "prep") return;
-
-    const audio = new Audio(girisSes);
-    introRef.current = audio;
-    audio.volume = 1;
-    audio.play().catch(() => {});
-
-    return () => {
-      audio.pause();
-      audio.currentTime = 0;
-      if (introRef.current === audio) introRef.current = null;
-    };
-  }, [phase]);
-
-  const stopIntro = () => {
-    if (!introRef.current) return;
-    introRef.current.pause();
-    introRef.current.currentTime = 0;
-    introRef.current = null;
-  };
 
   const selectedObjects = useMemo(
     () => OBJECT_GROUPS.filter((group) => selectedObjectIds.includes(group.id)),
@@ -362,7 +348,6 @@ export default function Yonerge14({
 
   const startAssessment = () => {
     if (!canStart) return;
-    stopIntro();
     setSessionTasks(preparedTasks);
     setCurrentIndex(0);
     setScore(0);
@@ -395,6 +380,9 @@ export default function Yonerge14({
   };
 
   const currentTask = sessionTasks[currentIndex];
+  const currentObjectName = currentTask
+    ? OBJECT_WARNING_NAMES[currentTask.objectId]
+    : "hedef nesneyi";
   const success = sessionTasks.length > 0 && score >= passScore;
   const successRate =
     sessionTasks.length > 0
@@ -409,10 +397,7 @@ export default function Yonerge14({
       <div className="shrink-0 p-4 landscape:py-2 landscape:px-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md relative z-10">
         <button
           type="button"
-          onClick={() => {
-            stopIntro();
-            onClose();
-          }}
+          onClick={onClose}
           className="p-2 landscape:p-1.5 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white"
           aria-label="Değerlendirmeyi kapat"
         >
@@ -454,11 +439,23 @@ export default function Yonerge14({
               <p className="text-slate-400 text-sm leading-relaxed px-2">
                 En az{" "}
                 <span className="text-teal-300 font-semibold">üç nesne</span>{" "}
-                seçin. Seçtiğiniz nesnelerin yönerge havuzundan her
-                değerlendirmede karışık sırayla 10 yönerge sorulur. Öğrenci 3–5
-                saniye içinde doğru nesneyi seçip istenen hareketi bağımsız
-                yaparsa doğru sayılır.
+                seçin ve gerçek nesneleri öğrencinin ulaşabileceği şekilde
+                hazırlayın. Uygulama seçilen nesnelerden karışık sırayla 10
+                yönerge oluşturur.
               </p>
+            </div>
+
+            <div className="rounded-2xl border border-teal-500/25 bg-teal-500/5 p-4">
+              <div className="mb-3 flex items-center gap-2 text-teal-200">
+                <EyeOff size={19} />
+                <h2 className="text-sm font-black uppercase tracking-wider">Öğretmen ipuçları</h2>
+              </div>
+              <div className="space-y-2 text-sm leading-relaxed text-slate-300">
+                <p><span className="font-bold text-white">1.</span> Ekrandaki yönergeyi öğrenciye yalnızca bir kez, doğal bir ses tonuyla söyleyin.</p>
+                <p><span className="font-bold text-white">2.</span> Hedef nesneye bakmayın; nesneyi göstermeyin, işaret etmeyin veya öğrencinin elini yönlendirmeyin.</p>
+                <p><span className="font-bold text-white">3.</span> Öğrencinin 3–5 saniye içinde doğru nesneyi seçip hareketi bağımsız yapmasını bekleyin.</p>
+                <p><span className="font-bold text-white">4.</span> Yardımla yapılan, yanlış nesneyle yapılan veya tepkisiz kalınan denemeyi “Yapamadı” olarak işaretleyin.</p>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -555,6 +552,16 @@ export default function Yonerge14({
               <h1 className="text-3xl md:text-5xl font-black text-center text-white leading-tight">
                 “{currentTask.text}.”
               </h1>
+              <div className="mt-6 w-full max-w-2xl rounded-2xl border-2 border-amber-500/50 bg-amber-500/10 px-4 py-4 text-center shadow-[0_0_20px_rgba(245,158,11,0.08)]">
+                <div className="mb-1 flex items-center justify-center gap-2 text-amber-300">
+                  <AlertTriangle size={22} />
+                  <span className="text-base font-black uppercase">İpucu vermeyin</span>
+                </div>
+                <p className="text-base font-bold leading-relaxed text-amber-100 sm:text-lg">
+                  Öğrenciye {currentObjectName} göstermeyin veya işaret etmeyin;
+                  bakışınızla ya da elinizle yönlendirmeyin.
+                </p>
+              </div>
               <p className="text-slate-500 text-sm mt-4 text-center max-w-lg">
                 Öğrenci 3–5 saniye içinde doğru nesneyi seçip hareketi bağımsız
                 yaparsa <span className="text-green-400">Yaptı</span>, yanlış
