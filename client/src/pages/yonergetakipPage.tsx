@@ -8,6 +8,7 @@ import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 import { useStudentData } from '@/hooks/useStudentData';
 import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
+import AssessmentModeBadges from '@/aba/shared/AssessmentModeBadges';
 
 import Yonerge1 from '@/aba/yonerge/yonerge1';
 import Yonerge2 from '@/aba/yonerge/yonerge2';
@@ -360,52 +361,56 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
                                 Geçemedi · öncelikli
                               </span>
                             )}
+                            <AssessmentModeBadges interactive={hasTest} manual tone="amber" />
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                    <div className="flex shrink-0 flex-col items-end gap-2 self-end sm:self-center">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setStatus(item, false)}
+                            className={twMerge(
+                              "flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
+                              status === false
+                                ? "bg-red-500/25 border-red-500 text-red-400"
+                                : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-red-400"
+                            )}
+                            title="Yapamıyor"
+                          >
+                              <XCircle size={18} />
+                          </button>
+
+                          <button
+                            onClick={() => setStatus(item, true)}
+                            className={twMerge(
+                              "flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
+                              status === true
+                                ? "bg-green-500/20 border-green-500 text-green-400 shadow-[0_0_10px_rgba(34,197,94,0.1)]"
+                                : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-green-400 hover:border-green-500/50"
+                            )}
+                            title="Yapıyor"
+                          >
+                              <CheckCircle2 size={18} />
+                          </button>
+                        </div>
                         {hasTest && (
                             <button
                                 onClick={() => setActiveItem(item)}
                                 className={twMerge(
-                                  "h-9 px-3 mr-2 rounded-lg text-white text-[10px] font-bold flex items-center gap-1.5 border shadow-sm transition-all active:scale-95",
+                                  "h-9 px-3 rounded-lg text-white text-[10px] font-bold flex items-center gap-1.5 border shadow-sm transition-all active:scale-95",
                                   isPassed &&
-                                    "bg-blue-600/50 border-blue-400/40 hover:bg-blue-600/80",
+                                    "bg-amber-600/50 border-amber-400/40 hover:bg-amber-600/80",
                                   isFailed &&
-                                    "bg-blue-600 border-blue-400 hover:bg-blue-500 ring-1 ring-blue-400/30",
+                                    "bg-amber-600 border-amber-400 hover:bg-amber-500 ring-1 ring-amber-400/30",
                                   !isPassed &&
                                     !isFailed &&
-                                    "bg-blue-600/90 border-blue-400 hover:bg-blue-500"
+                                    "bg-amber-600/90 border-amber-400 hover:bg-amber-500"
                                 )}
                             >
                                 <ClipboardCheck size={16} />{" "}
-                                <span className="hidden sm:inline">DEĞERLENDİR</span>
+                                <span>Değerlendir</span>
                             </button>
                         )}
-
-                        <button
-                          onClick={() => setStatus(item, false)}
-                          className={twMerge(
-                            "flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
-                            status === false
-                              ? "bg-red-500/25 border-red-500 text-red-400"
-                              : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-red-400"
-                          )}
-                        >
-                            <XCircle size={18} />
-                        </button>
-
-                        <button
-                          onClick={() => setStatus(item, true)}
-                          className={twMerge(
-                            "flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
-                            status === true
-                              ? "bg-green-500/20 border-green-500 text-green-400 shadow-[0_0_10px_rgba(34,197,94,0.1)]"
-                              : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-green-400 hover:border-green-500/50"
-                          )}
-                        >
-                            <CheckCircle2 size={18} />
-                        </button>
                     </div>
                 </div>
             );

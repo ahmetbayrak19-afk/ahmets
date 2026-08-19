@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase'; // Firebase yolun proje yapına göre değişebilir, sendeki gibi bıraktım
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, GraduationCap, ClipboardCheck, Video } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, GraduationCap, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
+import AssessmentModeBadges from '@/aba/shared/AssessmentModeBadges';
 
 // 🔥 DİKKAT: YOL GÜNCELLENDİ (Yeni yerine göre)
 import TaklitSession from '@/aba/taklit/TaklitSession';
@@ -23,7 +24,7 @@ export default function TaklitPage({ studentId, onBack }: TaklitPageProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveBanner, setSaveBanner] = useState<'ok' | 'err' | null>(null);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
-  
+
   const [activeItem, setActiveItem] = useState<string | null>(null);
   const [activeMode, setActiveMode] = useState<'assessment' | 'instruction' | null>(null);
 
@@ -40,7 +41,7 @@ export default function TaklitPage({ studentId, onBack }: TaklitPageProps) {
             if (docSnap.exists()) setFormData(docSnap.data());
             setDirty(false);
         }
-      } catch (error) { console.error(error); } 
+      } catch (error) { console.error(error); }
       finally { setLoading(false); }
     };
     load();
@@ -111,9 +112,9 @@ export default function TaklitPage({ studentId, onBack }: TaklitPageProps) {
   if (activeItem && activeMode) {
     const firstSpaceIndex = activeItem.indexOf(' ');
     const textOnly = activeItem.substring(firstSpaceIndex + 1);
-    
+
     return (
-      <TaklitSession 
+      <TaklitSession
         mode={activeMode}
         itemCode={activeItem}
         itemText={textOnly}
@@ -220,41 +221,40 @@ export default function TaklitPage({ studentId, onBack }: TaklitPageProps) {
                             )}>{text}</p>
                             {isPassed && <span className="block text-[10px] text-green-500/60 font-semibold uppercase tracking-wider">Geçti · tekrar değerlendirilebilir</span>}
                             {isFailed && <span className="block text-[10px] text-red-400/90 font-semibold uppercase tracking-wider">Geçemedi · öncelikli</span>}
-                            <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                              <Video size={12} /> Video Seti
-                            </span>
+                            <AssessmentModeBadges interactive manual tone="indigo" />
                         </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
-                        
+                    <div className="flex shrink-0 flex-col items-end gap-2 self-end sm:self-center">
                         <div className="flex items-center gap-1">
-                            <button 
-                              onClick={() => { setActiveItem(item); setActiveMode('instruction'); }} 
-                              className="h-8 px-3 rounded-md bg-purple-600/90 text-white text-[10px] font-bold flex items-center gap-1 hover:bg-purple-500 border border-purple-400 shadow-sm transition-transform active:scale-95"
-                            >
-                              <GraduationCap size={14} /> Öğretim
-                            </button>
-                            <button 
-                              onClick={() => { setActiveItem(item); setActiveMode('assessment'); }} 
-                              className="h-8 px-3 rounded-md bg-blue-600/90 text-white text-[10px] font-bold flex items-center gap-1 hover:bg-blue-500 border border-blue-400 shadow-sm transition-transform active:scale-95"
-                            >
-                              <ClipboardCheck size={14} /> Test
-                            </button>
-                        </div>
-
-                        <div className="flex items-center gap-1 ml-2">
-                            <button 
-                                onClick={() => setStatus(item, false)} 
+                            <button
+                                onClick={() => setStatus(item, false)}
                                 className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center transition-all active:scale-95", status === false ? "bg-red-500/20 border-red-500 text-red-400" : "bg-slate-950 border-slate-800 text-slate-500 hover:text-red-400")}
+                                title="Yapamıyor"
                             >
                                 <XCircle size={16} />
                             </button>
-                            <button 
-                                onClick={() => setStatus(item, true)} 
+                            <button
+                                onClick={() => setStatus(item, true)}
                                 className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center transition-all active:scale-95", status === true ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-800 text-slate-500 hover:text-green-400")}
+                                title="Yapıyor"
                             >
                                 <CheckCircle2 size={16} />
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => { setActiveItem(item); setActiveMode('instruction'); }}
+                              className="h-8 px-3 rounded-md bg-indigo-500/10 text-indigo-300 text-[10px] font-bold flex items-center gap-1 hover:bg-indigo-500/20 border border-indigo-400/40 shadow-sm transition-transform active:scale-95"
+                            >
+                              <GraduationCap size={14} /> Öğretim
+                            </button>
+                            <button
+                              onClick={() => { setActiveItem(item); setActiveMode('assessment'); }}
+                              className="h-8 px-3 rounded-md bg-indigo-600/90 text-white text-[10px] font-bold flex items-center gap-1 hover:bg-indigo-500 border border-indigo-400 shadow-sm transition-transform active:scale-95"
+                            >
+                              <ClipboardCheck size={14} /> Değerlendir
                             </button>
                         </div>
                     </div>

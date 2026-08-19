@@ -8,6 +8,7 @@ import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 import Talk from './talk';
 import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
+import AssessmentModeBadges from '@/aba/shared/AssessmentModeBadges';
 
 // --- OYUN IMPORT ---
 import IfadeEdiciGame15 from '@/aba/ifade/ifadeEdiciGame15';
@@ -160,7 +161,7 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
     }
 
     // ✅ 2. YENİ OYUNUN YÖNLENDİRMESİ EKLENDİ (Kodu kendi listene göre düzenle)
-    if (activeGameItem.startsWith("İEDB 3.6")) { 
+    if (activeGameItem.startsWith("İEDB 3.6")) {
       return (
         <IfadeEdiciGame14
           studentId={studentId}
@@ -259,7 +260,7 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
           const isFailed = status === false;
 
           const isTolkidoItem = item.includes("TOLKİDO");
-          
+
           // ✅ 3. BUTONLARIN GÖRÜNMESİ İÇİN 3.6 BURAYA DA EKLENDİ
           const hasGame = item.startsWith("İEDB 3.5") || item.startsWith("İEDB 3.6") || item.startsWith("İEDB 3.7");
 
@@ -295,66 +296,67 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
                   </p>
                   {isPassed && <span className="block text-[10px] text-green-500/60 font-semibold uppercase tracking-wider">Geçti · tekrar değerlendirilebilir</span>}
                   {isFailed && <span className="block text-[10px] text-red-400/90 font-semibold uppercase tracking-wider">Geçemedi · öncelikli</span>}
-                  {hasGame && (
-                    <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                      <Gamepad2 size={12} /> İnteraktif
-                    </span>
-                  )}
+                  <AssessmentModeBadges interactive={hasGame || isTolkidoItem} manual tone="orange" />
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 self-end sm:self-center">
-                {/* OYUN BUTONLARI */}
+              <div className="flex shrink-0 flex-col items-end gap-2 self-end sm:self-center">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setStatus(item, false)}
+                    className={twMerge(
+                      "flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
+                      status === false
+                        ? "bg-red-500/20 border-red-500 text-red-400"
+                        : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-red-400"
+                    )}
+                    title="Yapamıyor"
+                  >
+                    <XCircle size={18} />
+                  </button>
+
+                  <button
+                    onClick={() => setStatus(item, true)}
+                    className={twMerge(
+                      "flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
+                      status === true
+                        ? "bg-green-500/20 border-green-500 text-green-400 shadow-[0_0_10px_rgba(34,197,94,0.1)]"
+                        : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-green-400 hover:border-green-500/50"
+                    )}
+                    title="Yapıyor"
+                  >
+                    <CheckCircle2 size={18} />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-1">
                 {hasGame && (
-                  <div className="flex items-center gap-1 mr-2">
+                  <>
                     <button
                       onClick={() => { setActiveGameItem(item); setActiveGameMode('instruction'); }}
-                      className="h-8 px-3 rounded-md bg-purple-600/20 text-purple-400 text-[10px] font-bold flex items-center gap-1 hover:bg-purple-600/40 border border-purple-500/50 transition-all"
+                      className="h-8 px-3 rounded-md bg-orange-500/10 text-orange-300 text-[10px] font-bold flex items-center gap-1 hover:bg-orange-500/20 border border-orange-400/40 transition-all"
                     >
                       <GraduationCap size={14} /> Öğretim
                     </button>
                     <button
                       onClick={() => { setActiveGameItem(item); setActiveGameMode('assessment'); }}
-                      className="h-8 px-3 rounded-md bg-blue-600/20 text-blue-400 text-[10px] font-bold flex items-center gap-1 hover:bg-blue-600/40 border border-blue-500/50 transition-all"
+                      className="h-8 px-3 rounded-md bg-orange-600/90 text-white text-[10px] font-bold flex items-center gap-1 hover:bg-orange-500 border border-orange-400 transition-all"
                     >
-                      <ClipboardCheck size={14} /> Test
+                      <ClipboardCheck size={14} /> Değerlendir
                     </button>
-                  </div>
+                  </>
                 )}
 
                 {/* TOLKİDO ÖZEL BUTONU */}
                 {isTolkidoItem && (
                   <button
                     onClick={() => setShowTolkido(true)}
-                    className="flex items-center justify-center w-9 h-9 rounded-lg border bg-orange-500/20 border-orange-500 text-orange-400 hover:bg-orange-500/40 transition-all mr-1"
+                    className="flex h-8 items-center justify-center gap-1 rounded-md border border-orange-400 bg-orange-600/90 px-3 text-[10px] font-bold text-white transition-all hover:bg-orange-500"
                   >
-                    <Gamepad2 size={18} />
+                    <Gamepad2 size={14} /> Değerlendir
                   </button>
                 )}
-
-                <button
-                  onClick={() => setStatus(item, false)}
-                  className={twMerge(
-                    "flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
-                    status === false
-                      ? "bg-red-500/20 border-red-500 text-red-400"
-                      : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-red-400"
-                  )}
-                >
-                  <XCircle size={18} />
-                </button>
-
-                <button
-                  onClick={() => setStatus(item, true)}
-                  className={twMerge(
-                    "flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
-                    status === true
-                      ? "bg-green-500/20 border-green-500 text-green-400 shadow-[0_0_10px_rgba(34,197,94,0.1)]"
-                      : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-green-400 hover:border-green-500/50"
-                  )}
-                >
-                  <CheckCircle2 size={18} />
-                </button>
+                </div>
               </div>
             </div>
           );

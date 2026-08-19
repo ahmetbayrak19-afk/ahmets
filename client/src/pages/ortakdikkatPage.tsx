@@ -17,6 +17,7 @@ import OrtakDikkat8 from '@/aba/ortakdikkat/ortakdikkat8';
 import OrtakDikkat9 from '@/aba/ortakdikkat/ortakdikkat9';
 import OrtakDikkat10 from '@/aba/ortakdikkat/ortakdikkat10';
 import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
+import AssessmentModeBadges from '@/aba/shared/AssessmentModeBadges';
 
 interface OrtakDikkatPageProps {
   studentId: string;
@@ -102,9 +103,9 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
   };
 
   const setStatus = (itemCode: string, status: boolean) => {
-    setFormData(prev => ({ 
-        ...prev, 
-        [itemCode]: prev[itemCode] === status ? null : status 
+    setFormData(prev => ({
+        ...prev,
+        [itemCode]: prev[itemCode] === status ? null : status
     }));
     setDirty(true);
   };
@@ -353,7 +354,7 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
         {items.map((item) => {
             const status = formData[item];
             const hasAssessment = /^OD 1\.[1-6]\./.test(item) || /^OD 2\.[1-4]\./.test(item);
-            
+
             // Kod ve Metin Ayırma
             const firstSpaceIndex = item.indexOf(' ');
             const code = item.substring(0, firstSpaceIndex);
@@ -363,8 +364,8 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
             const isFailed = status === false;
 
             return (
-                <div 
-                    key={item} 
+                <div
+                    key={item}
                     className={twMerge(
                         "group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4",
                         isPassed &&
@@ -404,51 +405,54 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
                                 Geçemedi · öncelikli
                               </span>
                             )}
+                            <AssessmentModeBadges interactive={hasAssessment} manual tone="teal" />
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                    <div className="flex shrink-0 flex-col items-end gap-2 self-end sm:self-center">
+                        <div className="flex items-center gap-2">
+                          <button
+                              onClick={() => setStatus(item, false)}
+                              className={twMerge(
+                                  "flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
+                                  status === false
+                                      ? "bg-red-500/20 border-red-500 text-red-400"
+                                      : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-red-400"
+                              )}
+                              title="Yapamıyor"
+                          >
+                              <XCircle size={18} />
+                          </button>
+
+                          <button
+                              onClick={() => setStatus(item, true)}
+                              className={twMerge(
+                                  "flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
+                                  status === true
+                                      ? "bg-green-500/20 border-green-500 text-green-400 shadow-[0_0_10px_rgba(34,197,94,0.1)]"
+                                      : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-green-400 hover:border-green-500/50"
+                              )}
+                              title="Yapıyor"
+                          >
+                              <CheckCircle2 size={18} />
+                          </button>
+                        </div>
                         {hasAssessment && (
                           <button
                             type="button"
                             onClick={() => setActiveItem(item)}
                             className={twMerge(
-                              "h-9 px-3 mr-2 rounded-lg text-white text-[10px] font-bold flex items-center gap-1.5 border shadow-sm transition-all active:scale-95",
-                              isPassed && "bg-blue-600/50 border-blue-400/40 hover:bg-blue-600/80",
-                              isFailed && "bg-blue-600 border-blue-400 hover:bg-blue-500 ring-1 ring-blue-400/30",
-                              !isPassed && !isFailed && "bg-blue-600/90 border-blue-400 hover:bg-blue-500"
+                              "h-9 px-3 rounded-lg text-white text-[10px] font-bold flex items-center gap-1.5 border shadow-sm transition-all active:scale-95",
+                              isPassed && "bg-teal-600/50 border-teal-400/40 hover:bg-teal-600/80",
+                              isFailed && "bg-teal-600 border-teal-400 hover:bg-teal-500 ring-1 ring-teal-400/30",
+                              !isPassed && !isFailed && "bg-teal-600/90 border-teal-400 hover:bg-teal-500"
                             )}
                             title="Değerlendirmeyi aç"
                           >
                             <ClipboardCheck size={16} />
-                            <span className="hidden sm:inline">DEĞERLENDİR</span>
+                            <span>Değerlendir</span>
                           </button>
                         )}
-                        <button 
-                            onClick={() => setStatus(item, false)}
-                            className={twMerge(
-                                "flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
-                                status === false 
-                                    ? "bg-red-500/20 border-red-500 text-red-400" 
-                                    : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-red-400"
-                            )}
-                            title="Yapamıyor"
-                        >
-                            <XCircle size={18} />
-                        </button>
-
-                        <button 
-                            onClick={() => setStatus(item, true)}
-                            className={twMerge(
-                                "flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
-                                status === true 
-                                    ? "bg-green-500/20 border-green-500 text-green-400 shadow-[0_0_10px_rgba(34,197,94,0.1)]" 
-                                    : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-green-400 hover:border-green-500/50"
-                            )}
-                            title="Bağımsız Yapıyor"
-                        >
-                            <CheckCircle2 size={18} />
-                        </button>
                     </div>
                 </div>
             );

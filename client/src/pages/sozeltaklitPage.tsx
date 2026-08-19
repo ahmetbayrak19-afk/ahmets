@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Gamepad2, ClipboardCheck } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
@@ -12,6 +12,7 @@ import SozelTaklit1 from '@/aba/sozeltaklit/sozeltaklit1';
 import SozelTaklit2 from '@/aba/sozeltaklit/sozeltaklit2';
 import SozelTaklit3 from '@/aba/sozeltaklit/sozeltaklit3';
 import type { AssessmentCompletionDetails } from '@/aba/sozeltaklit/SozelTaklitAssessment';
+import AssessmentModeBadges from '@/aba/shared/AssessmentModeBadges';
 
 const WORD_PROGRESS_FIELD = 'sozeltaklit_st21_progress';
 
@@ -59,7 +60,7 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
   const [isSaving, setIsSaving] = useState(false);
   const [saveBanner, setSaveBanner] = useState<'ok' | 'err' | null>(null);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
-  
+
   // BURASI DÜZELTİLDİ: Artık "SÖZEL TAKLİT" modülünü arıyor.
   const moduleData = ABA_MODULES.find(m => m.name.includes("SÖZEL TAKLİT"));
   const items = moduleData ? moduleData.achievements : [];
@@ -210,7 +211,7 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
 
   return (
     <div className="space-y-6 relative">
-      
+
       {/* HEADER */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex items-center justify-between sticky top-0 backdrop-blur-md z-10 shadow-lg">
         <div className="flex items-center gap-3">
@@ -279,13 +280,13 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
             const status = formData[item];
             const isPassed = status === true;
             const isFailed = status === false;
-            
+
             // "ST 1.1. " kısmını ayıklama
             const firstSpaceIndex = item.indexOf(' ');
             const secondSpaceIndex = item.indexOf(' ', firstSpaceIndex + 1);
             // ST 1.1. formatı olduğu için 2. boşluğa kadar alabiliriz veya basitçe ilk boşluktan sonrasını metin sayabiliriz.
             // Senin formatında: "ST 1.1. Ses Taklidi" -> Kod: "ST 1.1.", Metin: "Ses Taklidi"
-            
+
             // Kod kısmı (ST 1.1.)
             const codePart = item.substring(0, secondSpaceIndex > -1 ? secondSpaceIndex : firstSpaceIndex);
             // Metin kısmı
@@ -295,7 +296,7 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
             const isWordImitation = item.startsWith('ST 2.1.');
             const wordProgress = isWordImitation ? getWordProgress(formData) : null;
             const hasAssessment = item.startsWith('ST 1.1.') || item.startsWith('ST 1.2.') || isWordImitation;
-            
+
             return (
                 <div key={item} className={twMerge(
                     "group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4",
@@ -328,16 +329,21 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
                                 {Math.min(wordProgress.masteredWords.length, 30)}/30 farklı sözcük
                               </span>
                             )}
-                            {hasAssessment && <span className="mt-2 inline-flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-400"><Gamepad2 size={12} /> İnteraktif</span>}
+                            <AssessmentModeBadges interactive={hasAssessment || isTolkidoItem} manual tone="cyan" />
                         </div>
                     </div>
-                    
+
                     {/* BUTON GRUBU */}
-                    <div className="flex items-center gap-1">
+                    <div className="flex shrink-0 flex-col items-end gap-2 self-end sm:self-center">
+                         <div className="flex items-center gap-1">
+                           <button onClick={() => setStatus(item, false)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center transition-all", status === false ? "bg-red-500/20 border-red-500 text-red-400" : "bg-slate-950 border-slate-800 text-slate-500 hover:border-red-500/50")} title="Yapamıyor"><XCircle size={16} /></button>
+                           <button onClick={() => setStatus(item, true)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center transition-all", status === true ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-800 text-slate-500 hover:border-green-500/50")} title="Yapıyor"><CheckCircle2 size={16} /></button>
+                         </div>
+                         <div className="flex items-center gap-1">
                          {hasAssessment && (
                            <button
                              onClick={() => setActiveAssessmentItem(item)}
-                             className="mr-1 flex h-8 items-center justify-center gap-1 rounded-md border border-blue-400 bg-blue-600/90 px-3 text-[10px] font-bold text-white shadow-sm transition-transform active:scale-95"
+                             className="flex h-8 items-center justify-center gap-1 rounded-md border border-cyan-400 bg-cyan-600/90 px-3 text-[10px] font-bold text-white shadow-sm transition-transform active:scale-95 hover:bg-cyan-500"
                            >
                              <ClipboardCheck size={14} /> Değerlendir
                            </button>
@@ -346,14 +352,13 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
                          {isTolkidoItem && (
                            <button
                              onClick={() => setShowTolkido(true)}
-                             className="flex items-center justify-center w-8 h-8 rounded-md border bg-orange-500/20 border-orange-500 text-orange-400 hover:bg-orange-500/40 transition-all mr-1"
+                             className="flex h-8 items-center justify-center gap-1 rounded-md border border-cyan-400 bg-cyan-600/90 px-3 text-[10px] font-bold text-white transition-all hover:bg-cyan-500"
                              title="Tolkido"
                            >
-                             <Gamepad2 size={16} />
+                             <ClipboardCheck size={14} /> Değerlendir
                            </button>
                          )}
-                         <button onClick={() => setStatus(item, false)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center transition-all", status === false ? "bg-red-500/20 border-red-500 text-red-400" : "bg-slate-950 border-slate-800 text-slate-500 hover:border-red-500/50")}><XCircle size={16} /></button>
-                         <button onClick={() => setStatus(item, true)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center transition-all", status === true ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-800 text-slate-500 hover:border-green-500/50")}><CheckCircle2 size={16} /></button>
+                         </div>
                     </div>
                 </div>
             );

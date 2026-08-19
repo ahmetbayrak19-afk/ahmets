@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { db } from '@/firebase'; 
+import { db } from '@/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Gamepad2, GraduationCap, ClipboardCheck } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, GraduationCap, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
+import AssessmentModeBadges from '@/aba/shared/AssessmentModeBadges';
 
 // --- MEVCUT OYUN DOSYALARI ---
 import NesneEslemeGame1 from '@/aba/esle/NesneEslemeGame1';   // EB.1.1
@@ -30,13 +31,13 @@ import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16'; // EB.4.2 (Klavye/
 import NesneEslemeGame17 from '@/aba/esle/NesneEslemeGame17'; // EB.4.3 (Sözcük-Nesne)
 
 // 🔥 YENİ EKLENEN: EB.4.8 (İlişkili Resimleri Eşleme)
-import NesneEslemeGame22 from '@/aba/esle/NesneEslemeGame22'; 
+import NesneEslemeGame22 from '@/aba/esle/NesneEslemeGame22';
 
 // --- ÖYKÜ EŞLEME OYUNU ---
 import NesneEslemeGame23 from '@/aba/esle/NesneEslemeGame23'; // EB.4.9 (Öykü)
 
 // --- GEÇİCİ/EK OYUN (EB.2.1 için) ---
-import EslemeGame from '@/aba/esle/game/eslemegame'; 
+import EslemeGame from '@/aba/esle/game/eslemegame';
 
 interface EslemePageProps {
   studentId: string;
@@ -50,7 +51,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveBanner, setSaveBanner] = useState<'ok' | 'err' | null>(null);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
-  
+
   const [activeGameMode, setActiveGameMode] = useState<'assessment' | 'instruction' | null>(null);
   const [activeGameItem, setActiveGameItem] = useState<string | null>(null);
 
@@ -141,7 +142,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
 
   return (
     <div className="space-y-6 relative">
-      
+
       {/* --- OYUN MODALLARI --- */}
       {activeGameMode && activeGameItem && (
           <>
@@ -149,7 +150,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             {activeGameItem.startsWith("EB.1.2") && <NesneEslemeGame2 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.1.3") && <NesneEslemeGame3 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.1.4") && <NesneEslemeGame4 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
-            
+
             {/* EB.2.1 (Geçici) */}
             {activeGameItem.startsWith("EB.2.1") && <div className="fixed inset-0 z-[100] bg-white"><EslemeGame onClose={() => setActiveGameMode(null)} /></div>}
 
@@ -162,7 +163,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             {activeGameItem.startsWith("EB.3.2") && <NesneEslemeGame11 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.3.3") && <NesneEslemeGame12 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
             {activeGameItem.startsWith("EB.3.4") && <NesneEslemeGame13 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />}
-            
+
             {/* EB.3.5 (Ses Eşleme) */}
             {activeGameItem.startsWith("EB.3.5") && (
                 <NesneEslemeGame14 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
@@ -172,7 +173,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             {activeGameItem.startsWith("EB.4.1.") && (
                 <NesneEslemeGame15 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
-            
+
             {/* EB.4.2. Klavye */}
             {activeGameItem.startsWith("EB.4.2") && (
                 <NesneEslemeGame16 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
@@ -265,29 +266,29 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
             const status = formData[item];
             const isPassed = status === true;
             const isFailed = status === false;
-            
+
             // --- OYUN BUTONU KONTROLÜ ---
-            const hasGame = 
-                item.startsWith("EB.1.1") || item.startsWith("EB.1.2") || 
+            const hasGame =
+                item.startsWith("EB.1.1") || item.startsWith("EB.1.2") ||
                 item.startsWith("EB.1.3") || item.startsWith("EB.1.4") ||
-                item.startsWith("EB.2.1") || 
-                item.startsWith("EB.2.2") || 
-                item.startsWith("EB.2.3") || 
+                item.startsWith("EB.2.1") ||
+                item.startsWith("EB.2.2") ||
+                item.startsWith("EB.2.3") ||
                 item.startsWith("EB.2.4") ||
                 item.startsWith("EB.2.5") ||
                 item.startsWith("EB.3.1") || item.startsWith("EB.3.2") ||
                 item.startsWith("EB.3.3") || item.startsWith("EB.3.4") ||
-                item.startsWith("EB.3.5") || 
-                item.startsWith("EB.4.1.") || 
+                item.startsWith("EB.3.5") ||
+                item.startsWith("EB.4.1.") ||
                 item.startsWith("EB.4.2") ||
-                item.startsWith("EB.4.3") || 
+                item.startsWith("EB.4.3") ||
                 item.startsWith("EB.4.8") || // 🔥 YENİ EKLENEN
                 item.startsWith("EB.4.9");
-            
+
             const firstSpaceIndex = item.indexOf(' ');
             const code = item.substring(0, firstSpaceIndex);
             const desc = item.substring(firstSpaceIndex + 1);
-            
+
             return (
                 <div key={item} className={twMerge(
                     "group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4",
@@ -313,21 +314,21 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                             )}>{desc}</p>
                             {isPassed && <span className="block text-[10px] text-green-500/60 font-semibold uppercase tracking-wider">Geçti · tekrar değerlendirilebilir</span>}
                             {isFailed && <span className="block text-[10px] text-red-400/90 font-semibold uppercase tracking-wider">Geçemedi · öncelikli</span>}
-                            {hasGame && <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20"><Gamepad2 size={12} /> İnteraktif</span>}
+                            <AssessmentModeBadges interactive={hasGame} manual tone="blue" />
                         </div>
                     </div>
-                    
-                    <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+
+                    <div className="flex shrink-0 flex-col items-end gap-2 self-end sm:self-center">
+                        <div className="flex items-center gap-1">
+                             <button onClick={() => setStatus(item, false)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center", status === false ? "bg-red-500/20 border-red-500 text-red-400" : "bg-slate-950 border-slate-800 text-slate-500")} title="Yapamıyor"><XCircle size={16} /></button>
+                             <button onClick={() => setStatus(item, true)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center", status === true ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-800 text-slate-500")} title="Yapıyor"><CheckCircle2 size={16} /></button>
+                        </div>
                         {hasGame && (
                             <div className="flex items-center gap-1">
-                                <button onClick={() => { setActiveGameItem(item); setActiveGameMode('instruction'); }} className="h-8 px-3 rounded-md bg-purple-600/90 text-white text-[10px] font-bold flex items-center gap-1 hover:bg-purple-500 border border-purple-400 shadow-sm transition-transform active:scale-95"><GraduationCap size={14} /> Öğretim</button>
-                                <button onClick={() => { setActiveGameItem(item); setActiveGameMode('assessment'); }} className="h-8 px-3 rounded-md bg-blue-600/90 text-white text-[10px] font-bold flex items-center gap-1 hover:bg-blue-500 border border-blue-400 shadow-sm transition-transform active:scale-95"><ClipboardCheck size={14} /> Test</button>
+                                <button onClick={() => { setActiveGameItem(item); setActiveGameMode('instruction'); }} className="h-8 px-3 rounded-md bg-blue-500/10 text-blue-300 text-[10px] font-bold flex items-center gap-1 hover:bg-blue-500/20 border border-blue-400/40 shadow-sm transition-transform active:scale-95"><GraduationCap size={14} /> Öğretim</button>
+                                <button onClick={() => { setActiveGameItem(item); setActiveGameMode('assessment'); }} className="h-8 px-3 rounded-md bg-blue-600/90 text-white text-[10px] font-bold flex items-center gap-1 hover:bg-blue-500 border border-blue-400 shadow-sm transition-transform active:scale-95"><ClipboardCheck size={14} /> Değerlendir</button>
                             </div>
                         )}
-                        <div className="flex items-center gap-1">
-                             <button onClick={() => setStatus(item, false)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center", status === false ? "bg-red-500/20 border-red-500 text-red-400" : "bg-slate-950 border-slate-800 text-slate-500")}><XCircle size={16} /></button>
-                             <button onClick={() => setStatus(item, true)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center", status === true ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-800 text-slate-500")}><CheckCircle2 size={16} /></button>
-                        </div>
                     </div>
                 </div>
             );

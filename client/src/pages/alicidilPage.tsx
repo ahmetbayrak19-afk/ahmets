@@ -2,15 +2,16 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Gamepad2, Play } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
+import AssessmentModeBadges from '@/aba/shared/AssessmentModeBadges';
 
 // --- OYUN IMPORTLARI ---
 import AliciGame4 from '@/aba/Alici/AliciGame4';   // ADB 2.1 - İnsan Tanıma
-import AliciGame15 from '@/aba/Alici/AliciGame15'; // ADB 4.2 - Tüm Vücut Bölümlerini Tanıma 
+import AliciGame15 from '@/aba/Alici/AliciGame15'; // ADB 4.2 - Tüm Vücut Bölümlerini Tanıma
 import AliciGame7 from '@/aba/Alici/AliciGame7';   // ADB 2.4 - Dedektif Oyunu (YENİ)
 
 interface AliciDilPageProps {
@@ -25,7 +26,7 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveBanner, setSaveBanner] = useState<'ok' | 'err' | null>(null);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
-   
+
   // Hangi oyunun açık olduğunu tutan state
   const [activeGameItem, setActiveGameItem] = useState<string | null>(null);
 
@@ -91,9 +92,9 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
   };
 
   const setStatus = (itemCode: string, status: boolean) => {
-    setFormData(prev => ({ 
-        ...prev, 
-        [itemCode]: prev[itemCode] === status ? null : status 
+    setFormData(prev => ({
+        ...prev,
+        [itemCode]: prev[itemCode] === status ? null : status
     }));
     setDirty(true);
     setSaveBanner(null);
@@ -111,11 +112,11 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
 
   return (
     <div className="space-y-6 relative">
-      
+
       {/* --- OYUN GÖSTERİM ALANI (MODAL) --- */}
       {activeGameItem && (
           <div className="fixed inset-0 z-[100] bg-white">
-             
+
              {/* OYUN 1: ADB 2.1 İnsan Tanıma */}
              {(activeGameItem.includes("2.1") || activeGameItem.includes("İnsan Tanıma")) && (
                  <AliciGame4 studentId={studentId} onClose={() => setActiveGameItem(null)} />
@@ -200,24 +201,24 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
       <div className="grid gap-3 animate-in slide-in-from-bottom-4 duration-500 pb-20">
         {items.map((item) => {
             const status = formData[item];
-            
+
             // Kod ve Metni güvenli ayırma
             const firstSpaceIndex = item.indexOf(' ');
-            const code = item.substring(0, firstSpaceIndex); 
+            const code = item.substring(0, firstSpaceIndex);
             const text = item.substring(firstSpaceIndex + 1);
 
             const isPassed = status === true;
             const isFailed = status === false;
 
             // --- OYUN KONTROLÜ (GÜNCELLENDİ) ---
-            const hasGame = 
+            const hasGame =
                 (item.includes("2.1") || item.includes("İnsan Tanıma")) ||
                 (item.includes("2.4") || item.includes("Büyük, Karmaşık")) ||
                 (item.includes("4.2") || item.includes("Tüm Vücut"));
 
             return (
-                <div 
-                    key={item} 
+                <div
+                    key={item}
                     className={twMerge(
                         "group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4",
                         isPassed && "bg-green-950/15 border-green-500/15 opacity-45 hover:opacity-80",
@@ -245,34 +246,18 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
                             </p>
                             {isPassed && <span className="block text-[10px] text-green-500/60 font-semibold uppercase tracking-wider">Geçti · tekrar değerlendirilebilir</span>}
                             {isFailed && <span className="block text-[10px] text-red-400/90 font-semibold uppercase tracking-wider">Geçemedi · öncelikli</span>}
-                            {/* İnteraktif Rozeti */}
-                            {hasGame && (
-                                <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                                    <Gamepad2 size={12} /> İnteraktif
-                                </span>
-                            )}
+                            <AssessmentModeBadges interactive={hasGame} manual tone="purple" />
                         </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
-                        
-                        {/* OYUN BUTONU */}
-                        {hasGame && (
-                            <button 
-                                onClick={() => setActiveGameItem(item)}
-                                className="h-9 px-4 rounded-lg bg-purple-600/90 text-white text-[10px] font-bold flex items-center gap-2 hover:bg-purple-500 border border-purple-400 shadow-sm transition-transform active:scale-95"
-                            >
-                                <Play size={14} fill="currentColor" /> OYUNA GİT
-                            </button>
-                        )}
-
+                    <div className="flex shrink-0 flex-col items-end gap-2 self-end sm:self-center">
                         <div className="flex items-center gap-2">
-                            <button 
+                            <button
                                 onClick={() => setStatus(item, false)}
                                 className={twMerge(
                                     "flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
-                                    status === false 
-                                        ? "bg-red-500/20 border-red-500 text-red-400" 
+                                    status === false
+                                        ? "bg-red-500/20 border-red-500 text-red-400"
                                         : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-red-400"
                                 )}
                                 title="Yapamıyor"
@@ -280,19 +265,28 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
                                 <XCircle size={18} />
                             </button>
 
-                            <button 
+                            <button
                                 onClick={() => setStatus(item, true)}
                                 className={twMerge(
                                     "flex items-center justify-center w-9 h-9 rounded-lg border transition-all active:scale-95",
-                                    status === true 
-                                        ? "bg-green-500/20 border-green-500 text-green-400 shadow-[0_0_10px_rgba(34,197,94,0.1)]" 
+                                    status === true
+                                        ? "bg-green-500/20 border-green-500 text-green-400 shadow-[0_0_10px_rgba(34,197,94,0.1)]"
                                         : "bg-slate-950 border-slate-800 text-slate-500 hover:bg-slate-800 hover:text-green-400 hover:border-green-500/50"
                                 )}
-                                title="Bağımsız Yapıyor"
+                                title="Yapıyor"
                             >
                                 <CheckCircle2 size={18} />
                             </button>
                         </div>
+
+                        {hasGame && (
+                            <button
+                                onClick={() => setActiveGameItem(item)}
+                                className="flex h-9 items-center gap-1.5 rounded-lg border border-purple-400 bg-purple-600/90 px-4 text-[10px] font-bold text-white shadow-sm transition-transform hover:bg-purple-500 active:scale-95"
+                            >
+                                <ClipboardCheck size={15} /> Değerlendir
+                            </button>
+                        )}
                     </div>
                 </div>
             );

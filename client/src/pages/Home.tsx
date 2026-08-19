@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, LogOut, Trash2, UserCircle2, ShieldCheck, Loader2, Users, AlertTriangle, Baby, Stethoscope, ClipboardCheck, BookOpen, AlertCircle, Lock, CheckCircle, UserX, ShieldAlert, Camera, X, BellRing, Archive, RotateCcw, Menu, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger, AlertDialogDescription
 } from "@/components/ui/alert-dialog";
 import {
@@ -23,10 +23,10 @@ export default function Home() {
   const [age, setAge] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   const [duplicateError, setDuplicateError] = useState(false);
   const [isPendingApproval, setIsPendingApproval] = useState(false);
-  
+
   // --- FOTOĞRAF STATE'LERİ ---
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -61,7 +61,7 @@ export default function Home() {
   const leaveHintPressTimerRef = useRef<number | null>(null);
   const leaveHintHideTimerRef = useRef<number | null>(null);
   const leaveHintTriggeredRef = useRef(false);
-  
+
   const [_, setLocation] = useLocation();
 
   const {
@@ -227,7 +227,7 @@ export default function Home() {
   const startCamera = async () => {
     setIsCameraModalOpen(true);
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); 
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         streamRef.current = stream;
         if (videoRef.current) {
             videoRef.current.srcObject = stream;
@@ -250,27 +250,27 @@ export default function Home() {
   // Canvas ile videodan görüntüyü alıp 512x512 olarak optimize etme
   const capturePhotoFromVideo = () => {
     if (!videoRef.current) return;
-    
+
     const video = videoRef.current;
     const canvas = document.createElement('canvas');
-    
+
     // Kameradan gelen asıl boyut
     const minDimension = Math.min(video.videoWidth, video.videoHeight);
-    
+
     // OPTİMİZASYON: Çıktı boyutunu 512x512 piksele kilitliyoruz
     const TARGET_SIZE = 512;
     canvas.width = TARGET_SIZE;
     canvas.height = TARGET_SIZE;
-    
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
+
     // Görüntüyü merkeze al ve hedef boyuta (512x512) sıkıştırarak çiz
     const startX = (video.videoWidth - minDimension) / 2;
     const startY = (video.videoHeight - minDimension) / 2;
-    
+
     ctx.drawImage(video, startX, startY, minDimension, minDimension, 0, 0, TARGET_SIZE, TARGET_SIZE);
-    
+
     // Ekranda göstermek için Base64 al (Kalite %80)
     const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
     setPhotoPreview(dataUrl);
@@ -301,8 +301,8 @@ export default function Home() {
   // --- KAYIT İŞLEMLERİ ---
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if(!name.trim() || !age.trim()) { 
+
+    if(!name.trim() || !age.trim()) {
         toast.warning("İsim ve Yaş zorunludur!");
         return;
     }
@@ -310,8 +310,8 @@ export default function Home() {
     const normalizedName = normalizeNameForMatch(name);
     const isDuplicate = students.some(s => normalizeNameForMatch(s.name) === normalizedName);
     if (isDuplicate) {
-      setDuplicateError(true); 
-      return; 
+      setDuplicateError(true);
+      return;
     }
 
     let archivedMatch = archivedStudents.find(student =>
@@ -342,7 +342,7 @@ export default function Home() {
         } else {
             setMissingMessage("fotoğraf");
         }
-        setMissingFieldsWarning(true); 
+        setMissingFieldsWarning(true);
         return;
     }
 
@@ -350,8 +350,8 @@ export default function Home() {
   };
 
   const proceedToSaveStudent = async () => {
-    setMissingFieldsWarning(false); 
-    
+    setMissingFieldsWarning(false);
+
     const loadingToast = toast.loading("Öğrenci kaydediliyor...");
     const result = await addStudent(name, age, diagnosis, photoFile);
     toast.dismiss(loadingToast);
@@ -369,7 +369,7 @@ export default function Home() {
     }
 
     clearStudentForm();
-    toast.success("Öğrenci başarıyla eklendi"); 
+    toast.success("Öğrenci başarıyla eklendi");
   };
 
   const openTeacherAssignment = (student: any) => {
@@ -479,7 +479,7 @@ export default function Home() {
         );
         const hasValidTeacher = activeTeachers.length > 0;
         const isDeletionPending = student.deletionStatus === 'pending';
-        
+
         const displayName = formatName(student.name);
 
         return (
@@ -493,16 +493,16 @@ export default function Home() {
               isDeletionPending
                 ? "border-orange-500/50 bg-orange-950/10 opacity-60 grayscale-[35%]"
                 : !hasValidTeacher
-                ? "border-red-600/60 bg-red-900/10" 
-                : isMyStudent 
-                  ? "border-green-500/50 bg-green-500/5" 
+                ? "border-red-600/60 bg-red-900/10"
+                : isMyStudent
+                  ? "border-green-500/50 bg-green-500/5"
                   : "bg-slate-900 border-white/5"
             )}
           >
             <div className="flex justify-between items-start gap-2">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                     {/* PROFİL FOTOĞRAFI YUVARLAĞI (TIKLANABİLİR) */}
-                    <div 
+                    <div
                       onClick={() => student.photoUrl && setViewingStudentPhoto({url: student.photoUrl, name: student.name})}
                       className={twMerge(
                         "h-12 w-12 rounded-full flex items-center justify-center font-bold text-lg border shadow-lg relative shrink-0 overflow-hidden",
@@ -516,14 +516,14 @@ export default function Home() {
                       ) : (
                         student.name.charAt(0).toUpperCase()
                       )}
-                      
+
                       {!hasValidTeacher && (
                          <div className="absolute -top-1 -right-1 bg-red-500 rounded-full p-0.5 border border-slate-900">
                            <AlertTriangle size={12} className="text-white" />
                          </div>
                       )}
                     </div>
-                    
+
                     <div className="min-w-0 flex-1">
                       <h3 className="font-bold text-base text-white leading-tight line-clamp-2 break-words" title={student.name}>
                         {displayName}
@@ -536,7 +536,7 @@ export default function Home() {
 
                 <div className="flex flex-col items-end gap-1.5 shrink-0">
                     <div className="bg-slate-950/80 border border-blue-500/20 rounded px-2 py-1 flex items-center gap-1.5 max-w-[90px]">
-                       <Stethoscope size={10} className="text-blue-400 shrink-0"/> 
+                       <Stethoscope size={10} className="text-blue-400 shrink-0"/>
                        <span className="text-[10px] text-blue-200 truncate font-medium">
                          {student.diagnosis || "Tanı yok"}
                        </span>
@@ -651,7 +651,7 @@ export default function Home() {
         </div>
         <h1 className="text-2xl font-bold mb-2 text-white">Hesap Onay Bekliyor</h1>
         <p className="text-slate-400 max-w-md mb-8">
-            Merhaba <strong>{currentTeacher?.name}</strong>, kurum girişini başarıyla yaptınız ancak 
+            Merhaba <strong>{currentTeacher?.name}</strong>, kurum girişini başarıyla yaptınız ancak
             öğrenci verilerine erişmek için <strong>Yönetici Onayı</strong> gerekmektedir.
         </p>
         <Button variant="outline" onClick={handleLogout} className="border-slate-700 hover:bg-slate-800 text-white">
@@ -672,21 +672,21 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#020617] p-4 md:p-8 text-white font-sans">
-      
+
       {/* --- INSTAGRAM TARZI FOTOĞRAF GÖRÜNTÜLEYİCİ (MODAL) --- */}
       <AnimatePresence>
         {viewingStudentPhoto && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }} 
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             onClick={() => setViewingStudentPhoto(null)} // Arkaplana tıklayınca kapat
             className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center p-4 backdrop-blur-sm cursor-zoom-out"
           >
-            <motion.div 
-              initial={{ scale: 0.8, opacity: 0, y: 50 }} 
-              animate={{ scale: 1, opacity: 1, y: 0 }} 
-              exit={{ scale: 0.8, opacity: 0, y: 50 }} 
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0, y: 50 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.8, opacity: 0, y: 50 }}
               className="relative flex flex-col items-center max-w-sm w-full"
               onClick={(e) => e.stopPropagation()} // Resme tıklayınca kapanmasını engelle
             >
@@ -694,8 +694,8 @@ export default function Home() {
                 <img src={viewingStudentPhoto.url} alt={viewingStudentPhoto.name} className="w-full h-full object-cover" />
               </div>
               <h2 className="text-white text-3xl font-bold mt-8 text-center">{viewingStudentPhoto.name}</h2>
-              
-              <button 
+
+              <button
                 data-android-back
                 onClick={() => setViewingStudentPhoto(null)}
                 className="mt-8 bg-slate-800 text-white p-4 rounded-full hover:bg-slate-700 hover:scale-105 active:scale-95 transition-all shadow-lg"
@@ -823,10 +823,10 @@ export default function Home() {
       {/* --- DAHİLİ KAMERA PENCERESİ (MODAL) --- */}
       <AnimatePresence>
         {isCameraModalOpen && (
-            <motion.div 
-                initial={{ opacity: 0 }} 
-                animate={{ opacity: 1 }} 
-                exit={{ opacity: 0 }} 
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm"
             >
                 <div className="w-full max-w-sm bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-700">
@@ -836,20 +836,20 @@ export default function Home() {
                             <X size={18} />
                         </button>
                     </div>
-                    
+
                     <div className="relative aspect-square w-full bg-black overflow-hidden flex items-center justify-center">
-                        <video 
-                            ref={videoRef} 
-                            autoPlay 
-                            playsInline 
-                            className="w-full h-full object-cover" 
+                        <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            className="w-full h-full object-cover"
                         />
                         <div className="absolute inset-4 border-2 border-white/30 rounded-full pointer-events-none border-dashed" />
                     </div>
 
                     <div className="p-4 bg-slate-950 flex justify-center">
-                        <button 
-                            onClick={capturePhotoFromVideo} 
+                        <button
+                            onClick={capturePhotoFromVideo}
                             className="w-16 h-16 bg-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
                         >
                             <div className="w-14 h-14 bg-white border-4 border-black rounded-full" />
@@ -1214,17 +1214,19 @@ export default function Home() {
       <div className="max-w-6xl mx-auto space-y-8">
         <header className="border-b border-white/5 py-2">
           {isAdmin ? (
-            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
-              <p className="min-w-0 truncate text-sm text-slate-400">
-                <UserCircle2 className="mr-1.5 inline h-4 w-4 text-blue-500" />
-                Hoş geldin, {currentTeacher.name}
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5 sm:gap-3">
+              <p className="min-w-0 text-[11px] leading-tight text-slate-400 sm:text-sm">
+                <span className="block text-[9px] text-slate-500 sm:inline sm:text-sm">Hoş geldin<span className="hidden sm:inline">, </span></span>
+                <span className="block break-words font-semibold text-slate-300 sm:inline">{currentTeacher.name}</span>
               </p>
               <Button
                 variant="outline"
                 onClick={() => setAdminMenuOpen(true)}
-                className="relative h-9 justify-self-center border-blue-500/60 bg-blue-500/5 px-3 text-blue-300 hover:bg-blue-500 hover:text-white"
+                className="relative h-8 justify-self-center border-blue-500/60 bg-blue-500/5 px-2 text-[10px] text-blue-300 hover:bg-blue-500 hover:text-white sm:h-9 sm:px-3 sm:text-sm"
               >
-                <Menu className="mr-2 h-4 w-4" /> Yönetim Paneli
+                <Menu className="mr-1 h-4 w-4 sm:mr-2" />
+                <span className="sm:hidden">Yönetim</span>
+                <span className="hidden sm:inline">Yönetim Paneli</span>
                 {(pendingDeletionRequests.length > 0 || teachers.some(t => t.isApproved === false)) && (
                   <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-slate-950 animate-pulse" />
                 )}
@@ -1232,9 +1234,11 @@ export default function Home() {
               <Button
                 variant="ghost"
                 onClick={handleLogout}
-                className="h-9 justify-self-end border border-white/5 px-3 text-slate-400"
+                aria-label="Çıkış"
+                title="Çıkış"
+                className="h-8 w-8 justify-self-end border border-white/5 p-0 text-slate-400 sm:h-9 sm:w-auto sm:px-3"
               >
-                <LogOut className="mr-2 h-4 w-4" /> Çıkış
+                <LogOut className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Çıkış</span>
               </Button>
             </div>
           ) : (
@@ -1260,8 +1264,8 @@ export default function Home() {
             <CardContent>
               <form onSubmit={handleAddStudent} className="space-y-3">
                 <div className="flex gap-2 items-center">
-                  
-                  <div 
+
+                  <div
                     onClick={startCamera}
                     className="h-10 w-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center cursor-pointer shrink-0 overflow-hidden hover:bg-slate-700 transition-colors relative group"
                     title="Kamerayı Aç"
@@ -1277,9 +1281,9 @@ export default function Home() {
                       <Camera size={18} className="text-slate-400" />
                     )}
                   </div>
-                  
+
                   <input type="file" accept="image/*" ref={fileInputRef} onChange={handlePhotoUpload} className="hidden" />
-                  
+
                   <Input placeholder="İsim Soyisim" value={name} onChange={(e) => setName(e.target.value)} className="bg-slate-950 border-slate-800 flex-1" />
                 </div>
 
