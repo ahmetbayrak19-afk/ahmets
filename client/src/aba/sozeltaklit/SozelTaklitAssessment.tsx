@@ -12,14 +12,24 @@ import {
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 
-type AssessmentKind = 'sound' | 'syllable';
+type AssessmentKind = 'sound' | 'syllable' | 'word';
 type TrialSource = 'digital' | 'teacher';
+
+export interface AssessmentCompletionDetails {
+  kind: AssessmentKind;
+  score: number;
+  setPassed: boolean;
+  correctLabels: string[];
+  totalMastered: number;
+}
 
 interface GameProps {
   kind: AssessmentKind;
   title: string;
   onClose: () => void;
-  onComplete: (success: boolean) => void | Promise<void>;
+  onComplete: (success: boolean, details?: AssessmentCompletionDetails) => void | Promise<void>;
+  masteredLabels?: string[];
+  completionTarget?: number;
 }
 
 interface DigitalAsset {
@@ -36,6 +46,8 @@ interface Trial {
   audioUrl?: string;
   videoUrl?: string;
 }
+
+const EMPTY_LABELS: string[] = [];
 
 const SOUND_VIDEO_MODULES = import.meta.glob('./videoses/1-1/*.{mp4,webm}', {
   eager: true,
@@ -57,6 +69,16 @@ const SYLLABLE_AUDIO_MODULES = import.meta.glob('./videoses/1-2/*.{mp3,wav,m4a,o
   import: 'default',
 }) as Record<string, string>;
 
+const WORD_VIDEO_MODULES = import.meta.glob('./videoses/1-3/*.{mp4,webm}', {
+  eager: true,
+  import: 'default',
+}) as Record<string, string>;
+
+const WORD_AUDIO_MODULES = import.meta.glob('./videoses/1-3/*.{mp3,wav,m4a,ogg}', {
+  eager: true,
+  import: 'default',
+}) as Record<string, string>;
+
 const SOUND_TEACHER_POOL = [
   'A', 'E', 'I', 'İ', 'O', 'Ö', 'U', 'Ü',
   'M', 'P', 'B', 'F', 'V', 'S', 'Z', 'Ş', 'J', 'L', 'R', 'N', 'K', 'G', 'T', 'D', 'Ç', 'C', 'H', 'Y',
@@ -73,6 +95,40 @@ const SYLLABLE_TEACHER_POOL = [
   'at', 'et', 'it', 'ot', 'ut', 'al', 'el', 'il', 'ol', 'ul', 'aç', 'iç', 'ip', 'un', 'üs',
   'bak', 'tak', 'kap', 'kat', 'top', 'set', 'pil', 'bal', 'dal', 'tel', 'kol', 'kum',
 ];
+
+const WORD_TEACHER_POOL = [
+  'Top', 'At', 'Su', 'Kuş', 'Taş', 'Bal', 'Süt', 'Muz', 'İp', 'Çay',
+  'Kapı', 'Vazo', 'Çorap', 'Kitap', 'Çiçek', 'Bardak', 'Tabak', 'Kaşık', 'Çatal', 'Ekmek',
+  'Pasta', 'Balon', 'Yatak', 'Koltuk', 'Oyuncak', 'Telefon', 'Bisiklet', 'Dondurma', 'Bisküvi', 'Meyve',
+  'Elma', 'Armut', 'Mandalina', 'Portakal', 'Kiraz', 'Üzüm', 'Havuç', 'Domates', 'Kavun', 'Pilav',
+  'Ayran', 'Limon', 'Ceket', 'Mont', 'Terlik', 'Ayakkabı', 'Şapka', 'Eldiven', 'Gömlek', 'Pantolon',
+  'Güneş', 'Yağmur', 'Bulut', 'Yıldız', 'Deniz', 'Park', 'Okul', 'Bahçe', 'Sokak', 'Ev',
+  'Abla', 'Abi', 'Teyze', 'Amca', 'Nine', 'Dost', 'Çocuk', 'Öğretmen', 'Arkadaş', 'Komşu',
+];
+
+const WORD_LABELS: Record<string, string> = {
+  anne: 'Anne',
+  araba: 'Araba',
+  aslan: 'Aslan',
+  baba: 'Baba',
+  bebek: 'Bebek',
+  canta: 'Çanta',
+  cilek: 'Çilek',
+  corba: 'Çorba',
+  dede: 'Dede',
+  dolap: 'Dolap',
+  kalem: 'Kalem',
+  karpuz: 'Karpuz',
+  kedi: 'Kedi',
+  kopek: 'Köpek',
+  masa: 'Masa',
+  patates: 'Patates',
+  peynir: 'Peynir',
+  salincak: 'Salıncak',
+  seker: 'Şeker',
+  yumurta: 'Yumurta',
+  zeytin: 'Zeytin',
+};
 
 const shuffle = <T,>(items: T[]) => {
   const copy = [...items];
@@ -98,6 +154,8 @@ const simpleText = (value: string) => value
 const labelFromPath = (path: string) => {
   const fileName = withoutExtension(path).split('/').pop() || '';
   if (fileName.toLocaleLowerCase('tr-TR') === 's2') return 'Ş';
+  const wordLabel = WORD_LABELS[simpleText(fileName)];
+  if (wordLabel) return wordLabel;
   return fileName.replace(/[_-]+/g, ' ').trim() || fileName;
 };
 
@@ -137,16 +195,25 @@ const buildDigitalAssets = (
 const DIGITAL_ASSETS = {
   soundAssets: buildDigitalAssets(SOUND_VIDEO_MODULES, SOUND_AUDIO_MODULES),
   syllableAssets: buildDigitalAssets(SYLLABLE_VIDEO_MODULES, SYLLABLE_AUDIO_MODULES),
+  wordAssets: buildDigitalAssets(WORD_VIDEO_MODULES, WORD_AUDIO_MODULES),
 };
 
-const createTeacherTrials = (kind: AssessmentKind, digitalLabels: string[]) => {
-  const digitalKeys = new Set(digitalLabels.map(simpleText));
+const createTeacherTrials = (
+  kind: AssessmentKind,
+  digitalLabels: string[],
+  excludedLabels: string[] = [],
+) => {
+  const excludedKeys = new Set([...digitalLabels, ...excludedLabels].map(simpleText));
   const usedKeys = new Set<string>();
-  const pool = kind === 'sound' ? SOUND_TEACHER_POOL : SYLLABLE_TEACHER_POOL;
+  const pool = kind === 'sound'
+    ? SOUND_TEACHER_POOL
+    : kind === 'syllable'
+      ? SYLLABLE_TEACHER_POOL
+      : WORD_TEACHER_POOL;
   return shuffle(pool)
     .filter(label => {
       const key = simpleText(label);
-      if (digitalKeys.has(key) || usedKeys.has(key)) return false;
+      if (excludedKeys.has(key) || usedKeys.has(key)) return false;
       usedKeys.add(key);
       return true;
     })
@@ -157,28 +224,49 @@ const createTeacherTrials = (kind: AssessmentKind, digitalLabels: string[]) => {
     }));
 };
 
-export default function SozelTaklitAssessment({ kind, title, onClose, onComplete }: GameProps) {
-  const digitalPool = kind === 'sound' ? DIGITAL_ASSETS.soundAssets : DIGITAL_ASSETS.syllableAssets;
-  const requiredDigitalCount = 6;
+export default function SozelTaklitAssessment({
+  kind,
+  title,
+  onClose,
+  onComplete,
+  masteredLabels = EMPTY_LABELS,
+  completionTarget,
+}: GameProps) {
+  const digitalPool = kind === 'sound'
+    ? DIGITAL_ASSETS.soundAssets
+    : kind === 'syllable'
+      ? DIGITAL_ASSETS.syllableAssets
+      : DIGITAL_ASSETS.wordAssets;
+  const masteredKeys = useMemo(
+    () => new Set(masteredLabels.map(simpleText)),
+    [masteredLabels],
+  );
 
   const session = useMemo(() => {
-    const shuffledDigital = shuffle(digitalPool);
-    const selectedDigital = shuffledDigital.slice(0, requiredDigitalCount).map(asset => ({
+    const availableDigital = kind === 'word'
+      ? digitalPool.filter(asset => !masteredKeys.has(simpleText(asset.label)))
+      : digitalPool;
+    const shuffledDigital = shuffle(availableDigital);
+    const digitalCount = kind === 'word' ? Math.min(6, shuffledDigital.length) : 6;
+    const teacherCount = 10 - digitalCount;
+    const selectedDigital = shuffledDigital.slice(0, digitalCount).map(asset => ({
       ...asset,
       source: 'digital' as const,
     }));
-    const teacherPool = createTeacherTrials(kind, digitalPool.map(item => item.label));
-    const selectedTeacher = teacherPool.slice(0, 4);
+    const teacherPool = createTeacherTrials(kind, digitalPool.map(item => item.label), masteredLabels);
+    const selectedTeacher = teacherPool.slice(0, teacherCount);
 
     return {
       trials: shuffle<Trial>([...selectedDigital, ...selectedTeacher]),
-      digitalReserve: shuffledDigital.slice(requiredDigitalCount).map(asset => ({
+      digitalReserve: shuffledDigital.slice(digitalCount).map(asset => ({
         ...asset,
         source: 'digital' as const,
       })),
-      teacherReserve: teacherPool.slice(4),
+      teacherReserve: teacherPool.slice(teacherCount),
+      digitalCount,
+      teacherCount,
     };
-  }, [kind, digitalPool]);
+  }, [kind, digitalPool, masteredKeys, masteredLabels]);
 
   const [trials, setTrials] = useState<Trial[]>(session.trials);
   const [digitalReserve, setDigitalReserve] = useState<Trial[]>(session.digitalReserve);
@@ -190,12 +278,15 @@ export default function SozelTaklitAssessment({ kind, title, onClose, onComplete
   const [isPlaying, setIsPlaying] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [correctLabels, setCorrectLabels] = useState<string[]>([]);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const currentTrial = trials[trialIndex];
-  const hasEnoughDigitalAssets = digitalPool.length >= requiredDigitalCount;
+  const setName = kind === 'sound' ? 'ses' : kind === 'syllable' ? 'hece' : 'sözcük';
+  const hasEnoughDigitalAssets = kind === 'word' ? digitalPool.length > 0 : digitalPool.length >= 6;
+  const hasEnoughTrials = session.trials.length === 10;
   const canChange = currentTrial?.source === 'digital'
     ? digitalReserve.length > 0
     : teacherReserve.length > 0;
@@ -270,6 +361,9 @@ export default function SozelTaklitAssessment({ kind, title, onClose, onComplete
     const nextAnsweredCount = answeredCount + 1;
     setCorrectCount(nextCorrectCount);
     setAnsweredCount(nextAnsweredCount);
+    if (wasCorrect) {
+      setCorrectLabels(previous => [...previous, currentTrial.label]);
+    }
 
     if (nextAnsweredCount >= 10) {
       setFinished(true);
@@ -283,20 +377,35 @@ export default function SozelTaklitAssessment({ kind, title, onClose, onComplete
   const saveAndExit = async () => {
     setIsSaving(true);
     try {
-      await onComplete(correctCount >= 8);
+      const setPassed = correctCount >= 8;
+      const resultingLabels = setPassed
+        ? [...masteredLabels, ...correctLabels]
+        : masteredLabels;
+      const uniqueMastered = Array.from(
+        new Map(resultingLabels.map(label => [simpleText(label), label])).values(),
+      );
+      const totalMastered = uniqueMastered.length;
+      const success = completionTarget ? totalMastered >= completionTarget : setPassed;
+      await onComplete(success, {
+        kind,
+        score: correctCount,
+        setPassed,
+        correctLabels,
+        totalMastered,
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (!hasEnoughDigitalAssets) {
+  if (!hasEnoughDigitalAssets || !hasEnoughTrials) {
     return (
       <div className="fixed inset-0 z-[700] flex min-h-[100dvh] items-center justify-center bg-slate-950 p-5 text-white">
         <div className="w-full max-w-md rounded-3xl border border-amber-500/30 bg-slate-900 p-6 text-center shadow-2xl">
           <Volume2 className="mx-auto mb-4 text-amber-400" size={48} />
           <h2 className="mb-2 text-xl font-black">Dijital dosyalar eksik</h2>
           <p className="text-sm leading-relaxed text-slate-300">
-            {title} için en az 6 eşleşen MP4 ve MP3 dosyası bulunmalıdır. Şu anda {digitalPool.length} eşleşen çift algılandı.
+            {title} için yeterli sayıda eşleşen MP4–MP3 çifti ve öğretmen hedefi bulunmalıdır. Şu anda {digitalPool.length} eşleşen çift algılandı.
           </p>
           <button onClick={onClose} className="mt-6 w-full rounded-xl bg-slate-700 px-5 py-3 font-bold text-white">
             GERİ DÖN
@@ -318,7 +427,9 @@ export default function SozelTaklitAssessment({ kind, title, onClose, onComplete
         </button>
         <div className="min-w-0 px-3 text-center">
           <h1 className="truncate text-sm font-black sm:text-base">{title}</h1>
-          <p className="mt-0.5 text-xs text-slate-400">Deneme {Math.min(answeredCount + 1, 10)}/10 · 6 dijital + 4 öğretmen</p>
+          <p className="mt-0.5 text-xs text-slate-400">
+            Deneme {Math.min(answeredCount + 1, 10)}/10 · {session.digitalCount} dijital + {session.teacherCount} öğretmen
+          </p>
         </div>
         <div className="flex h-10 min-w-10 items-center justify-center rounded-full border border-blue-500/30 bg-blue-500/10 text-xs font-black text-blue-300">
           {correctCount}
@@ -424,7 +535,23 @@ export default function SozelTaklitAssessment({ kind, title, onClose, onComplete
             <ClipboardCheck className="mx-auto mb-4 text-blue-400" size={52} />
             <h2 className="text-2xl font-black">Değerlendirme tamamlandı</h2>
             <p className="mt-3 text-lg font-bold text-slate-300">{correctCount}/10 · %{correctCount * 10}</p>
-            <p className="mt-1 text-sm text-slate-400">Geçme ölçütü: en az 8 doğru</p>
+            <p className="mt-1 text-sm text-slate-400">
+              {correctCount >= 8 ? `Bu ${setName} seti geçildi.` : `Bu ${setName} seti henüz geçilemedi.`}
+            </p>
+            {completionTarget && (
+              <div className="mt-4 rounded-2xl border border-blue-500/25 bg-blue-500/10 px-4 py-3">
+                <p className="text-xs font-semibold text-blue-200">Kazanım ilerlemesi</p>
+                <p className="mt-1 text-xl font-black text-white">
+                  {Math.min(
+                    completionTarget,
+                    new Set([
+                      ...masteredLabels.map(simpleText),
+                      ...(correctCount >= 8 ? correctLabels.map(simpleText) : []),
+                    ]).size,
+                  )}/{completionTarget} sözcük
+                </p>
+              </div>
+            )}
             <button
               onClick={saveAndExit}
               disabled={isSaving}
