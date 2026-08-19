@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Gamepad2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, CheckCircle2, XCircle, Trophy, Gamepad2, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 import Talk from './talk';
 import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
+import SozelTaklit1 from '@/aba/sozeltaklit/sozeltaklit1';
+import SozelTaklit2 from '@/aba/sozeltaklit/sozeltaklit2';
 
 interface SozelTaklitPageProps {
   studentId: string;
@@ -18,6 +20,7 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [showTolkido, setShowTolkido] = useState(false);
+  const [activeAssessmentItem, setActiveAssessmentItem] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveBanner, setSaveBanner] = useState<'ok' | 'err' | null>(null);
@@ -56,18 +59,19 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
   }, [dirty]);
 
-  const handleSave = async () => {
+  const handleSave = async (newData?: Record<string, any>, showMessage = true) => {
     setIsSaving(true);
     setSaveBanner(null);
     try {
       const instId = localStorage.getItem("kazanim-takip-institution-id");
       if (!instId) throw new Error("Kurum bilgisi bulunamadı.");
-      await setDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"), formData, { merge: true });
+      const dataToSave = newData || formData;
+      await setDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"), dataToSave, { merge: true });
       await associateCurrentTeacherWithStudent(studentId);
       setDirty(false);
       setSaveBanner('ok');
       window.setTimeout(() => setSaveBanner(null), 1500);
-      toast.success("Değişiklikler kaydedildi.");
+      if (showMessage) toast.success("Değişiklikler kaydedildi.");
       return true;
     } catch (error) {
       console.error("Sözel taklit kaydetme hatası:", error);
@@ -87,6 +91,20 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
     setSaveBanner(null);
   };
 
+  const handleAssessmentComplete = async (success: boolean) => {
+    if (!activeAssessmentItem) return;
+    const updatedData = { ...formData, [activeAssessmentItem]: success };
+    setFormData(updatedData);
+    setDirty(true);
+    setSaveBanner(null);
+
+    const saved = await handleSave(updatedData, false);
+    if (saved) {
+      toast.success("Değerlendirme sonucu kaydedildi.");
+      setActiveAssessmentItem(null);
+    }
+  };
+
   const calculateProgress = () => {
     if (items.length === 0) return 0;
     const completedCount = items.filter(item => formData[item] === true).length;
@@ -94,6 +112,24 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
   };
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
+
+  if (activeAssessmentItem?.startsWith('ST 1.1.')) {
+    return (
+      <SozelTaklit1
+        onClose={() => setActiveAssessmentItem(null)}
+        onComplete={handleAssessmentComplete}
+      />
+    );
+  }
+
+  if (activeAssessmentItem?.startsWith('ST 1.2.')) {
+    return (
+      <SozelTaklit2
+        onClose={() => setActiveAssessmentItem(null)}
+        onComplete={handleAssessmentComplete}
+      />
+    );
+  }
 
   // TOLKİDO MODU
   if (showTolkido) {
@@ -133,7 +169,7 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
             </div>
         </div>
         <div className="flex min-w-[7.5rem] flex-col items-end gap-1">
-          <Button onClick={handleSave} disabled={isSaving} className="bg-green-600 hover:bg-green-700 h-8 text-xs disabled:opacity-60">
+          <Button onClick={() => handleSave()} disabled={isSaving} className="bg-green-600 hover:bg-green-700 h-8 text-xs disabled:opacity-60">
             {isSaving ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-2 h-3.5 w-3.5" />}
             {isSaving ? 'Kaydediliyor…' : 'Kaydet'}
           </Button>
@@ -189,6 +225,7 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
             const textPart = item.substring(secondSpaceIndex > -1 ? secondSpaceIndex + 1 : firstSpaceIndex + 1);
 
             const isTolkidoItem = item.includes("TOLKİDO");
+            const hasAssessment = item.startsWith('ST 1.1.') || item.startsWith('ST 1.2.');
             
             return (
                 <div key={item} className={twMerge(
@@ -217,11 +254,20 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
                             </p>
                             {isPassed && <span className="block text-[10px] text-green-500/60 font-semibold uppercase tracking-wider">Geçti · tekrar değerlendirilebilir</span>}
                             {isFailed && <span className="block text-[10px] text-red-400/90 font-semibold uppercase tracking-wider">Geçemedi · öncelikli</span>}
+                            {hasAssessment && <span className="mt-2 inline-flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-400"><Gamepad2 size={12} /> İnteraktif</span>}
                         </div>
                     </div>
                     
                     {/* BUTON GRUBU */}
                     <div className="flex items-center gap-1">
+                         {hasAssessment && (
+                           <button
+                             onClick={() => setActiveAssessmentItem(item)}
+                             className="mr-1 flex h-8 items-center justify-center gap-1 rounded-md border border-blue-400 bg-blue-600/90 px-3 text-[10px] font-bold text-white shadow-sm transition-transform active:scale-95"
+                           >
+                             <ClipboardCheck size={14} /> Değerlendir
+                           </button>
+                         )}
                          {/* TOLKİDO ÖZEL BUTONU */}
                          {isTolkidoItem && (
                            <button
