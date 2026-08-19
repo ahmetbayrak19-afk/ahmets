@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, RefreshCcw, Volume2, VolumeX, Image as ImageIcon } from 'lucide-react';
+import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, Volume2, VolumeX, Image as ImageIcon } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
 
@@ -45,9 +45,13 @@ import harika1 from './ses/harika1.mp3';
 import harika2 from './ses/harika2.mp3';
 import tekrardene1 from './ses/tekrardene1.mp3';
 import tekrardene2 from './ses/tekrardene2.mp3';
+import devametNotr from './ses/devametnotr.mp3';
+import devamet2Notr from './ses/devamet2notr.mp3';
+import simdiSiradakiNotr from './ses/simdisiradakinotr.mp3';
 
 const POSITIVE_SOUNDS = [aferin1, aferin2, bravo, esledinbravo, harika1, harika2];
 const NEGATIVE_SOUNDS = [tekrardene1, tekrardene2];
+const NEUTRAL_SOUNDS = [devametNotr, devamet2Notr, simdiSiradakiNotr];
 
 // VERİ YAPISI
 const OBJECTS = [
@@ -123,14 +127,17 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
     }
   }, [isMuted]);
 
-  const playSoundEffect = (type: 'success' | 'fail') => {
+  const playSoundEffect = (type: 'success' | 'fail' | 'neutral') => {
     let soundSrc;
     if (type === 'success') {
         const randomIndex = Math.floor(Math.random() * POSITIVE_SOUNDS.length);
         soundSrc = POSITIVE_SOUNDS[randomIndex];
-    } else {
+    } else if (type === 'fail') {
         const randomIndex = Math.floor(Math.random() * NEGATIVE_SOUNDS.length);
         soundSrc = NEGATIVE_SOUNDS[randomIndex];
+    } else {
+        const randomIndex = Math.floor(Math.random() * NEUTRAL_SOUNDS.length);
+        soundSrc = NEUTRAL_SOUNDS[randomIndex];
     }
     const audio = new Audio(soundSrc);
     audio.volume = 1.0; 
@@ -207,7 +214,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
 
   const handleSuccess = () => {
     setIsMatched(true); 
-    playSoundEffect('success'); 
+    playSoundEffect(mode === 'assessment' ? 'neutral' : 'success');
 
     if (mode === 'instruction') {
         setShowFeedback('correct');
@@ -229,7 +236,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
   };
 
   const handleMistake = () => {
-    playSoundEffect('fail'); 
+    playSoundEffect(mode === 'assessment' ? 'neutral' : 'fail');
     if (mode === 'assessment') {
         setTimeout(() => {
             const nextCount = assessmentCount + 1;
@@ -454,14 +461,11 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
       {phase === 'fail' && (
         <div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center p-8">
            <div className="text-8xl mb-6 italic font-black text-slate-200">!</div>
-           <h1 className="text-2xl font-black text-slate-800 mb-2 uppercase">Tekrar Deneyelim</h1>
-           <p className="text-slate-500 mb-10 font-medium">Skor: {assessmentScore} / 10</p>
-           <div className="flex gap-4">
-             <button onClick={onClose} className="bg-slate-100 text-slate-600 px-8 py-4 rounded-xl font-bold text-lg">KAPAT</button>
-             <button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg flex items-center gap-2">
-               <RefreshCcw size={20}/> YENİDEN BAŞLA
-             </button>
-           </div>
+           <h1 className="text-2xl font-black text-slate-800 mb-2 uppercase">Değerlendirme Tamamlandı</h1>
+           <p className="text-slate-500 mb-10 font-medium">Başarı Oranı: {assessmentScore * 10}%</p>
+           <button onClick={() => onComplete(false)} className="bg-slate-700 text-white px-12 py-5 rounded-2xl font-bold text-xl shadow-xl active:scale-95 transition-all">
+             KAYDET VE ÇIK
+           </button>
         </div>
       )}
 
