@@ -90,6 +90,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
   const [isModeling, setIsModeling] = useState(false);
   const [flashCorrect, setFlashCorrect] = useState(false);
   const [isMatched, setIsMatched] = useState(false);
+  const [assessmentAnswered, setAssessmentAnswered] = useState(false);
   
   const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
   
@@ -168,12 +169,14 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
     setFlashCorrect(false);
     setInstructionMistakeCount(0);
     setIsMatched(false);
+    setAssessmentAnswered(false);
   };
 
   useEffect(() => { generateQuestion(); }, [level]);
 
   // --- SÜRÜKLEME ---
   const handleDragEnd = (event: any, info: any, droppedItem: typeof OBJECTS[0]) => {
+    if (mode === 'assessment' && assessmentAnswered) return;
     if (isModeling || isMatched) return;
 
     const dropZone = dropZoneRef.current;
@@ -214,6 +217,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
 
   const handleSuccess = () => {
     setIsMatched(true); 
+    if (mode === 'assessment') setAssessmentAnswered(true);
     playSoundEffect(mode === 'assessment' ? 'neutral' : 'success');
 
     if (mode === 'instruction') {
@@ -236,6 +240,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
   };
 
   const handleMistake = () => {
+    if (mode === 'assessment') setAssessmentAnswered(true);
     playSoundEffect(mode === 'assessment' ? 'neutral' : 'fail');
     if (mode === 'assessment') {
         setTimeout(() => {
@@ -353,7 +358,9 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                 style={{ perspective: '800px' }} 
                 className={twMerge(
                     "w-64 h-64 md:w-72 md:h-72 bg-white rounded-[3rem] flex items-center justify-center relative z-0 transition-all duration-300 overflow-hidden shadow-lg",
-                    isMatched ? "border-4 border-dashed border-green-500 shadow-green-100" : "border-4 border-dashed border-slate-300"
+                    mode === 'assessment' && assessmentAnswered
+                      ? "border-4 border-solid border-yellow-400 shadow-yellow-100"
+                      : isMatched ? "border-4 border-dashed border-green-500 shadow-green-100" : "border-4 border-dashed border-slate-300"
                 )}
             >
                {/* 3 KATMANLI YAPI */}

@@ -95,6 +95,7 @@ export default function NesneEslemeGame1({ mode, onClose, onComplete }: GameProp
   const [isModeling, setIsModeling] = useState(false);
   const [flashCorrect, setFlashCorrect] = useState(false);
   const [isMatched, setIsMatched] = useState(false);
+  const [assessmentAnswered, setAssessmentAnswered] = useState(false);
   const [isMuted, setIsMuted] = useState(false); 
   
   const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
@@ -184,11 +185,13 @@ export default function NesneEslemeGame1({ mode, onClose, onComplete }: GameProp
     setFlashCorrect(false);
     setInstructionMistakeCount(0);
     setIsMatched(false);
+    setAssessmentAnswered(false);
   };
 
   useEffect(() => { generateQuestion(); }, [level]);
 
   const handleDragEnd = (event: any, info: any, droppedItem: typeof OBJECTS[0]) => {
+    if (mode === 'assessment' && assessmentAnswered) return;
     if (isModeling || isMatched) return;
 
     const dropZone = dropZoneRef.current;
@@ -229,6 +232,7 @@ export default function NesneEslemeGame1({ mode, onClose, onComplete }: GameProp
 
   const handleSuccess = () => {
     setIsMatched(true); 
+    if (mode === 'assessment') setAssessmentAnswered(true);
     playSoundEffect(mode === 'assessment' ? 'neutral' : 'success');
 
     if (mode === 'instruction') {
@@ -253,6 +257,7 @@ export default function NesneEslemeGame1({ mode, onClose, onComplete }: GameProp
   };
 
   const handleMistake = () => {
+    if (mode === 'assessment') setAssessmentAnswered(true);
     playSoundEffect(mode === 'assessment' ? 'neutral' : 'fail');
 
     if (mode === 'assessment') {
@@ -376,7 +381,9 @@ export default function NesneEslemeGame1({ mode, onClose, onComplete }: GameProp
                 ref={dropZoneRef}
                 className={twMerge(
                     "w-72 h-72 bg-white rounded-[3rem] border-4 border-dashed flex items-center justify-center shadow-inner relative z-0 transition-all duration-300",
-                    isMatched ? "border-green-500 bg-green-50 border-solid" : "border-slate-300"
+                    mode === 'assessment' && assessmentAnswered
+                      ? "border-yellow-400 bg-yellow-50 border-solid"
+                      : isMatched ? "border-green-500 bg-green-50 border-solid" : "border-slate-300"
                 )}
             >
                <img 

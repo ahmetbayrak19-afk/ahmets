@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, XCircle, Trophy, GraduationCap, ClipboardCheck, RefreshCcw, Volume2, VolumeX, Layers } from 'lucide-react';
+import { Check, XCircle, Trophy, GraduationCap, ClipboardCheck, Volume2, VolumeX, Layers } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
+import { playNeutralAssessmentFeedback } from './neutralAssessmentFeedback';
 
 // --- SES DOSYALARI ---
 import arkaplanMusic from './ses/arkaplanmusic.mp3';
@@ -59,6 +60,7 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
   const [disabledKeys, setDisabledKeys] = useState<string[]>([]); 
   const [isShake, setIsShake] = useState(false); 
   const [isSuccessAnim, setIsSuccessAnim] = useState(false);
+  const [assessmentAnswered, setAssessmentAnswered] = useState(false);
 
   // Puanlama
   const [assessmentCount, setAssessmentCount] = useState(0); 
@@ -128,6 +130,7 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
     setDisabledKeys([]);
     setIsShake(false);
     setIsSuccessAnim(false);
+    setAssessmentAnswered(false);
   };
 
   // Seviye değişince
@@ -154,7 +157,7 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
 
   // --- TUŞA BASINCA ---
   const handleKeyPress = (letter: string) => {
-    if (phase !== 'playing' || disabledKeys.includes(letter) || isSuccessAnim) return;
+    if (phase !== 'playing' || disabledKeys.includes(letter) || isSuccessAnim || assessmentAnswered) return;
 
     const expectedChar = targetString[currentIndex];
 
@@ -181,7 +184,12 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
 
   const handleSuccess = () => {
     setIsSuccessAnim(true);
-    playSoundEffect('success');
+    if (mode === 'assessment') {
+        setAssessmentAnswered(true);
+        playNeutralAssessmentFeedback();
+    } else {
+        playSoundEffect('success');
+    }
     
     if (mode === 'assessment') {
         setAssessmentScore(prev => prev + 1);
@@ -201,6 +209,17 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
   };
 
   const handleMistake = () => {
+    if (mode === 'assessment') {
+        setAssessmentAnswered(true);
+        playNeutralAssessmentFeedback();
+        setTimeout(() => {
+            const nextCount = assessmentCount + 1;
+            setAssessmentCount(nextCount);
+            if (nextCount < 10) generateQuestion();
+        }, 800);
+        return;
+    }
+
     playSoundEffect('fail');
     setIsShake(true);
     setTimeout(() => setIsShake(false), 500);
@@ -331,19 +350,23 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
               </span>
               
               <motion.div 
-                animate={isShake ? { x: [-10, 10, -10, 10, 0], color: "#ef4444" } : { x: 0, color: isSuccessAnim ? "#22c55e" : "#334155" }}
+                animate={mode === 'assessment' && assessmentAnswered
+                  ? { x: 0, color: "#334155" }
+                  : isShake ? { x: [-10, 10, -10, 10, 0], color: "#ef4444" } : { x: 0, color: isSuccessAnim ? "#22c55e" : "#334155" }}
                 transition={{ duration: 0.4 }}
                 className={twMerge(
                     "flex items-center justify-center gap-1 sm:gap-2 px-6 py-4 sm:px-10 sm:py-6 bg-white rounded-2xl sm:rounded-3xl border-4 shadow-xl transition-all max-w-full overflow-hidden",
-                    isSuccessAnim ? "border-green-500 bg-green-50 scale-105" : "border-slate-200",
-                    isShake ? "border-red-400 bg-red-50" : ""
+                    mode === 'assessment' && assessmentAnswered
+                      ? "border-yellow-400 bg-yellow-50"
+                      : isSuccessAnim ? "border-green-500 bg-green-50 scale-105" : "border-slate-200",
+                    mode !== 'assessment' && isShake ? "border-red-400 bg-red-50" : ""
                 )}
               >
                   {/* Harfleri tek tek render et */}
                   {targetString.split('').map((char, index) => (
                       <span key={index} className={twMerge(
                           "text-4xl sm:text-6xl md:text-7xl font-black transition-colors",
-                          index < currentIndex ? "text-green-500" : 
+                          index < currentIndex ? (mode === 'assessment' ? "text-slate-700" : "text-green-500") :
                           index === currentIndex && !isSuccessAnim && !isShake ? "text-slate-800 underline decoration-4 decoration-blue-300 underline-offset-8" : 
                           "text-slate-300"
                       )}>
@@ -386,14 +409,11 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
       {phase === 'fail' && (
         <div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center p-8">
            <div className="text-8xl mb-6 italic font-black text-slate-200">!</div>
-           <h1 className="text-2xl font-black text-slate-800 mb-2 uppercase">Tekrar Deneyelim</h1>
-           <p className="text-slate-500 mb-10 font-medium">Skor: {assessmentScore} / 10</p>
-           <div className="flex gap-4">
-             <button onClick={onClose} className="bg-slate-100 text-slate-600 px-8 py-4 rounded-xl font-bold text-lg">KAPAT</button>
-             <button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg flex items-center gap-2">
-               <RefreshCcw size={20}/> YENİDEN BAŞLA
-             </button>
-           </div>
+           <h1 className="text-2xl font-black text-slate-800 mb-2 uppercase">Değerlendirme Tamamlandı</h1>
+           <p className="text-slate-500 mb-10 font-medium">Başarı Oranı: {assessmentScore * 10}%</p>
+           <button onClick={() => onComplete(false)} className="bg-slate-700 text-white px-12 py-5 rounded-2xl font-bold text-xl shadow-xl active:scale-95 transition-all">
+             KAYDET VE ÇIK
+           </button>
         </div>
       )}
 

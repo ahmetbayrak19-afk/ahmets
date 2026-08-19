@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, RefreshCcw, Volume2, VolumeX } from 'lucide-react';
+import { Check, XCircle, Trophy, MousePointer2, GraduationCap, ClipboardCheck, Volume2, VolumeX } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
+import { playNeutralAssessmentFeedback } from './neutralAssessmentFeedback';
 
 // --- SES DOSYALARI ---
 import arkaplanMusic from './ses/arkaplanmusic.mp3';
@@ -85,6 +86,7 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
   const [isModeling, setIsModeling] = useState(false);
   const [flashCorrect, setFlashCorrect] = useState(false);
   const [isMatched, setIsMatched] = useState(false);
+  const [assessmentAnswered, setAssessmentAnswered] = useState(false);
   
   const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
@@ -171,12 +173,14 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
     setFlashCorrect(false);
     setInstructionMistakeCount(0);
     setIsMatched(false);
+    setAssessmentAnswered(false);
   };
 
   useEffect(() => { generateQuestion(); }, [level]);
 
   // --- SÜRÜKLE BIRAK MANTIĞI ---
   const handleDragEnd = (event: any, info: any, droppedItem: typeof WORDS_LVL1[0]) => {
+    if (mode === 'assessment' && assessmentAnswered) return;
     if (isModeling || isMatched) return;
 
     const dropZone = dropZoneRef.current;
@@ -217,7 +221,12 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
 
   const handleSuccess = () => {
     setIsMatched(true); 
-    playSoundEffect('success'); 
+    if (mode === 'assessment') {
+      setAssessmentAnswered(true);
+      playNeutralAssessmentFeedback();
+    } else {
+      playSoundEffect('success');
+    }
 
     if (mode === 'instruction') {
         setShowFeedback('correct');
@@ -241,7 +250,12 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
   };
 
   const handleMistake = () => {
-    playSoundEffect('fail'); 
+    if (mode === 'assessment') {
+      setAssessmentAnswered(true);
+      playNeutralAssessmentFeedback();
+    } else {
+      playSoundEffect('fail');
+    }
 
     if (mode === 'assessment') {
         setTimeout(() => {
@@ -369,7 +383,9 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
                 ref={dropZoneRef}
                 className={twMerge(
                     "w-72 h-32 bg-white rounded-[2rem] border-4 border-dashed flex items-center justify-center shadow-inner relative z-0 transition-all duration-300 px-4",
-                    isMatched ? "border-green-500 bg-green-50 border-solid" : "border-slate-300"
+                    mode === 'assessment' && assessmentAnswered
+                      ? "border-yellow-400 bg-yellow-50 border-solid"
+                      : isMatched ? "border-green-500 bg-green-50 border-solid" : "border-slate-300"
                 )}
             >
                <span 
@@ -476,14 +492,11 @@ export default function NesneEslemeGame16({ mode, onClose, onComplete }: GamePro
       {phase === 'fail' && (
         <div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center p-8 font-sans">
            <div className="text-8xl mb-6 italic font-black text-slate-200">!</div>
-           <h1 className="text-2xl font-black text-slate-800 mb-2 uppercase">Tekrar Deneyelim</h1>
-           <p className="text-slate-500 mb-10 font-medium">Skor: {assessmentScore} / 10</p>
-           <div className="flex gap-4">
-             <button onClick={onClose} className="bg-slate-100 text-slate-600 px-8 py-4 rounded-xl font-bold text-lg">KAPAT</button>
-             <button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg flex items-center gap-2">
-               <RefreshCcw size={20}/> YENİDEN BAŞLA
-             </button>
-           </div>
+           <h1 className="text-2xl font-black text-slate-800 mb-2 uppercase">Değerlendirme Tamamlandı</h1>
+           <p className="text-slate-500 mb-10 font-medium">Başarı Oranı: {assessmentScore * 10}%</p>
+           <button onClick={() => onComplete(false)} className="bg-slate-700 text-white px-12 py-5 rounded-2xl font-bold text-xl shadow-xl active:scale-95 transition-all">
+             KAYDET VE ÇIK
+           </button>
         </div>
       )}
 

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Volume2, RotateCcw, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import confetti from 'canvas-confetti';
+import { playNeutralAssessmentFeedback } from './neutralAssessmentFeedback';
 
 // --- GENEL SESLER ---
 import soruSes from './oyku/soru.mp3'; 
@@ -65,9 +66,11 @@ const SUCCESS_SOUNDS = [aferin1, aferin2, bravo, harika1];
 
 interface GameProps {
     onClose: () => void;
+    mode: 'assessment' | 'instruction';
+    onComplete: (success: boolean) => void;
 }
 
-export default function NesneEslemeGame23({ onClose }: GameProps) {
+export default function NesneEslemeGame23({ onClose, mode, onComplete }: GameProps) {
     const [level, setLevel] = useState<1 | 2>(1);
     
     // Oyun State'leri
@@ -77,6 +80,10 @@ export default function NesneEslemeGame23({ onClose }: GameProps) {
     const [wrongCount, setWrongCount] = useState(0);
     const [status, setStatus] = useState<'listening' | 'answering' | 'success'>('listening');
     const [lastWrongId, setLastWrongId] = useState<string | null>(null);
+    const [assessmentCount, setAssessmentCount] = useState(0);
+    const [assessmentScore, setAssessmentScore] = useState(0);
+    const [assessmentResult, setAssessmentResult] = useState<boolean | null>(null);
+    const [assessmentSelection, setAssessmentSelection] = useState<string | null>(null);
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const timersRef = useRef<NodeJS.Timeout[]>([]); // Zamanlayıcıları takip etmek için
@@ -124,6 +131,7 @@ export default function NesneEslemeGame23({ onClose }: GameProps) {
         
         setWrongCount(0);
         setLastWrongId(null);
+        setAssessmentSelection(null);
         setIsLocked(true); // Kilidi kapat
         setStatus('listening'); // Mod: Dinleme
 
@@ -164,6 +172,28 @@ export default function NesneEslemeGame23({ onClose }: GameProps) {
     const handleAnswer = (selectedId: string) => {
         if (isLocked || status !== 'answering') return;
 
+        if (mode === 'assessment') {
+            const isCorrect = selectedId === currentStory.id;
+            const nextScore = assessmentScore + (isCorrect ? 1 : 0);
+            const nextCount = assessmentCount + 1;
+
+            setIsLocked(true);
+            setAssessmentSelection(selectedId);
+            if (isCorrect) setAssessmentScore(nextScore);
+            playNeutralAssessmentFeedback();
+
+            const nextTimer = setTimeout(() => {
+                setAssessmentCount(nextCount);
+                if (nextCount >= 10) {
+                    setAssessmentResult(nextScore >= 9);
+                } else {
+                    startGame(level);
+                }
+            }, 900);
+            timersRef.current.push(nextTimer);
+            return;
+        }
+
         if (selectedId === currentStory.id) {
             // DOĞRU
             setStatus('success');
@@ -198,6 +228,7 @@ export default function NesneEslemeGame23({ onClose }: GameProps) {
                 </button>
 
                 {/* SEVİYE BUTONLARI (ORTADA) */}
+                {mode === 'instruction' ? (
                 <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700">
                     <button
                         onClick={() => startGame(1)}
@@ -218,6 +249,11 @@ export default function NesneEslemeGame23({ onClose }: GameProps) {
                         2. Seviye
                     </button>
                 </div>
+                ) : (
+                    <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm font-bold text-blue-300">
+                        TEST: {Math.min(assessmentCount + 1, 10)}/10
+                    </div>
+                )}
 
                 <div className="w-10 sm:w-12" /> {/* Dengelemek için boşluk */}
             </div>
@@ -262,7 +298,9 @@ export default function NesneEslemeGame23({ onClose }: GameProps) {
                                 className={`
                                     flex-1 relative rounded-2xl overflow-hidden border-4 cursor-pointer shadow-md transition-all duration-500
                                     ${shouldDarken ? 'brightness-[0.2] grayscale pointer-events-none border-transparent' : 'bg-slate-800'}
-                                    ${status === 'success' && isCorrect ? 'border-green-500 ring-4 ring-green-400 z-10 scale-105' : 'border-slate-700'}
+                                    ${mode === 'assessment' && assessmentSelection === opt.id
+                                      ? 'border-yellow-400 ring-4 ring-yellow-300 z-10 scale-105'
+                                      : status === 'success' && isCorrect ? 'border-green-500 ring-4 ring-green-400 z-10 scale-105' : 'border-slate-700'}
                                     ${isLocked ? 'active:none' : 'active:scale-95'}
                                 `}
                             >
@@ -295,6 +333,19 @@ export default function NesneEslemeGame23({ onClose }: GameProps) {
                     </div>
                 )}
             </div>
+
+            {assessmentResult !== null && (
+                <div className="absolute inset-0 z-[80] flex flex-col items-center justify-center bg-slate-950/95 p-6 text-center">
+                    <h2 className="mb-3 text-3xl font-black text-white">Değerlendirme Tamamlandı</h2>
+                    <p className="mb-8 text-lg font-medium text-slate-300">Başarı Oranı: %{assessmentScore * 10}</p>
+                    <button
+                        onClick={() => onComplete(assessmentResult)}
+                        className="rounded-2xl bg-yellow-500 px-10 py-4 text-lg font-black text-slate-950 shadow-xl active:scale-95"
+                    >
+                        KAYDET VE ÇIK
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

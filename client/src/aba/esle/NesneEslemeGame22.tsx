@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, XCircle, Trophy, GraduationCap, ClipboardCheck, RefreshCcw, Volume2, VolumeX } from 'lucide-react';
+import { Check, XCircle, Trophy, GraduationCap, ClipboardCheck, Volume2, VolumeX } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
+import { playNeutralAssessmentFeedback } from './neutralAssessmentFeedback';
 
 import arkaplanMusic from './ses/arkaplanmusic.mp3';
 import aferin1 from './ses/aferin1.mp3';
@@ -133,6 +134,8 @@ export default function NesneEslemeGame22({ mode, onClose, onComplete }: GamePro
   const [matchedPieceIds, setMatchedPieceIds] = useState<string[]>([]);
   const [showFinalImage, setShowFinalImage] = useState(false);
   const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
+  const [assessmentAnswered, setAssessmentAnswered] = useState(false);
+  const [assessmentLocked, setAssessmentLocked] = useState(false);
 
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
@@ -174,6 +177,8 @@ export default function NesneEslemeGame22({ mode, onClose, onComplete }: GamePro
     setMatchedPieceIds([]);
     setShowFinalImage(false);
     setShowFeedback(null);
+    setAssessmentAnswered(false);
+    setAssessmentLocked(false);
   };
 
   useEffect(() => {
@@ -220,7 +225,7 @@ export default function NesneEslemeGame22({ mode, onClose, onComplete }: GamePro
     // İki defa üst üste ses çıkmasını engelliyor.
     
     setShowFinalImage(true);
-    setShowFeedback('correct');
+    if (mode === 'instruction') setShowFeedback('correct');
 
     if (mode === 'assessment') {
       setAssessmentScore(prev => prev + 1);
@@ -251,6 +256,7 @@ export default function NesneEslemeGame22({ mode, onClose, onComplete }: GamePro
   }, [assessmentCount, assessmentScore, mode]);
 
   const handleDragEnd = (event: any, info: any, droppedPiece: Piece) => {
+    if (mode === 'assessment' && assessmentLocked) return;
     if (!targetPiece || !questionGroup || showFinalImage) return;
 
     const dropZone = dropZoneRef.current;
@@ -272,13 +278,17 @@ export default function NesneEslemeGame22({ mode, onClose, onComplete }: GamePro
     const alreadyMatched = matchedPieceIds.includes(droppedPiece.id);
 
     if (isRequiredPiece && !alreadyMatched) {
-      // 🔥 YENİ: Parçayı doğru yere bıraktığı an "Bravo" desin
-      playSoundEffect('success');
+      if (mode === 'assessment') {
+        setAssessmentAnswered(true);
+        playNeutralAssessmentFeedback();
+      } else {
+        playSoundEffect('success');
+      }
       
       setMatchedPieceIds(prev => [...prev, droppedPiece.id]);
       setOptions(prev => prev.filter(option => option.id !== droppedPiece.id));
       
-      setShowFeedback('correct');
+      if (mode === 'instruction') setShowFeedback('correct');
       
       // Eğer henüz bütün grup tamamlanmadıysa yeşil tiki kısa süre sonra kaldır.
       // (Tamamlandıysa useEffect içindeki kod zaten kendi bekletmesini yapacak)
@@ -288,9 +298,17 @@ export default function NesneEslemeGame22({ mode, onClose, onComplete }: GamePro
       return;
     }
 
-    playSoundEffect('fail');
-    setShowFeedback('wrong');
-    setTimeout(() => setShowFeedback(null), 900);
+    if (mode === 'assessment') {
+      setAssessmentAnswered(true);
+      setAssessmentLocked(true);
+      playNeutralAssessmentFeedback();
+    } else {
+      playSoundEffect('fail');
+    }
+    if (mode === 'instruction') {
+      setShowFeedback('wrong');
+      setTimeout(() => setShowFeedback(null), 900);
+    }
 
     if (mode === 'assessment') {
       setTimeout(() => {
@@ -351,7 +369,9 @@ export default function NesneEslemeGame22({ mode, onClose, onComplete }: GamePro
               ref={dropZoneRef}
               className={twMerge(
                 'w-72 h-72 bg-white rounded-[3rem] border-4 border-dashed flex flex-col items-center justify-center shadow-inner relative z-0 transition-all duration-300',
-                showFinalImage ? 'border-green-500 bg-green-50 border-solid' : 'border-slate-300',
+                mode === 'assessment' && assessmentAnswered
+                  ? 'border-yellow-400 bg-yellow-50 border-solid'
+                  : showFinalImage ? 'border-green-500 bg-green-50 border-solid' : 'border-slate-300',
               )}
             >
               {/* 🔥 YENİ: Başarıyla eşlenen parçaların yukarıda küçük görünmesi */}
@@ -364,7 +384,12 @@ export default function NesneEslemeGame22({ mode, onClose, onComplete }: GamePro
                         key={p.id}
                         initial={{ scale: 0, y: 15 }}
                         animate={{ scale: 1, y: 0 }}
-                        className="w-16 h-16 bg-white border-2 border-green-400 rounded-xl shadow-[0_4px_0_0_#bbf7d0] flex items-center justify-center p-2"
+                        className={twMerge(
+                          "w-16 h-16 bg-white border-2 rounded-xl flex items-center justify-center p-2",
+                          mode === 'assessment'
+                            ? "border-yellow-400 shadow-[0_4px_0_0_#fef08a]"
+                            : "border-green-400 shadow-[0_4px_0_0_#bbf7d0]",
+                        )}
                       >
                         <img src={p.src} alt={p.name} className="w-full h-full object-contain drop-shadow-sm" />
                       </motion.div>
@@ -424,14 +449,11 @@ export default function NesneEslemeGame22({ mode, onClose, onComplete }: GamePro
       {phase === 'fail' && (
         <div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center p-8">
           <div className="text-8xl mb-6 italic font-black text-slate-200">!</div>
-          <h1 className="text-2xl font-black text-slate-800 mb-2 uppercase">Tekrar Deneyelim</h1>
-          <p className="text-slate-500 mb-10 font-medium">Skor: {assessmentScore} / 10</p>
-          <div className="flex gap-4">
-            <button onClick={onClose} className="bg-slate-100 text-slate-600 px-8 py-4 rounded-xl font-bold text-lg">KAPAT</button>
-            <button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg flex items-center gap-2">
-              <RefreshCcw size={20} /> YENİDEN BAŞLA
-            </button>
-          </div>
+          <h1 className="text-2xl font-black text-slate-800 mb-2 uppercase">Değerlendirme Tamamlandı</h1>
+          <p className="text-slate-500 mb-10 font-medium">Başarı Oranı: {assessmentScore * 10}%</p>
+          <button onClick={() => onComplete(false)} className="bg-slate-700 text-white px-12 py-5 rounded-2xl font-bold text-xl shadow-xl active:scale-95 transition-all">
+            KAYDET VE ÇIK
+          </button>
         </div>
       )}
 

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, XCircle, Trophy, GraduationCap, ClipboardCheck, RefreshCcw, Volume2, VolumeX } from 'lucide-react';
+import { Check, XCircle, Trophy, GraduationCap, ClipboardCheck, Volume2, VolumeX } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { twMerge } from 'tailwind-merge';
+import { playNeutralAssessmentFeedback } from './neutralAssessmentFeedback';
 
 // --- RESİMLER (Hem 1. hem 2. setten karışık) ---
 import anahtarImg from './anahtar.png';
@@ -91,6 +92,7 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
   
   const [instructionMistakeCount, setInstructionMistakeCount] = useState(0);
   const [wrongSelection, setWrongSelection] = useState<string | null>(null);
+  const [assessmentSelection, setAssessmentSelection] = useState<string | null>(null);
   
   const [showFeedback, setShowFeedback] = useState<'correct' | 'wrong' | null>(null);
   const bgMusicRef = useRef<HTMLAudioElement | null>(null);
@@ -169,6 +171,7 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
     
     setShowFeedback(null);
     setWrongSelection(null);
+    setAssessmentSelection(null);
     setInstructionMistakeCount(0);
   };
 
@@ -176,10 +179,15 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
 
   // --- CEVAP KONTROLÜ ---
   const handleOptionClick = (selectedWord: string) => {
-    if (showFeedback === 'correct') return; 
+    if (showFeedback === 'correct' || assessmentSelection) return;
+
+    if (mode === 'assessment') {
+        setAssessmentSelection(selectedWord);
+        playNeutralAssessmentFeedback();
+    }
 
     if (selectedWord === targetItem.name) {
-        playSoundEffect('success');
+        if (mode === 'instruction') playSoundEffect('success');
         if (mode === 'instruction') setShowFeedback('correct');
         if (mode === 'assessment') setAssessmentScore(prev => prev + 1);
 
@@ -193,8 +201,10 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
             }
         }, 1500);
     } else {
-        playSoundEffect('fail');
-        setWrongSelection(selectedWord);
+        if (mode === 'instruction') {
+            playSoundEffect('fail');
+            setWrongSelection(selectedWord);
+        }
         
         if (mode === 'assessment') {
             setTimeout(() => {
@@ -306,7 +316,9 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
                     whileTap={{ scale: 0.95 }}
                     onClick={() => handleOptionClick(word)}
                     animate={
-                        (showFeedback === 'correct' && isCorrect) 
+                        (mode === 'assessment' && assessmentSelection === word)
+                        ? { scale: [1, 1.04, 1], backgroundColor: "#fef9c3", color: "#334155", borderColor: "#facc15" }
+                        : (showFeedback === 'correct' && isCorrect)
                         ? { scale: [1, 1.1, 1], backgroundColor: "#22c55e", color: "#fff", borderColor: "#16a34a" } 
                         : (wrongSelection === word)
                         ? { x: [-10, 10, -10, 10, 0], backgroundColor: "#ef4444", color: "#fff", borderColor: "#dc2626" }
@@ -326,7 +338,7 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
       {phase === 'success' && (
         <div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center p-8 animate-in zoom-in duration-300">
            <Trophy size={100} className="text-yellow-500 mb-6 animate-bounce" />
-           <h1 className="text-3xl font-black text-slate-800 mb-2 uppercase">Harikasın!</h1>
+           <h1 className="text-3xl font-black text-slate-800 mb-2 uppercase">Tamamlandı!</h1>
            <p className="text-slate-500 mb-8 font-medium text-lg">Skor: {assessmentScore * 10}</p>
            <button onClick={() => onComplete(true)} className="bg-green-600 text-white px-12 py-5 rounded-2xl font-bold text-xl shadow-xl active:scale-95 transition-all">
              KAYDET VE BİTİR
@@ -337,14 +349,11 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
       {phase === 'fail' && (
         <div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center text-center p-8 animate-in zoom-in duration-300">
            <div className="text-8xl mb-6 italic font-black text-slate-200">!</div>
-           <h1 className="text-2xl font-black text-slate-800 mb-2 uppercase">Tekrar Deneyelim</h1>
-           <p className="text-slate-500 mb-10 font-medium">Skor: {assessmentScore} / 10</p>
-           <div className="flex gap-4">
-             <button onClick={onClose} className="bg-slate-100 text-slate-600 px-8 py-4 rounded-xl font-bold text-lg">KAPAT</button>
-             <button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg flex items-center gap-2">
-               <RefreshCcw size={20}/> TEKRAR
-             </button>
-           </div>
+           <h1 className="text-2xl font-black text-slate-800 mb-2 uppercase">Değerlendirme Tamamlandı</h1>
+           <p className="text-slate-500 mb-10 font-medium">Başarı Oranı: {assessmentScore * 10}%</p>
+           <button onClick={() => onComplete(false)} className="bg-slate-700 text-white px-12 py-5 rounded-2xl font-bold text-xl shadow-xl active:scale-95 transition-all">
+             KAYDET VE ÇIK
+           </button>
         </div>
       )}
 

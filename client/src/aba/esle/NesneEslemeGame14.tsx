@@ -118,6 +118,10 @@ export default function NesneEslemeGame14({ onClose, mode, onComplete }: GamePro
   const [targetSoundId, setTargetSoundId] = useState<number>(1); 
   const [bottomBoxes, setBottomBoxes] = useState<DraggableBox[]>([]);
   const [isGameWon, setIsGameWon] = useState(false);
+  const [assessmentCount, setAssessmentCount] = useState(0);
+  const [assessmentScore, setAssessmentScore] = useState(0);
+  const [assessmentResult, setAssessmentResult] = useState<boolean | null>(null);
+  const [assessmentAnswered, setAssessmentAnswered] = useState(false);
   
   // SÜRÜKLEME VE ETKİLEŞİM
   const [draggedBoxId, setDraggedBoxId] = useState<string | null>(null);
@@ -258,6 +262,7 @@ export default function NesneEslemeGame14({ onClose, mode, onComplete }: GamePro
     const target = Math.floor(Math.random() * 7) + 1;
     setTargetSoundId(target);
     setSuccessMatch(null);
+    setAssessmentAnswered(false);
 
     let distractorCount = 2;
     if (level === 2) distractorCount = 3;
@@ -370,10 +375,39 @@ export default function NesneEslemeGame14({ onClose, mode, onComplete }: GamePro
   };
 
   const checkAnswer = (boxId: string) => {
+    if (mode === 'assessment' && assessmentAnswered) return;
     const box = bottomBoxes.find(b => b.id === boxId);
     if (!box) return;
 
-    if (box.soundId === targetSoundId) {
+    const isCorrect = box.soundId === targetSoundId;
+
+    if (mode === 'assessment') {
+      setAssessmentAnswered(true);
+
+      if (isCorrect) {
+        setSuccessMatch({ visualType: box.visualType });
+        new Audio(assets.sndProgress).play().catch(() => {});
+      } else {
+        const selectedSound = SOUNDS[box.soundId];
+        if (selectedSound) new Audio(selectedSound).play().catch(() => {});
+      }
+
+      const nextScore = assessmentScore + (isCorrect ? 1 : 0);
+      const nextCount = assessmentCount + 1;
+      if (isCorrect) setAssessmentScore(nextScore);
+
+      setTimeout(() => {
+        setAssessmentCount(nextCount);
+        if (nextCount >= 10) {
+          setAssessmentResult(nextScore >= 9);
+        } else {
+          initRound(stage, gameLevel);
+        }
+      }, 900);
+      return;
+    }
+
+    if (isCorrect) {
       setSuccessMatch({ visualType: box.visualType });
       
       setTimeout(() => {
@@ -503,6 +537,11 @@ export default function NesneEslemeGame14({ onClose, mode, onComplete }: GamePro
 
         {/* SEVİYE GÖSTERGESİ (PILL STYLE) */}
         <div className="absolute top-4 right-4 z-50 pointer-events-auto">
+          {mode === 'assessment' ? (
+            <div className="rounded-full border border-white/30 bg-black/40 px-4 py-2 text-xs font-bold text-white backdrop-blur-md">
+              TEST: {Math.min(assessmentCount + 1, 10)}/10
+            </div>
+          ) : (
             <div className="flex bg-white/20 backdrop-blur-md p-1 rounded-full border border-white/30 items-center">
                 {[1, 2, 3].map((lvl) => (
                     <button
@@ -524,6 +563,7 @@ export default function NesneEslemeGame14({ onClose, mode, onComplete }: GamePro
                     </button>
                 ))}
             </div>
+          )}
         </div>
 
         {/* =========================================================================
@@ -549,7 +589,13 @@ export default function NesneEslemeGame14({ onClose, mode, onComplete }: GamePro
               </div>
 
               {/* SAĞ TARAF: EŞLE (DROP ZONE) */}
-              <div ref={dropZoneRef} className="relative w-28 h-28 md:w-36 md:h-36 bg-black/20 rounded-xl p-1">
+              <div
+                ref={dropZoneRef}
+                className={twMerge(
+                  "relative w-28 h-28 md:w-36 md:h-36 bg-black/20 rounded-xl p-1 border-4 transition-colors",
+                  mode === 'assessment' && assessmentAnswered ? "border-yellow-400" : "border-transparent",
+                )}
+              >
                   <img src={assets.frameMatch} className="absolute inset-0 w-full h-full object-contain opacity-90" alt="Hedef Çerçeve" />
                   
                   {successMatch && (
@@ -631,6 +677,19 @@ export default function NesneEslemeGame14({ onClose, mode, onComplete }: GamePro
         <button onClick={handleClose} className="absolute top-4 left-4 z-50 p-3 bg-slate-900/80 rounded-full border border-slate-600 text-white hover:bg-slate-700 pointer-events-auto">
            <ArrowLeft size={24} />
         </button>
+
+        {assessmentResult !== null && (
+          <div className="absolute inset-0 z-[70] flex flex-col items-center justify-center bg-black/90 p-6 text-center">
+            <h2 className="mb-3 text-3xl font-black text-white">Değerlendirme Tamamlandı</h2>
+            <p className="mb-8 text-lg font-medium text-slate-300">Başarı Oranı: %{assessmentScore * 10}</p>
+            <button
+              onClick={() => onComplete?.(assessmentResult)}
+              className="rounded-2xl bg-yellow-500 px-10 py-4 text-lg font-black text-slate-950 shadow-xl active:scale-95"
+            >
+              KAYDET VE ÇIK
+            </button>
+          </div>
+        )}
 
         {/* KAZANMA EKRANI */}
         {isGameWon && (
