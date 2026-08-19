@@ -120,12 +120,12 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
   };
 
   const handleGameComplete = async (success: boolean) => {
-    if (success && activeGameMode === 'assessment' && activeGameItem) {
-        const updatedData = { ...formData, [activeGameItem]: true };
+    if (activeGameMode === 'assessment' && activeGameItem) {
+        const updatedData = { ...formData, [activeGameItem]: success };
         setFormData(updatedData);
         setDirty(true);
         const saved = await handleSave(updatedData, false);
-        if (saved) toast.success("Tebrikler! Kazanım tamamlandı. 🎉");
+        if (saved) toast.success("Değerlendirme sonucu kaydedildi.");
     }
     setActiveGameMode(null);
     setActiveGameItem(null);

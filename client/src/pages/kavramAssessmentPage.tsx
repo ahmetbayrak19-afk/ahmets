@@ -1010,9 +1010,6 @@ export default function KavramAssessmentPage() {
           ) : (
             <img src={item.src} alt={item.name} className="w-full h-full object-contain" />
           )}
-          <div className="absolute top-4 left-4 bg-black/60 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 animate-in fade-in duration-700 delay-300">
-            <h2 className="text-2xl font-bold text-white tracking-wide">{item.name}</h2>
-          </div>
         </div>
 
         <div className="flex items-center gap-8 z-50">
