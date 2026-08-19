@@ -10,6 +10,40 @@ import Talk from './talk';
 import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 import SozelTaklit1 from '@/aba/sozeltaklit/sozeltaklit1';
 import SozelTaklit2 from '@/aba/sozeltaklit/sozeltaklit2';
+import SozelTaklit3 from '@/aba/sozeltaklit/sozeltaklit3';
+import type { AssessmentCompletionDetails } from '@/aba/sozeltaklit/SozelTaklitAssessment';
+
+const WORD_PROGRESS_FIELD = 'sozeltaklit_st21_progress';
+
+interface WordProgress {
+  masteredWords: string[];
+  lastScore?: number;
+  lastSetPassed?: boolean;
+  updatedAt?: string;
+}
+
+const normalizeWord = (value: string) => value
+  .toLocaleLowerCase('tr-TR')
+  .replace(/[ç]/g, 'c')
+  .replace(/[ğ]/g, 'g')
+  .replace(/[ıİi]/g, 'i')
+  .replace(/[ö]/g, 'o')
+  .replace(/[ş]/g, 's')
+  .replace(/[ü]/g, 'u')
+  .replace(/[^a-z0-9]/g, '');
+
+const getWordProgress = (data: Record<string, any>): WordProgress => {
+  const progress = data[WORD_PROGRESS_FIELD];
+  if (!progress || !Array.isArray(progress.masteredWords)) return { masteredWords: [] };
+  return {
+    ...progress,
+    masteredWords: progress.masteredWords.filter((word: unknown): word is string => typeof word === 'string'),
+  };
+};
+
+const mergeUniqueWords = (words: string[]) => Array.from(
+  new Map(words.map(word => [normalizeWord(word), word])).values(),
+);
 
 interface SozelTaklitPageProps {
   studentId: string;
@@ -91,9 +125,32 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
     setSaveBanner(null);
   };
 
-  const handleAssessmentComplete = async (success: boolean) => {
+  const handleAssessmentComplete = async (
+    success: boolean,
+    details?: AssessmentCompletionDetails,
+  ) => {
     if (!activeAssessmentItem) return;
-    const updatedData = { ...formData, [activeAssessmentItem]: success };
+    let updatedData = { ...formData, [activeAssessmentItem]: success };
+
+    if (activeAssessmentItem.startsWith('ST 2.1.') && details?.kind === 'word') {
+      const currentProgress = getWordProgress(formData);
+      const masteredWords = details.setPassed
+        ? mergeUniqueWords([...currentProgress.masteredWords, ...details.correctLabels])
+        : currentProgress.masteredWords;
+      const completed = masteredWords.length >= 30;
+
+      updatedData = {
+        ...formData,
+        [activeAssessmentItem]: completed,
+        [WORD_PROGRESS_FIELD]: {
+          masteredWords,
+          lastScore: details.score,
+          lastSetPassed: details.setPassed,
+          updatedAt: new Date().toISOString(),
+        } satisfies WordProgress,
+      };
+    }
+
     setFormData(updatedData);
     setDirty(true);
     setSaveBanner(null);
@@ -125,6 +182,16 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
   if (activeAssessmentItem?.startsWith('ST 1.2.')) {
     return (
       <SozelTaklit2
+        onClose={() => setActiveAssessmentItem(null)}
+        onComplete={handleAssessmentComplete}
+      />
+    );
+  }
+
+  if (activeAssessmentItem?.startsWith('ST 2.1.')) {
+    return (
+      <SozelTaklit3
+        masteredWords={getWordProgress(formData).masteredWords}
         onClose={() => setActiveAssessmentItem(null)}
         onComplete={handleAssessmentComplete}
       />
@@ -225,7 +292,9 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
             const textPart = item.substring(secondSpaceIndex > -1 ? secondSpaceIndex + 1 : firstSpaceIndex + 1);
 
             const isTolkidoItem = item.includes("TOLKİDO");
-            const hasAssessment = item.startsWith('ST 1.1.') || item.startsWith('ST 1.2.');
+            const isWordImitation = item.startsWith('ST 2.1.');
+            const wordProgress = isWordImitation ? getWordProgress(formData) : null;
+            const hasAssessment = item.startsWith('ST 1.1.') || item.startsWith('ST 1.2.') || isWordImitation;
             
             return (
                 <div key={item} className={twMerge(
@@ -254,6 +323,11 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
                             </p>
                             {isPassed && <span className="block text-[10px] text-green-500/60 font-semibold uppercase tracking-wider">Geçti · tekrar değerlendirilebilir</span>}
                             {isFailed && <span className="block text-[10px] text-red-400/90 font-semibold uppercase tracking-wider">Geçemedi · öncelikli</span>}
+                            {wordProgress && (
+                              <span className="mt-1 block text-[11px] font-bold text-blue-300">
+                                {Math.min(wordProgress.masteredWords.length, 30)}/30 farklı sözcük
+                              </span>
+                            )}
                             {hasAssessment && <span className="mt-2 inline-flex items-center gap-1 rounded border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-400"><Gamepad2 size={12} /> İnteraktif</span>}
                         </div>
                     </div>
