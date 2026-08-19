@@ -5,7 +5,6 @@ import {
   ClipboardCheck,
   Loader2,
   RefreshCw,
-  RotateCcw,
   Volume2,
   XCircle,
 } from 'lucide-react';
@@ -80,10 +79,10 @@ const WORD_AUDIO_MODULES = import.meta.glob('./videoses/1-3/*.{mp3,wav,m4a,ogg}'
 }) as Record<string, string>;
 
 const SOUND_TEACHER_POOL = [
-  'A', 'E', 'I', 'İ', 'O', 'Ö', 'U', 'Ü',
-  'M', 'P', 'B', 'F', 'V', 'S', 'Z', 'Ş', 'J', 'L', 'R', 'N', 'K', 'G', 'T', 'D', 'Ç', 'C', 'H', 'Y',
-  'aaa', 'eee', 'iii', 'ooo', 'uuu', 'mmm', 'sss', 'zzz', 'şşş', 'fff', 'vvv', 'rrr', 'nnn',
-  'a-a-a', 'o-o-o', 'u-u-u', 'm-m-m', 'p-p-p', 'b-b-b',
+  'ı', 'ö', 'ü',
+  'aaa', 'eee', 'ııı', 'iii', 'ooo', 'ööö', 'uuu', 'üüü',
+  'mmm', 'nnn', 'fff', 'sss', 'zzz', 'vvv',
+  'bbb', 'ppp', 'ttt', 'ddd', 'lll',
 ];
 
 const SYLLABLE_TEACHER_POOL = [
@@ -452,15 +451,26 @@ export default function SozelTaklitAssessment({
 
           {currentTrial.source === 'digital' ? (
             <div className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-slate-800 bg-slate-900/70 p-4 shadow-xl">
-              <div className="relative aspect-video w-full max-w-md overflow-hidden rounded-2xl border border-slate-700 bg-black">
+              <button
+                type="button"
+                onClick={playDigitalTrial}
+                disabled={isPlaying || playCount >= 2}
+                aria-label={playCount === 0 ? 'Videoyu oynat' : 'Videoyu bir kez daha oynat'}
+                className="relative aspect-square w-full max-w-sm overflow-hidden rounded-2xl border border-slate-700 bg-black text-left shadow-lg disabled:cursor-default"
+              >
                 <video
                   key={currentTrial.videoUrl}
                   ref={videoRef}
                   src={currentTrial.videoUrl}
                   muted
                   playsInline
-                  preload="metadata"
-                  className="h-full w-full object-cover"
+                  preload="auto"
+                  onLoadedData={(event) => {
+                    if (event.currentTarget.currentTime === 0 && event.currentTarget.duration > 0.05) {
+                      event.currentTarget.currentTime = 0.01;
+                    }
+                  }}
+                  className="pointer-events-none h-full w-full object-cover"
                 />
                 <audio
                   key={currentTrial.audioUrl}
@@ -468,27 +478,23 @@ export default function SozelTaklitAssessment({
                   src={currentTrial.audioUrl}
                   preload="auto"
                   onEnded={() => {
-                    if (videoRef.current) videoRef.current.pause();
+                    if (videoRef.current) {
+                      videoRef.current.pause();
+                      videoRef.current.currentTime = 0.01;
+                    }
                     setIsPlaying(false);
                   }}
                 />
-              </div>
-
-              <button
-                onClick={playDigitalTrial}
-                disabled={isPlaying || playCount >= 2}
-                className="mt-5 flex min-h-14 w-full max-w-sm items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 font-black shadow-lg transition active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
-              >
-                {isPlaying ? (
-                  <><Loader2 className="animate-spin" size={20} /> OYNATILIYOR</>
-                ) : playCount === 0 ? (
-                  <><Volume2 size={20} /> OYNAT</>
-                ) : playCount === 1 ? (
-                  <><RotateCcw size={20} /> TEKRAR OYNAT · 1 KEZ</>
-                ) : (
-                  <><RotateCcw size={20} /> TEKRAR KULLANILDI</>
-                )}
               </button>
+              <p className="mt-3 text-center text-xs font-semibold text-slate-400">
+                {isPlaying
+                  ? 'Video oynatılıyor.'
+                  : playCount === 0
+                    ? 'Başlatmak için videoya dokunun.'
+                    : playCount === 1
+                      ? 'Gerekirse videoya dokunup bir kez daha oynatabilirsiniz.'
+                      : 'Tekrar hakkı kullanıldı.'}
+              </p>
             </div>
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-purple-500/20 bg-slate-900/70 p-6 text-center shadow-xl">
