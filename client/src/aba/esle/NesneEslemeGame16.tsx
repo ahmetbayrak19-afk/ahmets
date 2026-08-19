@@ -357,7 +357,7 @@ export default function NesneEslemeGame15({ mode, onClose, onComplete }: GamePro
                 className={twMerge(
                     "flex items-center justify-center gap-1 sm:gap-2 px-6 py-4 sm:px-10 sm:py-6 bg-white rounded-2xl sm:rounded-3xl border-4 shadow-xl transition-all max-w-full overflow-hidden",
                     mode === 'assessment' && assessmentAnswered
-                      ? "border-yellow-400 bg-yellow-50"
+                      ? "border-yellow-400"
                       : isSuccessAnim ? "border-green-500 bg-green-50 scale-105" : "border-slate-200",
                     mode !== 'assessment' && isShake ? "border-red-400 bg-red-50" : ""
                 )}

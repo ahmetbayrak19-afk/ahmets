@@ -359,7 +359,7 @@ export default function NesneEslemeGame4({ mode, onClose, onComplete }: GameProp
                 className={twMerge(
                     "w-64 h-64 md:w-72 md:h-72 bg-white rounded-[3rem] flex items-center justify-center relative z-0 transition-all duration-300 overflow-hidden shadow-lg",
                     mode === 'assessment' && assessmentAnswered
-                      ? "border-4 border-solid border-yellow-400 shadow-yellow-100"
+                      ? "border-4 border-solid border-yellow-400"
                       : isMatched ? "border-4 border-dashed border-green-500 shadow-green-100" : "border-4 border-dashed border-slate-300"
                 )}
             >

@@ -370,7 +370,7 @@ export default function NesneEslemeGame22({ mode, onClose, onComplete }: GamePro
               className={twMerge(
                 'w-72 h-72 bg-white rounded-[3rem] border-4 border-dashed flex flex-col items-center justify-center shadow-inner relative z-0 transition-all duration-300',
                 mode === 'assessment' && assessmentAnswered
-                  ? 'border-yellow-400 bg-yellow-50 border-solid'
+                  ? 'border-yellow-400 border-solid'
                   : showFinalImage ? 'border-green-500 bg-green-50 border-solid' : 'border-slate-300',
               )}
             >
@@ -387,7 +387,7 @@ export default function NesneEslemeGame22({ mode, onClose, onComplete }: GamePro
                         className={twMerge(
                           "w-16 h-16 bg-white border-2 rounded-xl flex items-center justify-center p-2",
                           mode === 'assessment'
-                            ? "border-yellow-400 shadow-[0_4px_0_0_#fef08a]"
+                            ? "border-yellow-400"
                             : "border-green-400 shadow-[0_4px_0_0_#bbf7d0]",
                         )}
                       >

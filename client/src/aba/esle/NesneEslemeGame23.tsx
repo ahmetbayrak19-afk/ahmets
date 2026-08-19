@@ -299,7 +299,7 @@ export default function NesneEslemeGame23({ onClose, mode, onComplete }: GamePro
                                     flex-1 relative rounded-2xl overflow-hidden border-4 cursor-pointer shadow-md transition-all duration-500
                                     ${shouldDarken ? 'brightness-[0.2] grayscale pointer-events-none border-transparent' : 'bg-slate-800'}
                                     ${mode === 'assessment' && assessmentSelection === opt.id
-                                      ? 'border-yellow-400 ring-4 ring-yellow-300 z-10 scale-105'
+                                      ? 'border-yellow-400 z-10 scale-105'
                                       : status === 'success' && isCorrect ? 'border-green-500 ring-4 ring-green-400 z-10 scale-105' : 'border-slate-700'}
                                     ${isLocked ? 'active:none' : 'active:scale-95'}
                                 `}

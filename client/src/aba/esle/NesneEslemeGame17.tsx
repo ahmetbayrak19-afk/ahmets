@@ -317,7 +317,7 @@ export default function NesneEslemeGame17({ mode, onClose, onComplete }: GamePro
                     onClick={() => handleOptionClick(word)}
                     animate={
                         (mode === 'assessment' && assessmentSelection === word)
-                        ? { scale: [1, 1.04, 1], backgroundColor: "#fef9c3", color: "#334155", borderColor: "#facc15" }
+                        ? { scale: [1, 1.04, 1], borderColor: "#facc15" }
                         : (showFeedback === 'correct' && isCorrect)
                         ? { scale: [1, 1.1, 1], backgroundColor: "#22c55e", color: "#fff", borderColor: "#16a34a" } 
                         : (wrongSelection === word)

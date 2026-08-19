@@ -365,7 +365,7 @@ export default function NesneEslemeGame13({ mode, onClose, onComplete }: GamePro
                 className={twMerge(
                     "w-72 h-72 bg-white rounded-[3rem] border-4 flex items-center justify-center shadow-inner relative z-0 transition-all duration-300 overflow-hidden",
                     mode === 'assessment' && assessmentAnswered
-                      ? "border-yellow-400 bg-yellow-50 border-solid"
+                      ? "border-yellow-400 border-solid"
                       : isMatched ? "border-green-500 bg-green-50 border-solid" : "border-dashed border-slate-300"
                 )}
             >
