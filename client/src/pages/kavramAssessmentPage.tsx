@@ -205,6 +205,11 @@ import muzImg from '@/fruits/muz.jpg';
 import narImg from '@/fruits/nar.jpg';
 import portakalImg from '@/fruits/portakal.jpg';
 import uzumImg from '@/fruits/uzum.jpg';
+import erikImg from '@/fruits/erik.png';
+import kavunImg from '@/fruits/kavun.png';
+import kiviImg from '@/fruits/kivi.png';
+import limonImg from '@/fruits/limon.png';
+import seftaliImg from '@/fruits/seftali.png';
 import biberImg from '@/vegetables/biber.jpg';
 import brokoliImg from '@/vegetables/brokoli.jpg';
 import domatesImg from '@/vegetables/domates.jpg';
@@ -226,6 +231,11 @@ import kazakImg from '@/clothes/kazak.jpg';
 import pantolonImg from '@/clothes/pantolon.jpg';
 import sapkaImg from '@/clothes/sapka.jpg';
 import tshirtImg from '@/clothes/tshirt.jpg';
+import atkiImg from '@/clothes/atki.png';
+import eldivenImg from '@/clothes/eldiven.png';
+import kemerImg from '@/clothes/kemer.png';
+import pijamaImg from '@/clothes/pijama.png';
+import terlikImg from '@/clothes/terlik.png';
 import beyazImg from '@/colours/beyaz.jpg';
 import kirmiziImg from '@/colours/kirmizi.jpg';
 import maviImg from '@/colours/mavi.jpg';
@@ -385,9 +395,41 @@ const LIMBS_WITH_VIDEO = [
   { name: "Saç", src: sacVid } 
 ];
 
-const FRUITS_WITH_IMAGE = [ { name: "Ananas", src: ananasImg }, { name: "Armut", src: armutImg }, { name: "Çilek", src: cilekImg }, { name: "Elma", src: elmaImg }, { name: "Karpuz", src: karpuzImg }, { name: "Kiraz", src: kirazImg }, { name: "Muz", src: muzImg }, { name: "Nar", src: narImg }, { name: "Portakal", src: portakalImg }, { name: "Üzüm", src: uzumImg } ];
+const FRUITS_WITH_IMAGE = [
+  { name: "Ananas", src: ananasImg },
+  { name: "Armut", src: armutImg },
+  { name: "Çilek", src: cilekImg },
+  { name: "Elma", src: elmaImg },
+  { name: "Karpuz", src: karpuzImg },
+  { name: "Kiraz", src: kirazImg },
+  { name: "Muz", src: muzImg },
+  { name: "Nar", src: narImg },
+  { name: "Portakal", src: portakalImg },
+  { name: "Üzüm", src: uzumImg },
+  { name: "Erik", src: erikImg },
+  { name: "Kavun", src: kavunImg },
+  { name: "Kivi", src: kiviImg },
+  { name: "Limon", src: limonImg },
+  { name: "Şeftali", src: seftaliImg },
+];
 const VEGETABLES_WITH_IMAGE = [ { name: "Biber", src: biberImg }, { name: "Brokoli", src: brokoliImg }, { name: "Domates", src: domatesImg }, { name: "Havuç", src: havucImg }, { name: "Kabak", src: kabakImg }, { name: "Mantar", src: mantarImg }, { name: "Mısır", src: misirImg }, { name: "Patates", src: patatesImg }, { name: "Patlıcan", src: patlicanImg }, { name: "Salatalık", src: salatalikImg }, { name: "Soğan", src: soganImg } ];
-const CLOTHES_WITH_IMAGE = [ { name: "Atlet", src: atletImg }, { name: "Ayakkabı", src: ayakkabiImg }, { name: "Çorap", src: corapImg }, { name: "Etek", src: etekImg }, { name: "Gömlek", src: gomlekImg }, { name: "Kaban", src: kabanImg }, { name: "Kazak", src: kazakImg }, { name: "Pantolon", src: pantolonImg }, { name: "Şapka", src: sapkaImg }, { name: "Tişört", src: tshirtImg } ];
+const CLOTHES_WITH_IMAGE = [
+  { name: "Atlet", src: atletImg },
+  { name: "Ayakkabı", src: ayakkabiImg },
+  { name: "Çorap", src: corapImg },
+  { name: "Etek", src: etekImg },
+  { name: "Gömlek", src: gomlekImg },
+  { name: "Kaban", src: kabanImg },
+  { name: "Kazak", src: kazakImg },
+  { name: "Pantolon", src: pantolonImg },
+  { name: "Şapka", src: sapkaImg },
+  { name: "Tişört", src: tshirtImg },
+  { name: "Atkı", src: atkiImg },
+  { name: "Eldiven", src: eldivenImg },
+  { name: "Kemer", src: kemerImg },
+  { name: "Pijama", src: pijamaImg },
+  { name: "Terlik", src: terlikImg },
+];
 const COLOURS_WITH_IMAGE = [ { name: "Beyaz", src: beyazImg }, { name: "Kırmızı", src: kirmiziImg }, { name: "Mavi", src: maviImg }, { name: "Mor", src: morImg }, { name: "Sarı", src: sariImg }, { name: "Siyah", src: siyahImg }, { name: "Turuncu", src: turuncuImg }, { name: "Yeşil", src: yesilImg } ];
 const SCHOOL_WITH_IMAGE = [
   { name: "Cetvel", src: cetvelImg },
