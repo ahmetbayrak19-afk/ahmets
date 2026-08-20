@@ -71,7 +71,7 @@ const jobModules = import.meta.glob('./grup/meslek/*.webp', {
   import: 'default',
   query: '?url',
 }) as Record<string, string>;
-const fruitModules = import.meta.glob('../../fruits/*.jpg', {
+const fruitModules = import.meta.glob('../../fruits/*.webp', {
   eager: true,
   import: 'default',
   query: '?url',
