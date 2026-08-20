@@ -13,7 +13,7 @@ import {
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 
-type AssessmentKind = 'sound' | 'syllable' | 'word';
+type AssessmentKind = 'sound' | 'syllable' | 'word' | 'environmental';
 type TrialSource = 'digital' | 'teacher';
 
 export interface AssessmentCompletionDetails {
@@ -80,6 +80,16 @@ const WORD_AUDIO_MODULES = import.meta.glob('./videoses/1-3/*.{mp3,wav,m4a,ogg}'
   import: 'default',
 }) as Record<string, string>;
 
+const ENVIRONMENTAL_VIDEO_MODULES = import.meta.glob('./videoses/1-4/*.{mp4,webm}', {
+  eager: true,
+  import: 'default',
+}) as Record<string, string>;
+
+const ENVIRONMENTAL_AUDIO_MODULES = import.meta.glob('./videoses/1-4/*.{mp3,wav,m4a,ogg}', {
+  eager: true,
+  import: 'default',
+}) as Record<string, string>;
+
 const SOUND_TEACHER_POOL = [
   'ı', 'ö', 'ü',
   'aaa', 'eee', 'ııı', 'iii', 'ooo', 'ööö', 'uuu', 'üüü',
@@ -107,6 +117,14 @@ const WORD_TEACHER_POOL = [
   'Abla', 'Abi', 'Teyze', 'Amca', 'Nine', 'Dost', 'Çocuk', 'Öğretmen', 'Arkadaş', 'Komşu',
 ];
 
+const ENVIRONMENTAL_TEACHER_POOL = [
+  'Vak vak', 'Vız vız', 'Tıs tıs', 'Vırak vırak', 'Hu hu',
+  'Düt düt', 'Brum brum', 'Vuu vuu', 'Şıp şıp', 'Güm güm',
+  'Ding dong', 'Çın çın', 'Tık tık', 'Fıs fıs', 'Çıngır çıngır',
+  'Hapşu', 'Öhö öhö', 'Hor hor', 'Lıkır lıkır', 'Fokur fokur',
+  'Şakır şakır', 'Küt', 'Bam', 'Pof', 'Çat',
+];
+
 const WORD_LABELS: Record<string, string> = {
   anne: 'Anne',
   araba: 'Araba',
@@ -129,6 +147,24 @@ const WORD_LABELS: Record<string, string> = {
   seker: 'Şeker',
   yumurta: 'Yumurta',
   zeytin: 'Zeytin',
+};
+
+const ENVIRONMENTAL_LABELS: Record<string, string> = {
+  cik: 'Cik cik',
+  cirt: 'Cırt',
+  cuf: 'Çuf çuf',
+  gitgidak: 'Gıt gıdak',
+  hav: 'Hav hav',
+  kirt: 'Kırt kırt',
+  me: 'Mee',
+  miyav: 'Miyav',
+  mo: 'Mö',
+  pat: 'Pat',
+  sirr: 'Şırr',
+  tak: 'Tak',
+  tiktak: 'Tik tak',
+  uuruu: 'Ü-ürü-üü',
+  vinn: 'Vınn',
 };
 
 const shuffle = <T,>(items: T[]) => {
@@ -155,6 +191,8 @@ const simpleText = (value: string) => value
 const labelFromPath = (path: string) => {
   const fileName = withoutExtension(path).split('/').pop() || '';
   if (fileName.toLocaleLowerCase('tr-TR') === 's2') return 'Ş';
+  const environmentalLabel = ENVIRONMENTAL_LABELS[simpleText(fileName)];
+  if (environmentalLabel) return environmentalLabel;
   const wordLabel = WORD_LABELS[simpleText(fileName)];
   if (wordLabel) return wordLabel;
   return fileName.replace(/[_-]+/g, ' ').trim() || fileName;
@@ -197,6 +235,7 @@ const DIGITAL_ASSETS = {
   soundAssets: buildDigitalAssets(SOUND_VIDEO_MODULES, SOUND_AUDIO_MODULES),
   syllableAssets: buildDigitalAssets(SYLLABLE_VIDEO_MODULES, SYLLABLE_AUDIO_MODULES),
   wordAssets: buildDigitalAssets(WORD_VIDEO_MODULES, WORD_AUDIO_MODULES),
+  environmentalAssets: buildDigitalAssets(ENVIRONMENTAL_VIDEO_MODULES, ENVIRONMENTAL_AUDIO_MODULES),
 };
 
 const createTeacherTrials = (
@@ -210,7 +249,9 @@ const createTeacherTrials = (
     ? SOUND_TEACHER_POOL
     : kind === 'syllable'
       ? SYLLABLE_TEACHER_POOL
-      : WORD_TEACHER_POOL;
+      : kind === 'word'
+        ? WORD_TEACHER_POOL
+        : ENVIRONMENTAL_TEACHER_POOL;
   return shuffle(pool)
     .filter(label => {
       const key = simpleText(label);
@@ -237,18 +278,21 @@ export default function SozelTaklitAssessment({
     ? DIGITAL_ASSETS.soundAssets
     : kind === 'syllable'
       ? DIGITAL_ASSETS.syllableAssets
-      : DIGITAL_ASSETS.wordAssets;
+      : kind === 'word'
+        ? DIGITAL_ASSETS.wordAssets
+        : DIGITAL_ASSETS.environmentalAssets;
   const masteredKeys = useMemo(
     () => new Set(masteredLabels.map(simpleText)),
     [masteredLabels],
   );
 
   const session = useMemo(() => {
-    const availableDigital = kind === 'word'
+    const tracksMastery = kind === 'word' || kind === 'environmental';
+    const availableDigital = tracksMastery
       ? digitalPool.filter(asset => !masteredKeys.has(simpleText(asset.label)))
       : digitalPool;
     const shuffledDigital = shuffle(availableDigital);
-    const digitalCount = kind === 'word' ? Math.min(6, shuffledDigital.length) : 6;
+    const digitalCount = tracksMastery ? Math.min(6, shuffledDigital.length) : 6;
     const teacherCount = 10 - digitalCount;
     const selectedDigital = shuffledDigital.slice(0, digitalCount).map(asset => ({
       ...asset,
@@ -285,7 +329,13 @@ export default function SozelTaklitAssessment({
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const currentTrial = trials[trialIndex];
-  const setName = kind === 'sound' ? 'ses' : kind === 'syllable' ? 'hece' : 'sözcük';
+  const setName = kind === 'sound'
+    ? 'ses'
+    : kind === 'syllable'
+      ? 'hece'
+      : kind === 'word'
+        ? 'sözcük'
+        : 'hayvan ve çevre sesi';
   const hasEnoughDigitalAssets = kind === 'word' ? digitalPool.length > 0 : digitalPool.length >= 6;
   const hasEnoughTrials = session.trials.length === 10;
   const canChange = currentTrial?.source === 'digital'
@@ -563,7 +613,7 @@ export default function SozelTaklitAssessment({
                       ...masteredLabels.map(simpleText),
                       ...(correctCount >= 8 ? correctLabels.map(simpleText) : []),
                     ]).size,
-                  )}/{completionTarget} sözcük
+                  )}/{completionTarget} {kind === 'word' ? 'sözcük' : 'farklı ses'}
                 </p>
               </div>
             )}
