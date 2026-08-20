@@ -722,12 +722,12 @@ export default function NesneEslemeGame20({
               dragMomentum={false}
               onDragEnd={handleDragEnd}
               whileDrag={{ scale: 1.07, zIndex: 80 }}
-              className="flex h-[clamp(10rem,25dvh,13rem)] w-[clamp(10rem,25dvh,13rem)] touch-none items-center justify-center"
+              className="flex h-32 w-32 touch-none items-center justify-center"
             >
               <img
                 src={currentTrial.src}
                 alt="Eşlenecek resim"
-                className="pointer-events-none h-full w-full object-contain drop-shadow-lg"
+                className="pointer-events-none max-h-32 max-w-32 object-contain drop-shadow-md"
                 draggable={false}
               />
             </motion.div>
