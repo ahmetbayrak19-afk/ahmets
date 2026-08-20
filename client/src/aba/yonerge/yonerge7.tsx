@@ -14,8 +14,8 @@ import saatImg from '@/aba/esle/saat.png';
 import silgiImg from '@/aba/Alici/dedektif/silgi.png';
 import defterImg from '@/aba/Alici/dedektif/defter.png';
 import cantaImg from '@/aba/Alici/dedektif/canta.png';
-import tarakImg from '@/aba/esle/grup/evesya/tarak.png';
-import corapImg from '@/clothes/corap.jpg';
+import tarakImg from '@/aba/esle/grup/evesya/tarak.webp';
+import corapImg from '@/clothes/corap.webp';
 
 // --- GİRİŞ SESİ ---
 import girisSes from './sesgorsel/yonerge31giris.mp3';
