@@ -670,6 +670,11 @@ export default function KavramAssessmentPage() {
   // Yeni state'ler
   const [selectedCategory, setSelectedCategory] = useState<any | null>(null);
   const [showComingSoon, setShowComingSoon] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveBanner, setSaveBanner] = useState<'ok' | 'err' | null>(null);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+  const [completedSectionTitle, setCompletedSectionTitle] = useState<string | null>(null);
 
   // Dokunma efekti
   const [touchEffect, setTouchEffect] = useState<{x: number, y: number, id: number} | null>(null);
@@ -745,10 +750,22 @@ export default function KavramAssessmentPage() {
       const instId = localStorage.getItem("kazanim-takip-institution-id");
       const docSnap = await getDoc(doc(db, "institutions", instId!, "students", studentId, "assessments", "kavram"));
       if (docSnap.exists()) setFormData(docSnap.data());
+      setDirty(false);
       setLoading(false);
     };
     loadData();
   }, [studentId]);
+
+  useEffect(() => {
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!dirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [dirty]);
 
   // Sayfadan çıkınca yönü serbest bırak
   useEffect(() => {
@@ -803,11 +820,38 @@ export default function KavramAssessmentPage() {
     }
   };
 
-  const handleSave = async () => {
-    const instId = localStorage.getItem("kazanim-takip-institution-id");
-    await setDoc(doc(db, "institutions", instId!, "students", studentId!, "assessments", "kavram"), formData);
-    await associateCurrentTeacherWithStudent(studentId!);
-    toast.success("Kavramlar kaydedildi!");
+  const handleSave = async (showMessage = true) => {
+    setIsSaving(true);
+    setSaveBanner(null);
+    try {
+      const instId = localStorage.getItem("kazanim-takip-institution-id");
+      if (!instId || !studentId) throw new Error('Kurum veya öğrenci bilgisi bulunamadı.');
+      await setDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "kavram"), formData);
+      await associateCurrentTeacherWithStudent(studentId);
+      setDirty(false);
+      setSaveBanner('ok');
+      window.setTimeout(() => setSaveBanner(null), 1500);
+      if (showMessage) toast.success("Kavramlar kaydedildi!");
+      return true;
+    } catch (error) {
+      console.error('Kavram değerlendirme kaydetme hatası:', error);
+      setSaveBanner('err');
+      window.setTimeout(() => setSaveBanner(null), 2500);
+      toast.error('Kavram değerlendirmesi kaydedilemedi.');
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const markUnsaved = () => {
+    setDirty(true);
+    setSaveBanner(null);
+  };
+
+  const requestPageExit = () => {
+    if (dirty) setShowLeaveDialog(true);
+    else setLocation(`/assessment/${studentId}`);
   };
 
   const playSound = (key: string) => {
@@ -856,6 +900,8 @@ export default function KavramAssessmentPage() {
     if (questionCount >= 5) {
       setTimeout(() => {
         setFormData(p => ({ ...p, [activeGame!]: newCorrect === 5 }));
+        markUnsaved();
+        setCompletedSectionTitle(activeGame);
         setActiveGame(null);
         unlockOrientation();
       }, 500);
@@ -876,11 +922,12 @@ export default function KavramAssessmentPage() {
   const handleEvalResponse = (status: boolean) => {
     const currentItem = activeEvaluation.data[evalIndex];
     setFormData(prev => ({ ...prev, [currentItem.name]: status }));
+    markUnsaved();
     
     if (evalIndex < activeEvaluation.data.length - 1) {
       setEvalIndex(prev => prev + 1);
     } else {
-      toast.success(`${activeEvaluation.title} - İsimlendirme tamamlandı!`);
+      setCompletedSectionTitle(`${activeEvaluation.title} · İsimlendirme`);
       setActiveEvaluation(null);
       unlockOrientation();
     }
@@ -893,6 +940,7 @@ export default function KavramAssessmentPage() {
     const isCorrect = selectedSide === currentScenario.correctPosition;
     
     setFormData(prev => ({ ...prev, [`${currentScenario.targetName}_Ayirt_Etme`]: isCorrect }));
+    markUnsaved();
 
     if (isCorrect) {
       toast.success("Süpersin! Doğru bildin. 🎉");
@@ -904,7 +952,7 @@ export default function KavramAssessmentPage() {
       setTimeout(() => setDiscrimIndex(prev => prev + 1), 600); 
     } else {
       setTimeout(() => {
-        toast.success("Gösterme değerlendirmesi bitti!");
+        setCompletedSectionTitle('Hayvanlar · Gösterme');
         setIsDiscriminationMode(false);
         unlockOrientation();
       }, 1000);
@@ -1247,15 +1295,95 @@ export default function KavramAssessmentPage() {
       {activeEvaluation && !isDiscriminationMode && renderEvaluationMode()}
       {isDiscriminationMode && renderDiscriminationGame()}
 
+      {completedSectionTitle && (
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[400] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-3xl border border-slate-700 bg-slate-900 p-5 text-center shadow-2xl">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+              <Check size={28} />
+            </div>
+            <h2 className="text-lg font-black text-white">Bölüm tamamlandı</h2>
+            <p className="mt-1 text-sm text-slate-300">{completedSectionTitle}</p>
+            <p className="mt-3 text-xs leading-relaxed text-amber-300/90">Sonuçlar henüz kaydedilmedi.</p>
+            <Button
+              className="mt-5 w-full bg-green-600 text-white hover:bg-green-500"
+              disabled={isSaving}
+              onClick={async () => {
+                const saved = await handleSave(false);
+                if (saved) {
+                  setCompletedSectionTitle(null);
+                  toast.success('Sonuç kaydedildi.');
+                }
+              }}
+            >
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {isSaving ? 'Kaydediliyor…' : 'Kaydet ve çık'}
+            </Button>
+            <button
+              type="button"
+              data-android-back
+              disabled={isSaving}
+              onClick={() => setCompletedSectionTitle(null)}
+              className="mt-2 w-full rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-50"
+            >
+              Şimdilik burada kal
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showLeaveDialog && (
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[500] flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-sm space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+            <h3 className="text-base font-bold text-white">Kaydedilmemiş değişiklikler</h3>
+            <p className="text-sm leading-relaxed text-slate-300">Yaptığınız değerlendirmeler kaydedilmedi. Çıkarsanız bu sonuçlar kaybolur.</p>
+            <div className="flex gap-2 pt-1">
+              <Button data-android-back variant="ghost" className="flex-1 text-slate-300 hover:text-white" onClick={() => setShowLeaveDialog(false)}>Hayır, kal</Button>
+              <Button
+                className="flex-1 bg-red-600 text-white hover:bg-red-500"
+                onClick={() => {
+                  setShowLeaveDialog(false);
+                  setDirty(false);
+                  setLocation(`/assessment/${studentId}`);
+                }}
+              >
+                Evet, çık
+              </Button>
+            </div>
+            <Button
+              className="w-full bg-green-600 text-white hover:bg-green-500"
+              disabled={isSaving}
+              onClick={async () => {
+                const saved = await handleSave(false);
+                if (saved) {
+                  setShowLeaveDialog(false);
+                  setLocation(`/assessment/${studentId}`);
+                }
+              }}
+            >
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {isSaving ? 'Kaydediliyor…' : 'Kaydet ve çık'}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <header className="flex items-center justify-between mb-6 sticky top-0 bg-[#020617]/95 backdrop-blur z-20 py-2 border-b border-white/5">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => setLocation(`/assessment/${studentId}`)} className="text-slate-400 hover:bg-slate-800"><ArrowLeft /></Button>
+          <Button variant="ghost" size="icon" onClick={requestPageExit} className="text-slate-400 hover:bg-slate-800"><ArrowLeft /></Button>
           <div>
             <h1 className="text-lg font-bold">Kavram Değerlendirme</h1>
             <p className="text-xs text-slate-400">{student.name}</p>
           </div>
         </div>
-        <Button onClick={handleSave} className="bg-green-600 h-9 px-4 text-xs shadow-lg shadow-green-900/20"><Save className="mr-2 h-4 w-4" /> Kaydet</Button>
+        <div className="flex min-w-[7.25rem] flex-col items-end gap-1">
+          <Button onClick={() => handleSave()} disabled={isSaving} className="bg-green-600 h-9 px-4 text-xs shadow-lg shadow-green-900/20 disabled:opacity-60">
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            {isSaving ? 'Kaydediliyor…' : 'Kaydet'}
+          </Button>
+          {saveBanner === 'ok' && <span className="text-[11px] font-semibold text-emerald-400">✓ Kaydedildi</span>}
+          {saveBanner === 'err' && <span className="text-[11px] font-semibold text-red-400">✕ Kaydedilemedi</span>}
+          {dirty && !saveBanner && !isSaving && <span className="text-[10px] font-semibold text-amber-400">Kaydedilmedi</span>}
+        </div>
       </header>
 
       <main className="max-w-4xl mx-auto">
