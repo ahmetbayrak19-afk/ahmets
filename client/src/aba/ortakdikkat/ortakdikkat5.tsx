@@ -28,7 +28,7 @@ const imageModules = import.meta.glob(
     "../yonerge/sesgorsel/*.{png,jpg,jpeg,webp}",
     "../esle/gitar.png",
     "../../fruits/*.webp",
-    "../../icecekler/*.{png,jpg,jpeg,webp}",
+    "../../icecekler/*.webp",
     "../../temelgidalar/*.{png,jpg,jpeg,webp}",
     "../../okulmalzemeleri/suluboya.png",
   ],
