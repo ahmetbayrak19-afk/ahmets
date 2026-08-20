@@ -29,11 +29,11 @@ import pantolonImg from '@/clothes/pantolon.jpg';
 import sapkaImg from '@/clothes/sapka.jpg';
 
 // --- 3. FRUITS (Image) ---
-import ananasImg from '@/fruits/ananas.jpg';
-import armutImg from '@/fruits/armut.jpg';
-import elmaImg from '@/fruits/elma.jpg';
-import karpuzImg from '@/fruits/karpuz.jpg';
-import muzImg from '@/fruits/muz.jpg';
+import ananasImg from '@/fruits/ananas.webp';
+import armutImg from '@/fruits/armut.webp';
+import elmaImg from '@/fruits/elma.webp';
+import karpuzImg from '@/fruits/karpuz.webp';
+import muzImg from '@/fruits/muz.webp';
 
 // --- 4. VEGETABLES (Image) ---
 import biberImg from '@/vegetables/biber.jpg';
