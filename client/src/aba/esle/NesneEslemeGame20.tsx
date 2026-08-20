@@ -86,12 +86,12 @@ const vegetableModules = import.meta.glob('../../vegetables/*.jpg', {
   import: 'default',
   query: '?url',
 }) as Record<string, string>;
-const drinkModules = import.meta.glob('../../icecekler/*.png', {
+const drinkModules = import.meta.glob('../../icecekler/*.webp', {
   eager: true,
   import: 'default',
   query: '?url',
 }) as Record<string, string>;
-const householdModules = import.meta.glob('../../evesyalari/*.png', {
+const householdModules = import.meta.glob('../../evesyalari/*.webp', {
   eager: true,
   import: 'default',
   query: '?url',
@@ -101,7 +101,7 @@ const schoolModules = import.meta.glob('../../okulmalzemeleri/*.png', {
   import: 'default',
   query: '?url',
 }) as Record<string, string>;
-const placeModules = import.meta.glob('../../mekanlar/*.png', {
+const placeModules = import.meta.glob('../../mekanlar/*.webp', {
   eager: true,
   import: 'default',
   query: '?url',
