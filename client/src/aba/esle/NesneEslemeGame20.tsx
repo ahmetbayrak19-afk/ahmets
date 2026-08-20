@@ -12,6 +12,7 @@ import {
   Volume2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
@@ -31,6 +32,29 @@ import vegetablesAudio from './grup/sebzeler.mp3';
 import schoolAudio from './grup/okulmalzemeleri.mp3';
 import placesAudio from './grup/mekanlar.mp3';
 import foodAudio from './grup/yiyecekler.mp3';
+
+import animalBasketEmpty from './grup/sepet/hayvanbos.png';
+import animalBasketFull from './grup/sepet/hayvandolu.png';
+import vehicleBasketEmpty from './grup/sepet/tasitbos.png';
+import vehicleBasketFull from './grup/sepet/tasitdolu.png';
+import fruitBasketEmpty from './grup/sepet/meyvebos.png';
+import fruitBasketFull from './grup/sepet/meyvedolu.png';
+import clothesBasketEmpty from './grup/sepet/kiyafetbos.png';
+import clothesBasketFull from './grup/sepet/kiyafetdolu.png';
+import jobsBasketEmpty from './grup/sepet/meslekbos.png';
+import jobsBasketFull from './grup/sepet/meslekdolu.png';
+import drinksBasketEmpty from './grup/sepet/icecekbos.png';
+import drinksBasketFull from './grup/sepet/icecekdolu.png';
+import householdBasketEmpty from './grup/sepet/evesyabos.png';
+import householdBasketFull from './grup/sepet/evesyadolu.png';
+import vegetablesBasketEmpty from './grup/sepet/sebzelerbos.png';
+import vegetablesBasketFull from './grup/sepet/sebzedolu.png';
+import schoolBasketEmpty from './grup/sepet/okulbos.png';
+import schoolBasketFull from './grup/sepet/okuldolu.png';
+import placesBasketEmpty from './grup/sepet/mekanbos.png';
+import placesBasketFull from './grup/sepet/mekandolu.png';
+import foodBasketEmpty from './grup/sepet/yiyecekbos.png';
+import foodBasketFull from './grup/sepet/yiyecekdolu.png';
 
 const animalModules = import.meta.glob('./grup/hayvan/*.webp', {
   eager: true,
@@ -111,6 +135,8 @@ type Category = {
   id: CategoryId;
   label: string;
   audio: string;
+  emptyBasket: string;
+  fullBasket: string;
   items: CategoryItem[];
 };
 
@@ -141,7 +167,6 @@ interface GameProps {
 }
 
 const PROGRESS_KEY = 'EB46CategoryProgress';
-const RESPONSE_SECONDS = 5;
 
 const DISPLAY_NAMES: Record<string, string> = {
   asci: 'Aşçı',
@@ -204,17 +229,17 @@ const modulesToItems = (modules: Record<string, string>): CategoryItem[] =>
     .sort((first, second) => first.name.localeCompare(second.name, 'tr'));
 
 const CATEGORY_LIST: Category[] = [
-  { id: 'animals', label: 'Hayvanlar', audio: animalsAudio, items: modulesToItems(animalModules) },
-  { id: 'vehicles', label: 'Taşıtlar', audio: vehiclesAudio, items: modulesToItems(vehicleModules) },
-  { id: 'fruits', label: 'Meyveler', audio: fruitsAudio, items: modulesToItems(fruitModules) },
-  { id: 'clothes', label: 'Kıyafetler', audio: clothesAudio, items: modulesToItems(clothesModules) },
-  { id: 'jobs', label: 'Meslekler', audio: jobsAudio, items: modulesToItems(jobModules) },
-  { id: 'drinks', label: 'İçecekler', audio: drinksAudio, items: modulesToItems(drinkModules) },
-  { id: 'household', label: 'Ev eşyaları', audio: householdAudio, items: modulesToItems(householdModules) },
-  { id: 'vegetables', label: 'Sebzeler', audio: vegetablesAudio, items: modulesToItems(vegetableModules) },
-  { id: 'school', label: 'Okul malzemeleri', audio: schoolAudio, items: modulesToItems(schoolModules) },
-  { id: 'places', label: 'Yerler', audio: placesAudio, items: modulesToItems(placeModules) },
-  { id: 'food', label: 'Yiyecekler', audio: foodAudio, items: modulesToItems(foodModules) },
+  { id: 'animals', label: 'Hayvanlar', audio: animalsAudio, emptyBasket: animalBasketEmpty, fullBasket: animalBasketFull, items: modulesToItems(animalModules) },
+  { id: 'vehicles', label: 'Taşıtlar', audio: vehiclesAudio, emptyBasket: vehicleBasketEmpty, fullBasket: vehicleBasketFull, items: modulesToItems(vehicleModules) },
+  { id: 'fruits', label: 'Meyveler', audio: fruitsAudio, emptyBasket: fruitBasketEmpty, fullBasket: fruitBasketFull, items: modulesToItems(fruitModules) },
+  { id: 'clothes', label: 'Kıyafetler', audio: clothesAudio, emptyBasket: clothesBasketEmpty, fullBasket: clothesBasketFull, items: modulesToItems(clothesModules) },
+  { id: 'jobs', label: 'Meslekler', audio: jobsAudio, emptyBasket: jobsBasketEmpty, fullBasket: jobsBasketFull, items: modulesToItems(jobModules) },
+  { id: 'drinks', label: 'İçecekler', audio: drinksAudio, emptyBasket: drinksBasketEmpty, fullBasket: drinksBasketFull, items: modulesToItems(drinkModules) },
+  { id: 'household', label: 'Ev eşyaları', audio: householdAudio, emptyBasket: householdBasketEmpty, fullBasket: householdBasketFull, items: modulesToItems(householdModules) },
+  { id: 'vegetables', label: 'Sebzeler', audio: vegetablesAudio, emptyBasket: vegetablesBasketEmpty, fullBasket: vegetablesBasketFull, items: modulesToItems(vegetableModules) },
+  { id: 'school', label: 'Okul malzemeleri', audio: schoolAudio, emptyBasket: schoolBasketEmpty, fullBasket: schoolBasketFull, items: modulesToItems(schoolModules) },
+  { id: 'places', label: 'Yerler', audio: placesAudio, emptyBasket: placesBasketEmpty, fullBasket: placesBasketFull, items: modulesToItems(placeModules) },
+  { id: 'food', label: 'Yiyecekler', audio: foodAudio, emptyBasket: foodBasketEmpty, fullBasket: foodBasketFull, items: modulesToItems(foodModules) },
 ];
 
 const CATEGORY_MAP = Object.fromEntries(
@@ -266,7 +291,7 @@ export default function NesneEslemeGame20({
   onClose,
   onComplete,
 }: GameProps) {
-  const [phase, setPhase] = useState<'setup' | 'intro' | 'playing' | 'result'>('setup');
+  const [phase, setPhase] = useState<'setup' | 'intro' | 'playing' | 'full' | 'result'>('setup');
   const [selectedSet, setSelectedSet] = useState<SetDefinition | null>(null);
   const [progress, setProgress] = useState<ProgressRecord>({});
   const [loadingProgress, setLoadingProgress] = useState(mode === 'assessment');
@@ -276,17 +301,13 @@ export default function NesneEslemeGame20({
   const [trialIndex, setTrialIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [categoryScores, setCategoryScores] = useState<Partial<Record<CategoryId, number>>>({});
-  const [exemplars, setExemplars] = useState<Partial<Record<CategoryId, CategoryItem>>>({});
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
-  const [selectionResult, setSelectionResult] = useState<'correct' | 'wrong' | null>(null);
   const [locked, setLocked] = useState(false);
-  const [remainingSeconds, setRemainingSeconds] = useState(RESPONSE_SECONDS);
   const [resultProgress, setResultProgress] = useState<ProgressRecord>({});
   const [resultScores, setResultScores] = useState<Partial<Record<CategoryId, number>>>({});
   const [resultTotal, setResultTotal] = useState(0);
 
   const boxRefs = useRef<Partial<Record<CategoryId, HTMLDivElement | null>>>({});
-  const timerHandledRef = useRef(false);
 
   const currentTrial = trials[trialIndex];
   const completedCategoryCount = CATEGORY_LIST.filter(category => progress[category.id]?.passed).length;
@@ -297,9 +318,19 @@ export default function NesneEslemeGame20({
     const previousTouchAction = document.body.style.touchAction;
     document.body.style.overflow = 'hidden';
     document.body.style.touchAction = 'none';
+    if ((window as any).AndroidOrientation) {
+      (window as any).AndroidOrientation.lockOrientation('portrait');
+    } else {
+      ScreenOrientation.lock({ orientation: 'portrait' }).catch(() => {});
+    }
     return () => {
       document.body.style.overflow = previousOverflow;
       document.body.style.touchAction = previousTouchAction;
+      if ((window as any).AndroidOrientation) {
+        (window as any).AndroidOrientation.lockOrientation('unlock');
+      } else {
+        ScreenOrientation.unlock().catch(() => {});
+      }
     };
   }, []);
 
@@ -332,24 +363,10 @@ export default function NesneEslemeGame20({
   }, [mode, studentId]);
 
   useEffect(() => {
-    if (phase !== 'playing' || locked || !currentTrial) return;
-
-    timerHandledRef.current = false;
-    setRemainingSeconds(RESPONSE_SECONDS);
-    const startedAt = Date.now();
-    const interval = window.setInterval(() => {
-      const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
-      const nextSeconds = Math.max(0, RESPONSE_SECONDS - elapsedSeconds);
-      setRemainingSeconds(nextSeconds);
-      if (nextSeconds === 0 && !timerHandledRef.current) {
-        timerHandledRef.current = true;
-        window.clearInterval(interval);
-        handleNoResponse();
-      }
-    }, 200);
-
-    return () => window.clearInterval(interval);
-  }, [phase, trialIndex, locked, currentTrial]);
+    if (phase !== 'full') return;
+    const timeout = window.setTimeout(() => setPhase('result'), 1000);
+    return () => window.clearTimeout(timeout);
+  }, [phase]);
 
   const activeCategories = useMemo(() => {
     if (!selectedSet) return [];
@@ -362,28 +379,22 @@ export default function NesneEslemeGame20({
     const leftItems = shuffle(leftCategory.items);
     const rightItems = shuffle(rightCategory.items);
 
-    if (leftItems.length < 6 || rightItems.length < 6) {
+    if (leftItems.length < 5 || rightItems.length < 5) {
       toast.error('Bu kategori için yeterli resim bulunamadı.');
       return;
     }
 
-    const nextExemplars: Partial<Record<CategoryId, CategoryItem>> = {
-      [leftCategory.id]: leftItems[0],
-      [rightCategory.id]: rightItems[0],
-    };
     const nextTrials: Trial[] = [
-      ...leftItems.slice(1, 6).map(item => ({ ...item, categoryId: leftCategory.id })),
-      ...rightItems.slice(1, 6).map(item => ({ ...item, categoryId: rightCategory.id })),
+      ...leftItems.slice(0, 5).map(item => ({ ...item, categoryId: leftCategory.id })),
+      ...rightItems.slice(0, 5).map(item => ({ ...item, categoryId: rightCategory.id })),
     ];
 
     setSelectedSet(setDefinition);
-    setExemplars(nextExemplars);
     setTrials(shuffleWithoutThreeInARow(nextTrials));
     setTrialIndex(0);
     setScore(0);
     setCategoryScores({ [leftCategory.id]: 0, [rightCategory.id]: 0 });
     setSelectedCategory(null);
-    setSelectionResult(null);
     setLocked(false);
     setSaveFailed(false);
     setPhase('intro');
@@ -444,7 +455,7 @@ export default function NesneEslemeGame20({
   ) => {
     setResultTotal(finalScore);
     setResultScores(finalCategoryScores);
-    setPhase('result');
+    setPhase('full');
 
     if (mode === 'assessment') {
       const nextProgress = await saveAssessmentProgress(finalCategoryScores);
@@ -469,17 +480,14 @@ export default function NesneEslemeGame20({
 
     setTrialIndex(previous => previous + 1);
     setSelectedCategory(null);
-    setSelectionResult(null);
     setLocked(false);
   };
 
   const recordAnswer = (categoryId: CategoryId) => {
     if (!currentTrial || locked) return;
 
-    timerHandledRef.current = true;
     const isCorrect = categoryId === currentTrial.categoryId;
     setSelectedCategory(categoryId);
-    setSelectionResult(isCorrect ? 'correct' : 'wrong');
     setLocked(true);
 
     if (mode === 'assessment') playNeutralAssessmentFeedback();
@@ -487,7 +495,6 @@ export default function NesneEslemeGame20({
     if (mode === 'instruction' && !isCorrect) {
       window.setTimeout(() => {
         setSelectedCategory(null);
-        setSelectionResult(null);
         setLocked(false);
       }, 900);
       return;
@@ -508,35 +515,27 @@ export default function NesneEslemeGame20({
     );
   };
 
-  const handleNoResponse = () => {
-    if (!currentTrial || locked) return;
-    setLocked(true);
-    setSelectionResult('wrong');
-    if (mode === 'assessment') playNeutralAssessmentFeedback();
-
-    const nextCategoryScores = { ...categoryScores };
-    window.setTimeout(
-      () => advanceTrial(score, nextCategoryScores),
-      mode === 'assessment' ? 700 : 900,
-    );
-  };
-
   const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: { point: { x: number; y: number } }) => {
     if (locked || !selectedSet) return;
 
-    const changedTouch = 'changedTouches' in event ? event.changedTouches?.[0] : undefined;
-    const clientX = changedTouch?.clientX ?? info.point.x;
-    const clientY = changedTouch?.clientY ?? info.point.y;
+    const draggedElement = event.currentTarget as HTMLElement | null;
+    const draggedRectangle = draggedElement?.getBoundingClientRect();
+    const centerX = draggedRectangle
+      ? draggedRectangle.left + draggedRectangle.width / 2
+      : info.point.x;
+    const centerY = draggedRectangle
+      ? draggedRectangle.top + draggedRectangle.height / 2
+      : info.point.y;
 
     const droppedCategory = [selectedSet.left, selectedSet.right].find(categoryId => {
       const element = boxRefs.current[categoryId];
       if (!element) return false;
       const rectangle = element.getBoundingClientRect();
       return (
-        clientX >= rectangle.left &&
-        clientX <= rectangle.right &&
-        clientY >= rectangle.top &&
-        clientY <= rectangle.bottom
+        centerX >= rectangle.left &&
+        centerX <= rectangle.right &&
+        centerY >= rectangle.top &&
+        centerY <= rectangle.bottom
       );
     });
 
@@ -545,8 +544,7 @@ export default function NesneEslemeGame20({
 
   const categoryBorderClass = (categoryId: CategoryId) => {
     if (selectedCategory !== categoryId) return 'border-slate-300';
-    if (mode === 'assessment') return 'border-yellow-400';
-    return selectionResult === 'correct' ? 'border-emerald-500' : 'border-red-500';
+    return 'border-yellow-400';
   };
 
   const exitFromResult = () => {
@@ -668,62 +666,56 @@ export default function NesneEslemeGame20({
       )}
 
       {phase === 'playing' && currentTrial && selectedSet && (
-        <main className="flex min-h-0 flex-1 flex-col px-3 pb-4 pt-3">
-          <div className="mx-auto mb-3 flex w-full max-w-xl items-center justify-between text-xs font-bold text-slate-500">
-            <span>{trialIndex + 1}/10</span>
-            <div className="h-1.5 w-32 overflow-hidden rounded-full bg-slate-200">
+        <main className="flex min-h-0 flex-1 flex-col px-2.5 pb-3 pt-2.5">
+          <div className="mx-auto mb-2 flex w-full max-w-xl items-center gap-3 px-1 text-xs font-bold text-slate-500">
+            <span className="shrink-0">{trialIndex + 1}/10</span>
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
               <div
                 className="h-full rounded-full bg-blue-500 transition-all duration-200"
-                style={{ width: `${(remainingSeconds / RESPONSE_SECONDS) * 100}%` }}
+                style={{ width: `${((trialIndex + 1) / 10) * 100}%` }}
               />
             </div>
-            <span>{remainingSeconds} sn</span>
           </div>
 
-          <div className="mx-auto grid w-full max-w-xl grid-cols-2 gap-3">
-            {activeCategories.map(category => {
-              const exemplar = exemplars[category.id];
-              return (
-                <div
-                  key={category.id}
-                  ref={element => {
-                    boxRefs.current[category.id] = element;
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => playAudio(category.audio)}
-                  onKeyDown={event => {
-                    if (event.key === 'Enter' || event.key === ' ') playAudio(category.audio);
-                  }}
-                  className={twMerge(
-                    'relative flex min-h-[205px] flex-col items-center rounded-[1.6rem] border-[3px] border-dashed bg-white p-3 text-center shadow-sm transition-colors',
-                    categoryBorderClass(category.id),
-                  )}
-                >
-                  <div className="flex w-full items-center justify-between gap-1">
-                    <span className="truncate text-xs font-black text-slate-700 sm:text-sm">{category.label}</span>
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-blue-600">
-                      <Speaker size={14} />
-                    </span>
-                  </div>
-                  {exemplar && (
-                    <img
-                      src={exemplar.src}
-                      alt={`${category.label} örneği`}
-                      className="mt-2 h-24 w-full rounded-xl object-contain"
-                      draggable={false}
-                    />
-                  )}
-                  <div className="mt-auto flex w-full items-center justify-center rounded-xl border border-slate-200 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Buraya bırak
-                  </div>
-                </div>
-              );
-            })}
+          <div className="mx-auto grid w-full max-w-xl grid-cols-2 gap-2 sm:gap-3">
+            {activeCategories.map(category => (
+              <motion.div
+                key={category.id}
+                ref={element => {
+                  boxRefs.current[category.id] = element;
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label={`${category.label} sepeti. Seslendirmek için dokunun.`}
+                onClick={() => playAudio(category.audio)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') playAudio(category.audio);
+                }}
+                animate={selectedCategory === category.id ? { scale: [1, 1.07, 1] } : { scale: 1 }}
+                transition={{ duration: 0.38, ease: 'easeOut' }}
+                className={twMerge(
+                  'relative aspect-square min-w-0 cursor-pointer overflow-hidden rounded-[1.5rem] border-[3px] bg-white shadow-md transition-colors',
+                  categoryBorderClass(category.id),
+                )}
+              >
+                <img
+                  src={category.emptyBasket}
+                  alt={`${category.label} boş sepeti`}
+                  className="h-full w-full object-contain p-0.5"
+                  draggable={false}
+                />
+                <span className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-white/95 text-blue-600 shadow-sm">
+                  <Speaker size={15} />
+                </span>
+                <span className="absolute inset-x-2 bottom-2 truncate rounded-full border border-slate-200 bg-white/95 px-2 py-1 text-center text-[10px] font-black text-slate-700 shadow-sm sm:text-xs">
+                  {category.label}
+                </span>
+              </motion.div>
+            ))}
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-4">
-            <p className="mb-2 text-xs font-bold text-slate-400">Resmi uygun kutuya sürükle</p>
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-2.5">
+            <p className="mb-1.5 text-xs font-bold text-slate-400">Resmi uygun sepetin içine sürükle</p>
             <motion.div
               key={`${currentTrial.categoryId}-${currentTrial.id}-${trialIndex}`}
               drag={!locked}
@@ -734,7 +726,7 @@ export default function NesneEslemeGame20({
               onDragEnd={handleDragEnd}
               whileDrag={{ scale: 1.07, zIndex: 80 }}
               className={twMerge(
-                'flex h-40 w-40 touch-none items-center justify-center rounded-[2rem] border-[3px] bg-white p-3 shadow-xl',
+                'flex h-[clamp(7.5rem,19dvh,10rem)] w-[clamp(7.5rem,19dvh,10rem)] touch-none items-center justify-center rounded-[1.75rem] border-[3px] bg-white p-2.5 shadow-xl',
                 locked && mode === 'assessment' ? 'border-yellow-400' : 'border-slate-200',
               )}
             >
@@ -745,16 +737,32 @@ export default function NesneEslemeGame20({
                 draggable={false}
               />
             </motion.div>
-            {selectionResult && mode === 'instruction' && (
-              <p
-                className={twMerge(
-                  'mt-3 text-sm font-black',
-                  selectionResult === 'correct' ? 'text-emerald-600' : 'text-red-600',
-                )}
+          </div>
+        </main>
+      )}
+
+      {phase === 'full' && selectedSet && (
+        <main className="flex flex-1 flex-col items-center justify-center gap-4 px-3 py-5">
+          <p className="text-base font-black text-slate-700">Eşleme tamamlandı</p>
+          <div className="grid w-full max-w-xl grid-cols-2 gap-3">
+            {activeCategories.map(category => (
+              <motion.div
+                key={category.id}
+                initial={{ scale: 0.94, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="relative aspect-square overflow-hidden rounded-[1.6rem] border-[3px] border-yellow-400 bg-white shadow-lg"
               >
-                {selectionResult === 'correct' ? 'Doğru kategori' : 'Bir daha dene'}
-              </p>
-            )}
+                <img
+                  src={category.fullBasket}
+                  alt={`${category.label} dolu sepeti`}
+                  className="h-full w-full object-contain p-0.5"
+                  draggable={false}
+                />
+                <span className="absolute inset-x-2 bottom-2 truncate rounded-full border border-slate-200 bg-white/95 px-2 py-1 text-center text-xs font-black text-slate-700 shadow-sm">
+                  {category.label}
+                </span>
+              </motion.div>
+            ))}
           </div>
         </main>
       )}
