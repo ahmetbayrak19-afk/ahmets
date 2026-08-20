@@ -22,11 +22,11 @@ import maymunVid from '@/animals/maymun.mp4';
 import yilanVid from '@/animals/yilan.mp4';
 
 // --- 2. CLOTHES (Image) ---
-import ayakkabiImg from '@/clothes/ayakkabi.jpg';
-import atletImg from '@/clothes/atlet.jpg';
-import kazakImg from '@/clothes/kazak.jpg';
-import pantolonImg from '@/clothes/pantolon.jpg';
-import sapkaImg from '@/clothes/sapka.jpg';
+import ayakkabiImg from '@/clothes/ayakkabi.webp';
+import atletImg from '@/clothes/atlet.webp';
+import kazakImg from '@/clothes/kazak.webp';
+import pantolonImg from '@/clothes/pantolon.webp';
+import sapkaImg from '@/clothes/sapka.webp';
 
 // --- 3. FRUITS (Image) ---
 import ananasImg from '@/fruits/ananas.webp';
@@ -36,8 +36,8 @@ import karpuzImg from '@/fruits/karpuz.webp';
 import muzImg from '@/fruits/muz.webp';
 
 // --- 4. VEGETABLES (Image) ---
-import biberImg from '@/vegetables/biber.jpg';
-import havucImg from '@/vegetables/havuc.jpg';
+import biberImg from '@/vegetables/biber.webp';
+import havucImg from '@/vegetables/havuc.webp';
 
 // --- 5. VEHICLES (Video) ---
 import arabaVid from '@/vehicles/araba.mp4';
