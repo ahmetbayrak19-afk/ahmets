@@ -11,13 +11,22 @@ import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociat
 import SozelTaklit1 from '@/aba/sozeltaklit/sozeltaklit1';
 import SozelTaklit2 from '@/aba/sozeltaklit/sozeltaklit2';
 import SozelTaklit3 from '@/aba/sozeltaklit/sozeltaklit3';
+import SozelTaklit4 from '@/aba/sozeltaklit/sozeltaklit4';
 import type { AssessmentCompletionDetails } from '@/aba/sozeltaklit/SozelTaklitAssessment';
 import AssessmentModeBadges from '@/aba/shared/AssessmentModeBadges';
 
 const WORD_PROGRESS_FIELD = 'sozeltaklit_st21_progress';
+const ENVIRONMENTAL_PROGRESS_FIELD = 'sozeltaklit_st22_progress';
 
 interface WordProgress {
   masteredWords: string[];
+  lastScore?: number;
+  lastSetPassed?: boolean;
+  updatedAt?: string;
+}
+
+interface EnvironmentalProgress {
+  masteredSounds: string[];
   lastScore?: number;
   lastSetPassed?: boolean;
   updatedAt?: string;
@@ -42,8 +51,21 @@ const getWordProgress = (data: Record<string, any>): WordProgress => {
   };
 };
 
+const getEnvironmentalProgress = (data: Record<string, any>): EnvironmentalProgress => {
+  const progress = data[ENVIRONMENTAL_PROGRESS_FIELD];
+  if (!progress || !Array.isArray(progress.masteredSounds)) return { masteredSounds: [] };
+  return {
+    ...progress,
+    masteredSounds: progress.masteredSounds.filter((sound: unknown): sound is string => typeof sound === 'string'),
+  };
+};
+
 const mergeUniqueWords = (words: string[]) => Array.from(
   new Map(words.map(word => [normalizeWord(word), word])).values(),
+);
+
+const mergeUniqueSounds = (sounds: string[]) => Array.from(
+  new Map(sounds.map(sound => [normalizeWord(sound), sound])).values(),
 );
 
 interface SozelTaklitPageProps {
@@ -152,6 +174,25 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
       };
     }
 
+    if (activeAssessmentItem.startsWith('ST 2.2.') && details?.kind === 'environmental') {
+      const currentProgress = getEnvironmentalProgress(formData);
+      const masteredSounds = details.setPassed
+        ? mergeUniqueSounds([...currentProgress.masteredSounds, ...details.correctLabels])
+        : currentProgress.masteredSounds;
+      const completed = masteredSounds.length >= 10;
+
+      updatedData = {
+        ...formData,
+        [activeAssessmentItem]: completed,
+        [ENVIRONMENTAL_PROGRESS_FIELD]: {
+          masteredSounds,
+          lastScore: details.score,
+          lastSetPassed: details.setPassed,
+          updatedAt: new Date().toISOString(),
+        } satisfies EnvironmentalProgress,
+      };
+    }
+
     setFormData(updatedData);
     setDirty(true);
     setSaveBanner(null);
@@ -193,6 +234,16 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
     return (
       <SozelTaklit3
         masteredWords={getWordProgress(formData).masteredWords}
+        onClose={() => setActiveAssessmentItem(null)}
+        onComplete={handleAssessmentComplete}
+      />
+    );
+  }
+
+  if (activeAssessmentItem?.startsWith('ST 2.2.')) {
+    return (
+      <SozelTaklit4
+        masteredSounds={getEnvironmentalProgress(formData).masteredSounds}
         onClose={() => setActiveAssessmentItem(null)}
         onComplete={handleAssessmentComplete}
       />
@@ -294,8 +345,10 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
 
             const isTolkidoItem = item.includes("TOLKİDO");
             const isWordImitation = item.startsWith('ST 2.1.');
+            const isEnvironmentalImitation = item.startsWith('ST 2.2.');
             const wordProgress = isWordImitation ? getWordProgress(formData) : null;
-            const hasAssessment = item.startsWith('ST 1.1.') || item.startsWith('ST 1.2.') || isWordImitation;
+            const environmentalProgress = isEnvironmentalImitation ? getEnvironmentalProgress(formData) : null;
+            const hasAssessment = item.startsWith('ST 1.1.') || item.startsWith('ST 1.2.') || isWordImitation || isEnvironmentalImitation;
 
             return (
                 <div key={item} className={twMerge(
@@ -327,6 +380,11 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
                             {wordProgress && (
                               <span className="mt-1 block text-[11px] font-bold text-blue-300">
                                 {Math.min(wordProgress.masteredWords.length, 30)}/30 farklı sözcük
+                              </span>
+                            )}
+                            {environmentalProgress && (
+                              <span className="mt-1 block text-[11px] font-bold text-blue-300">
+                                {Math.min(environmentalProgress.masteredSounds.length, 10)}/10 farklı ses
                               </span>
                             )}
                             <AssessmentModeBadges interactive={hasAssessment || isTolkidoItem} manual tone="cyan" />
