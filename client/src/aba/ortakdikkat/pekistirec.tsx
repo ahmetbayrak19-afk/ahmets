@@ -21,8 +21,8 @@ const imageModules = import.meta.glob(
     "../esle/gitar.png",
     "../../fruits/*.webp",
     "../../icecekler/*.webp",
-    "../../temelgidalar/*.{png,jpg,jpeg,webp}",
-    "../../okulmalzemeleri/suluboya.png",
+    "../../temelgidalar/*.webp",
+    "../../okulmalzemeleri/suluboya.webp",
   ],
   { eager: true, import: "default", query: "?url" },
 ) as Record<string, string>;
