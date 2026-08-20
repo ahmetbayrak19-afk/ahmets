@@ -518,24 +518,21 @@ export default function NesneEslemeGame20({
   const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: { point: { x: number; y: number } }) => {
     if (locked || !selectedSet) return;
 
-    const draggedElement = event.currentTarget as HTMLElement | null;
-    const draggedRectangle = draggedElement?.getBoundingClientRect();
-    const centerX = draggedRectangle
-      ? draggedRectangle.left + draggedRectangle.width / 2
-      : info.point.x;
-    const centerY = draggedRectangle
-      ? draggedRectangle.top + draggedRectangle.height / 2
-      : info.point.y;
+    const changedTouch = 'changedTouches' in event ? event.changedTouches.item(0) : null;
+    const pointerX = changedTouch?.clientX
+      ?? ('clientX' in event ? event.clientX : info.point.x - window.scrollX);
+    const pointerY = changedTouch?.clientY
+      ?? ('clientY' in event ? event.clientY : info.point.y - window.scrollY);
 
     const droppedCategory = [selectedSet.left, selectedSet.right].find(categoryId => {
       const element = boxRefs.current[categoryId];
       if (!element) return false;
       const rectangle = element.getBoundingClientRect();
       return (
-        centerX >= rectangle.left &&
-        centerX <= rectangle.right &&
-        centerY >= rectangle.top &&
-        centerY <= rectangle.bottom
+        pointerX >= rectangle.left &&
+        pointerX <= rectangle.right &&
+        pointerY >= rectangle.top &&
+        pointerY <= rectangle.bottom
       );
     });
 
@@ -725,15 +722,12 @@ export default function NesneEslemeGame20({
               dragMomentum={false}
               onDragEnd={handleDragEnd}
               whileDrag={{ scale: 1.07, zIndex: 80 }}
-              className={twMerge(
-                'flex h-[clamp(7.5rem,19dvh,10rem)] w-[clamp(7.5rem,19dvh,10rem)] touch-none items-center justify-center rounded-[1.75rem] border-[3px] bg-white p-2.5 shadow-xl',
-                locked && mode === 'assessment' ? 'border-yellow-400' : 'border-slate-200',
-              )}
+              className="flex h-[clamp(10rem,25dvh,13rem)] w-[clamp(10rem,25dvh,13rem)] touch-none items-center justify-center"
             >
               <img
                 src={currentTrial.src}
                 alt="Eşlenecek resim"
-                className="h-full w-full pointer-events-none rounded-2xl object-contain"
+                className="pointer-events-none h-full w-full object-contain drop-shadow-lg"
                 draggable={false}
               />
             </motion.div>
