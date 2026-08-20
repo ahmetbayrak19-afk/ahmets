@@ -210,32 +210,32 @@ import kavunImg from '@/fruits/kavun.webp';
 import kiviImg from '@/fruits/kivi.webp';
 import limonImg from '@/fruits/limon.webp';
 import seftaliImg from '@/fruits/seftali.webp';
-import biberImg from '@/vegetables/biber.jpg';
-import brokoliImg from '@/vegetables/brokoli.jpg';
-import domatesImg from '@/vegetables/domates.jpg';
-import havucImg from '@/vegetables/havuc.jpg';
-import kabakImg from '@/vegetables/kabak.jpg';
-import mantarImg from '@/vegetables/mantar.jpg';
-import misirImg from '@/vegetables/misir.jpg';
-import patatesImg from '@/vegetables/patates.jpg';
-import patlicanImg from '@/vegetables/patlican.jpg';
-import salatalikImg from '@/vegetables/salatalik.jpg';
-import soganImg from '@/vegetables/sogan.jpg';
-import atletImg from '@/clothes/atlet.jpg';
-import ayakkabiImg from '@/clothes/ayakkabi.jpg';
-import corapImg from '@/clothes/corap.jpg';
-import etekImg from '@/clothes/etek.jpg';
-import gomlekImg from '@/clothes/gomlek.jpg';
-import kabanImg from '@/clothes/kaban.jpg';
-import kazakImg from '@/clothes/kazak.jpg';
-import pantolonImg from '@/clothes/pantolon.jpg';
-import sapkaImg from '@/clothes/sapka.jpg';
-import tshirtImg from '@/clothes/tshirt.jpg';
-import atkiImg from '@/clothes/atki.png';
-import eldivenImg from '@/clothes/eldiven.png';
-import kemerImg from '@/clothes/kemer.png';
-import pijamaImg from '@/clothes/pijama.png';
-import terlikImg from '@/clothes/terlik.png';
+import biberImg from '@/vegetables/biber.webp';
+import brokoliImg from '@/vegetables/brokoli.webp';
+import domatesImg from '@/vegetables/domates.webp';
+import havucImg from '@/vegetables/havuc.webp';
+import kabakImg from '@/vegetables/kabak.webp';
+import mantarImg from '@/vegetables/mantar.webp';
+import misirImg from '@/vegetables/misir.webp';
+import patatesImg from '@/vegetables/patates.webp';
+import patlicanImg from '@/vegetables/patlican.webp';
+import salatalikImg from '@/vegetables/salatalik.webp';
+import soganImg from '@/vegetables/sogan.webp';
+import atletImg from '@/clothes/atlet.webp';
+import ayakkabiImg from '@/clothes/ayakkabi.webp';
+import corapImg from '@/clothes/corap.webp';
+import etekImg from '@/clothes/etek.webp';
+import gomlekImg from '@/clothes/gomlek.webp';
+import kabanImg from '@/clothes/kaban.webp';
+import kazakImg from '@/clothes/kazak.webp';
+import pantolonImg from '@/clothes/pantolon.webp';
+import sapkaImg from '@/clothes/sapka.webp';
+import tshirtImg from '@/clothes/tshirt.webp';
+import atkiImg from '@/clothes/atki.webp';
+import eldivenImg from '@/clothes/eldiven.webp';
+import kemerImg from '@/clothes/kemer.webp';
+import pijamaImg from '@/clothes/pijama.webp';
+import terlikImg from '@/clothes/terlik.webp';
 import beyazImg from '@/colours/beyaz.jpg';
 import kirmiziImg from '@/colours/kirmizi.jpg';
 import maviImg from '@/colours/mavi.jpg';
@@ -245,19 +245,19 @@ import siyahImg from '@/colours/siyah.jpg';
 import turuncuImg from '@/colours/turuncu.jpg';
 import yesilImg from '@/colours/yesil.jpg';
 
-import cetvelImg from '@/okulmalzemeleri/cetvel.png';
-import derskitabiImg from '@/okulmalzemeleri/derskitabi.png';
-import kalemImg from '@/okulmalzemeleri/kalem.png';
-import kalemtrasImg from '@/okulmalzemeleri/kalemtras.png';
-import okulcantasiImg from '@/okulmalzemeleri/okulcantasi.png';
-import okuldefteriImg from '@/okulmalzemeleri/okuldefteri.png';
-import okulkiyafetiImg from '@/okulmalzemeleri/okulkiyafeti.png';
-import panoImg from '@/okulmalzemeleri/pano.png';
-import silgiImg from '@/okulmalzemeleri/silgi.png';
-import sinifsirasiImg from '@/okulmalzemeleri/sinifsirasi.png';
-import siniftahtasiImg from '@/okulmalzemeleri/siniftahtasi.png';
-import suluboyaImg from '@/okulmalzemeleri/suluboya.png';
-import sulukImg from '@/okulmalzemeleri/suluk.png';
+import cetvelImg from '@/okulmalzemeleri/cetvel.webp';
+import derskitabiImg from '@/okulmalzemeleri/kitap.webp';
+import kalemImg from '@/okulmalzemeleri/kalem.webp';
+import kalemtrasImg from '@/okulmalzemeleri/kalemtras.webp';
+import okulcantasiImg from '@/okulmalzemeleri/canta.webp';
+import okuldefteriImg from '@/okulmalzemeleri/defter.webp';
+import okulkiyafetiImg from '@/okulmalzemeleri/okulkiyafeti.webp';
+import panoImg from '@/okulmalzemeleri/pano.webp';
+import silgiImg from '@/okulmalzemeleri/silgi.webp';
+import sinifsirasiImg from '@/okulmalzemeleri/sinifsirasi.webp';
+import siniftahtasiImg from '@/okulmalzemeleri/siniftahtasi.webp';
+import suluboyaImg from '@/okulmalzemeleri/suluboya.webp';
+import sulukImg from '@/okulmalzemeleri/suluk.webp';
 
 import bankaImg from '@/mekanlar/banka.webp';
 import camiImg from '@/mekanlar/cami.webp';
@@ -285,21 +285,21 @@ import suImg from '@/icecekler/su.webp';
 import sutImg from '@/icecekler/sut.webp';
 import tursusuyuImg from '@/icecekler/tursusuyu.webp';
 
-import balImg from '@/temelgidalar/bal.png';
-import balikImg from '@/temelgidalar/balik.png';
-import corbaImg from '@/temelgidalar/corba.png';
-import ekmekImg from '@/temelgidalar/ekmek.png';
-import etImg from '@/temelgidalar/et.png';
-import kuruyemisImg from '@/temelgidalar/kuruyemis.png';
-import makarnaImg from '@/temelgidalar/makarna.png';
-import peynirImg from '@/temelgidalar/peynir.png';
-import pilavImg from '@/temelgidalar/pilav.png';
-import recelImg from '@/temelgidalar/recel.png';
-import tavukGidaImg from '@/temelgidalar/tavuk.png';
-import yagImg from '@/temelgidalar/yag.png';
-import yogurtImg from '@/temelgidalar/yogurt.png';
-import yumurtaImg from '@/temelgidalar/yumurta.png';
-import zeytinImg from '@/temelgidalar/zeytin.png';
+import balImg from '@/temelgidalar/bal.webp';
+import balikImg from '@/temelgidalar/balik.webp';
+import corbaImg from '@/temelgidalar/corba.webp';
+import ekmekImg from '@/temelgidalar/ekmek.webp';
+import etImg from '@/temelgidalar/et.webp';
+import kuruyemisImg from '@/temelgidalar/kuruyemis.webp';
+import makarnaImg from '@/temelgidalar/makarna.webp';
+import peynirImg from '@/temelgidalar/peynir.webp';
+import pilavImg from '@/temelgidalar/pilav.webp';
+import recelImg from '@/temelgidalar/recel.webp';
+import tavukGidaImg from '@/temelgidalar/tavuk.webp';
+import yagImg from '@/temelgidalar/yag.webp';
+import yogurtImg from '@/temelgidalar/yogurt.webp';
+import yumurtaImg from '@/temelgidalar/yumurta.webp';
+import zeytinImg from '@/temelgidalar/zeytin.webp';
 
 import buzdolabiImg from '@/evesyalari/buzdolabi.webp';
 import camasirmakinesiImg from '@/evesyalari/camasirmakinesi.webp';
@@ -435,7 +435,7 @@ const SCHOOL_WITH_IMAGE = [
   { name: "Cetvel", src: cetvelImg },
   { name: "Ders kitabı", src: derskitabiImg },
   { name: "Kalem", src: kalemImg },
-  { name: "Kalemtraş", src: kalemtrasImg },
+  { name: "Kalemtıraş", src: kalemtrasImg },
   { name: "Okul çantası", src: okulcantasiImg },
   { name: "Okul defteri", src: okuldefteriImg },
   { name: "Okul kıyafeti", src: okulkiyafetiImg },
@@ -443,7 +443,7 @@ const SCHOOL_WITH_IMAGE = [
   { name: "Silgi", src: silgiImg },
   { name: "Sınıf sırası", src: sinifsirasiImg },
   { name: "Sınıf tahtası", src: siniftahtasiImg },
-  { name: "Suluboya", src: suluboyaImg },
+  { name: "Sulu boya", src: suluboyaImg },
   { name: "Suluk", src: sulukImg },
 ];
 const PLACES_WITH_IMAGE = [
