@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   XCircle,
   Check,
@@ -53,8 +53,6 @@ const ALL_QUESTIONS: Question[] = [
   { id: 25, text: 'Bardağı masaya koy', material: 'Bardak' },
 ];
 
-const MATERIALS = Array.from(new Set(ALL_QUESTIONS.map((question) => question.material)));
-
 const shuffleQuestions = (questions: Question[]) => {
   const shuffled = [...questions];
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
@@ -81,6 +79,10 @@ export default function Yonerge2({
   const [phase, setPhase] = useState<'intro' | 'playing' | 'result'>('intro');
 
   const currentInstruction = instructions[currentIndex]?.text ?? '';
+  const materialsList = useMemo(
+    () => Array.from(new Set(instructions.map((instruction) => instruction.material))),
+    [instructions],
+  );
 
   const replacePreparationInstruction = (instructionIndex: number) => {
     if (unusedQuestions.length === 0) return;
@@ -108,13 +110,18 @@ export default function Yonerge2({
   };
 
   const handlePass = () => {
-    if (unusedQuestions.length === 0) return;
-    const [replacement, ...remainingQuestions] = unusedQuestions;
+    const preparedMaterials = new Set(instructions.map((instruction) => instruction.material));
+    const replacementIndex = unusedQuestions.findIndex((question) => preparedMaterials.has(question.material));
+    if (replacementIndex < 0) return;
+
+    const replacement = unusedQuestions[replacementIndex];
     setInstructions((currentInstructions) => currentInstructions.map(
       (instruction, index) => index === currentIndex ? replacement : instruction,
     ));
-    setUnusedQuestions(remainingQuestions);
+    setUnusedQuestions((currentQuestions) => currentQuestions.filter((_, index) => index !== replacementIndex));
   };
+
+  const canPass = unusedQuestions.some((question) => materialsList.includes(question.material));
 
   return (
     <div className="fixed inset-0 h-[100dvh] w-screen z-[100] flex flex-col bg-slate-950 text-white font-sans select-none">
@@ -172,14 +179,14 @@ export default function Yonerge2({
                 <h2 className="text-sm font-black uppercase tracking-wider">Hazır Bulundurulacak Malzemeler</h2>
               </div>
               <div className="flex flex-wrap gap-2">
-                {MATERIALS.map((material) => (
+                {materialsList.map((material) => (
                   <span key={material} className="rounded-full border border-amber-400/25 bg-slate-950/60 px-3 py-1.5 text-xs font-semibold text-amber-100">
                     {material}
                   </span>
                 ))}
               </div>
               <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
-                “Geç” seçeneğinde listede olmayan bir yönerge gelebileceği için bu malzemeleri hazır bulundurun.
+                Yönergeleri değiştirdiğinizde ihtiyaç duyulan malzemeler otomatik güncellenir.
               </p>
             </div>
 
@@ -236,7 +243,7 @@ export default function Yonerge2({
           
           <button 
             onClick={handlePass} 
-            disabled={unusedQuestions.length === 0}
+            disabled={!canPass}
             className="flex-1 max-w-[200px] flex flex-col landscape:flex-row items-center justify-center gap-2 p-4 landscape:p-3 bg-slate-700 border border-slate-600 rounded-2xl active:scale-95 transition-all text-slate-300 hover:bg-slate-600 disabled:opacity-35 disabled:cursor-not-allowed disabled:active:scale-100"
           >
             <SkipForward className="w-8 h-8 landscape:w-5 landscape:h-5" />
