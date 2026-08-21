@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useAnimationControls } from 'framer-motion';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -272,7 +272,7 @@ const CATEGORY_LIST: Category[] = [
   { id: 'household', label: 'Ev eşyaları', audio: householdAudio, emptyBasket: householdBasketEmpty, fullBasket: householdBasketFull, items: modulesToItems(householdModules) },
   { id: 'vegetables', label: 'Sebzeler', audio: vegetablesAudio, emptyBasket: vegetablesBasketEmpty, fullBasket: vegetablesBasketFull, items: modulesToItems(vegetableModules) },
   { id: 'school', label: 'Okul malzemeleri', audio: schoolAudio, emptyBasket: schoolBasketEmpty, fullBasket: schoolBasketFull, items: modulesToItems(schoolModules) },
-  { id: 'places', label: 'Yerler', audio: placesAudio, emptyBasket: placesBasketEmpty, fullBasket: placesBasketFull, items: modulesToItems(placeModules) },
+  { id: 'places', label: 'Mekanlar', audio: placesAudio, emptyBasket: placesBasketEmpty, fullBasket: placesBasketFull, items: modulesToItems(placeModules) },
   { id: 'food', label: 'Yiyecekler', audio: foodAudio, emptyBasket: foodBasketEmpty, fullBasket: foodBasketFull, items: modulesToItems(foodModules) },
 ];
 
@@ -342,6 +342,7 @@ export default function NesneEslemeGame20({
   const [resultTotal, setResultTotal] = useState(0);
 
   const boxRefs = useRef<Partial<Record<CategoryId, HTMLDivElement | null>>>({});
+  const dragAnimation = useAnimationControls();
 
   const currentTrial = trials[trialIndex];
   const completedCategoryCount = CATEGORY_LIST.filter(category => progress[category.id]?.passed).length;
@@ -401,6 +402,10 @@ export default function NesneEslemeGame20({
     const timeout = window.setTimeout(() => setPhase('result'), 1000);
     return () => window.clearTimeout(timeout);
   }, [phase]);
+
+  useEffect(() => {
+    dragAnimation.set({ x: 0, y: 0, scale: 1, opacity: 1 });
+  }, [dragAnimation, trialIndex]);
 
   const activeCategories = useMemo(() => {
     if (!selectedSet) return [];
@@ -526,14 +531,6 @@ export default function NesneEslemeGame20({
 
     if (mode === 'assessment') playNeutralAssessmentFeedback();
 
-    if (mode === 'instruction' && !isCorrect) {
-      window.setTimeout(() => {
-        setSelectedCategory(null);
-        setLocked(false);
-      }, 900);
-      return;
-    }
-
     const nextScore = score + (isCorrect ? 1 : 0);
     const nextCategoryScores = {
       ...categoryScores,
@@ -570,7 +567,23 @@ export default function NesneEslemeGame20({
       );
     });
 
-    if (droppedCategory) recordAnswer(droppedCategory);
+    if (droppedCategory) {
+      void dragAnimation.start({
+        scale: 0.05,
+        opacity: 0,
+        transition: { duration: 0.28, ease: 'easeIn' },
+      });
+      recordAnswer(droppedCategory);
+      return;
+    }
+
+    void dragAnimation.start({
+      x: 0,
+      y: 0,
+      scale: 1,
+      opacity: 1,
+      transition: { type: 'spring', stiffness: 520, damping: 36 },
+    });
   };
 
   const categoryBorderClass = (categoryId: CategoryId) => {
@@ -749,9 +762,10 @@ export default function NesneEslemeGame20({
             <p className="mb-1.5 text-xs font-bold text-slate-400">Resmi uygun sepetin içine sürükle</p>
             <motion.div
               key={`${currentTrial.categoryId}-${currentTrial.id}-${trialIndex}`}
+              initial={{ x: 0, y: 0, scale: 1, opacity: 1 }}
+              animate={dragAnimation}
               drag={!locked}
               dragConstraints={false}
-              dragSnapToOrigin
               dragElastic={0.08}
               dragMomentum={false}
               onDragEnd={handleDragEnd}
