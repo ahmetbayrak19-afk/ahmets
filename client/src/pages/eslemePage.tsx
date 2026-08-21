@@ -30,6 +30,7 @@ import NesneEslemeGame16 from '@/aba/esle/NesneEslemeGame16'; // EB.4.2 (Klavye/
 
 import NesneEslemeGame17 from '@/aba/esle/NesneEslemeGame17'; // EB.4.3 (Sözcük-Nesne)
 import NesneEslemeGame20 from '@/aba/esle/NesneEslemeGame20'; // EB.4.6 (Kategori)
+import NesneEslemeGame21 from '@/aba/esle/NesneEslemeGame21'; // EB.4.7 (Görsel Örüntü)
 
 // 🔥 YENİ EKLENEN: EB.4.8 (İlişkili Resimleri Eşleme)
 import NesneEslemeGame22 from '@/aba/esle/NesneEslemeGame22';
@@ -190,6 +191,11 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                 <NesneEslemeGame20 studentId={studentId} mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
             )}
 
+            {/* EB.4.7 (Görsel örüntü modeline göre eşleme) */}
+            {activeGameItem.startsWith("EB.4.7") && (
+                <NesneEslemeGame21 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
+            )}
+
             {/* 🔥 YENİ: EB.4.8 (İlişkili Resimler) */}
             {activeGameItem.startsWith("EB.4.8") && (
                 <NesneEslemeGame22 mode={activeGameMode} onClose={() => setActiveGameMode(null)} onComplete={handleGameComplete} />
@@ -289,6 +295,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
                 item.startsWith("EB.4.2") ||
                 item.startsWith("EB.4.3") ||
                 item.startsWith("EB.4.6") ||
+                item.startsWith("EB.4.7") ||
                 item.startsWith("EB.4.8") || // 🔥 YENİ EKLENEN
                 item.startsWith("EB.4.9");
 
