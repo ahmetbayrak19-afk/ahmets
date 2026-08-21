@@ -17,18 +17,40 @@ export default function Yonerge1({
 }: Yonerge1Props) {
   
   const allInstructions = [
-    "Ayağa kalk", "Zıpla", "Etrafında dön", "Yere yat", "Otur / Yere otur",
-    "Ayaklarını yere vur", "Kollarını kaldır", "Bay bay yap", "Ellerini çırp / Alkışla",
-    "Kollarını bağla", "Gözlerini kapat", "Ağzını aç", "Karnını ovala", "Burnuna dokun",
-    "Kafanı salla", "Elini kaldır", "Parmaklarını aç", "Başını sağa sola çevir",
-    "Omuzlarını silk", "Dizlerini bük", "Eliyle selam ver", "Ayağını yere vur",
-    "Ellerinle çember yap", "Eliyle işaret et", "Başını eğ"
+    "Ayağa kalk",
+    "Otur",
+    "Zıpla",
+    "Olduğun yerde dön",
+    "Çömel",
+    "Yere uzan",
+    "Bana doğru gel",
+    "Bir adım geri git",
+    "Ellerini çırp",
+    "Bana el salla",
+    "Bir elini kaldır",
+    "Kollarını iki yana aç",
+    "Kollarını bağla",
+    "Ellerini başına koy",
+    "Ellerinle yüzünü kapat",
+    "Gözlerini kapat",
+    "Ağzını aç",
+    "Dilini çıkar",
+    "Burnuna dokun",
+    "Başını öne eğ",
+    "Omuzlarını silk",
+    "Bir ayağını kaldır",
+    "Gülümse",
+    "Üfle"
   ];
 
-  // Rastgele 10 soru (sadece başlangıç için)
+  // Havuz bir kez karıştırılır. Böylece değerlendirme boyunca aynı yönerge tekrarlanmaz.
   const [instructions] = useState(() => {
-    const shuffled = [...allInstructions].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, 10);
+    const shuffled = [...allInstructions];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+    return shuffled;
   });
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -37,6 +59,9 @@ export default function Yonerge1({
   const [phase, setPhase] = useState<'intro' | 'playing' | 'result'>('intro');
 
   const currentInstruction = instructions[currentIndex];
+  const remainingAfterCurrent = instructions.length - currentIndex - 1;
+  const neededAfterPass = 10 - validCount;
+  const canPass = remainingAfterCurrent >= neededAfterPass;
 
   const handleAssess = (correct: boolean) => {
     if (correct) setScore(prev => prev + 1);
@@ -50,25 +75,13 @@ export default function Yonerge1({
         confetti({ particleCount: 250, spread: 90, origin: { y: 0.6 } });
       }
     } else {
-      // Yeni soru getir (rastgele)
-      const randomIndex = Math.floor(Math.random() * instructions.length);
-      setCurrentIndex(randomIndex);
+      setCurrentIndex(prev => prev + 1);
     }
   };
 
-  // === GEÇ BUTONU (İstediğin Gibi) ===
   const handlePass = () => {
-    // Geç butonuna basıldığında:
-    // - Hiçbir şey sayılmıyor
-    // - Sayaç artmıyor
-    // - Sadece yeni soru geliyor
-    const randomIndex = Math.floor(Math.random() * instructions.length);
-    setCurrentIndex(randomIndex);
-  };
-
-  const completeSession = () => {
-    const isSuccess = score >= 8;
-    onComplete(isSuccess);
+    if (!canPass) return;
+    setCurrentIndex(prev => prev + 1);
   };
 
   return (
@@ -153,7 +166,8 @@ export default function Yonerge1({
           
           <button 
             onClick={handlePass} 
-            className="flex-1 max-w-[200px] flex flex-col landscape:flex-row items-center justify-center gap-2 p-4 landscape:p-3 bg-slate-700 border border-slate-600 rounded-2xl active:scale-95 transition-all text-slate-300 hover:bg-slate-600"
+            disabled={!canPass}
+            className="flex-1 max-w-[200px] flex flex-col landscape:flex-row items-center justify-center gap-2 p-4 landscape:p-3 bg-slate-700 border border-slate-600 rounded-2xl active:scale-95 transition-all text-slate-300 hover:bg-slate-600 disabled:opacity-35 disabled:cursor-not-allowed disabled:active:scale-100"
           >
             <SkipForward className="w-8 h-8 landscape:w-5 landscape:h-5" />
             <span className="text-sm landscape:text-xs font-bold uppercase tracking-wider">GEÇ</span>
