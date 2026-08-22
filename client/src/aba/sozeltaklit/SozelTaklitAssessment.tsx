@@ -13,7 +13,7 @@ import {
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 
-type AssessmentKind = 'sound' | 'syllable' | 'word' | 'environmental';
+type AssessmentKind = 'sound' | 'syllable' | 'word' | 'environmental' | 'sentence';
 type TrialSource = 'digital' | 'teacher';
 
 export interface AssessmentCompletionDetails {
@@ -90,6 +90,16 @@ const ENVIRONMENTAL_AUDIO_MODULES = import.meta.glob('./videoses/1-4/*.{mp3,wav,
   import: 'default',
 }) as Record<string, string>;
 
+const SENTENCE_VIDEO_MODULES = import.meta.glob('./videoses/2-3video/*.{mp4,webm}', {
+  eager: true,
+  import: 'default',
+}) as Record<string, string>;
+
+const SENTENCE_AUDIO_MODULES = import.meta.glob('./videoses/2-3video/*.{mp3,wav,m4a,ogg}', {
+  eager: true,
+  import: 'default',
+}) as Record<string, string>;
+
 const SOUND_TEACHER_POOL = [
   'ı', 'ö', 'ü',
   'aaa', 'eee', 'ııı', 'iii', 'ooo', 'ööö', 'uuu', 'üüü',
@@ -123,6 +133,16 @@ const ENVIRONMENTAL_TEACHER_POOL = [
   'Ding dong', 'Çın çın', 'Tık tık', 'Fıs fıs', 'Çıngır çıngır',
   'Hapşu', 'Öhö öhö', 'Hor hor', 'Lıkır lıkır', 'Fokur fokur',
   'Şakır şakır', 'Küt', 'Bam', 'Pof', 'Çat',
+];
+
+const SENTENCE_TEACHER_POOL = [
+  'Buraya gel', 'El salla', 'Kapıyı kapat', 'Çantayı al', 'Ayakkabını giy',
+  'Montunu giy', 'Kalemi ver', 'Kitabı getir', 'Topu getir', 'Topu yuvarla',
+  'Arabayı sür', 'Bebeği uyut', 'Bebeği besle', 'Ellerini çırp', 'Bana bak',
+  'Otur bakalım', 'Kalk bakalım', 'Su ver', 'Süt istiyorum', 'Meyve istiyorum',
+  'Dondurma istiyorum', 'Eve dönelim', 'Bahçeye çıkalım', 'Müzik açalım',
+  'Şarkı söyle', 'Çok güzel', 'Çok yaşa', 'Hoşça kal', 'Annem geldi',
+  'Babam geldi', 'Ben hazırım', 'Ben de', 'Bana yardım et', 'Birlikte oynayalım',
 ];
 
 const WORD_LABELS: Record<string, string> = {
@@ -167,6 +187,37 @@ const ENVIRONMENTAL_LABELS: Record<string, string> = {
   vinn: 'Vınn',
 };
 
+const SENTENCE_LABELS: Record<string, string> = {
+  banaver: 'Bana ver',
+  bebekistiyorum: 'Bebek istiyorum',
+  benimleoyna: 'Benimle oyna',
+  benyaptim: 'Ben yaptım',
+  birdaha: 'Bir daha',
+  disaricikalim: 'Dışarı çıkalım',
+  ellerimiyika: 'Ellerimi yıka',
+  evegidelim: 'Eve gidelim',
+  isigiac: 'Işığı aç',
+  kapiyiac: 'Kapıyı aç',
+  karnimacikti: 'Karnım acıktı',
+  kitabiac: 'Kitabı aç',
+  kosmakistiyorum: 'Koşmak istiyorum',
+  okulagidelim: 'Okula gidelim',
+  oyuncakistiyorum: 'Oyuncak istiyorum',
+  parkagidelim: 'Parka gidelim',
+  resimyapalim: 'Resim yapalım',
+  salincakistiyorum: 'Salıncak istiyorum',
+  sirabende: 'Sıra bende',
+  sirasende: 'Sıra sende',
+  suistiyorum: 'Su istiyorum',
+  telefonistiyorum: 'Telefon istiyorum',
+  tesekkurederim: 'Teşekkür ederim',
+  topistiyorum: 'Top istiyorum',
+  topuat: 'Topu at',
+  toputut: 'Topu tut',
+  tuvaletimgeldi: 'Tuvaletim geldi',
+  yardimet: 'Yardım et',
+};
+
 const shuffle = <T,>(items: T[]) => {
   const copy = [...items];
   for (let index = copy.length - 1; index > 0; index -= 1) {
@@ -191,6 +242,8 @@ const simpleText = (value: string) => value
 const labelFromPath = (path: string) => {
   const fileName = withoutExtension(path).split('/').pop() || '';
   if (fileName.toLocaleLowerCase('tr-TR') === 's2') return 'Ş';
+  const sentenceLabel = SENTENCE_LABELS[simpleText(fileName)];
+  if (sentenceLabel) return sentenceLabel;
   const environmentalLabel = ENVIRONMENTAL_LABELS[simpleText(fileName)];
   if (environmentalLabel) return environmentalLabel;
   const wordLabel = WORD_LABELS[simpleText(fileName)];
@@ -236,6 +289,7 @@ const DIGITAL_ASSETS = {
   syllableAssets: buildDigitalAssets(SYLLABLE_VIDEO_MODULES, SYLLABLE_AUDIO_MODULES),
   wordAssets: buildDigitalAssets(WORD_VIDEO_MODULES, WORD_AUDIO_MODULES),
   environmentalAssets: buildDigitalAssets(ENVIRONMENTAL_VIDEO_MODULES, ENVIRONMENTAL_AUDIO_MODULES),
+  sentenceAssets: buildDigitalAssets(SENTENCE_VIDEO_MODULES, SENTENCE_AUDIO_MODULES),
 };
 
 const createTeacherTrials = (
@@ -251,7 +305,9 @@ const createTeacherTrials = (
       ? SYLLABLE_TEACHER_POOL
       : kind === 'word'
         ? WORD_TEACHER_POOL
-        : ENVIRONMENTAL_TEACHER_POOL;
+        : kind === 'environmental'
+          ? ENVIRONMENTAL_TEACHER_POOL
+          : SENTENCE_TEACHER_POOL;
   return shuffle(pool)
     .filter(label => {
       const key = simpleText(label);
@@ -280,14 +336,16 @@ export default function SozelTaklitAssessment({
       ? DIGITAL_ASSETS.syllableAssets
       : kind === 'word'
         ? DIGITAL_ASSETS.wordAssets
-        : DIGITAL_ASSETS.environmentalAssets;
+        : kind === 'environmental'
+          ? DIGITAL_ASSETS.environmentalAssets
+          : DIGITAL_ASSETS.sentenceAssets;
   const masteredKeys = useMemo(
     () => new Set(masteredLabels.map(simpleText)),
     [masteredLabels],
   );
 
   const session = useMemo(() => {
-    const tracksMastery = kind === 'word' || kind === 'environmental';
+    const tracksMastery = kind === 'word' || kind === 'environmental' || kind === 'sentence';
     const availableDigital = tracksMastery
       ? digitalPool.filter(asset => !masteredKeys.has(simpleText(asset.label)))
       : digitalPool;
@@ -335,8 +393,12 @@ export default function SozelTaklitAssessment({
       ? 'hece'
       : kind === 'word'
         ? 'sözcük'
-        : 'hayvan ve çevre sesi';
-  const hasEnoughDigitalAssets = kind === 'word' ? digitalPool.length > 0 : digitalPool.length >= 6;
+        : kind === 'environmental'
+          ? 'hayvan ve çevre sesi'
+          : 'cümle';
+  const tracksMastery = kind === 'word' || kind === 'environmental' || kind === 'sentence';
+  const progressUnit = kind === 'word' ? 'sözcük' : kind === 'sentence' ? 'cümle' : 'farklı ses';
+  const hasEnoughDigitalAssets = tracksMastery ? digitalPool.length > 0 : digitalPool.length >= 6;
   const hasEnoughTrials = session.trials.length === 10;
   const canChange = currentTrial?.source === 'digital'
     ? digitalReserve.length > 0
@@ -560,7 +622,10 @@ export default function SozelTaklitAssessment({
               <p className="mb-3 text-sm font-semibold text-slate-400">Öğrencinin dikkatini çekin ve model olun:</p>
               <div className="rounded-2xl border-2 border-purple-400 bg-white px-8 py-6 text-slate-900 shadow-lg">
                 <span className="block text-sm font-bold text-purple-700">SÖYLE</span>
-                <span className="mt-1 block text-5xl font-black tracking-wide">{currentTrial.label}</span>
+                <span className={twMerge(
+                  'mt-1 block font-black tracking-wide',
+                  kind === 'sentence' ? 'text-3xl sm:text-4xl' : 'text-5xl',
+                )}>{currentTrial.label}</span>
               </div>
             </div>
           )}
@@ -613,7 +678,7 @@ export default function SozelTaklitAssessment({
                       ...masteredLabels.map(simpleText),
                       ...(correctCount >= 8 ? correctLabels.map(simpleText) : []),
                     ]).size,
-                  )}/{completionTarget} {kind === 'word' ? 'sözcük' : 'farklı ses'}
+                  )}/{completionTarget} {progressUnit}
                 </p>
               </div>
             )}
