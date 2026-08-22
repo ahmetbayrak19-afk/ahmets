@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type PointerEventHandler,
+} from 'react';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import {
   ArrowLeft,
@@ -7,6 +14,8 @@ import {
   GraduationCap,
   Hand,
   Loader2,
+  Move,
+  PackageCheck,
   RotateCcw,
   Trophy,
   XCircle,
@@ -47,6 +56,17 @@ type PatternTrial = {
 type PatternToken = {
   tokenId: string;
   item: PatternItem;
+};
+
+type DragSource = 'available' | 'placed';
+
+type DragState = {
+  token: PatternToken;
+  source: DragSource;
+  sourceIndex?: number;
+  pointerId: number;
+  x: number;
+  y: number;
 };
 
 type TrialResult = {
@@ -133,6 +153,13 @@ const TRIALS: PatternTrial[] = [
   },
 ];
 
+const TEACHER_MATERIALS = [
+  { name: 'Kalem', count: 2 },
+  { name: 'Silgi', count: 2 },
+  { name: 'Kitap', count: 2 },
+  { name: 'Defter', count: 2 },
+];
+
 const shuffle = <T,>(items: T[]) => {
   const result = [...items];
   for (let index = result.length - 1; index > 0; index -= 1) {
@@ -170,41 +197,65 @@ function ImageCard({
   compact = false,
   muted = false,
   highlighted = false,
-  onClick,
+  draggable = false,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
 }: {
   item: PatternItem;
   compact?: boolean;
   muted?: boolean;
   highlighted?: boolean;
-  onClick?: () => void;
+  draggable?: boolean;
+  onPointerDown?: PointerEventHandler<HTMLButtonElement>;
+  onPointerMove?: PointerEventHandler<HTMLButtonElement>;
+  onPointerUp?: PointerEventHandler<HTMLButtonElement>;
+  onPointerCancel?: PointerEventHandler<HTMLButtonElement>;
 }) {
   const className = twMerge(
-    'flex shrink-0 items-center justify-center rounded-xl border bg-white/95 shadow-sm transition-all',
+    'flex shrink-0 flex-col items-stretch justify-between overflow-hidden rounded-xl border bg-white shadow-sm transition-all',
     compact
-      ? 'h-[clamp(42px,13vh,72px)] w-[clamp(42px,7.5vw,72px)] p-1.5'
-      : 'h-[clamp(50px,16vh,88px)] w-[clamp(50px,9vw,88px)] p-2',
-    onClick && 'cursor-pointer active:scale-95',
+      ? 'h-[clamp(58px,19vh,82px)] w-[clamp(58px,9vw,82px)] p-0.5'
+      : 'h-[clamp(62px,20vh,92px)] w-[clamp(62px,10vw,92px)] p-0.5',
+    draggable && 'cursor-grab touch-none active:cursor-grabbing active:scale-95',
     highlighted ? 'border-amber-400 ring-2 ring-amber-400/50' : 'border-slate-300',
     muted && 'scale-95 opacity-25',
   );
-  const image = <img src={item.src} alt={item.name} draggable={false} className="h-full w-full select-none object-contain" />;
+  const content = (
+    <img
+      src={item.src}
+      alt={item.name}
+      draggable={false}
+      className="h-full w-full scale-110 select-none object-contain"
+    />
+  );
 
-  if (onClick) {
+  if (draggable) {
     return (
-      <button type="button" onClick={onClick} aria-label={item.name} className={className}>
-        {image}
+      <button
+        type="button"
+        aria-label={`${item.name} nesnesini sürükle`}
+        className={className}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+      >
+        {content}
       </button>
     );
   }
 
-  return <div className={className}>{image}</div>;
+  return <div className={className}>{content}</div>;
 }
 
 export default function NesneEslemeGame21({ mode, onClose, onComplete }: GameProps) {
   const [stage, setStage] = useState<Stage>('intro');
   const [trialIndex, setTrialIndex] = useState(0);
   const [available, setAvailable] = useState<PatternToken[]>([]);
-  const [placed, setPlaced] = useState<PatternToken[]>([]);
+  const [placed, setPlaced] = useState<Array<PatternToken | null>>([]);
+  const [dragState, setDragState] = useState<DragState | null>(null);
   const [trialResults, setTrialResults] = useState<TrialResult[]>([]);
   const [locked, setLocked] = useState(false);
   const [recorded, setRecorded] = useState(false);
@@ -213,6 +264,7 @@ export default function NesneEslemeGame21({ mode, onClose, onComplete }: GamePro
 
   const firstActionInTimeRef = useRef<boolean | null>(null);
   const trialStartedAtRef = useRef(0);
+  const dragStateRef = useRef<DragState | null>(null);
   const noResponseTimerRef = useRef<number | null>(null);
   const advanceTimerRef = useRef<number | null>(null);
   const lockedRef = useRef(false);
@@ -229,7 +281,7 @@ export default function NesneEslemeGame21({ mode, onClose, onComplete }: GamePro
     const previousOverflow = document.body.style.overflow;
     const previousTouchAction = document.body.style.touchAction;
     document.body.style.overflow = 'hidden';
-    document.body.style.touchAction = 'manipulation';
+    document.body.style.touchAction = 'none';
 
     if ((window as any).AndroidOrientation) {
       (window as any).AndroidOrientation.lockOrientation('landscape');
@@ -255,7 +307,9 @@ export default function NesneEslemeGame21({ mode, onClose, onComplete }: GamePro
     if (advanceTimerRef.current !== null) window.clearTimeout(advanceTimerRef.current);
 
     setAvailable(createTokens(currentTrial));
-    setPlaced([]);
+    setPlaced(Array.from({ length: currentTrial.pattern.length }, () => null));
+    dragStateRef.current = null;
+    setDragState(null);
     setLocked(false);
     setRecorded(false);
     setCanMarkNoResponse(false);
@@ -301,31 +355,97 @@ export default function NesneEslemeGame21({ mode, onClose, onComplete }: GamePro
     }, 700);
   };
 
-  const handleAvailableClick = (token: PatternToken) => {
-    if (lockedRef.current || placed.length >= currentTrial.pattern.length) return;
-
+  const markFirstAction = () => {
     if (firstActionInTimeRef.current === null) {
       firstActionInTimeRef.current = performance.now() - trialStartedAtRef.current <= RESPONSE_WINDOW_MS;
       setCanMarkNoResponse(false);
       if (noResponseTimerRef.current !== null) window.clearTimeout(noResponseTimerRef.current);
     }
-
-    const nextPlaced = [...placed, token];
-    setPlaced(nextPlaced);
-    setAvailable((items) => items.filter((item) => item.tokenId !== token.tokenId));
-
-    if (nextPlaced.length === currentTrial.pattern.length) {
-      const correctOrder = nextPlaced.every(
-        (placedToken, index) => placedToken.item.id === currentTrial.pattern[index].id,
-      );
-      finishTrial(correctOrder && firstActionInTimeRef.current === true, firstActionInTimeRef.current === true);
-    }
   };
 
-  const handlePlacedClick = (token: PatternToken) => {
+  const completeDigitalTrialIfReady = (nextPlaced: Array<PatternToken | null>) => {
+    if (!nextPlaced.every((token): token is PatternToken => token !== null)) return;
+
+    const correctOrder = nextPlaced.every(
+      (placedToken, index) => placedToken.item.id === currentTrial.pattern[index].id,
+    );
+    finishTrial(correctOrder && firstActionInTimeRef.current === true, firstActionInTimeRef.current === true);
+  };
+
+  const placeDraggedToken = (drag: DragState, targetIndex: number) => {
+    if (lockedRef.current || targetIndex < 0 || targetIndex >= currentTrial.pattern.length) return;
+
+    const nextPlaced = [...placed];
+    const displacedToken = nextPlaced[targetIndex];
+    nextPlaced[targetIndex] = drag.token;
+
+    if (drag.source === 'available') {
+      setAvailable((items) => {
+        const remaining = items.filter((item) => item.tokenId !== drag.token.tokenId);
+        return displacedToken ? [...remaining, displacedToken] : remaining;
+      });
+    } else if (drag.sourceIndex !== undefined && drag.sourceIndex !== targetIndex) {
+      nextPlaced[drag.sourceIndex] = displacedToken ?? null;
+    }
+
+    setPlaced(nextPlaced);
+    completeDigitalTrialIfReady(nextPlaced);
+  };
+
+  const returnDraggedTokenToPool = (drag: DragState) => {
+    if (drag.source !== 'placed' || drag.sourceIndex === undefined || lockedRef.current) return;
+    const nextPlaced = [...placed];
+    nextPlaced[drag.sourceIndex] = null;
+    setPlaced(nextPlaced);
+    setAvailable((items) => items.some((item) => item.tokenId === drag.token.tokenId)
+      ? items
+      : [...items, drag.token]);
+  };
+
+  const beginDrag = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    token: PatternToken,
+    source: DragSource,
+    sourceIndex?: number,
+  ) => {
     if (lockedRef.current) return;
-    setPlaced((items) => items.filter((item) => item.tokenId !== token.tokenId));
-    setAvailable((items) => [...items, token]);
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    if (source === 'available') markFirstAction();
+    const nextDrag = { token, source, sourceIndex, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    dragStateRef.current = nextDrag;
+    setDragState(nextDrag);
+  };
+
+  const moveDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const current = dragStateRef.current;
+    if (!current || current.pointerId !== event.pointerId) return;
+    const nextDrag = { ...current, x: event.clientX, y: event.clientY };
+    dragStateRef.current = nextDrag;
+    setDragState(nextDrag);
+  };
+
+  const endDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const activeDrag = dragStateRef.current;
+    if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+
+    const target = document.elementFromPoint(event.clientX, event.clientY);
+    const slot = target?.closest('[data-pattern-drop-index]') as HTMLElement | null;
+    const pool = target?.closest('[data-pattern-pool]');
+
+    if (slot) {
+      placeDraggedToken(activeDrag, Number(slot.dataset.patternDropIndex));
+    } else if (pool) {
+      returnDraggedTokenToPool(activeDrag);
+    }
+    dragStateRef.current = null;
+    setDragState(null);
+  };
+
+  const cancelDrag = () => {
+    dragStateRef.current = null;
+    setDragState(null);
   };
 
   const handleNoResponse = () => {
@@ -352,22 +472,22 @@ export default function NesneEslemeGame21({ mode, onClose, onComplete }: GamePro
   };
 
   return (
-    <div className="fixed inset-0 z-[120] overflow-y-auto bg-[#07111f] text-white">
-      <div className="mx-auto flex min-h-full w-full max-w-[1280px] flex-col px-3 py-2 sm:px-5">
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-700/70 pb-2">
+    <div className="fixed inset-0 z-[120] overflow-hidden bg-[#07111f] text-white">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1280px] flex-col px-2 py-1 sm:px-4">
+        <header className="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-slate-700/70">
           <div className="flex min-w-0 items-center gap-2">
             <button
               data-android-back
               type="button"
               onClick={onClose}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-slate-200 active:scale-95"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-slate-200 active:scale-95"
               aria-label="Geri"
             >
               <ArrowLeft size={19} />
             </button>
             <div className="min-w-0">
-              <h1 className="truncate text-sm font-bold sm:text-lg">Görsel Örüntüye Göre Eşleme</h1>
-              <p className="text-[10px] text-slate-400 sm:text-xs">EB 4.7</p>
+              <h1 className="truncate text-xs font-bold sm:text-base">Görsel Örüntüye Göre Eşleme</h1>
+              <p className="text-[9px] leading-none text-slate-400 sm:text-[10px]">EB 4.7</p>
             </div>
           </div>
 
@@ -390,40 +510,57 @@ export default function NesneEslemeGame21({ mode, onClose, onComplete }: GamePro
         </header>
 
         {stage === 'intro' && (
-          <main className="flex flex-1 items-center justify-center py-4">
-            <section className="w-full max-w-3xl rounded-3xl border border-slate-700 bg-slate-900/75 p-5 shadow-2xl sm:p-7">
-              <div className="mb-4 flex items-start gap-3">
+          <main className="flex min-h-0 flex-1 items-center justify-center py-1.5">
+            <section className="w-full max-w-4xl rounded-2xl border border-slate-700 bg-slate-900/75 p-3 shadow-2xl sm:p-4">
+              <div className="mb-2 flex items-start gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-500/15 text-blue-300">
                   <Hand size={24} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold sm:text-xl">Uygulama nasıl yapılacak?</h2>
-                  <p className="mt-1 text-sm leading-relaxed text-slate-300">
+                  <h2 className="text-base font-bold sm:text-lg">Uygulama nasıl yapılacak?</h2>
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-300 sm:text-sm">
                     Öğrenci, gösterilen görsel modeli aynı sırayla oluşturur. İlk 6 deneme ekranda,
                     son 4 deneme öğretmenin hazırladığı gerçek nesnelerle yapılır.
                   </p>
                 </div>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-3">
-                <div className="rounded-2xl border border-slate-700 bg-slate-950/55 p-3">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl border border-slate-700 bg-slate-950/55 p-2">
                   <p className="text-xs font-bold text-blue-300">Yönerge</p>
                   <p className="mt-1 text-sm text-slate-200">“Modele göre düzenle.”</p>
                 </div>
-                <div className="rounded-2xl border border-slate-700 bg-slate-950/55 p-3">
+                <div className="rounded-xl border border-slate-700 bg-slate-950/55 p-2">
                   <p className="text-xs font-bold text-blue-300">Başlama süresi</p>
                   <p className="mt-1 text-sm text-slate-200">5 saniye içinde bağımsız başlamalıdır.</p>
                 </div>
-                <div className="rounded-2xl border border-slate-700 bg-slate-950/55 p-3">
+                <div className="rounded-xl border border-slate-700 bg-slate-950/55 p-2">
                   <p className="text-xs font-bold text-blue-300">Başarı ölçütü</p>
                   <p className="mt-1 text-sm text-slate-200">10 denemenin en az 8’i doğru olmalıdır.</p>
                 </div>
               </div>
 
+              <div className="mt-2 rounded-xl border border-amber-400/30 bg-amber-500/5 p-2">
+                <div className="flex items-center gap-2 text-amber-200">
+                  <PackageCheck size={16} />
+                  <p className="text-xs font-bold">Öğretmen denemeleri için malzeme önerisi</p>
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {TEACHER_MATERIALS.map((material) => (
+                    <span key={material.name} className="rounded-lg border border-amber-300/20 bg-slate-950/55 px-2 py-1 text-[10px] font-semibold text-amber-100">
+                      {material.count} {material.name.toLocaleLowerCase('tr-TR')}
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-1 text-[10px] leading-relaxed text-slate-400">
+                  Bu liste zorunlu değildir; aynı sıra yapısını koruyarak elinizdeki başka nesneleri de kullanabilirsiniz.
+                </p>
+              </div>
+
               <button
                 type="button"
                 onClick={() => setStage('trial')}
-                className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-950/40 transition active:scale-[0.99]"
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow-lg shadow-blue-950/40 transition active:scale-[0.99] sm:text-sm"
               >
                 <ClipboardCheck size={18} />
                 {mode === 'assessment' ? 'Değerlendirmeyi Başlat' : 'Çalışmayı Başlat'}
@@ -433,64 +570,78 @@ export default function NesneEslemeGame21({ mode, onClose, onComplete }: GamePro
         )}
 
         {stage === 'trial' && currentTrial.kind === 'digital' && (
-          <main className="flex flex-1 flex-col justify-center gap-[clamp(5px,1.6vh,12px)] py-2">
-            <section>
-              <div className="mb-1 flex items-center justify-between gap-2">
+          <main className="flex min-h-0 flex-1 flex-col justify-center gap-1 py-1">
+            <section className="flex min-h-0 flex-1 flex-col">
+              <div className="flex h-4 shrink-0 items-center justify-between gap-2">
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-300 sm:text-xs">Model</p>
-                <p className="text-[10px] text-slate-400 sm:text-xs">Alttaki görsellere sırayla dokunun.</p>
+                <p className="flex items-center gap-1 text-[9px] text-slate-400 sm:text-[10px]"><Move size={11} /> Görselleri boş alanlara sürükleyin.</p>
               </div>
-              <div className="flex min-h-[clamp(54px,17vh,96px)] items-center justify-center gap-[clamp(3px,0.7vw,9px)] rounded-2xl border border-blue-400/30 bg-blue-950/20 px-2 py-1.5">
+              <div className="flex min-h-0 flex-1 items-center justify-center gap-[clamp(2px,0.55vw,7px)] rounded-xl border border-blue-400/30 bg-blue-950/20 px-1 py-0.5">
                 {currentTrial.pattern.map((item, index) => (
                   <ImageCard key={`model-${currentTrial.id}-${index}`} item={item} />
                 ))}
               </div>
             </section>
 
-            <section>
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-300 sm:text-xs">Öğrencinin sırası</p>
+            <section className="flex min-h-0 flex-1 flex-col">
+              <p className="flex h-4 shrink-0 items-center text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-300 sm:text-xs">Öğrencinin sırası</p>
               <div className={twMerge(
-                'flex min-h-[clamp(54px,17vh,96px)] items-center justify-center gap-[clamp(3px,0.7vw,9px)] rounded-2xl border bg-emerald-950/15 px-2 py-1.5 transition-colors',
+                'flex min-h-0 flex-1 items-center justify-center gap-[clamp(2px,0.55vw,7px)] rounded-xl border bg-emerald-950/15 px-1 py-0.5 transition-colors',
                 recorded ? 'border-amber-400' : 'border-emerald-400/30',
               )}>
                 {currentTrial.pattern.map((_, index) => {
                   const token = placed[index];
-                  return token ? (
-                    <ImageCard
-                      key={token.tokenId}
-                      item={token.item}
-                      highlighted={recorded}
-                      onClick={() => handlePlacedClick(token)}
-                    />
-                  ) : (
+                  return (
                     <div
                       key={`slot-${currentTrial.id}-${index}`}
-                      className="h-[clamp(50px,16vh,88px)] w-[clamp(50px,9vw,88px)] shrink-0 rounded-xl border-2 border-dashed border-slate-600 bg-slate-900/70"
-                    />
+                      data-pattern-drop-index={index}
+                      className={twMerge(
+                        'flex h-[clamp(62px,20vh,92px)] w-[clamp(62px,10vw,92px)] shrink-0 items-center justify-center rounded-xl border-2 border-dashed transition-colors',
+                        dragState ? 'border-cyan-300/70 bg-cyan-500/10' : 'border-slate-600 bg-slate-900/70',
+                      )}
+                    >
+                      {token && (
+                        <ImageCard
+                          item={token.item}
+                          highlighted={recorded}
+                          draggable={!locked}
+                          muted={dragState?.token.tokenId === token.tokenId}
+                          onPointerDown={(event) => beginDrag(event, token, 'placed', index)}
+                          onPointerMove={moveDrag}
+                          onPointerUp={endDrag}
+                          onPointerCancel={cancelDrag}
+                        />
+                      )}
+                    </div>
                   );
                 })}
               </div>
             </section>
 
-            <section>
-              <div className="mb-1 flex items-center justify-between gap-2">
+            <section className="flex min-h-0 flex-1 flex-col">
+              <div className="flex h-5 shrink-0 items-center justify-between gap-2">
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-300 sm:text-xs">Görseller</p>
                 <button
                   type="button"
                   disabled={!canMarkNoResponse || locked}
                   onClick={handleNoResponse}
-                  className="rounded-lg border border-red-400/40 bg-red-500/10 px-2.5 py-1 text-[10px] font-bold text-red-200 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-800/40 disabled:text-slate-600"
+                  className="rounded-md border border-red-400/40 bg-red-500/10 px-2 py-0.5 text-[9px] font-bold text-red-200 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-800/40 disabled:text-slate-600"
                 >
                   Yanıt vermedi
                 </button>
               </div>
-              <div className="flex min-h-[clamp(50px,15vh,84px)] items-center justify-center gap-[clamp(4px,0.9vw,11px)] rounded-2xl border border-slate-700 bg-slate-900/80 px-2 py-1.5">
+              <div data-pattern-pool className="flex min-h-0 flex-1 items-center justify-center gap-[clamp(3px,0.7vw,9px)] rounded-xl border border-slate-700 bg-slate-900/80 px-1 py-0.5">
                 {available.map((token) => (
                   <ImageCard
                     key={token.tokenId}
                     item={token.item}
                     compact
                     muted={locked}
-                    onClick={() => handleAvailableClick(token)}
+                    draggable={!locked}
+                    onPointerDown={(event) => beginDrag(event, token, 'available')}
+                    onPointerMove={moveDrag}
+                    onPointerUp={endDrag}
+                    onPointerCancel={cancelDrag}
                   />
                 ))}
                 {available.length === 0 && (
@@ -501,42 +652,52 @@ export default function NesneEslemeGame21({ mode, onClose, onComplete }: GamePro
           </main>
         )}
 
+        {dragState && (
+          <div
+            className="pointer-events-none fixed z-[300] w-[74px] -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 border-cyan-300 bg-white p-1 shadow-2xl shadow-cyan-950/60"
+            style={{ left: dragState.x, top: dragState.y }}
+          >
+            <img src={dragState.token.item.src} alt="" className="h-16 w-full object-contain" />
+          </div>
+        )}
+
         {stage === 'trial' && currentTrial.kind === 'teacher' && (
-          <main className="flex flex-1 items-center justify-center py-3">
-            <section className="w-full max-w-5xl rounded-3xl border border-violet-400/25 bg-slate-900/75 p-4 shadow-xl">
-              <div className="mb-3 flex items-start justify-between gap-4">
+          <main className="flex min-h-0 flex-1 items-center justify-center py-1">
+            <section className="w-full max-w-5xl rounded-2xl border border-violet-400/25 bg-slate-900/75 p-2.5 shadow-xl">
+              <div className="mb-1.5 flex items-start justify-between gap-3">
                 <div>
                   <div className="mb-1 flex items-center gap-2 text-violet-300">
                     <GraduationCap size={18} />
                     <p className="text-xs font-bold uppercase tracking-[0.16em]">Öğretmen uygulaması</p>
                   </div>
-                  <p className="text-sm text-slate-300">
+                  <p className="text-xs text-slate-300 sm:text-sm">
                     Modeli oluşturun, aynı nesneleri karışık koyun ve “Modele göre düzenle.” deyin.
                   </p>
                 </div>
-                <p className="shrink-0 rounded-xl border border-slate-700 bg-slate-950/50 px-3 py-2 text-[11px] text-slate-300">
+                <p className="shrink-0 rounded-lg border border-slate-700 bg-slate-950/50 px-2 py-1 text-[10px] text-slate-300">
                   5 saniye içinde bağımsız başlamalıdır.
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-blue-400/30 bg-blue-950/20 p-2">
+              <div className="rounded-xl border border-blue-400/30 bg-blue-950/20 p-1.5">
                 <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-blue-300">Hazırlanacak model</p>
-                <div className="flex items-center justify-center gap-[clamp(5px,1vw,12px)]">
+                <div className="flex items-center justify-center gap-[clamp(3px,0.8vw,9px)]">
                   {currentTrial.pattern.map((item, index) => (
                     <ImageCard key={`teacher-model-${currentTrial.id}-${index}`} item={item} />
                   ))}
                 </div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between gap-4">
-                <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto rounded-2xl border border-slate-700 bg-slate-950/45 p-2">
-                  <span className="shrink-0 text-[11px] font-bold text-slate-400">Gerekli nesneler:</span>
+              <div className="mt-1.5 flex items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto rounded-xl border border-slate-700 bg-slate-950/45 p-1.5">
+                  <span className="shrink-0 text-[10px] font-bold text-slate-400">Önerilen nesneler:</span>
                   {currentMaterials.map(({ item, count }) => (
-                    <div key={item.id} className="flex shrink-0 items-center gap-1.5 rounded-xl bg-slate-800 px-2 py-1">
-                      <img src={item.src} alt="" className="h-7 w-7 object-contain" />
-                      <span className="text-xs font-semibold text-slate-200">{count} {item.name}</span>
+                    <div key={item.id} className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-800 px-1.5 py-0.5">
+                      <img src={item.src} alt="" className="h-6 w-6 object-contain" />
+                      <span className="text-[10px] font-semibold text-slate-200">{count} {item.name}</span>
                     </div>
                   ))}
+                  <span className="shrink-0 text-[9px] text-amber-200">Zorunlu değil; aynı sırayla başka nesneler kullanılabilir.</span>
                 </div>
 
                 <div className="flex shrink-0 gap-2">
@@ -544,7 +705,7 @@ export default function NesneEslemeGame21({ mode, onClose, onComplete }: GamePro
                     type="button"
                     disabled={locked}
                     onClick={() => finishTrial(false, false)}
-                    className="flex h-11 items-center gap-1.5 rounded-xl border border-red-400/50 bg-red-500/15 px-4 text-xs font-bold text-red-100 active:scale-95 disabled:opacity-40"
+                    className="flex h-9 items-center gap-1.5 rounded-lg border border-red-400/50 bg-red-500/15 px-3 text-[10px] font-bold text-red-100 active:scale-95 disabled:opacity-40"
                   >
                     <XCircle size={17} /> Yapamadı
                   </button>
@@ -552,7 +713,7 @@ export default function NesneEslemeGame21({ mode, onClose, onComplete }: GamePro
                     type="button"
                     disabled={locked}
                     onClick={() => finishTrial(true, true)}
-                    className="flex h-11 items-center gap-1.5 rounded-xl border border-emerald-400/50 bg-emerald-500/20 px-4 text-xs font-bold text-emerald-100 active:scale-95 disabled:opacity-40"
+                    className="flex h-9 items-center gap-1.5 rounded-lg border border-emerald-400/50 bg-emerald-500/20 px-3 text-[10px] font-bold text-emerald-100 active:scale-95 disabled:opacity-40"
                   >
                     <CheckCircle2 size={17} /> Doğru yaptı
                   </button>
