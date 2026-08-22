@@ -12,11 +12,13 @@ import SozelTaklit1 from '@/aba/sozeltaklit/sozeltaklit1';
 import SozelTaklit2 from '@/aba/sozeltaklit/sozeltaklit2';
 import SozelTaklit3 from '@/aba/sozeltaklit/sozeltaklit3';
 import SozelTaklit4 from '@/aba/sozeltaklit/sozeltaklit4';
+import SozelTaklit5 from '@/aba/sozeltaklit/sozeltaklit5';
 import type { AssessmentCompletionDetails } from '@/aba/sozeltaklit/SozelTaklitAssessment';
 import AssessmentModeBadges from '@/aba/shared/AssessmentModeBadges';
 
 const WORD_PROGRESS_FIELD = 'sozeltaklit_st21_progress';
 const ENVIRONMENTAL_PROGRESS_FIELD = 'sozeltaklit_st22_progress';
+const SENTENCE_PROGRESS_FIELD = 'sozeltaklit_st23_progress';
 
 interface WordProgress {
   masteredWords: string[];
@@ -27,6 +29,13 @@ interface WordProgress {
 
 interface EnvironmentalProgress {
   masteredSounds: string[];
+  lastScore?: number;
+  lastSetPassed?: boolean;
+  updatedAt?: string;
+}
+
+interface SentenceProgress {
+  masteredSentences: string[];
   lastScore?: number;
   lastSetPassed?: boolean;
   updatedAt?: string;
@@ -60,12 +69,27 @@ const getEnvironmentalProgress = (data: Record<string, any>): EnvironmentalProgr
   };
 };
 
+const getSentenceProgress = (data: Record<string, any>): SentenceProgress => {
+  const progress = data[SENTENCE_PROGRESS_FIELD];
+  if (!progress || !Array.isArray(progress.masteredSentences)) return { masteredSentences: [] };
+  return {
+    ...progress,
+    masteredSentences: progress.masteredSentences.filter(
+      (sentence: unknown): sentence is string => typeof sentence === 'string',
+    ),
+  };
+};
+
 const mergeUniqueWords = (words: string[]) => Array.from(
   new Map(words.map(word => [normalizeWord(word), word])).values(),
 );
 
 const mergeUniqueSounds = (sounds: string[]) => Array.from(
   new Map(sounds.map(sound => [normalizeWord(sound), sound])).values(),
+);
+
+const mergeUniqueSentences = (sentences: string[]) => Array.from(
+  new Map(sentences.map(sentence => [normalizeWord(sentence), sentence])).values(),
 );
 
 interface SozelTaklitPageProps {
@@ -193,6 +217,25 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
       };
     }
 
+    if (activeAssessmentItem.startsWith('ST 2.3.') && details?.kind === 'sentence') {
+      const currentProgress = getSentenceProgress(formData);
+      const masteredSentences = details.setPassed
+        ? mergeUniqueSentences([...currentProgress.masteredSentences, ...details.correctLabels])
+        : currentProgress.masteredSentences;
+      const completed = masteredSentences.length >= 20;
+
+      updatedData = {
+        ...formData,
+        [activeAssessmentItem]: completed,
+        [SENTENCE_PROGRESS_FIELD]: {
+          masteredSentences,
+          lastScore: details.score,
+          lastSetPassed: details.setPassed,
+          updatedAt: new Date().toISOString(),
+        } satisfies SentenceProgress,
+      };
+    }
+
     setFormData(updatedData);
     setDirty(true);
     setSaveBanner(null);
@@ -244,6 +287,16 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
     return (
       <SozelTaklit4
         masteredSounds={getEnvironmentalProgress(formData).masteredSounds}
+        onClose={() => setActiveAssessmentItem(null)}
+        onComplete={handleAssessmentComplete}
+      />
+    );
+  }
+
+  if (activeAssessmentItem?.startsWith('ST 2.3.')) {
+    return (
+      <SozelTaklit5
+        masteredSentences={getSentenceProgress(formData).masteredSentences}
         onClose={() => setActiveAssessmentItem(null)}
         onComplete={handleAssessmentComplete}
       />
@@ -344,32 +397,34 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
             const isTolkidoItem = item.includes("TOLKİDO");
             const isWordImitation = item.startsWith('ST 2.1.');
             const isEnvironmentalImitation = item.startsWith('ST 2.2.');
+            const isSentenceImitation = item.startsWith('ST 2.3.');
             const wordProgress = isWordImitation ? getWordProgress(formData) : null;
             const environmentalProgress = isEnvironmentalImitation ? getEnvironmentalProgress(formData) : null;
-            const hasAssessment = item.startsWith('ST 1.1.') || item.startsWith('ST 1.2.') || isWordImitation || isEnvironmentalImitation;
-            const isWordInProgress = Boolean(
-              wordProgress &&
-              wordProgress.masteredWords.length > 0 &&
-              wordProgress.masteredWords.length < 30,
+            const sentenceProgress = isSentenceImitation ? getSentenceProgress(formData) : null;
+            const hasAssessment = item.startsWith('ST 1.1.') || item.startsWith('ST 1.2.') || isWordImitation || isEnvironmentalImitation || isSentenceImitation;
+            const isCumulativeInProgress = Boolean(
+              (wordProgress && wordProgress.masteredWords.length > 0 && wordProgress.masteredWords.length < 30) ||
+              (environmentalProgress && environmentalProgress.masteredSounds.length > 0 && environmentalProgress.masteredSounds.length < 10) ||
+              (sentenceProgress && sentenceProgress.masteredSentences.length > 0 && sentenceProgress.masteredSentences.length < 20),
             );
             const isPassed = status === true;
-            const isFailed = status === false && !isWordInProgress;
+            const isFailed = status === false && !isCumulativeInProgress;
 
             return (
                 <div key={item} className={twMerge(
                     "group p-4 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4",
                     isPassed && "bg-green-950/15 border-green-500/15 opacity-45 hover:opacity-80",
                     isFailed && "bg-red-950/30 border-red-500/50 shadow-[0_0_0_1px_rgba(239,68,68,0.15)] hover:border-red-400/70 hover:bg-red-950/40",
-                    isWordInProgress && "bg-amber-950/15 border-amber-500/35 hover:border-amber-400/55",
-                    !isPassed && !isFailed && !isWordInProgress && "bg-slate-900/40 border-slate-800 hover:bg-slate-800 hover:border-slate-700"
+                    isCumulativeInProgress && "bg-amber-950/15 border-amber-500/35 hover:border-amber-400/55",
+                    !isPassed && !isFailed && !isCumulativeInProgress && "bg-slate-900/40 border-slate-800 hover:bg-slate-800 hover:border-slate-700"
                 )}>
                     <div className="flex items-start gap-4 flex-1">
                         <div className={twMerge(
                             "min-w-[60px] h-10 rounded-lg flex items-center justify-center text-[10px] font-bold font-mono border shrink-0",
                             isPassed && "bg-green-500/15 border-green-500/40 text-green-400/80",
                             isFailed && "bg-red-500/25 border-red-500 text-red-300",
-                            isWordInProgress && "bg-amber-500/15 border-amber-500/45 text-amber-300",
-                            !isPassed && !isFailed && !isWordInProgress && "bg-slate-950 border-slate-700 text-slate-500"
+                            isCumulativeInProgress && "bg-amber-500/15 border-amber-500/45 text-amber-300",
+                            !isPassed && !isFailed && !isCumulativeInProgress && "bg-slate-950 border-slate-700 text-slate-500"
                         )}>
                             {isPassed ? <Trophy size={18} /> : isFailed ? <XCircle size={18} /> : codePart}
                         </div>
@@ -378,14 +433,14 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
                                 "font-medium text-sm leading-relaxed",
                                 isPassed && "text-green-100/70",
                                 isFailed && "text-red-100",
-                                isWordInProgress && "text-amber-50",
-                                !isPassed && !isFailed && !isWordInProgress && "text-slate-200"
+                                isCumulativeInProgress && "text-amber-50",
+                                !isPassed && !isFailed && !isCumulativeInProgress && "text-slate-200"
                             )}>
                                 {textPart || item} {/* Eğer parse edemezse düz item'ı bas */}
                             </p>
                             {isPassed && <span className="block text-[10px] text-green-500/60 font-semibold uppercase tracking-wider">Geçti · tekrar değerlendirilebilir</span>}
                             {isFailed && <span className="block text-[10px] text-red-400/90 font-semibold uppercase tracking-wider">Geçemedi · öncelikli</span>}
-                            {isWordInProgress && <span className="block text-[10px] font-semibold uppercase tracking-wider text-amber-300">Devam ediyor</span>}
+                            {isCumulativeInProgress && <span className="block text-[10px] font-semibold uppercase tracking-wider text-amber-300">Devam ediyor</span>}
                             {wordProgress && (
                               <span className="mt-1 block text-[11px] font-bold text-blue-300">
                                 {Math.min(wordProgress.masteredWords.length, 30)}/30 farklı sözcük
@@ -396,6 +451,11 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
                                 {Math.min(environmentalProgress.masteredSounds.length, 10)}/10 farklı ses
                               </span>
                             )}
+                            {sentenceProgress && (
+                              <span className="mt-1 block text-[11px] font-bold text-blue-300">
+                                {Math.min(sentenceProgress.masteredSentences.length, 20)}/20 farklı cümle
+                              </span>
+                            )}
                             <AssessmentModeBadges interactive={hasAssessment || isTolkidoItem} manual tone="cyan" />
                         </div>
                     </div>
@@ -403,7 +463,7 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
                     {/* BUTON GRUBU */}
                     <div className="flex shrink-0 flex-col items-end gap-2 self-end sm:self-center">
                          <div className="flex items-center gap-1">
-                           <button onClick={() => setStatus(item, false)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center transition-all", status === false && !isWordInProgress ? "bg-red-500/20 border-red-500 text-red-400" : "bg-slate-950 border-slate-800 text-slate-500 hover:border-red-500/50")} title="Yapamıyor"><XCircle size={16} /></button>
+                           <button onClick={() => setStatus(item, false)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center transition-all", status === false && !isCumulativeInProgress ? "bg-red-500/20 border-red-500 text-red-400" : "bg-slate-950 border-slate-800 text-slate-500 hover:border-red-500/50")} title="Yapamıyor"><XCircle size={16} /></button>
                            <button onClick={() => setStatus(item, true)} className={twMerge("w-8 h-8 rounded-md border flex items-center justify-center transition-all", status === true ? "bg-green-500/20 border-green-500 text-green-400" : "bg-slate-950 border-slate-800 text-slate-500 hover:border-green-500/50")} title="Yapıyor"><CheckCircle2 size={16} /></button>
                          </div>
                          <div className="flex items-center gap-1">
