@@ -13,6 +13,12 @@ import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
+import {
+  createShowingSession,
+  getShowingTargetNames,
+  type ShowingPosition,
+  type ShowingScenario,
+} from '@/kavram/showingScenarios';
 
 // --- KAVRAM OYUN SESLERİ ---
 import bosSes from '@/kavram/bos.mp3';
@@ -665,7 +671,8 @@ export default function KavramAssessmentPage() {
   // Ayırt etme
   const [isDiscriminationMode, setIsDiscriminationMode] = useState(false);
   const [discrimIndex, setDiscrimIndex] = useState(0);
-  const [shuffledScenarios, setShuffledScenarios] = useState<any[]>([]);
+  const [shuffledScenarios, setShuffledScenarios] = useState<ShowingScenario[]>([]);
+  const [activeShowingCategoryId, setActiveShowingCategoryId] = useState<string | null>(null);
 
   // Yeni state'ler
   const [selectedCategory, setSelectedCategory] = useState<any | null>(null);
@@ -788,14 +795,6 @@ export default function KavramAssessmentPage() {
       }
     }
   }, [evalIndex, activeEvaluation]);
-
-  useEffect(() => {
-    if (isDiscriminationMode) {
-      const mixed = shuffleArray([...ANIMAL_DISCRIMINATION_SCENARIOS]);
-      setShuffledScenarios(mixed);
-      setDiscrimIndex(0); 
-    }
-  }, [isDiscriminationMode]);
 
   useEffect(() => {
     if (isDiscriminationMode && shuffledScenarios.length > 0) {
@@ -934,12 +933,43 @@ export default function KavramAssessmentPage() {
   };
 
   // --- AYIRT ETME MOTORU ---
-  const handleDiscriminationChoice = (selectedSide: 'left' | 'center' | 'right', e: any) => {
+  const getShowingResultKey = (categoryId: string, targetName: string) =>
+    categoryId === 'animals'
+      ? `${targetName}_Ayirt_Etme`
+      : `${categoryId}_${targetName}_Ayirt_Etme`;
+
+  const startShowingEvaluation = (categoryId: string) => {
+    const scenarios = categoryId === 'animals'
+      ? shuffleArray([...ANIMAL_DISCRIMINATION_SCENARIOS]).map((scenario) => ({
+          ...scenario,
+          promptText: `“${scenario.targetName}” hangisi?`,
+          zoneCount: 3 as const,
+          aspectRatio: 16 / 9,
+        }))
+      : createShowingSession(categoryId);
+
+    if (scenarios.length === 0) {
+      setShowComingSoon(true);
+      return;
+    }
+
+    setActiveShowingCategoryId(categoryId);
+    setShuffledScenarios(scenarios);
+    setDiscrimIndex(0);
+    setIsDiscriminationMode(true);
+    lockLandscape();
+  };
+
+  const handleDiscriminationChoice = (selectedSide: ShowingPosition, e: any) => {
     handleTouchEffect(e);
     const currentScenario = shuffledScenarios[discrimIndex];
+    if (!currentScenario || !activeShowingCategoryId) return;
     const isCorrect = selectedSide === currentScenario.correctPosition;
     
-    setFormData(prev => ({ ...prev, [`${currentScenario.targetName}_Ayirt_Etme`]: isCorrect }));
+    setFormData(prev => ({
+      ...prev,
+      [getShowingResultKey(activeShowingCategoryId, currentScenario.targetName)]: isCorrect,
+    }));
     markUnsaved();
 
     if (isCorrect) {
@@ -952,8 +982,10 @@ export default function KavramAssessmentPage() {
       setTimeout(() => setDiscrimIndex(prev => prev + 1), 600); 
     } else {
       setTimeout(() => {
-        setCompletedSectionTitle('Hayvanlar · Gösterme');
+        const categoryTitle = CATEGORY_MAP.find((item) => item.id === activeShowingCategoryId)?.title ?? 'Kavram';
+        setCompletedSectionTitle(`${categoryTitle} · Gösterme`);
         setIsDiscriminationMode(false);
+        setActiveShowingCategoryId(null);
         unlockOrientation();
       }, 1000);
     }
@@ -977,20 +1009,21 @@ export default function KavramAssessmentPage() {
   };
 
   const calculateShowingScore = (category: any) => {
-    if (category.id !== 'animals') return null;
-    const items = category.data;
-    if (!items || items.length === 0) return null;
+    const targetNames = category.id === 'animals'
+      ? ANIMAL_DISCRIMINATION_SCENARIOS.map((item) => item.targetName)
+      : getShowingTargetNames(category.id);
+    if (targetNames.length === 0) return null;
     let correct = 0;
     let attempted = 0;
-    items.forEach((item: any) => {
-      const val = formData[`${item.name}_Ayirt_Etme`];
+    targetNames.forEach((targetName) => {
+      const val = formData[getShowingResultKey(category.id, targetName)];
       if (val !== undefined && val !== null) {
         attempted++;
         if (val === true) correct++;
       }
     });
     if (attempted === 0) return null;
-    return Math.round((correct / items.length) * 100);
+    return Math.round((correct / targetNames.length) * 100);
   };
 
   const calculateScore = (category: any) => {
@@ -1123,15 +1156,29 @@ export default function KavramAssessmentPage() {
   const renderDiscriminationGame = () => {
     if (!isDiscriminationMode || shuffledScenarios.length === 0) return null;
     const scenario = shuffledScenarios[discrimIndex];
+    const isVideo = scenario.src.endsWith('.mp4');
+    const zonePositions: ShowingPosition[] = scenario.zoneCount === 2
+      ? ['left', 'right']
+      : ['left', 'center', 'right'];
+    const sceneWidth = `min(100vw, ${scenario.aspectRatio * 100}vh)`;
+    const sceneHeight = `min(100vh, ${100 / scenario.aspectRatio}vw)`;
 
     return (
       <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center">
         <button 
-          onClick={() => { setIsDiscriminationMode(false); unlockOrientation(); }} 
+          onClick={() => {
+            setIsDiscriminationMode(false);
+            setActiveShowingCategoryId(null);
+            unlockOrientation();
+          }}
           className="absolute top-8 right-8 z-[120] bg-white/20 p-3 rounded-full text-white hover:bg-white/30"
         >
           <X size={32} />
         </button>
+
+        <div className="absolute bottom-5 right-6 z-[110] rounded-full border border-white/15 bg-black/55 px-4 py-2 text-sm font-bold text-white/80 backdrop-blur-md">
+          {discrimIndex + 1} / {shuffledScenarios.length}
+        </div>
 
         <div 
           className="absolute top-8 left-8 z-[110] animate-in slide-in-from-top duration-500 cursor-pointer active:scale-95 transition-transform" 
@@ -1143,25 +1190,45 @@ export default function KavramAssessmentPage() {
               <Volume2 size={24} />
             </div>
             <span className="text-xl font-bold text-white tracking-wide">
-              "{scenario.targetName}" hangisi?
+              {scenario.promptText}
             </span>
           </div>
         </div>
 
-        <div className="relative w-full h-full flex items-center justify-center bg-black animate-pop-in" key={scenario.id}>
-          <video 
-            src={scenario.src}
-            autoPlay 
-            loop 
-            muted 
-            playsInline
-            className="h-full w-auto max-w-none object-contain pointer-events-none select-none"
-          />
-          
-          <div className="absolute inset-0 flex z-50 w-full h-full">
-            <div onClick={(e) => handleDiscriminationChoice('left', e)} className="flex-[2] h-full active:bg-white/5 transition-colors cursor-pointer border-r border-white/5"></div>
-            <div onClick={(e) => handleDiscriminationChoice('center', e)} className="flex-[1] h-full active:bg-white/5 transition-colors cursor-pointer border-r border-white/5"></div>
-            <div onClick={(e) => handleDiscriminationChoice('right', e)} className="flex-[2] h-full active:bg-white/5 transition-colors cursor-pointer"></div>
+        <div
+          className="relative bg-black animate-pop-in"
+          key={scenario.id}
+          style={{ width: sceneWidth, height: sceneHeight }}
+        >
+          {isVideo ? (
+            <video
+              src={scenario.src}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="absolute inset-0 h-full w-full object-contain pointer-events-none select-none"
+            />
+          ) : (
+            <img
+              src={scenario.src}
+              alt=""
+              className="absolute inset-0 h-full w-full object-contain pointer-events-none select-none"
+            />
+          )}
+
+          <div
+            className={`absolute inset-0 z-50 grid h-full w-full ${scenario.zoneCount === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}
+          >
+            {zonePositions.map((position) => (
+              <button
+                key={position}
+                type="button"
+                aria-label={`${position} alanı`}
+                onClick={(event) => handleDiscriminationChoice(position, event)}
+                className="h-full cursor-pointer border-r border-white/5 bg-transparent transition-colors last:border-r-0 active:bg-white/5"
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -1184,12 +1251,7 @@ export default function KavramAssessmentPage() {
 
     const handleShowing = () => {
       setSelectedCategory(null);
-      if (selectedCategory.id === 'animals') {
-        setIsDiscriminationMode(true);
-        lockLandscape();
-      } else {
-        setShowComingSoon(true);
-      }
+      startShowingEvaluation(selectedCategory.id);
     };
 
     return (
