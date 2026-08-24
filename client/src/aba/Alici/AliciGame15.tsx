@@ -31,7 +31,8 @@ import sirtNerede from "./sirtnerede.mp3";
 import tirnakNerede from "./tirnaknerede.mp3";
 import yanakNerede from "./yanaknerede.mp3";
 
-const MODEL_PATH = "/models/human.glb";
+const PUBLIC_ASSET_BASE = new URL("/assets/public/", window.location.origin).toString();
+const MODEL_PATH = new URL("models/human.glb", PUBLIC_ASSET_BASE).toString();
 const TRIAL_COUNT = 10;
 const PASS_SCORE = 8;
 
