@@ -67,18 +67,19 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
   }, [dirty]);
 
-  const handleSave = async () => {
+  const handleSave = async (newData?: Record<string, any>, showMessage = true) => {
     setIsSaving(true);
     setSaveBanner(null);
     try {
       const instId = localStorage.getItem("kazanim-takip-institution-id");
       if (!instId) throw new Error("Kurum bilgisi bulunamadı.");
-      await setDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"), formData, { merge: true });
+      const dataToSave = newData || formData;
+      await setDoc(doc(db, "institutions", instId, "students", studentId, "assessments", "aba"), dataToSave, { merge: true });
       await associateCurrentTeacherWithStudent(studentId);
       setDirty(false);
       setSaveBanner('ok');
       window.setTimeout(() => setSaveBanner(null), 1500);
-      toast.success("Alıcı Dil becerileri kaydedildi!");
+      if (showMessage) toast.success("Alıcı Dil becerileri kaydedildi!");
       return true;
     } catch (error) {
       console.error("Alıcı dil kaydetme hatası:", error);
@@ -98,6 +99,15 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
     }));
     setDirty(true);
     setSaveBanner(null);
+  };
+
+  const handleGameComplete = async (success: boolean) => {
+    if (!activeGameItem) return;
+    const updatedData = { ...formData, [activeGameItem]: success };
+    setFormData(updatedData);
+    setDirty(true);
+    const saved = await handleSave(updatedData, false);
+    if (saved) toast.success("Değerlendirme sonucu kaydedildi.");
   };
 
   const calculateProgress = () => {
@@ -129,7 +139,7 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
 
              {/* OYUN 3: ADB 4.2 Tüm Vücut Bölümlerini Tanıma */}
              {(activeGameItem.includes("4.2") || activeGameItem.includes("Tüm Vücut")) && (
-                 <AliciGame15 onClose={() => setActiveGameItem(null)} />
+                 <AliciGame15 onClose={() => setActiveGameItem(null)} onComplete={handleGameComplete} />
              )}
 
           </div>
