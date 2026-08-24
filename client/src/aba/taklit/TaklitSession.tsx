@@ -5,9 +5,14 @@ import confetti from 'canvas-confetti';
 // --- NESNELİ TAKLİT VİDEOLARI ---
 import arabasurme from './nesnelitaklit/arabasurme.mp4';
 import davulcalma from './nesnelitaklit/davulcalma.mp4';
-import kovakupatma from './nesnelitaklit/kovakupatma.mp4';
-import ksilofon from './nesnelitaklit/ksilofon.mp4';
-import marakas from './nesnelitaklit/marakas.mp4';
+import kovayakupatma from './nesnelitaklit/kovayakupatma.mp4';
+import ksilofoncalma from './nesnelitaklit/ksilofoncalma.mp4';
+import marakassallama from './nesnelitaklit/marakassallama.mp4';
+import arabasurmeAudio from './nesnelitaklit/arabasurme.mp3';
+import davulcalmaAudio from './nesnelitaklit/davulcalma.mp3';
+import kovayakupatmaAudio from './nesnelitaklit/kovayakupatma.mp3';
+import ksilofoncalmaAudio from './nesnelitaklit/ksilofoncalma.mp3';
+import marakassallamaAudio from './nesnelitaklit/marakassallama.mp3';
 
 // --- NESNESİZ TAKLİT VİDEOLARI ---
 import alkis from './nesnesiztaklit/alkis.mp4';
@@ -23,11 +28,11 @@ import dudakbuz from './yuzdudak/dudakbuz.mp4';
 
 const PLAYLISTS = {
   NESNELI: [
-    { id: 'araba', name: 'Araba Sürme', src: arabasurme },
-    { id: 'davul', name: 'Davul Çalma', src: davulcalma },
-    { id: 'kova', name: 'Kova Kapatma', src: kovakupatma },
-    { id: 'ksilofon', name: 'Ksilofon', src: ksilofon },
-    { id: 'marakas', name: 'Marakas', src: marakas },
+    { id: 'araba', name: 'Araba Sürme', src: arabasurme, audioSrc: arabasurmeAudio },
+    { id: 'davul', name: 'Davul Çalma', src: davulcalma, audioSrc: davulcalmaAudio },
+    { id: 'kova', name: 'Kovaya Küp Atma', src: kovayakupatma, audioSrc: kovayakupatmaAudio },
+    { id: 'ksilofon', name: 'Ksilofon Çalma', src: ksilofoncalma, audioSrc: ksilofoncalmaAudio },
+    { id: 'marakas', name: 'Marakas Sallama', src: marakassallama, audioSrc: marakassallamaAudio },
   ],
   NESNESIZ: [
     { id: 'alkis', name: 'Alkış Yapma', src: alkis },
@@ -58,6 +63,7 @@ export default function TaklitSession({ mode, itemCode, itemText, onClose, onSav
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const webcamRef = useRef<HTMLVideoElement>(null);
+  const exampleAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const activePlaylist = useMemo(() => {
     if (itemCode.includes("1.1")) return PLAYLISTS.NESNELI;
@@ -67,6 +73,21 @@ export default function TaklitSession({ mode, itemCode, itemText, onClose, onSav
   }, [itemCode]);
 
   const currentVideo = activePlaylist[currentIndex];
+
+  const playCurrentExample = () => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play().catch(() => {});
+    }
+
+    exampleAudioRef.current?.pause();
+    const audioSrc = 'audioSrc' in currentVideo ? currentVideo.audioSrc : undefined;
+    if (audioSrc) {
+      const audio = new Audio(audioSrc);
+      exampleAudioRef.current = audio;
+      audio.play().catch(() => {});
+    }
+  };
 
   useEffect(() => {
     let stream: MediaStream | null = null;
@@ -96,8 +117,13 @@ export default function TaklitSession({ mode, itemCode, itemText, onClose, onSav
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.load();
-      videoRef.current.play().catch(() => {});
+      playCurrentExample();
     }
+
+    return () => {
+      exampleAudioRef.current?.pause();
+      exampleAudioRef.current = null;
+    };
   }, [currentIndex]);
 
   const handlePrev = () => {
@@ -160,9 +186,10 @@ export default function TaklitSession({ mode, itemCode, itemText, onClose, onSav
                 ref={videoRef}
                 src={currentVideo.src}
                 autoPlay
-                loop
                 playsInline
                 muted
+                onEnded={playCurrentExample}
+                onClick={playCurrentExample}
                 className="w-full h-full object-cover landscape:object-contain"
               />
             </div>
