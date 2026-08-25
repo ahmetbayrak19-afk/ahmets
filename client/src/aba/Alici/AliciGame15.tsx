@@ -1,6 +1,6 @@
 import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { Environment, Html, OrbitControls, useGLTF } from "@react-three/drei";
+import { Html, OrbitControls, useGLTF } from "@react-three/drei";
 import { ArrowLeft, CheckCircle2, Headphones, RotateCw, Save, Volume2 } from "lucide-react";
 import * as THREE from "three";
 
@@ -316,7 +316,9 @@ export default function AliciGame15({ onClose, onComplete }: { onClose: () => vo
     {phase === "asking" && <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full bg-slate-950/65 px-4 py-2 text-xs text-white/80 backdrop-blur"><RotateCw size={15} /> Sağa-sola çevrilebilir</div>}
 
     <div className="h-full w-full bg-gradient-to-b from-slate-100 to-slate-300"><Canvas camera={{ fov: 42, near: 0.01, far: 1000 }} dpr={[1, 1.6]}>
-      <ambientLight intensity={1.05} /><directionalLight position={[5, 8, 6]} intensity={1.2} /><directionalLight position={[-4, 3, -4]} intensity={0.45} /><Environment preset="studio" />
+      <ambientLight intensity={0.45} />
+      <directionalLight position={[5, 8, 6]} intensity={0.7} />
+      <directionalLight position={[-4, 3, -4]} intensity={0.15} />
       <OrbitControls ref={controlsRef} makeDefault enableZoom={false} enablePan={false} minPolarAngle={Math.PI / 2} maxPolarAngle={Math.PI / 2} rotateSpeed={0.65} />
       <CameraDirector modelScene={modelScene} focus={focus} controlsRef={controlsRef} />
       <Suspense fallback={<Loader />}><ModelErrorBoundary onError={() => setModelFailed(true)}><Model onPick={handlePick} onReady={setModelScene} /></ModelErrorBoundary></Suspense>
