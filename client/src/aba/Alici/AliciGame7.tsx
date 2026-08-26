@@ -1,261 +1,330 @@
-import { useState, useEffect, useRef } from 'react';
-import { db } from '../../firebase'; 
-import { doc, getDoc } from 'firebase/firestore';
-import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, Search, Backpack, Star, Sparkles, User, Move, ZoomIn, ZoomOut } from 'lucide-react';
-import { toast } from 'sonner';
-import { twMerge } from 'tailwind-merge';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ScreenOrientation } from '@capacitor/screen-orientation';
+import { ArrowLeft, Search } from 'lucide-react';
 
-import canta1 from './dedektif/canta1.png';
-import canta1x from './dedektif/canta1x.png';
+import cantaArkaPlan from './dedektif/canta1.png';
+import cocuk1Video from './dedektif/cocuk1.webm';
+import cocuk2Video from './dedektif/cocuk2.webm';
+import cocuk1Ses from './dedektif/cocuk1ses.mp3';
+import cocuk2Ses from './dedektif/cocuk2ses.mp3';
 
-const GAMES = [
-  { id: 'dedektif', title: 'Not Defteri', icon: Search, color: 'from-blue-600 to-indigo-900', btnColor: 'bg-blue-600', disabled: true },
-  { id: 'canta', title: 'Okul Çantası', icon: Backpack, color: 'from-orange-500 to-red-800', btnColor: 'bg-orange-600', disabled: false },
-  { id: 'gizemli_3', title: 'Gizem 3', icon: Star, color: 'from-slate-700 to-slate-900', btnColor: 'bg-slate-700', disabled: true },
-  { id: 'gizemli_4', title: 'Gizem 4', icon: Sparkles, color: 'from-slate-700 to-slate-900', btnColor: 'bg-slate-700', disabled: true }
+import canta from './dedektif/canta.webp';
+import kitap from './dedektif/kitap.webp';
+import defter from './dedektif/defter.webp';
+import kalem from './dedektif/kalem.webp';
+import silgi from './dedektif/silgi.webp';
+import cantaSes from './dedektif/cantayibul.mp3';
+import kitapSes from './dedektif/kitabibul.mp3';
+import defterSes from './dedektif/defteribul.mp3';
+import kalemSes from './dedektif/ kalemibul.mp3';
+import silgiSes from './dedektif/silgibul.mp3';
+import onaySes from '@/aba/yonerge/sesgorsel/onay.mp3';
+
+type Point = readonly [number, number];
+type Phase = 'intro' | 'target' | 'search' | 'outro';
+
+interface AliciGame7Props {
+  studentId: string;
+  onClose: () => void;
+  onComplete?: (success: boolean) => void | Promise<void>;
+}
+
+interface Trial {
+  id: string;
+  label: string;
+  instruction: string;
+  image: string;
+  audio: string;
+  hitArea: readonly Point[];
+}
+
+// canta1.png üzerindeki nesnelerin yüzdelik çokgenleri.
+// Kalem ve silgi küçük olduğu için dokunma alanları biraz geniş tutuldu.
+const TRIALS: readonly Trial[] = [
+  {
+    id: 'canta',
+    label: 'Çanta',
+    instruction: 'Çantayı bul.',
+    image: canta,
+    audio: cantaSes,
+    hitArea: [[30, 43.8], [31.4, 36.6], [36.9, 35.7], [38.2, 54.5], [32.2, 56.2], [30.3, 52.6]],
+  },
+  {
+    id: 'kitap',
+    label: 'Kitap',
+    instruction: 'Kitabı bul.',
+    image: kitap,
+    audio: kitapSes,
+    hitArea: [[60.6, 76.2], [54.6, 65.7], [61.4, 61], [64.8, 64], [67.1, 68.5], [67.2, 72]],
+  },
+  {
+    id: 'defter',
+    label: 'Defter',
+    instruction: 'Defteri bul.',
+    image: defter,
+    audio: defterSes,
+    hitArea: [[32.7, 81.4], [35.8, 78.6], [40.1, 80.8], [44.4, 86], [44.1, 90], [37.7, 96.2], [28.2, 87]],
+  },
+  {
+    id: 'kalem',
+    label: 'Kalem',
+    instruction: 'Kalemi bul.',
+    image: kalem,
+    audio: kalemSes,
+    hitArea: [[7.1, 90.4], [23.4, 78.2], [25.7, 79.7], [26, 85], [9.2, 97], [7.1, 95.2]],
+  },
+  {
+    id: 'silgi',
+    label: 'Silgi',
+    instruction: 'Silgiyi bul.',
+    image: silgi,
+    audio: silgiSes,
+    hitArea: [[15.6, 70.8], [17.4, 66.6], [23.5, 66.8], [24.3, 69], [23.7, 73.5], [17, 75.3], [15.3, 73.3]],
+  },
 ];
 
-export default function AliciGame7({ studentId, onClose }: { studentId: string, onClose: () => void }) {
-  const [student, setStudent] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeGameId, setActiveGameId] = useState<string | null>(null);
+const lockLandscape = async () => {
+  try {
+    if ((window as any).AndroidOrientation) {
+      (window as any).AndroidOrientation.lockOrientation('landscape');
+    } else {
+      await ScreenOrientation.lock({ orientation: 'landscape' });
+    }
+  } catch (error) {
+    console.info('Yatay ekran kilidi kullanılamadı:', error);
+  }
+};
+
+const unlockOrientation = async () => {
+  try {
+    if ((window as any).AndroidOrientation) {
+      (window as any).AndroidOrientation.lockOrientation('unlock');
+    } else {
+      await ScreenOrientation.unlock();
+    }
+  } catch (error) {
+    console.info('Ekran yönü serbest bırakılamadı:', error);
+  }
+};
+
+const isInsidePolygon = (x: number, y: number, polygon: readonly Point[]) => {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    const crosses = yi > y !== yj > y
+      && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+    if (crosses) inside = !inside;
+  }
+  return inside;
+};
+
+export default function AliciGame7({ onClose, onComplete }: AliciGame7Props) {
+  const [phase, setPhase] = useState<Phase>('intro');
+  const [trialIndex, setTrialIndex] = useState(0);
+  const [tapPoint, setTapPoint] = useState<{ x: number; y: number } | null>(null);
+
+  const sceneRef = useRef<HTMLImageElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioFallbackRef = useRef<number | null>(null);
+  const targetDisplayTimeoutRef = useRef<number | null>(null);
+  const correctCountRef = useRef(0);
+  const trialLockedRef = useRef(false);
+  const completedRef = useRef(false);
+
+  const currentTrial = TRIALS[trialIndex];
+
+  const stopAudio = useCallback(() => {
+    if (audioFallbackRef.current !== null) {
+      window.clearTimeout(audioFallbackRef.current);
+      audioFallbackRef.current = null;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
+  }, []);
+
+  const playOnce = useCallback((source: string, onFinished: () => void, fallbackMs: number) => {
+    stopAudio();
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      if (audioFallbackRef.current !== null) {
+        window.clearTimeout(audioFallbackRef.current);
+        audioFallbackRef.current = null;
+      }
+      onFinished();
+    };
+
+    const audio = new Audio(source);
+    audio.loop = false;
+    audio.preload = 'auto';
+    audioRef.current = audio;
+    audio.addEventListener('ended', finish, { once: true });
+    audio.addEventListener('error', finish, { once: true });
+    audioFallbackRef.current = window.setTimeout(finish, fallbackMs);
+    audio.play().catch(() => {
+      // Otomatik ses engellenirse görsel akış yedek süreyle devam eder.
+    });
+  }, [stopAudio]);
+
+  const finishAssessment = useCallback(async () => {
+    if (completedRef.current) return;
+    completedRef.current = true;
+    await onComplete?.(correctCountRef.current >= 4);
+    await unlockOrientation();
+    onClose();
+  }, [onClose, onComplete]);
+
+  const moveToNextTrial = useCallback(() => {
+    setTapPoint(null);
+    trialLockedRef.current = false;
+    if (trialIndex >= TRIALS.length - 1) {
+      setPhase('outro');
+      return;
+    }
+    setTrialIndex((previous) => previous + 1);
+    setPhase('target');
+  }, [trialIndex]);
+
+  const resolveTrial = useCallback((correct: boolean) => {
+    if (trialLockedRef.current) return;
+    trialLockedRef.current = true;
+
+    if (correct) correctCountRef.current += 1;
+    playOnce(onaySes, moveToNextTrial, 1400);
+  }, [moveToNextTrial, playOnce]);
 
   useEffect(() => {
-    const instId = localStorage.getItem("kazanim-takip-institution-id");
-    if (!studentId || !instId) return onClose();
+    lockLandscape();
+    return () => {
+      stopAudio();
+      if (targetDisplayTimeoutRef.current !== null) window.clearTimeout(targetDisplayTimeoutRef.current);
+      unlockOrientation();
+    };
+  }, [stopAudio]);
 
-    const fetchStudent = async () => {
-      try {
-        const studentRef = doc(db, "institutions", instId, "students", studentId);
-        const docSnap = await getDoc(studentRef);
-        if (docSnap.exists()) setStudent({ id: docSnap.id, ...docSnap.data() });
-      } catch (error) {
-        toast.error("Öğrenci yüklenirken hata oluştu.");
-      } finally {
-        setIsLoading(false);
+  useEffect(() => {
+    if (phase === 'intro') {
+      playOnce(cocuk1Ses, () => setPhase('target'), 7000);
+    } else if (phase === 'target') {
+      // Kısa ses dosyası bitse bile hedef görsel çocuğun inceleyebilmesi için
+      // toplam 2,3 saniye ekranda kalır; ardından yalnız karmaşık resim görünür.
+      playOnce(currentTrial.audio, () => undefined, 2500);
+      targetDisplayTimeoutRef.current = window.setTimeout(() => setPhase('search'), 2300);
+    } else if (phase === 'outro') {
+      playOnce(cocuk2Ses, finishAssessment, 7000);
+    }
+    return () => {
+      stopAudio();
+      if (targetDisplayTimeoutRef.current !== null) {
+        window.clearTimeout(targetDisplayTimeoutRef.current);
+        targetDisplayTimeoutRef.current = null;
       }
     };
-    fetchStudent();
-  }, [studentId]);
+  }, [currentTrial.audio, finishAssessment, phase, playOnce, stopAudio]);
 
-  if (isLoading) return <div className="fixed inset-0 z-[100] bg-slate-950 flex justify-center items-center"><Loader2 className="animate-spin text-blue-500" size={48} /></div>;
+  const handleScenePointer = (event: React.PointerEvent<HTMLImageElement>) => {
+    if (phase !== 'search' || trialLockedRef.current) return;
+    const image = sceneRef.current;
+    if (!image || !image.naturalWidth || !image.naturalHeight) return;
 
-  if (activeGameId === 'canta') {
-      return <HiddenObjectEngine onClose={() => setActiveGameId(null)} />;
-  }
+    const rect = image.getBoundingClientRect();
+    const naturalRatio = image.naturalWidth / image.naturalHeight;
+    const boxRatio = rect.width / rect.height;
+    const renderedWidth = boxRatio > naturalRatio ? rect.height * naturalRatio : rect.width;
+    const renderedHeight = boxRatio > naturalRatio ? rect.height : rect.width / naturalRatio;
+    const offsetX = (rect.width - renderedWidth) / 2;
+    const offsetY = (rect.height - renderedHeight) / 2;
+    const localX = event.clientX - rect.left - offsetX;
+    const localY = event.clientY - rect.top - offsetY;
+
+    if (localX < 0 || localY < 0 || localX > renderedWidth || localY > renderedHeight) return;
+    const xPercent = (localX / renderedWidth) * 100;
+    const yPercent = (localY / renderedHeight) * 100;
+    setTapPoint({ x: event.clientX, y: event.clientY });
+    resolveTrial(isInsidePolygon(xPercent, yPercent, currentTrial.hitArea));
+  };
+
+  const handleClose = async () => {
+    stopAudio();
+    await unlockOrientation();
+    onClose();
+  };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-950 text-white font-sans flex flex-col overflow-y-auto">
-      <div className="shrink-0 p-4 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-10">
-        <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full text-slate-400"><ArrowLeft size={24} /></button>
-        <div className="text-center">
-            <h1 className="text-lg font-bold">Macera Seçimi</h1>
+    <div className="fixed inset-0 z-[110] overflow-hidden bg-black text-white select-none">
+      <button
+        type="button"
+        data-android-back
+        onClick={handleClose}
+        className="absolute left-3 top-3 z-50 flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-slate-950/75 shadow-xl backdrop-blur-md active:scale-95"
+        aria-label="Değerlendirmeden çık"
+      >
+        <ArrowLeft size={24} />
+      </button>
+
+      {(phase === 'intro' || phase === 'outro') && (
+        <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-black">
+          <video
+            key={phase}
+            src={phase === 'intro' ? cocuk1Video : cocuk2Video}
+            autoPlay
+            muted
+            playsInline
+            preload="auto"
+            className="h-full w-full object-contain"
+            aria-label={phase === 'intro' ? 'Yardım isteyen çocuk' : 'Teşekkür eden çocuk'}
+          />
+          <div className="absolute bottom-3 left-1/2 z-20 max-w-[74vw] -translate-x-1/2 rounded-2xl border border-white/20 bg-slate-950/80 px-5 py-2 text-center text-sm font-semibold shadow-2xl backdrop-blur sm:text-base">
+            {phase === 'intro'
+              ? 'Okula geç kalıyorum. Eşyalarım yok. Dedektif, bana yardım et.'
+              : 'Teşekkür ederim dedektif.'}
+          </div>
         </div>
-        <div className="w-10"></div>
-      </div>
+      )}
 
-      <div className="flex-1 flex flex-col items-center p-6 w-full max-w-md mx-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6 mb-8 w-full flex flex-col items-center text-center shadow-xl">
-              {student?.photoUrl ? (
-                  <img src={student.photoUrl} alt="Profil" className="w-24 h-24 rounded-full border-4 border-slate-700 object-cover mb-4" />
-              ) : (
-                  <div className="w-24 h-24 rounded-full bg-slate-800 flex items-center justify-center border-4 border-slate-700 mb-4"><User size={40} className="text-slate-500" /></div>
-              )}
-              <h2 className="text-2xl font-black">{student?.name?.split(' ')[0]}</h2>
-              <p className="text-slate-400 text-sm mt-1">Süper Dedektif</p>
+      {(phase === 'target' || phase === 'search') && (
+        <div className="relative flex h-full w-full items-center justify-center bg-black">
+          <img
+            ref={sceneRef}
+            src={cantaArkaPlan}
+            alt="Okul eşyalarının saklandığı karmaşık resim"
+            draggable={false}
+            onPointerUp={handleScenePointer}
+            className="h-full w-full touch-manipulation object-contain"
+          />
+
+          <div className="pointer-events-none absolute right-3 top-3 z-30 flex items-center gap-2 rounded-full border border-white/25 bg-slate-950/75 px-4 py-2 text-xs font-bold shadow-lg backdrop-blur-md sm:text-sm">
+            <Search size={17} className="text-cyan-300" />
+            {trialIndex + 1} / {TRIALS.length} · {currentTrial.instruction}
           </div>
 
-          <div className="grid grid-cols-2 gap-4 w-full">
-              {GAMES.map((game) => (
-                  <div 
-                      key={game.id} 
-                      className={twMerge(
-                          "relative overflow-hidden rounded-[2rem] aspect-square flex flex-col items-center justify-center text-center p-4 transition-all duration-300",
-                          game.disabled ? "bg-slate-900/50 border-2 border-slate-800/50 opacity-50 grayscale" : "bg-slate-900 border-2 border-slate-700 hover:border-slate-500 hover:-translate-y-1 active:scale-95 cursor-pointer shadow-xl"
-                      )}
-                      onClick={() => !game.disabled && setActiveGameId(game.id)}
-                  >
-                      <div className={twMerge("absolute inset-0 bg-gradient-to-br opacity-20", game.color)}></div>
-                      <div className={twMerge("w-14 h-14 rounded-2xl flex items-center justify-center mb-3 relative z-10", game.disabled ? "bg-slate-800 text-slate-500" : game.btnColor)}>
-                          <game.icon size={28} className={game.disabled ? "opacity-50" : "text-white"} />
-                      </div>
-                      <h4 className="text-sm font-bold text-white relative z-10">{game.title}</h4>
-                  </div>
-              ))}
-          </div>
-      </div>
+          {phase === 'target' && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/70 backdrop-blur-[3px]">
+              <div className="flex min-w-[210px] flex-col items-center rounded-[2rem] border border-white/50 bg-white/95 px-8 py-5 shadow-2xl sm:min-w-[270px] sm:px-12 sm:py-7">
+                <img
+                  src={currentTrial.image}
+                  alt={currentTrial.label}
+                  draggable={false}
+                  className="h-[35vh] max-h-52 w-[38vw] max-w-64 object-contain drop-shadow-xl"
+                />
+                <p className="mt-2 text-xl font-black text-slate-900 sm:text-2xl">{currentTrial.instruction}</p>
+              </div>
+            </div>
+          )}
+
+          {tapPoint && (
+            <span
+              className="pointer-events-none fixed z-40 h-12 w-12 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full border-4 border-cyan-300 bg-cyan-300/20"
+              style={{ left: tapPoint.x, top: tapPoint.y }}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
-
-
-// --- GİZLİ NESNE BULMA MOTORU (SADECE TEST MANTIĞI) ---
-function HiddenObjectEngine({ onClose }: { onClose: () => void }) {
-    const [scale, setScale] = useState(1.5); 
-    const [showDragHint, setShowDragHint] = useState(true); 
-
-    const [radarState, setRadarState] = useState({ 
-        title: "RADAR TEST MODU", 
-        message: "Sistem Hazır. Dokun!", 
-        theme: "bg-purple-600/90 border-purple-400 text-purple-200" 
-    });
-
-    const containerRef = useRef<HTMLDivElement>(null);
-    const overlayImgRef = useRef<HTMLImageElement>(null);
-    
-    const pointerDownPos = useRef({ x: 0, y: 0 });
-
-    // 🔥 GÜNCELLENMİŞ VE DARALTILMIŞ RADAR HARİTASI 🔥
-    const identifyObject = (xPercent: number, yPercent: number) => {
-        // 1. Çanta: Ekranın üst kısmı 
-        if (yPercent < 55) return "Çanta 🎒";
-        
-        // 2. Kitap: Sağ taraf 
-        if (xPercent > 55) return "Kitap 📚";
-        
-        // 3. Sol Taraf (Kalem ve Silgi)
-        // DİKEY ÇİZGİYİ 35'TEN 26'YA ÇEKTİK: Defterin solunu artık rahat bıraktık!
-        if (xPercent < 26) {
-            // YATAY ÇİZGİYİ 85'TEN 75'E ÇEKTİK: Kalemin havaya kalkan sağ ucunu kurtardık!
-            if (yPercent > 75) return "Kalem ✏️";
-            else return "Silgi 🧽";
-        }
-        
-        // 4. Geriye kalan orta alan (26 ile 55 arası): Tamamen Defter!
-        return "Defter 📖";
-    };
-
-    const handlePointerDown = (e: React.PointerEvent) => {
-        pointerDownPos.current = { x: e.clientX, y: e.clientY };
-    };
-
-    const handlePointerUp = (e: React.PointerEvent) => {
-        const dist = Math.hypot(e.clientX - pointerDownPos.current.x, e.clientY - pointerDownPos.current.y);
-        if (dist > 15) return;
-
-        setShowDragHint(false);
-        const img = overlayImgRef.current;
-        if (!img) return;
-
-        const rect = img.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const clickY = e.clientY - rect.top;
-
-        const xPercent = (clickX / rect.width) * 100;
-        const yPercent = (clickY / rect.height) * 100;
-
-        const naturalClickX = (clickX / rect.width) * img.naturalWidth;
-        const naturalClickY = (clickY / rect.height) * img.naturalHeight;
-
-        try {
-            const canvas = document.createElement('canvas');
-            canvas.width = 1;
-            canvas.height = 1;
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            if (!ctx) return;
-
-            ctx.drawImage(img, -naturalClickX, -naturalClickY);
-            const pixelData = ctx.getImageData(0, 0, 1, 1).data;
-            const alpha = pixelData[3]; 
-
-            if (alpha > 10) {
-                const touchedObjectName = identifyObject(xPercent, yPercent);
-                setRadarState({
-                    title: "HEDEF VURULDU!",
-                    message: touchedObjectName,
-                    theme: "bg-green-600/90 border-green-400 text-green-100"
-                });
-            } else {
-                setRadarState({
-                    title: "BİLGİ",
-                    message: "Burada bir şey yok (Boşluk)",
-                    theme: "bg-blue-600/90 border-blue-400 text-blue-200"
-                });
-            }
-        } catch (error: any) {
-            setRadarState({
-                title: "SİSTEM HATASI",
-                message: "Güvenlik resmi okutmadı!",
-                theme: "bg-red-600/90 border-red-400 text-red-200"
-            });
-        }
-    };
-
-    return (
-        <div ref={containerRef} className="fixed inset-0 z-[110] bg-black overflow-hidden flex items-center justify-center touch-none">
-            
-            {/* TEPEDEKİ CANLI RADAR KUTUMUZ */}
-            <div className="absolute top-4 left-4 right-4 z-[9999] flex items-center justify-between pointer-events-none">
-                <button onClick={onClose} className="pointer-events-auto w-12 h-12 bg-black/80 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20 active:scale-95 transition-transform">
-                    <ArrowLeft size={24} />
-                </button>
-                
-                <div className={twMerge("backdrop-blur-md border-2 rounded-2xl px-6 py-2 flex flex-col items-center shadow-xl pointer-events-auto transition-colors duration-300", radarState.theme)}>
-                    <span className="text-[10px] font-bold uppercase tracking-widest animate-pulse opacity-80">{radarState.title}</span>
-                    <span className="text-sm font-bold text-white">{radarState.message}</span>
-                </div>
-                
-                <div className="w-12"></div>
-            </div>
-
-            {/* ZOOM KONTROLLERİ */}
-            <div className="absolute right-4 bottom-8 z-[9999] flex flex-col gap-3 pointer-events-auto">
-                <button 
-                    onClick={() => setScale(prev => Math.min(prev + 0.5, 3))} 
-                    className="w-14 h-14 bg-slate-800/80 backdrop-blur-md border border-slate-600 rounded-2xl flex items-center justify-center text-white active:scale-90 transition-all shadow-xl"
-                >
-                    <ZoomIn size={28} />
-                </button>
-                <button 
-                    onClick={() => setScale(prev => Math.max(prev - 0.5, 1))} 
-                    className="w-14 h-14 bg-slate-800/80 backdrop-blur-md border border-slate-600 rounded-2xl flex items-center justify-center text-white active:scale-90 transition-all shadow-xl"
-                >
-                    <ZoomOut size={28} />
-                </button>
-            </div>
-
-            {/* SÜRÜKLENEBİLİR VE BÜYÜTÜLEBİLİR ALAN */}
-            <motion.div 
-                drag
-                dragConstraints={containerRef} 
-                dragElastic={0} 
-                dragMomentum={true}
-                onDragStart={() => setShowDragHint(false)}
-                onPointerDown={handlePointerDown}
-                onPointerUp={handlePointerUp}
-                animate={{ scale: scale }} 
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                className="w-max h-max shrink-0 cursor-grab active:cursor-grabbing relative"
-            >
-                <img 
-                    src={canta1} 
-                    alt="Arka Plan" 
-                    draggable="false" 
-                    className="h-[120vh] sm:h-[150vh] w-auto max-w-none pointer-events-none" 
-                />
-                
-                <img 
-                    ref={overlayImgRef}
-                    src={canta1x} 
-                    alt="Hedef Katman" 
-                    draggable="false" 
-                    className="absolute inset-0 h-[120vh] sm:h-[150vh] w-auto max-w-none pointer-events-none"
-                />
-            </motion.div>
-
-            <AnimatePresence>
-                {showDragHint && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 pointer-events-none flex items-center justify-center z-40">
-                        <div className="relative w-48 h-48">
-                            <Move size={64} className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white/50 animate-pulse" />
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-        </div>
-    );
-                                                             }
-      
