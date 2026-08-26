@@ -134,7 +134,11 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
 
              {/* OYUN 2: ADB 2.4 Büyük, Karmaşık Bir Resimdeki Nesneleri Ayırt Etme (YENİ DEDEKTİF OYUNU) */}
              {(activeGameItem.includes("2.4") || activeGameItem.includes("Büyük, Karmaşık")) && (
-                 <AliciGame7 studentId={studentId} onClose={() => setActiveGameItem(null)} />
+                 <AliciGame7
+                   studentId={studentId}
+                   onClose={() => setActiveGameItem(null)}
+                   onComplete={handleGameComplete}
+                 />
              )}
 
              {/* OYUN 3: ADB 4.2 Tüm Vücut Bölümlerini Tanıma */}
