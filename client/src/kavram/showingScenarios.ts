@@ -1,4 +1,8 @@
+import limbShowingImage from '@/limbs/elkolayak.jpg';
+
 export type ShowingPosition = 'left' | 'center' | 'right';
+export type ShowingPoint = readonly [x: number, y: number];
+export type ShowingHitArea = readonly ShowingPoint[];
 
 export type ShowingScenario = {
   id: string;
@@ -6,12 +10,13 @@ export type ShowingScenario = {
   promptText: string;
   src: string;
   audioSrc: string;
-  correctPosition: ShowingPosition;
-  zoneCount: 2 | 3;
+  correctPosition?: ShowingPosition;
+  zoneCount?: 2 | 3;
+  hitAreas?: readonly ShowingHitArea[];
   aspectRatio: number;
 };
 
-type ShowingVariant = Pick<ShowingScenario, 'src' | 'correctPosition' | 'zoneCount' | 'aspectRatio'>;
+type ShowingVariant = Pick<ShowingScenario, 'src' | 'correctPosition' | 'zoneCount' | 'hitAreas' | 'aspectRatio'>;
 
 type ShowingTarget = {
   targetName: string;
@@ -57,6 +62,16 @@ const variant = (
   aspectRatio,
 });
 
+const coordinateVariant = (
+  src: string,
+  hitAreas: readonly ShowingHitArea[],
+  aspectRatio = 16 / 9,
+): ShowingVariant => ({
+  src,
+  hitAreas,
+  aspectRatio,
+});
+
 const target = (
   targetName: string,
   promptText: string,
@@ -65,7 +80,7 @@ const target = (
 ): ShowingTarget => ({
   targetName,
   promptText,
-  audioSrc: audio(audioFile),
+  audioSrc: audioFile ? audio(audioFile) : '',
   variants,
 });
 
@@ -103,6 +118,32 @@ const emotion1 = 'sasirmismutluuzgun.mp4';
 const emotion2 = 'sinirlikorkmus.mp4';
 
 export const SHOWING_TARGETS: Record<string, ShowingTarget[]> = {
+  limbs: [
+    target('El', 'Elini göster.', '', [
+      coordinateVariant(limbShowingImage, [
+        // Yukarıdaki açık el: parmaklar, avuç ve bileğe kadar olan bölüm.
+        [[58.4, 39.8], [58.3, 31.4], [59.1, 27.0], [59.8, 28.6], [59.7, 22.5], [60.5, 21.6], [61.3, 28.0], [61.7, 21.8], [62.5, 21.9], [62.8, 28.2], [63.5, 22.8], [64.2, 23.7], [64.1, 29.7], [65.1, 26.8], [65.8, 28.5], [65.0, 34.1], [63.5, 39.2], [61.2, 41.2]],
+        // Kucağındaki el; kol alanından ayrı tutulur.
+        [[46.1, 77.2], [47.5, 76.8], [49.0, 78.5], [50.7, 82.0], [51.1, 85.0], [50.1, 87.9], [48.2, 87.0], [46.8, 84.2]],
+      ]),
+    ]),
+    target('Kol', 'Kolunu göster.', '', [
+      coordinateVariant(limbShowingImage, [
+        // Aşağı uzanan kol; çokgen bilekte biter, el bu alana dahil değildir.
+        [[38.6, 48.0], [42.5, 48.8], [42.9, 57.5], [44.2, 66.0], [46.0, 72.5], [48.1, 77.5], [46.7, 80.8], [44.5, 76.5], [42.0, 69.0], [40.0, 60.0], [38.8, 53.0]],
+        // Yukarı kalkmış kol; açık elin başladığı bilek çizgisinde biter.
+        [[56.8, 47.0], [58.8, 42.5], [59.8, 38.8], [62.0, 39.5], [62.7, 47.0], [62.6, 53.5], [61.6, 59.5], [60.4, 62.4], [58.8, 61.7], [57.5, 56.0]],
+      ]),
+    ]),
+    target('Ayak', 'Ayağını göster.', '', [
+      coordinateVariant(limbShowingImage, [
+        // Görselin alt-solundaki yatay ayak.
+        [[34.1, 88.5], [35.5, 86.1], [39.3, 86.2], [43.4, 85.0], [48.0, 84.7], [49.7, 87.2], [48.2, 91.2], [44.0, 94.5], [39.0, 96.8], [35.1, 97.0], [34.0, 94.2]],
+        // Görselin alt-sağındaki ayak.
+        [[55.5, 88.0], [57.4, 86.7], [59.8, 86.9], [61.4, 89.1], [62.0, 92.5], [61.3, 95.2], [59.5, 95.6], [57.6, 93.5], [55.7, 91.8]],
+      ]),
+    ]),
+  ],
   vehicles: [
     target('Araba', 'Arabayı göster.', 'arabayigoster.mp3', [
       variant('tasitgoster', vehicle1, 'left'),
