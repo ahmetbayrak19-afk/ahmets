@@ -987,7 +987,50 @@ export default function KavramAssessmentPage() {
     const currentScenario = shuffledScenarios[discrimIndex];
     if (!currentScenario || !activeShowingCategoryId) return;
     const isCorrect = selectedSide === currentScenario.correctPosition;
-    
+
+    completeDiscriminationChoice(isCorrect);
+  };
+
+  const isPointInsidePolygon = (
+    point: readonly [number, number],
+    polygon: readonly (readonly [number, number])[],
+  ) => {
+    const [x, y] = point;
+    let inside = false;
+
+    for (let current = 0, previous = polygon.length - 1; current < polygon.length; previous = current++) {
+      const [currentX, currentY] = polygon[current];
+      const [previousX, previousY] = polygon[previous];
+      const crossesHorizontalRay = (currentY > y) !== (previousY > y);
+      const intersectionX = ((previousX - currentX) * (y - currentY)) / (previousY - currentY) + currentX;
+
+      if (crossesHorizontalRay && x < intersectionX) inside = !inside;
+    }
+
+    return inside;
+  };
+
+  const handleCoordinateChoice = (event: React.MouseEvent<HTMLButtonElement>) => {
+    handleTouchEffect(event);
+    const currentScenario = shuffledScenarios[discrimIndex];
+    if (!currentScenario?.hitAreas?.length || !activeShowingCategoryId) return;
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const point: readonly [number, number] = [
+      ((event.clientX - bounds.left) / bounds.width) * 100,
+      ((event.clientY - bounds.top) / bounds.height) * 100,
+    ];
+    const isCorrect = currentScenario.hitAreas.some((polygon) =>
+      isPointInsidePolygon(point, polygon),
+    );
+
+    completeDiscriminationChoice(isCorrect);
+  };
+
+  const completeDiscriminationChoice = (isCorrect: boolean) => {
+    const currentScenario = shuffledScenarios[discrimIndex];
+    if (!currentScenario || !activeShowingCategoryId) return;
+
     setFormData(prev => ({
       ...prev,
       [getShowingResultKey(activeShowingCategoryId, currentScenario.targetName)]: isCorrect,
@@ -1179,6 +1222,7 @@ export default function KavramAssessmentPage() {
     if (!isDiscriminationMode || shuffledScenarios.length === 0) return null;
     const scenario = shuffledScenarios[discrimIndex];
     const isVideo = scenario.src.endsWith('.mp4');
+    const usesCoordinateHitAreas = Boolean(scenario.hitAreas?.length);
     const zonePositions: ShowingPosition[] = scenario.zoneCount === 2
       ? ['left', 'right']
       : ['left', 'center', 'right'];
@@ -1203,14 +1247,16 @@ export default function KavramAssessmentPage() {
         </div>
 
         <div 
-          className="absolute top-8 left-8 z-[110] animate-in slide-in-from-top duration-500 cursor-pointer active:scale-95 transition-transform" 
+          className={`absolute top-8 left-8 z-[110] animate-in slide-in-from-top duration-500 transition-transform ${scenario.audioSrc ? 'cursor-pointer active:scale-95' : ''}`}
           key={scenario.id + 'text'}
-          onClick={replayInstruction}
+          onClick={scenario.audioSrc ? replayInstruction : undefined}
         >
           <div className="bg-blue-600/80 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20 shadow-xl flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-full animate-pulse">
-              <Volume2 size={24} />
-            </div>
+            {scenario.audioSrc && (
+              <div className="bg-white/20 p-2 rounded-full animate-pulse">
+                <Volume2 size={24} />
+              </div>
+            )}
             <span className="text-xl font-bold text-white tracking-wide">
               {scenario.promptText}
             </span>
@@ -1239,19 +1285,28 @@ export default function KavramAssessmentPage() {
             />
           )}
 
-          <div
-            className={`absolute inset-0 z-50 grid h-full w-full ${scenario.zoneCount === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}
-          >
-            {zonePositions.map((position) => (
-              <button
-                key={position}
-                type="button"
-                aria-label={`${position} alanı`}
-                onClick={(event) => handleDiscriminationChoice(position, event)}
-                className="h-full cursor-pointer border-r border-white/5 bg-transparent transition-colors last:border-r-0 active:bg-white/5"
-              />
-            ))}
-          </div>
+          {usesCoordinateHitAreas ? (
+            <button
+              type="button"
+              aria-label={`${scenario.targetName} için görsel üzerinde seçim yap`}
+              onClick={handleCoordinateChoice}
+              className="absolute inset-0 z-50 h-full w-full cursor-pointer bg-transparent active:bg-white/[0.02]"
+            />
+          ) : (
+            <div
+              className={`absolute inset-0 z-50 grid h-full w-full ${scenario.zoneCount === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}
+            >
+              {zonePositions.map((position) => (
+                <button
+                  key={position}
+                  type="button"
+                  aria-label={`${position} alanı`}
+                  onClick={(event) => handleDiscriminationChoice(position, event)}
+                  className="h-full cursor-pointer border-r border-white/5 bg-transparent transition-colors last:border-r-0 active:bg-white/5"
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
