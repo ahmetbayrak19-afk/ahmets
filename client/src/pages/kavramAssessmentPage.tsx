@@ -188,17 +188,28 @@ import sinirliMp3 from '@/emotions/sinirli.mp3';
 import uzgunMp3 from '@/emotions/uzgun.mp3';
 
 // --- VÜCUDUMUZ ---
-import agizVid from '@/limbs/agiz.mp4';
-import ayakVid from '@/limbs/ayak.mp4';
-import burunVid from '@/limbs/burun.mp4';
-import dilVid from '@/limbs/dil.mp4';
-import disVid from '@/limbs/dis.mp4';
-import elVid from '@/limbs/el.mp4';
-import gozVid from '@/limbs/goz.mp4';
-import kolVid from '@/limbs/kol.mp4';
-import kulakVid from '@/limbs/kulak.mp4';
-import parmakVid from '@/limbs/parmak.mp4';
-import sacVid from '@/limbs/sac.mp4';
+import ayakVid from '@/limbs/uzuvgosterme/ayakgoster.mp4';
+import burunVid from '@/limbs/uzuvgosterme/burungoster.mp4';
+import dilVid from '@/limbs/uzuvgosterme/dilgoster.mp4';
+import disVid from '@/limbs/uzuvgosterme/disgoster.mp4';
+import dudakVid from '@/limbs/uzuvgosterme/dudakgoster.mp4';
+import elVid from '@/limbs/uzuvgosterme/elgoster.mp4';
+import gozVid from '@/limbs/uzuvgosterme/gozgoster.mp4';
+import kolVid from '@/limbs/uzuvgosterme/kolgoster.mp4';
+import kulakVid from '@/limbs/uzuvgosterme/kulakgoster.mp4';
+import parmakVid from '@/limbs/uzuvgosterme/parmakgoster.mp4';
+import sacVid from '@/limbs/uzuvgosterme/sacgoster.mp4';
+import ayakMp3 from '@/limbs/uzuvgosterme/ayakgoster.mp3';
+import burunMp3 from '@/limbs/uzuvgosterme/burungoster.mp3';
+import dilMp3 from '@/limbs/uzuvgosterme/dilgoster.mp3';
+import disMp3 from '@/limbs/uzuvgosterme/disgoster.mp3';
+import dudakMp3 from '@/limbs/uzuvgosterme/dudakgoster.mp3';
+import elMp3 from '@/limbs/uzuvgosterme/elgoster.mp3';
+import gozMp3 from '@/limbs/uzuvgosterme/gozgoster.mp3';
+import kolMp3 from '@/limbs/uzuvgosterme/kolgoster.mp3';
+import kulakMp3 from '@/limbs/uzuvgosterme/kulakgoster.mp3';
+import parmakMp3 from '@/limbs/uzuvgosterme/parmakgoster.mp3';
+import sacMp3 from '@/limbs/uzuvgosterme/sacgoster.mp3';
 
 // --- DİĞER GÖRSELLER ---
 import ananasImg from '@/fruits/ananas.webp';
@@ -388,17 +399,17 @@ const EMOTIONS_WITH_VIDEO = [
 ];
 
 const LIMBS_WITH_VIDEO = [ 
-  { name: "Ağız", src: agizVid }, 
-  { name: "Ayak", src: ayakVid }, 
-  { name: "Burun", src: burunVid }, 
-  { name: "Dil", src: dilVid }, 
-  { name: "Diş", src: disVid }, 
-  { name: "El", src: elVid }, 
-  { name: "Göz", src: gozVid }, 
-  { name: "Kol", src: kolVid }, 
-  { name: "Kulak", src: kulakVid }, 
-  { name: "Parmak", src: parmakVid }, 
-  { name: "Saç", src: sacVid } 
+  { name: "Ayak", src: ayakVid, audio: ayakMp3 },
+  { name: "Burun", src: burunVid, audio: burunMp3 },
+  { name: "Dil", src: dilVid, audio: dilMp3 },
+  { name: "Diş", src: disVid, audio: disMp3 },
+  { name: "Dudak", src: dudakVid, audio: dudakMp3 },
+  { name: "El", src: elVid, audio: elMp3 },
+  { name: "Göz", src: gozVid, audio: gozMp3 },
+  { name: "Kol", src: kolVid, audio: kolMp3 },
+  { name: "Kulak", src: kulakVid, audio: kulakMp3 },
+  { name: "Parmak", src: parmakVid, audio: parmakMp3 },
+  { name: "Saç", src: sacVid, audio: sacMp3 }
 ];
 
 const FRUITS_WITH_IMAGE = [
@@ -782,18 +793,29 @@ export default function KavramAssessmentPage() {
   }, []);
 
   useEffect(() => {
-    if (activeEvaluation) {
-      if (flashcardAudioRef.current) {
-        flashcardAudioRef.current.pause();
-        flashcardAudioRef.current.currentTime = 0;
-      }
-      const item = activeEvaluation.data[evalIndex];
-      if (item.audio) {
-        const audio = new Audio(item.audio); 
-        flashcardAudioRef.current = audio;
-        audio.play().catch(e => console.log("Flashcard ses hatası:", e));
-      }
+    if (flashcardAudioRef.current) {
+      flashcardAudioRef.current.pause();
+      flashcardAudioRef.current.currentTime = 0;
+      flashcardAudioRef.current = null;
     }
+
+    if (!activeEvaluation) return;
+
+    const item = activeEvaluation.data[evalIndex];
+    if (!item?.audio) return;
+
+    const audio = new Audio(item.audio);
+    audio.loop = false;
+    flashcardAudioRef.current = audio;
+    audio.play().catch(e => console.log("Flashcard ses hatası:", e));
+
+    return () => {
+      audio.pause();
+      audio.currentTime = 0;
+      if (flashcardAudioRef.current === audio) {
+        flashcardAudioRef.current = null;
+      }
+    };
   }, [evalIndex, activeEvaluation]);
 
   useEffect(() => {
