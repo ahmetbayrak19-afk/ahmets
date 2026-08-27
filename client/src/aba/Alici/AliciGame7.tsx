@@ -3,22 +3,27 @@ import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { ArrowLeft, Search } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-import cantaArkaPlan from './dedektif/canta1.png';
-import cocuk1Video from './dedektif/cocuk1.webm';
-import cocuk2Video from './dedektif/cocuk2.webm';
-import cocuk1Ses from './dedektif/cocuk1ses.mp3';
-import cocuk2Ses from './dedektif/cocuk2ses.mp3';
+import mutfakArkaPlan from './dedektif/mutfak.png';
+import kadin1Video from './dedektif/kadin1.webm';
+import kadin2Video from './dedektif/kadin2.webm';
+import kadin1Ses from './dedektif/kadin1ses.mp3';
+import kadin2Ses from './dedektif/kadin2ses.mp3';
 
-import canta from './dedektif/canta.webp';
-import kitap from './dedektif/kitap.webp';
-import defter from './dedektif/defter.webp';
-import kalem from './dedektif/kalem.webp';
-import silgi from './dedektif/silgi.webp';
-import cantaSes from './dedektif/cantayibul.mp3';
-import kitapSes from './dedektif/kitabibul.mp3';
-import defterSes from './dedektif/defteribul.mp3';
-import kalemSes from './dedektif/kalemibul.mp3';
-import silgiSes from './dedektif/silgibul.mp3';
+import un from './dedektif/un.webp';
+import seker from './dedektif/seker.webp';
+import tereyag from './dedektif/tereyag.webp';
+import yumurta from './dedektif/yumurta.webp';
+import sut from './dedektif/sut.webp';
+import unSes from './dedektif/unubul.mp3';
+import sekerSes from './dedektif/sekeribul.mp3';
+import tereyagSes from './dedektif/tereyagibul.mp3';
+import yumurtaSes from './dedektif/yumurtayibul.mp3';
+import sutSes from './dedektif/sutubul.mp3';
+import unKapama from './dedektif/un-kapama.webp';
+import sekerKapama from './dedektif/seker-kapama.webp';
+import tereyagKapama from './dedektif/tereyag-kapama.webp';
+import yumurtaKapama from './dedektif/yumurta-kapama.webp';
+import sutKapama from './dedektif/sut-kapama.webp';
 import onaySes from '@/aba/yonerge/sesgorsel/onay.mp3';
 
 type Point = readonly [number, number];
@@ -38,45 +43,54 @@ interface Trial {
   hitArea: readonly Point[];
 }
 
-// canta1.png üzerindeki nesnelerin yüzdelik çokgenleri.
-// Kalem ve silgi küçük olduğu için dokunma alanları biraz geniş tutuldu.
+// mutfak.png üzerindeki beş kayıp malzemenin yüzdelik çokgenleri.
+// Küçük nesnelerin dokunma alanları çocukların daha rahat seçebilmesi için
+// görsel sınırlarının biraz dışına taşırıldı.
 const TRIALS: readonly Trial[] = [
   {
-    id: 'canta',
-    label: 'Çanta',
-    image: canta,
-    audio: cantaSes,
-    hitArea: [[30, 43.8], [31.4, 36.6], [36.9, 35.7], [38.2, 54.5], [32.2, 56.2], [30.3, 52.6]],
+    id: 'un',
+    label: 'Un',
+    image: un,
+    audio: unSes,
+    hitArea: [[91.7, 7.2], [98.5, 6.5], [99.2, 23.8], [92, 24.1]],
   },
   {
-    id: 'kitap',
-    label: 'Kitap',
-    image: kitap,
-    audio: kitapSes,
-    hitArea: [[60.6, 76.2], [54.6, 65.7], [61.4, 61], [64.8, 64], [67.1, 68.5], [67.2, 72]],
+    id: 'seker',
+    label: 'Şeker',
+    image: seker,
+    audio: sekerSes,
+    hitArea: [[6.1, 61.3], [7.2, 58.2], [12.8, 57.7], [15.3, 62.8], [15.1, 79.7], [7, 81]],
   },
   {
-    id: 'defter',
-    label: 'Defter',
-    image: defter,
-    audio: defterSes,
-    hitArea: [[32.7, 81.4], [35.8, 78.6], [40.1, 80.8], [44.4, 86], [44.1, 90], [37.7, 96.2], [28.2, 87]],
+    id: 'tereyag',
+    label: 'Tereyağı',
+    image: tereyag,
+    audio: tereyagSes,
+    hitArea: [[88.6, 59.1], [90.2, 57.6], [94.6, 58.6], [95.5, 63.8], [93.5, 66.7], [88.7, 65.5]],
   },
   {
-    id: 'kalem',
-    label: 'Kalem',
-    image: kalem,
-    audio: kalemSes,
-    hitArea: [[7.1, 90.4], [23.4, 78.2], [25.7, 79.7], [26, 85], [9.2, 97], [7.1, 95.2]],
+    id: 'yumurta',
+    label: 'Yumurta',
+    image: yumurta,
+    audio: yumurtaSes,
+    hitArea: [[7.2, 42.2], [8.1, 39.9], [10.2, 40], [11.3, 43.7], [10.8, 50.2], [7.5, 50.7]],
   },
   {
-    id: 'silgi',
-    label: 'Silgi',
-    image: silgi,
-    audio: silgiSes,
-    hitArea: [[15.6, 70.8], [17.4, 66.6], [23.5, 66.8], [24.3, 69], [23.7, 73.5], [17, 75.3], [15.3, 73.3]],
+    id: 'sut',
+    label: 'Süt',
+    image: sut,
+    audio: sutSes,
+    hitArea: [[44.3, 29.3], [45.2, 27.7], [46.5, 27.8], [47.6, 31.4], [47.5, 40.2], [44.3, 40.3]],
   },
 ];
+
+const COVER_IMAGES: Readonly<Record<string, string>> = {
+  un: unKapama,
+  seker: sekerKapama,
+  tereyag: tereyagKapama,
+  yumurta: yumurtaKapama,
+  sut: sutKapama,
+};
 
 const lockLandscape = async () => {
   try {
@@ -118,6 +132,7 @@ export default function AliciGame7({ onClose, onComplete }: AliciGame7Props) {
   const [phase, setPhase] = useState<Phase>('intro');
   const [trialIndex, setTrialIndex] = useState(0);
   const [tapPoint, setTapPoint] = useState<{ x: number; y: number } | null>(null);
+  const [foundIds, setFoundIds] = useState<string[]>([]);
 
   const sceneRef = useRef<HTMLImageElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -189,9 +204,14 @@ export default function AliciGame7({ onClose, onComplete }: AliciGame7Props) {
     if (trialLockedRef.current) return;
     trialLockedRef.current = true;
 
-    if (correct) correctCountRef.current += 1;
+    if (correct) {
+      correctCountRef.current += 1;
+      setFoundIds((previous) => previous.includes(currentTrial.id)
+        ? previous
+        : [...previous, currentTrial.id]);
+    }
     playOnce(onaySes, moveToNextTrial, 1400);
-  }, [moveToNextTrial, playOnce]);
+  }, [currentTrial.id, moveToNextTrial, playOnce]);
 
   useEffect(() => {
     lockLandscape();
@@ -204,12 +224,12 @@ export default function AliciGame7({ onClose, onComplete }: AliciGame7Props) {
 
   useEffect(() => {
     if (phase === 'intro') {
-      playOnce(cocuk1Ses, () => setPhase('target'), 7000);
+      playOnce(kadin1Ses, () => setPhase('target'), 7000);
     } else if (phase === 'target') {
       // Nesne, "... bul" yönergesi boyunca görünür ve ses bitince kaybolur.
       playOnce(currentTrial.audio, () => setPhase('search'), 3000);
     } else if (phase === 'outro') {
-      playOnce(cocuk2Ses, () => setPhase('complete'), 7000);
+      playOnce(kadin2Ses, () => setPhase('complete'), 7000);
     } else if (phase === 'complete') {
       // Çıkış karakterinin aşağı kayma animasyonu tamamlandıktan sonra kapat.
       finishTimeoutRef.current = window.setTimeout(finishAssessment, 650);
@@ -254,7 +274,7 @@ export default function AliciGame7({ onClose, onComplete }: AliciGame7Props) {
   return (
     <div className="fixed inset-0 z-[110] overflow-hidden bg-slate-900 text-white select-none">
       <img
-        src={cantaArkaPlan}
+        src={mutfakArkaPlan}
         alt=""
         aria-hidden="true"
         draggable={false}
@@ -263,12 +283,23 @@ export default function AliciGame7({ onClose, onComplete }: AliciGame7Props) {
 
       <img
         ref={sceneRef}
-        src={cantaArkaPlan}
-        alt="Okul eşyalarının saklandığı karmaşık resim"
+        src={mutfakArkaPlan}
+        alt="Kek malzemelerinin saklandığı karmaşık mutfak resmi"
         draggable={false}
         onPointerUp={handleScenePointer}
         className="absolute inset-0 h-full w-full touch-manipulation object-contain"
       />
+
+      {foundIds.map((id) => (
+        <img
+          key={id}
+          src={COVER_IMAGES[id]}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          className="pointer-events-none absolute inset-0 z-[5] h-full w-full object-contain"
+        />
+      ))}
 
       <button
         type="button"
@@ -325,13 +356,13 @@ export default function AliciGame7({ onClose, onComplete }: AliciGame7Props) {
             className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex h-full items-end justify-center"
           >
             <video
-              src={phase === 'intro' ? cocuk1Video : cocuk2Video}
+              src={phase === 'intro' ? kadin1Video : kadin2Video}
               autoPlay
               muted
               playsInline
               preload="auto"
               className="h-[88vh] max-w-[72vw] object-contain object-bottom drop-shadow-[0_18px_28px_rgba(0,0,0,0.45)]"
-              aria-label={phase === 'intro' ? 'Yardım isteyen çocuk' : 'Teşekkür eden çocuk'}
+              aria-label={phase === 'intro' ? 'Kek malzemelerini bulmak için yardım isteyen kadın' : 'Teşekkür eden kadın'}
             />
           </motion.div>
         )}
