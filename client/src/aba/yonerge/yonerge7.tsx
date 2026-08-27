@@ -11,9 +11,9 @@ import arabaImg from '@/aba/esle/araba.png';
 import elmaImg from '@/aba/esle/elma.png';
 import cicekImg from '@/aba/esle/cicek.png';
 import saatImg from '@/aba/esle/saat.png';
-import silgiImg from '@/aba/Alici/dedektif/silgi.png';
-import defterImg from '@/aba/Alici/dedektif/defter.png';
-import cantaImg from '@/aba/Alici/dedektif/canta.png';
+import silgiImg from '@/aba/Alici/dedektif/silgi.webp';
+import defterImg from '@/aba/Alici/dedektif/defter.webp';
+import cantaImg from '@/aba/Alici/dedektif/canta.webp';
 import tarakImg from '@/aba/esle/grup/evesya/tarak.webp';
 import corapImg from '@/clothes/corap.webp';
 
