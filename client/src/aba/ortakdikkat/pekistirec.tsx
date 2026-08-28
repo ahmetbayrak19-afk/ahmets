@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { twMerge } from "tailwind-merge";
 import { db, storage } from "@/firebase";
 import { associateCurrentTeacherWithStudent } from "@/lib/studentTeacherAssociation";
+import LogoLoader from '@/components/LogoLoader';
 
 const imageModules = import.meta.glob(
   [
@@ -414,7 +415,7 @@ export default function Pekistirec({ studentId, studentName, onBack }: Props) {
     input.value = "";
   };
 
-  if (loading) return <div className="flex min-h-[420px] items-center justify-center"><Loader2 className="animate-spin text-cyan-400" size={36} /></div>;
+  if (loading) return <LogoLoader />;
 
   return <div className="min-h-screen bg-[#020617] px-4 py-4 pb-24 text-slate-100">
     <div className="mx-auto max-w-4xl">

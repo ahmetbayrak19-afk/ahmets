@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import LogoLoader from '@/components/LogoLoader';
 import {
   ArrowLeft,
   BookOpenCheck,
@@ -425,13 +426,7 @@ export default function OrtakDikkat4({
     setStage("home");
   };
 
-  if (loading) {
-    return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950 text-white">
-        <Loader2 className="animate-spin text-cyan-400" size={38} />
-      </div>
-    );
-  }
+  if (loading) return <LogoLoader fullScreen />;
 
   const currentTarget = orderedTargets[trialIndex];
   const progressPercent = Math.min(
