@@ -9,6 +9,7 @@ import { ABA_MODULES } from '@/shared/abaData';
 import Talk from './talk';
 import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 import AssessmentModeBadges from '@/aba/shared/AssessmentModeBadges';
+import LogoLoader from '@/components/LogoLoader';
 
 // --- OYUN IMPORT ---
 import IfadeEdiciGame15 from '@/aba/ifade/ifadeEdiciGame15';
@@ -135,7 +136,7 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
 
   const progress = calculateProgress();
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
+  if (loading) return <LogoLoader />;
 
   // 1. TOLKİDO MODU KONTROLÜ
   if (showTolkido) {

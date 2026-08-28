@@ -6,7 +6,6 @@ import { doc, getDoc } from 'firebase/firestore';
 
 import { db } from '@/firebase';
 import onaySes from '@/aba/yonerge/sesgorsel/onay.mp3';
-import dedektifKostum from './dedektif_kostum.png';
 
 import okulArkaPlan from './dedektif/canta1.png';
 import cocuk1Video from './dedektif/cocuk1.webm';
@@ -23,6 +22,11 @@ import kitapSes from './dedektif/kitabibul.mp3';
 import defterSes from './dedektif/defteribul.mp3';
 import kalemSes from './dedektif/kalemibul.mp3';
 import silgiSes from './dedektif/silgibul.mp3';
+import cantaOkulKapama from './dedektif/canta-okul-kapama.webp';
+import kitapOkulKapama from './dedektif/kitap-okul-kapama.webp';
+import defterOkulKapama from './dedektif/defter-okul-kapama.webp';
+import kalemOkulKapama from './dedektif/kalem-okul-kapama.webp';
+import silgiOkulKapama from './dedektif/silgi-okul-kapama.webp';
 
 import mutfakArkaPlan from './dedektif/mutfak.png';
 import kadin1Video from './dedektif/kadin1.webm';
@@ -69,6 +73,7 @@ interface GameConfig {
   title: string;
   description: string;
   emoji: string;
+  thumbnail?: string;
   available: boolean;
   background?: string;
   introVideo?: string;
@@ -100,15 +105,23 @@ const KITCHEN_COVERS: Readonly<Record<string, string>> = {
   un: unKapama, seker: sekerKapama, tereyag: tereyagKapama, yumurta: yumurtaKapama, sut: sutKapama,
 };
 
+const SCHOOL_COVERS: Readonly<Record<string, string>> = {
+  canta: cantaOkulKapama,
+  kitap: kitapOkulKapama,
+  defter: defterOkulKapama,
+  kalem: kalemOkulKapama,
+  silgi: silgiOkulKapama,
+};
+
 const GAMES: readonly GameConfig[] = [
   {
     id: 'school', title: 'Kayıp Okul Eşyaları', description: 'Çocuğun kaybolan okul eşyalarını bul.', emoji: '🎒', available: true,
-    background: okulArkaPlan, introVideo: cocuk1Video, outroVideo: cocuk2Video, introAudio: cocuk1Ses, outroAudio: cocuk2Ses,
-    sceneAlt: 'Okul eşyalarının saklandığı karmaşık resim', trials: SCHOOL_TRIALS,
+    thumbnail: okulArkaPlan, background: okulArkaPlan, introVideo: cocuk1Video, outroVideo: cocuk2Video, introAudio: cocuk1Ses, outroAudio: cocuk2Ses,
+    sceneAlt: 'Okul eşyalarının saklandığı karmaşık resim', trials: SCHOOL_TRIALS, coverImages: SCHOOL_COVERS,
   },
   {
     id: 'kitchen', title: 'Mutfak Dedektifi', description: 'Kek yapmak için gereken kayıp malzemeleri bul.', emoji: '🧁', available: true,
-    background: mutfakArkaPlan, introVideo: kadin1Video, outroVideo: kadin2Video, introAudio: kadin1Ses, outroAudio: kadin2Ses,
+    thumbnail: mutfakArkaPlan, background: mutfakArkaPlan, introVideo: kadin1Video, outroVideo: kadin2Video, introAudio: kadin1Ses, outroAudio: kadin2Ses,
     sceneAlt: 'Kek malzemelerinin saklandığı karmaşık mutfak resmi', trials: KITCHEN_TRIALS, coverImages: KITCHEN_COVERS,
   },
   { id: 'toy-room', title: 'Oyuncak Odası Dedektifi', description: 'Dağınık odadaki kayıp oyuncakları bul.', emoji: '🧸', available: false },
@@ -310,36 +323,39 @@ export default function AliciGame7({ studentId, onClose, onComplete }: AliciGame
 
   if (screen === 'menu') {
     return (
-      <div className="fixed inset-0 z-[110] overflow-auto bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-4 text-white select-none sm:p-6">
+      <div className="fixed inset-0 z-[110] overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-3 text-white select-none">
         <button type="button" data-android-back onClick={handleClose} className="fixed left-3 top-3 z-50 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-slate-950/75 shadow-xl backdrop-blur-md" aria-label="Değerlendirmeden çık"><ArrowLeft size={24} /></button>
-        <div className="mx-auto flex min-h-full w-full max-w-6xl items-center justify-center">
-          <div className="grid w-full items-center gap-5 lg:grid-cols-[320px_1fr]">
-            <section className="relative mx-auto h-[390px] w-[285px] overflow-hidden rounded-[2rem] border border-amber-300/30 bg-amber-100/10 shadow-2xl">
-              <div className="absolute left-1/2 top-[6%] z-0 h-[132px] w-[122px] -translate-x-1/2 overflow-hidden rounded-[48%] bg-slate-700 ring-4 ring-amber-200/50">
+        <div className="mx-auto flex h-full w-full max-w-[1500px] items-center justify-center pt-12">
+          <div className="grid w-full grid-cols-[180px_1fr] items-center gap-3 sm:grid-cols-[220px_1fr]">
+            <section className="relative mx-auto flex h-[72vh] max-h-[430px] w-full flex-col items-center justify-center overflow-hidden rounded-[1.5rem] border border-amber-300/30 bg-amber-100/10 p-3 shadow-2xl">
+              <div className="h-[42vh] max-h-[260px] w-[90%] overflow-hidden rounded-[1.3rem] bg-slate-700 ring-4 ring-amber-200/40">
                 {studentPhoto ? <img src={studentPhoto} alt={studentName} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-5xl font-black">{studentName.charAt(0).toLocaleUpperCase('tr-TR')}</div>}
               </div>
-              <img src={dedektifKostum} alt="Dedektif kostümü" draggable={false} className="pointer-events-none absolute inset-0 z-10 h-full w-full object-contain object-bottom" />
-              <div className="absolute inset-x-3 bottom-3 z-20 rounded-2xl bg-slate-950/80 px-3 py-2 text-center backdrop-blur-sm">
+              <div className="mt-3 w-full rounded-xl bg-slate-950/80 px-2 py-2 text-center backdrop-blur-sm">
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-300">Baş Dedektif</p>
-                <p className="truncate text-lg font-black">{studentName}</p>
+                <p className="truncate text-base font-black">{studentName}</p>
               </div>
             </section>
             <section>
-              <div className="mb-4 text-center lg:text-left">
-                <div className="mb-1 flex items-center justify-center gap-2 lg:justify-start"><Sparkles className="text-amber-300" /><h1 className="text-2xl font-black sm:text-3xl">Dedektif Görevleri</h1></div>
-                <p className="text-sm text-slate-300">Dört görevden ikisini tamamla. Başarı için 10 sorudan en az 8 doğru gerekli.</p>
-                {completedCount === 1 && <p className="mt-2 font-bold text-emerald-300">İlk görev tamamlandı. Şimdi ikinci görevi seç!</p>}
+              <div className="mb-3 text-center">
+                <div className="mb-1 flex items-center justify-center gap-2"><Sparkles className="text-amber-300" size={22} /><h1 className="text-xl font-black sm:text-2xl">Dedektif Görevleri</h1></div>
+                <p className="text-xs text-slate-300">İki görevi tamamla · 10 soruda en az 8 doğru</p>
+                {completedCount === 1 && <p className="mt-1 text-sm font-bold text-emerald-300">Şimdi ikinci görevi seç!</p>}
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-4 gap-2">
                 {GAMES.map((game) => {
                   const score = completedGames[game.id];
                   const completed = score !== undefined;
                   return (
                     <button key={game.id} type="button" disabled={!game.available || completed} onClick={() => startGame(game)}
-                      className={`relative min-h-[145px] rounded-2xl border p-4 text-left shadow-xl transition ${completed ? 'border-emerald-400/20 bg-emerald-950/30 opacity-35' : game.available ? 'border-white/20 bg-white/10 hover:-translate-y-1 hover:border-amber-300/60 hover:bg-white/15 active:scale-[0.98]' : 'border-white/10 bg-slate-900/45 opacity-55'}`}>
-                      <span className="text-4xl">{game.emoji}</span>
-                      <h2 className="mt-2 text-base font-black sm:text-lg">{game.title}</h2>
-                      <p className="mt-1 text-xs leading-relaxed text-slate-300 sm:text-sm">{game.description}</p>
+                      className={`relative flex h-[48vh] max-h-[300px] min-h-[185px] flex-col items-center justify-center rounded-xl border p-2 text-center shadow-xl transition ${completed ? 'border-emerald-400/20 bg-emerald-950/30 opacity-35' : game.available ? 'border-white/20 bg-white/10 hover:-translate-y-1 hover:border-amber-300/60 hover:bg-white/15 active:scale-[0.98]' : 'border-white/10 bg-slate-900/45 opacity-55'}`}>
+                      {game.thumbnail ? (
+                        <img src={game.thumbnail} alt="" aria-hidden="true" className="h-[19vh] max-h-[115px] w-full rounded-lg object-cover" />
+                      ) : (
+                        <span className="text-3xl sm:text-4xl">{game.emoji}</span>
+                      )}
+                      <h2 className="mt-2 text-xs font-black sm:text-sm">{game.title}</h2>
+                      <p className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-300 sm:text-xs">{game.description}</p>
                       {completed && <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-1 text-[11px] font-black"><CheckCircle2 size={13} /> {score}/5</span>}
                       {!game.available && <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-slate-700 px-2 py-1 text-[11px] font-bold"><Lock size={12} /> Yakında</span>}
                     </button>
@@ -396,8 +412,8 @@ export default function AliciGame7({ studentId, onClose, onComplete }: AliciGame
       )}
       <AnimatePresence mode="wait">
         {(phase === 'intro' || phase === 'outro') && (
-          <motion.div key={`${currentGame.id}-${phase}`} initial={{ y: '110%', opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: '110%', opacity: 0 }} transition={{ duration: 0.6, ease: 'easeOut' }} className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex h-full items-end justify-center">
-            <video src={phase === 'intro' ? currentGame.introVideo : currentGame.outroVideo} autoPlay muted playsInline preload="auto" className="h-[88vh] max-w-[72vw] object-contain object-bottom drop-shadow-[0_18px_28px_rgba(0,0,0,0.45)]" aria-label={phase === 'intro' ? 'Yardım isteyen kişi' : 'Teşekkür eden kişi'} />
+          <motion.div key={`${currentGame.id}-${phase}`} initial={{ y: '110%', opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: '110%', opacity: 0 }} transition={{ duration: 0.6, ease: 'easeOut' }} className="pointer-events-none absolute inset-x-0 -bottom-[45vh] z-30 flex h-[145vh] items-end justify-center">
+            <video src={phase === 'intro' ? currentGame.introVideo : currentGame.outroVideo} autoPlay muted playsInline preload="auto" className="h-[135vh] max-w-[88vw] object-contain object-bottom drop-shadow-[0_18px_28px_rgba(0,0,0,0.45)]" aria-label={phase === 'intro' ? 'Yardım isteyen kişi' : 'Teşekkür eden kişi'} />
           </motion.div>
         )}
       </AnimatePresence>

@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
+import LogoLoader from '@/components/LogoLoader';
 import {
   createShowingSession,
   getShowingTargetNames,
@@ -35,6 +36,7 @@ import buyukSes from '@/kavram/buyukkucuk/buyuk.mp3';
 import kucukSes from '@/kavram/buyukkucuk/kucuk.mp3';
 import sicakSes from '@/kavram/sicak.mp3';
 import sogukSes from '@/kavram/soguk.mp3';
+import dokunmaOnaySes from '@/aba/yonerge/sesgorsel/onay.mp3';
 
 // --- KAVRAM OYUN VİDEOLARI/RESİMLERİ ---
 import bosdolu1 from '@/kavram/bosdolu1.mp4';
@@ -684,6 +686,7 @@ export default function KavramAssessmentPage() {
   const [discrimIndex, setDiscrimIndex] = useState(0);
   const [shuffledScenarios, setShuffledScenarios] = useState<ShowingScenario[]>([]);
   const [activeShowingCategoryId, setActiveShowingCategoryId] = useState<string | null>(null);
+  const [isShowingInputReady, setIsShowingInputReady] = useState(false);
 
   // Yeni state'ler
   const [selectedCategory, setSelectedCategory] = useState<any | null>(null);
@@ -701,6 +704,9 @@ export default function KavramAssessmentPage() {
   const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
   const questionAudioRef = useRef<HTMLAudioElement | null>(null);
   const flashcardAudioRef = useRef<HTMLAudioElement | null>(null);
+  const showingInputLockedRef = useRef(true);
+  const questionAudioTimerRef = useRef<number | null>(null);
+  const touchConfirmationAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const student = students.find(s => s.id === studentId);
 
@@ -819,24 +825,77 @@ export default function KavramAssessmentPage() {
   }, [evalIndex, activeEvaluation]);
 
   useEffect(() => {
-    if (isDiscriminationMode && shuffledScenarios.length > 0) {
-      const scenario = shuffledScenarios[discrimIndex];
-      if (scenario && scenario.audioSrc) {
-        if (questionAudioRef.current) {
-          questionAudioRef.current.pause();
-          questionAudioRef.current.currentTime = 0;
-        }
-        const audio = new Audio(scenario.audioSrc);
-        questionAudioRef.current = audio;
-        setTimeout(() => audio.play().catch(e => console.log("Ses oynatma hatası:", e)), 500);
-      }
+    showingInputLockedRef.current = true;
+    setIsShowingInputReady(false);
+
+    if (questionAudioTimerRef.current !== null) {
+      window.clearTimeout(questionAudioTimerRef.current);
+      questionAudioTimerRef.current = null;
     }
+    if (questionAudioRef.current) {
+      questionAudioRef.current.pause();
+      questionAudioRef.current.currentTime = 0;
+      questionAudioRef.current = null;
+    }
+
+    if (!isDiscriminationMode || shuffledScenarios.length === 0) return;
+
+    const scenario = shuffledScenarios[discrimIndex];
+    if (!scenario?.audioSrc) {
+      showingInputLockedRef.current = false;
+      setIsShowingInputReady(true);
+      return;
+    }
+
+    const audio = new Audio(scenario.audioSrc);
+    questionAudioRef.current = audio;
+
+    const openInput = () => {
+      if (questionAudioRef.current !== audio) return;
+      showingInputLockedRef.current = false;
+      setIsShowingInputReady(true);
+    };
+    audio.addEventListener('ended', openInput, { once: true });
+    audio.addEventListener('error', openInput, { once: true });
+
+    questionAudioTimerRef.current = window.setTimeout(() => {
+      questionAudioTimerRef.current = null;
+      audio.play().catch((error) => {
+        console.log("Ses oynatma hatası:", error);
+        openInput();
+      });
+    }, 500);
+
+    return () => {
+      if (questionAudioTimerRef.current !== null) {
+        window.clearTimeout(questionAudioTimerRef.current);
+        questionAudioTimerRef.current = null;
+      }
+      audio.removeEventListener('ended', openInput);
+      audio.removeEventListener('error', openInput);
+      audio.pause();
+      audio.currentTime = 0;
+      if (questionAudioRef.current === audio) questionAudioRef.current = null;
+    };
   }, [isDiscriminationMode, discrimIndex, shuffledScenarios]);
 
   const replayInstruction = () => {
     if (questionAudioRef.current) {
+      showingInputLockedRef.current = true;
+      setIsShowingInputReady(false);
+      const audio = questionAudioRef.current;
+      const openInput = () => {
+        if (questionAudioRef.current !== audio) return;
+        showingInputLockedRef.current = false;
+        setIsShowingInputReady(true);
+      };
+      audio.addEventListener('ended', openInput, { once: true });
+      audio.addEventListener('error', openInput, { once: true });
       questionAudioRef.current.currentTime = 0;
-      questionAudioRef.current.play().catch(e => console.log("Tekrar çalma hatası:", e));
+      questionAudioRef.current.play().catch(e => {
+        console.log("Tekrar çalma hatası:", e);
+        openInput();
+      });
       toast.info("Ses tekrar çalınıyor...");
     }
   };
@@ -975,6 +1034,8 @@ export default function KavramAssessmentPage() {
       return;
     }
 
+    showingInputLockedRef.current = true;
+    setIsShowingInputReady(false);
     setActiveShowingCategoryId(categoryId);
     setShuffledScenarios(scenarios);
     setDiscrimIndex(0);
@@ -983,6 +1044,9 @@ export default function KavramAssessmentPage() {
   };
 
   const handleDiscriminationChoice = (selectedSide: ShowingPosition, e: any) => {
+    if (showingInputLockedRef.current) return;
+    showingInputLockedRef.current = true;
+    setIsShowingInputReady(false);
     handleTouchEffect(e);
     const currentScenario = shuffledScenarios[discrimIndex];
     if (!currentScenario || !activeShowingCategoryId) return;
@@ -1011,6 +1075,9 @@ export default function KavramAssessmentPage() {
   };
 
   const handleCoordinateChoice = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (showingInputLockedRef.current) return;
+    showingInputLockedRef.current = true;
+    setIsShowingInputReady(false);
     handleTouchEffect(event);
     const currentScenario = shuffledScenarios[discrimIndex];
     if (!currentScenario?.hitAreas?.length || !activeShowingCategoryId) return;
@@ -1036,6 +1103,14 @@ export default function KavramAssessmentPage() {
       [getShowingResultKey(activeShowingCategoryId, currentScenario.targetName)]: isCorrect,
     }));
     markUnsaved();
+
+    if (touchConfirmationAudioRef.current) {
+      touchConfirmationAudioRef.current.pause();
+      touchConfirmationAudioRef.current.currentTime = 0;
+    }
+    const confirmationAudio = new Audio(dokunmaOnaySes);
+    touchConfirmationAudioRef.current = confirmationAudio;
+    confirmationAudio.play().catch(error => console.log('Dokunma onay sesi hatası:', error));
 
     if (isCorrect) {
       toast.success("Süpersin! Doğru bildin. 🎉");
@@ -1233,6 +1308,8 @@ export default function KavramAssessmentPage() {
       <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center">
         <button 
           onClick={() => {
+            showingInputLockedRef.current = true;
+            setIsShowingInputReady(false);
             setIsDiscriminationMode(false);
             setActiveShowingCategoryId(null);
             unlockOrientation();
@@ -1247,17 +1324,17 @@ export default function KavramAssessmentPage() {
         </div>
 
         <div 
-          className={`absolute top-8 left-8 z-[110] animate-in slide-in-from-top duration-500 transition-transform ${scenario.audioSrc ? 'cursor-pointer active:scale-95' : ''}`}
+          className={`absolute left-2 top-2 z-[110] animate-in slide-in-from-top duration-500 transition-transform ${scenario.audioSrc ? 'cursor-pointer active:scale-95' : ''}`}
           key={scenario.id + 'text'}
           onClick={scenario.audioSrc ? replayInstruction : undefined}
         >
-          <div className="bg-blue-600/80 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20 shadow-xl flex items-center gap-3">
+          <div className="flex items-center gap-1.5 rounded-lg border border-white/20 bg-blue-600/85 px-2.5 py-1.5 shadow-lg backdrop-blur-sm">
             {scenario.audioSrc && (
-              <div className="bg-white/20 p-2 rounded-full animate-pulse">
-                <Volume2 size={24} />
+              <div className="rounded-full bg-white/20 p-1">
+                <Volume2 size={15} className={!isShowingInputReady ? 'animate-pulse' : ''} />
               </div>
             )}
-            <span className="text-xl font-bold text-white tracking-wide">
+            <span className="max-w-[42vw] truncate text-sm font-bold tracking-wide text-white">
               {scenario.promptText}
             </span>
           </div>
@@ -1289,8 +1366,9 @@ export default function KavramAssessmentPage() {
             <button
               type="button"
               aria-label={`${scenario.targetName} için görsel üzerinde seçim yap`}
+              disabled={!isShowingInputReady}
               onClick={handleCoordinateChoice}
-              className="absolute inset-0 z-50 h-full w-full cursor-pointer bg-transparent active:bg-white/[0.02]"
+              className="absolute inset-0 z-50 h-full w-full cursor-pointer bg-transparent active:bg-white/[0.02] disabled:cursor-default"
             />
           ) : (
             <div
@@ -1301,8 +1379,9 @@ export default function KavramAssessmentPage() {
                   key={position}
                   type="button"
                   aria-label={`${position} alanı`}
+                  disabled={!isShowingInputReady}
                   onClick={(event) => handleDiscriminationChoice(position, event)}
-                  className="h-full cursor-pointer border-r border-white/5 bg-transparent transition-colors last:border-r-0 active:bg-white/5"
+                  className="h-full cursor-pointer border-r border-white/5 bg-transparent transition-colors last:border-r-0 active:bg-white/5 disabled:cursor-default"
                 />
               ))}
             </div>
@@ -1526,7 +1605,7 @@ export default function KavramAssessmentPage() {
       </header>
 
       <main className="max-w-4xl mx-auto">
-        {loading ? <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" size={40}/></div> : (
+        {loading ? <LogoLoader /> : (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
             {/* Ana kategoriler — 2 sütun */}
             <div className="grid grid-cols-2 gap-3">

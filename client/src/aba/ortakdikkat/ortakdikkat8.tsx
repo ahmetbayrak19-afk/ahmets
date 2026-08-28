@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import LogoLoader from '@/components/LogoLoader';
 import {
   AlertTriangle,
   Check,
@@ -251,13 +252,7 @@ export default function OrtakDikkat8({
     }, 650);
   };
 
-  if (loading) {
-    return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950 text-white">
-        <Loader2 className="animate-spin text-cyan-400" size={38} />
-      </div>
-    );
-  }
+  if (loading) return <LogoLoader fullScreen />;
 
   if (stage === "blocked") {
     return (

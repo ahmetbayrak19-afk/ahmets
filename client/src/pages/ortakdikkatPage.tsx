@@ -18,6 +18,7 @@ import OrtakDikkat9 from '@/aba/ortakdikkat/ortakdikkat9';
 import OrtakDikkat10 from '@/aba/ortakdikkat/ortakdikkat10';
 import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 import AssessmentModeBadges from '@/aba/shared/AssessmentModeBadges';
+import LogoLoader from '@/components/LogoLoader';
 
 interface OrtakDikkatPageProps {
   studentId: string;
@@ -118,7 +119,7 @@ export default function OrtakDikkatPage({ studentId, onBack, onOpenReinforcers }
 
   const progress = calculateProgress();
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
+  if (loading) return <LogoLoader />;
 
   if (activeItem) {
     const codeMatch = activeItem.match(/^OD\s+\d+\.\d+\./);

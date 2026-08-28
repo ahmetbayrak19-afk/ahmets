@@ -17,6 +17,7 @@ import SozelTaklitPage from './sozeltaklitPage';
 import IfadeEdiciDilPage from './ifadeedicidilPage';
 import OrtakDikkatPage from './ortakdikkatPage';
 import Pekistirec from '@/aba/ortakdikkat/pekistirec';
+import LogoLoader from '@/components/LogoLoader';
 
 interface ReinforcerProfile {
   rankings?: Array<{
@@ -106,7 +107,7 @@ export default function AbaAssessmentPage() {
     void refreshAssessmentData();
   };
 
-  if (loading) return <div className="h-screen bg-[#020617] flex items-center justify-center text-blue-500"><Loader2 className="animate-spin" size={40}/></div>;
+  if (loading) return <LogoLoader fullScreen />;
 
   const reinforcerRankings = [...(reinforcerProfile?.rankings || [])]
     .sort((a, b) => a.rank - b.rank)

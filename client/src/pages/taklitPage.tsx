@@ -8,6 +8,7 @@ import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 import AssessmentModeBadges from '@/aba/shared/AssessmentModeBadges';
+import LogoLoader from '@/components/LogoLoader';
 
 // 🔥 DİKKAT: YOL GÜNCELLENDİ (Yeni yerine göre)
 import TaklitSession from '@/aba/taklit/TaklitSession';
@@ -107,7 +108,7 @@ export default function TaklitPage({ studentId, onBack }: TaklitPageProps) {
     return Math.round((completedCount / items.length) * 100);
   };
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
+  if (loading) return <LogoLoader />;
 
   if (activeItem && activeMode) {
     const firstSpaceIndex = activeItem.indexOf(' ');

@@ -3,7 +3,7 @@ import { useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { User, AlertCircle, Building2 } from 'lucide-react';
+import { User, AlertCircle, Building2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
@@ -12,6 +12,7 @@ import { doc, setDoc, getDoc, collection, getDocs, updateDoc } from "firebase/fi
 import { twMerge } from 'tailwind-merge';
 
 import logoImg from '../logo.png';
+import LogoLoader from '@/components/LogoLoader';
 
 type LoginStep = 'institution' | 'institution-register' | 'teacher-name' | 'teacher-password';
 
@@ -19,6 +20,7 @@ export default function TeacherLogin() {
   const [_, setLocation] = useLocation();
   const [step, setStep] = useState<LoginStep>('institution');
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   const [institutionName, setInstitutionName] = useState('');
   const [institutionPassword, setInstitutionPassword] = useState('');
@@ -71,7 +73,9 @@ export default function TeacherLogin() {
 
   const handleInstitutionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     clearError();
+    setSubmitting(true);
     try {
       const email = safeEmail(institutionName);
       const userCredential = await signInWithEmailAndPassword(auth, email, institutionPassword);
@@ -84,15 +88,17 @@ export default function TeacherLogin() {
       setErrorMessage("Kurum adı veya şifre hatalı!");
       toast.error("Giriş yapılamadı.");
       setTimeout(() => setIsError(false), 500); 
-    }
+    } finally { setSubmitting(false); }
   };
 
   const handleInstitutionRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     if (institutionPassword.length < 6) {
         toast.warning("Şifre en az 6 karakter olmalı.");
         return;
     }
+    setSubmitting(true);
     try {
       const email = safeEmail(institutionName);
       const userCredential = await createUserWithEmailAndPassword(auth, email, institutionPassword);
@@ -103,11 +109,13 @@ export default function TeacherLogin() {
       setStep("teacher-name");
       toast.success("Kurum başarıyla oluşturuldu!");
     } catch (error: any) { toast.error("Hata: " + error.message); }
+    finally { setSubmitting(false); }
   };
 
   // --- ÖĞRETMEN ŞİFRE KONTROLÜ VE KAYIT ---
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     clearError();
 
     const instId = localStorage.getItem("kazanim-takip-institution-id");
@@ -119,6 +127,7 @@ export default function TeacherLogin() {
       return;
     }
 
+    setSubmitting(true);
     try {
       const teacherRef = doc(db, "institutions", instId, "teachers", teacherName.trim());
       const docSnap = await getDoc(teacherRef);
@@ -160,21 +169,12 @@ export default function TeacherLogin() {
       
     } catch (e) { 
       toast.error("Bir hata oluştu."); 
-    }
+    } finally { setSubmitting(false); }
   };
 
   const shakeAnimation = isError ? { x: [0, -10, 10, -10, 10, 0] } : {};
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center text-white space-y-8 z-50 fixed inset-0">
-        <div className="relative flex items-center justify-center">
-            <div className="absolute inset-0 bg-blue-500/30 blur-3xl rounded-full scale-150 animate-pulse"></div>
-            <img src={logoImg} alt="Yükleniyor" className="w-24 h-24 object-contain animate-spin relative z-10 drop-shadow-2xl" style={{ animationDuration: '3s' }} />
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <LogoLoader fullScreen />;
 
   return (
     <div className="min-h-screen bg-[#020617] text-white flex flex-col items-center justify-center p-4 overflow-hidden relative">
@@ -206,8 +206,10 @@ export default function TeacherLogin() {
                     <Input type="password" placeholder="Şifre" value={institutionPassword} onChange={(e) => { setInstitutionPassword(e.target.value); clearError(); }} className={`bg-slate-950 border-slate-800 ${isError ? 'border-red-500' : ''}`} />
                   </div>
                   {isError && <p className="text-red-400 text-xs flex items-center justify-center gap-1"><AlertCircle size={12}/> {errorMessage}</p>}
-                  <Button onClick={handleInstitutionSubmit} className={`w-full ${isError ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}>Giriş Yap</Button>
-                  <Button variant="ghost" onClick={handleGoToRegister} className="w-full text-blue-400 hover:text-blue-300">Yeni Kurum Kaydı</Button>
+                  <Button disabled={submitting} onClick={handleInstitutionSubmit} className={`w-full ${isError ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                    {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{submitting ? 'Giriş yapılıyor…' : 'Giriş Yap'}
+                  </Button>
+                  <Button disabled={submitting} variant="ghost" onClick={handleGoToRegister} className="w-full text-blue-400 hover:text-blue-300">Yeni Kurum Kaydı</Button>
                 </CardContent>
               </Card>
             </motion.div>
@@ -222,8 +224,10 @@ export default function TeacherLogin() {
                 <Input placeholder="Kurum Adı" value={institutionName} onChange={(e) => setInstitutionName(e.target.value)} className="bg-slate-950 border-slate-800" />
                 <Input type="password" placeholder="Şifre" value={institutionPassword} onChange={(e) => setInstitutionPassword(e.target.value)} className="bg-slate-950 border-slate-800" />
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setStep('institution')} className="border-slate-800 text-white hover:bg-slate-800">Geri</Button>
-                  <Button onClick={handleInstitutionRegister} className="flex-1 bg-green-600 hover:bg-green-700">Kaydı Tamamla</Button>
+                  <Button disabled={submitting} variant="outline" onClick={() => setStep('institution')} className="border-slate-800 text-white hover:bg-slate-800">Geri</Button>
+                  <Button disabled={submitting} onClick={handleInstitutionRegister} className="flex-1 bg-green-600 hover:bg-green-700">
+                    {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{submitting ? 'Kaydediliyor…' : 'Kaydı Tamamla'}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -287,8 +291,10 @@ export default function TeacherLogin() {
                     <AlertCircle size={14} /> <span>{errorMessage}</span>
                   </div>
                 )}
-                <Button onClick={handlePasswordSubmit} className={`w-full h-11 ${isError ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}>Sisteme Gir</Button>
-                <Button variant="ghost" onClick={() => { setStep('teacher-name'); clearError(); setPassword(''); }} className="w-full text-slate-400">Geri Dön</Button>
+                <Button disabled={submitting} onClick={handlePasswordSubmit} className={`w-full h-11 ${isError ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                  {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{submitting ? 'Giriş yapılıyor…' : 'Sisteme Gir'}
+                </Button>
+                <Button disabled={submitting} variant="ghost" onClick={() => { setStep('teacher-name'); clearError(); setPassword(''); }} className="w-full text-slate-400">Geri Dön</Button>
               </CardContent>
             </Card>
           </motion.div>

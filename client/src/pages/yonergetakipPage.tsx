@@ -9,6 +9,7 @@ import { ABA_MODULES } from '@/shared/abaData';
 import { useStudentData } from '@/hooks/useStudentData';
 import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 import AssessmentModeBadges from '@/aba/shared/AssessmentModeBadges';
+import LogoLoader from '@/components/LogoLoader';
 
 import Yonerge1 from '@/aba/yonerge/yonerge1';
 import Yonerge2 from '@/aba/yonerge/yonerge2';
@@ -122,7 +123,7 @@ export default function YonergeTakipPage({ studentId, onBack }: YonergeTakipPage
 
   const progress = calculateProgress();
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
+  if (loading) return <LogoLoader />;
 
   if (activeItem) {
     const firstSpaceIndex = activeItem.indexOf(' ');

@@ -21,6 +21,7 @@ import {
 import { toast } from 'sonner';
 import { ABA_MODULES } from '../../../shared/abaData';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import LogoLoader from '@/components/LogoLoader';
 
 interface Achievement {
   id: string;
@@ -199,7 +200,7 @@ export default function AdminPanel() {
   };
 
   if (!isAdmin) return <div className="p-10 text-center text-white">Admin yetkisi gerekli.</div>;
-  if (loading) return <div className="flex h-screen items-center justify-center bg-[#020617] text-blue-500"><Loader2 className="animate-spin" /></div>;
+  if (loading) return <LogoLoader fullScreen />;
 
   return (
     <div className="min-h-screen bg-[#020617] text-white font-sans">

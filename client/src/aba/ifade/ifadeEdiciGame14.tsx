@@ -1,6 +1,7 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Html, useAnimations, useGLTF, useProgress, OrbitControls } from "@react-three/drei";
+import { Html, useAnimations, useGLTF, OrbitControls } from "@react-three/drei";
+import logoImg from "@/logo.png";
 import * as THREE from "three";
 import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
 import { twMerge } from "tailwind-merge";
@@ -79,11 +80,10 @@ const GAME_DATA = {
 
 /** ---- Yükleyici Bileşeni ---- */
 function Loader3D() {
-  const { progress } = useProgress();
   return (
     <Html center>
-      <div className="text-white bg-white/10 px-4 py-2 rounded-xl font-mono text-sm border border-white/20 backdrop-blur-md whitespace-nowrap shadow-xl">
-        Yükleniyor... %{progress.toFixed(0)}
+      <div className="rounded-full bg-white/90 p-3 shadow-[0_0_30px_rgba(59,130,246,0.65)]">
+        <img src={logoImg} alt="" className="h-16 w-16 animate-spin object-contain" />
       </div>
     </Html>
   );
