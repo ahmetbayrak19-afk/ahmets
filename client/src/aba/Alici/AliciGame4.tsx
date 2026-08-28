@@ -7,6 +7,7 @@ import confetti from 'canvas-confetti';
 import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { db, storage } from '@/firebase';
+import LogoLoader from '@/components/LogoLoader';
 
 // --- SES DOSYALARI ---
 import aferin1 from '../esle/ses/aferin1.mp3';
@@ -534,27 +535,7 @@ export default function AliciGame4({ studentId, onClose }: GameProps) {
   };
 
   // --- RENDER ---
-  if (profilesLoading) {
-    return (
-      <div className="fixed inset-0 z-[500] flex flex-col bg-slate-950 text-slate-100">
-        <div className="flex items-center border-b border-slate-800 bg-slate-900 p-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full bg-slate-800 p-2 text-slate-300"
-            aria-label="Kapat"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <h1 className="ml-3 text-lg font-bold">İnsan Tanıma</h1>
-        </div>
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-slate-400">
-          <Loader2 className="animate-spin text-blue-400" size={36} />
-          <p className="text-sm font-bold">Kişiler yükleniyor…</p>
-        </div>
-      </div>
-    );
-  }
+  if (profilesLoading) return <LogoLoader fullScreen />;
 
   return (
     <div className="fixed inset-0 z-[500] bg-slate-950 flex flex-col font-sans text-slate-100">
