@@ -1,6 +1,7 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Html, useAnimations, useGLTF, useProgress } from "@react-three/drei";
+import { Html, useAnimations, useGLTF } from "@react-three/drei";
+import logoImg from "@/logo.png";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 
@@ -89,11 +90,10 @@ const playAferinSound = () => {
 };
 
 function Loader3D() {
-  const { progress } = useProgress();
   return (
     <Html center>
-      <div style={{ color: "white", background: "rgba(0,0,0,0.75)", padding: "10px 12px", borderRadius: 10, fontFamily: "monospace" }}>
-        Yükleniyor: %{progress.toFixed(0)}
+      <div className="rounded-full bg-white/90 p-3 shadow-[0_0_30px_rgba(59,130,246,0.65)]">
+        <img src={logoImg} alt="" className="h-16 w-16 animate-spin object-contain" />
       </div>
     </Html>
   );
