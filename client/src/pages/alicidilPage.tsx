@@ -8,6 +8,7 @@ import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 import AssessmentModeBadges from '@/aba/shared/AssessmentModeBadges';
+import LogoLoader from '@/components/LogoLoader';
 
 // --- OYUN IMPORTLARI ---
 import AliciGame4 from '@/aba/Alici/AliciGame4';   // ADB 2.1 - İnsan Tanıma
@@ -118,7 +119,7 @@ export default function AliciDilPage({ studentId, onBack }: AliciDilPageProps) {
 
   const progress = calculateProgress();
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
+  if (loading) return <LogoLoader />;
 
   return (
     <div className="space-y-6 relative">

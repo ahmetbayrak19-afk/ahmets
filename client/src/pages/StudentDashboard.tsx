@@ -9,6 +9,7 @@ import { ArrowLeft, Target, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { clsx } from 'clsx';
 import { getCurrentTeacherAssociationUpdate } from '@/lib/studentTeacherAssociation';
+import LogoLoader from '@/components/LogoLoader';
 
 const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
@@ -120,12 +121,7 @@ export default function StudentDashboard() {
     } catch (e) { toast.error("Hata!"); }
   };
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center text-white">
-      <Loader2 className="animate-spin text-blue-500 mb-4" size={40} />
-      <span className="italic text-slate-400">Öğrenci dosyası hazırlanıyor...</span>
-    </div>
-  );
+  if (loading) return <LogoLoader fullScreen />;
 
   return (
     <div className="min-h-screen bg-[#020617] text-white font-sans pb-20">

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
+import LogoLoader from '@/components/LogoLoader';
 
 export default function Home() {
   const [name, setName] = useState('');
@@ -661,12 +662,7 @@ export default function Home() {
     );
   }
 
-  if (isLoading) return (
-    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center text-white">
-      <Loader2 className="animate-spin text-blue-500 mb-4" size={40} />
-      <p className="italic">Veriler doğrulanıyor...</p>
-    </div>
-  );
+  if (isLoading) return <LogoLoader fullScreen />;
 
   if (!currentTeacher) return null;
 

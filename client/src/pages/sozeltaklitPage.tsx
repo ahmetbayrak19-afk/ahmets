@@ -15,6 +15,7 @@ import SozelTaklit4 from '@/aba/sozeltaklit/sozeltaklit4';
 import SozelTaklit5 from '@/aba/sozeltaklit/sozeltaklit5';
 import type { AssessmentCompletionDetails } from '@/aba/sozeltaklit/SozelTaklitAssessment';
 import AssessmentModeBadges from '@/aba/shared/AssessmentModeBadges';
+import LogoLoader from '@/components/LogoLoader';
 
 const WORD_PROGRESS_FIELD = 'sozeltaklit_st21_progress';
 const ENVIRONMENTAL_PROGRESS_FIELD = 'sozeltaklit_st22_progress';
@@ -253,7 +254,7 @@ export default function SozelTaklitPage({ studentId, onBack }: SozelTaklitPagePr
     return Math.round((completedCount / items.length) * 100);
   };
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
+  if (loading) return <LogoLoader />;
 
   if (activeAssessmentItem?.startsWith('ST 1.1.')) {
     return (

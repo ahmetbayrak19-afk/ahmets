@@ -8,6 +8,7 @@ import { twMerge } from 'tailwind-merge';
 import { ABA_MODULES } from '@/shared/abaData';
 import { associateCurrentTeacherWithStudent } from '@/lib/studentTeacherAssociation';
 import AssessmentModeBadges from '@/aba/shared/AssessmentModeBadges';
+import LogoLoader from '@/components/LogoLoader';
 
 // --- MEVCUT OYUN DOSYALARI ---
 import NesneEslemeGame1 from '@/aba/esle/NesneEslemeGame1';   // EB.1.1
@@ -140,7 +141,7 @@ export default function EslemePage({ studentId, onBack }: EslemePageProps) {
     return Math.round((completedCount / items.length) * 100);
   };
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500" /></div>;
+  if (loading) return <LogoLoader />;
 
   return (
     <div className="space-y-6 relative">
