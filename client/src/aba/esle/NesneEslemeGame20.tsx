@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import LogoLoader from '@/components/LogoLoader';
 import { motion, useAnimationControls } from 'framer-motion';
 import {
   ArrowLeft,
@@ -608,13 +609,7 @@ export default function NesneEslemeGame20({
     else onClose();
   };
 
-  if (loadingProgress) {
-    return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-50">
-        <Loader2 className="h-9 w-9 animate-spin text-blue-600" />
-      </div>
-    );
-  }
+  if (loadingProgress) return <LogoLoader fullScreen />;
 
   return (
     <div className="fixed inset-0 z-[100] flex h-[100dvh] w-screen select-none flex-col overflow-hidden bg-slate-50 font-sans text-slate-800 overscroll-none">
