@@ -117,12 +117,15 @@ export default function IfadeEdiciDilPage({ studentId, onBack }: IfadeEdiciDilPa
 
   // Oyun Tamamlandığında Çalışacak Fonksiyon
   const handleGameComplete = async (success: boolean) => {
-    if (success && activeGameMode === 'assessment' && activeGameItem) {
-      const updatedData = { ...formData, [activeGameItem]: true };
+    if (activeGameMode === 'assessment' && activeGameItem) {
+      const updatedData = { ...formData, [activeGameItem]: success };
       setFormData(updatedData);
       setDirty(true);
       const saved = await handleSave(updatedData, false);
-      if (saved) toast.success("Tebrikler! Kazanım tamamlandı. 🎉");
+      if (saved) {
+        if (success) toast.success("Tebrikler! Kazanım tamamlandı. 🎉");
+        else toast.error("Değerlendirme sonucu başarısız olarak kaydedildi.");
+      }
     }
     setActiveGameMode(null);
     setActiveGameItem(null);
