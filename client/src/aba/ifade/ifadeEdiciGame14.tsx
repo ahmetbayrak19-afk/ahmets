@@ -1,23 +1,25 @@
-import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Html, useAnimations, useGLTF, OrbitControls } from "@react-three/drei";
-import logoImg from "@/logo.png";
+import { Html, OrbitControls, useAnimations, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, Play, RotateCcw, Volume2, X, XCircle } from "lucide-react";
 import { twMerge } from "tailwind-merge";
+import logoImg from "@/logo.png";
 
-/** ==== OYUN VERİLERİ (Aşağı Yukarı Kaydırma ve Ölçek) ==== */
-const GAME_DATA = {
+type Part = { id: string; label: string; animName: string | string[] };
+type Category = {
+  id: string; title: string; desc: string; modelFile: string; scale: number;
+  position: [number, number, number]; target: [number, number, number];
+  cameraDistance: number; minDistance: number; maxDistance: number;
+  gradient: string; border: string; badge: string; parts: Part[];
+};
+
+const GAME_DATA: Record<string, Category> = {
   bilgisayar: {
-    id: "bilgisayar",
-    title: "Bilgisayar",
-    desc: "Ekran, Kasa, Mouse...",
-    modelFile: "bilgisayar.glb",
-    scale: 1.0,
-    position: [0, -1, 0], // Modeli biraz aşağı çeker
-    gradient: "bg-gradient-to-br from-blue-600/25 to-blue-400/10",
-    border: "border-blue-400/40",
-    badge: "bg-blue-500",
+    id: "bilgisayar", title: "Bilgisayar", desc: "Ekran, klavye, mouse ve kasa",
+    modelFile: "bilgisayar.glb", scale: 1, position: [0, -1, 0], target: [0, 0, 0],
+    cameraDistance: 12, minDistance: 10, maxDistance: 14,
+    gradient: "bg-gradient-to-br from-blue-600/25 to-blue-400/10", border: "border-blue-400/40", badge: "bg-blue-500",
     parts: [
       { id: "ekran", label: "Ekran", animName: "monitorAction" },
       { id: "klavye", label: "Klavye", animName: "klavyeAction.001" },
@@ -26,15 +28,10 @@ const GAME_DATA = {
     ],
   },
   cicek: {
-    id: "cicek",
-    title: "Çiçek",
-    desc: "Yaprak, Kök, Toprak...",
-    modelFile: "cicek.glb",
-    scale: 1.0, 
-    position: [0, -2.5, 0], // ❗ Çiçek çok yukarıdaysa buradaki -2.5 değeri onu tam ortaya indirir
-    gradient: "bg-gradient-to-br from-pink-600/25 to-pink-400/10",
-    border: "border-pink-400/40",
-    badge: "bg-pink-500",
+    id: "cicek", title: "Çiçek", desc: "Çiçek, yaprak, saksı ve toprak",
+    modelFile: "cicek.glb", scale: 1, position: [0, -2.2, 0], target: [0, 0, 0],
+    cameraDistance: 12, minDistance: 10, maxDistance: 14,
+    gradient: "bg-gradient-to-br from-pink-600/25 to-pink-400/10", border: "border-pink-400/40", badge: "bg-pink-500",
     parts: [
       { id: "cicek_bas", label: "Çiçek", animName: "cicekact" },
       { id: "yaprak", label: "Yaprak", animName: "yaprak" },
@@ -43,285 +40,220 @@ const GAME_DATA = {
     ],
   },
   ev: {
-    id: "ev",
-    title: "Ev",
-    desc: "Çatı, Kapı, Pencere...",
-    modelFile: "ev.glb",
-    scale: 1.0, 
-    position: [0, -1.5, 0], // Evi biraz aşağı çeker
-    gradient: "bg-gradient-to-br from-orange-600/25 to-orange-400/10",
-    border: "border-orange-400/40",
-    badge: "bg-orange-500",
+    id: "ev", title: "Ev", desc: "Çatı, kapı, pencereler ve baca",
+    modelFile: "ev.glb", scale: 1, position: [0, -1.5, 0], target: [0, 0, 0],
+    cameraDistance: 15, minDistance: 7, maxDistance: 19,
+    gradient: "bg-gradient-to-br from-orange-600/25 to-orange-400/10", border: "border-orange-400/40", badge: "bg-orange-500",
     parts: [
       { id: "cati", label: "Çatı", animName: "catiev_1" },
       { id: "kapi", label: "Kapı", animName: "kapiev_1" },
-      { id: "pencere", label: "Pencereler", animName: ["pen1", "pen2", "pen3", "penarka", "pencere"] }, 
+      { id: "pencere", label: "Pencereler", animName: ["pen1", "pen2", "pen3", "penarka", "pencere"] },
       { id: "baca", label: "Baca", animName: "bacaev_1" },
     ],
   },
   araba: {
-    id: "araba",
-    title: "Araba",
-    desc: "Tekerlek, Kapı, Bagaj...",
-    modelFile: "araba.glb",
-    scale: 1.0,
-    position: [0, -0.5, 0],
-    gradient: "bg-gradient-to-br from-indigo-600/25 to-indigo-400/10",
-    border: "border-indigo-400/40",
-    badge: "bg-indigo-500",
+    id: "araba", title: "Araba", desc: "Tekerlek, kapı, far ve bagaj",
+    modelFile: "araba.glb", scale: 1, position: [0, -0.5, 0], target: [0, 0, 0],
+    cameraDistance: 13, minDistance: 11, maxDistance: 15,
+    gradient: "bg-gradient-to-br from-indigo-600/25 to-indigo-400/10", border: "border-indigo-400/40", badge: "bg-indigo-500",
     parts: [
       { id: "tekerlek", label: "Tekerlek", animName: ["solarkateker", "sagonteker", "sagarkateker", "solonteker"] },
       { id: "kapi", label: "Kapı", animName: "kapiac" },
-      { id: "far", label: "Far", animName: "FAR_YAK" }, 
+      { id: "far", label: "Far", animName: "FAR_YAK" },
       { id: "bagaj", label: "Bagaj", animName: "bagaj" },
     ],
   },
 };
 
-/** ---- Yükleyici Bileşeni ---- */
+type Trial = { categoryId: string; part: Part };
+type Answer = Trial & { correct: boolean };
+const shuffle = <T,>(items: T[]) => {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+};
+const createTrials = () => shuffle(Object.values(GAME_DATA)).flatMap(c => shuffle(c.parts).map(part => ({ categoryId: c.id, part })));
+
 function Loader3D() {
-  return (
-    <Html center>
-      <div className="rounded-full bg-white/90 p-3 shadow-[0_0_30px_rgba(59,130,246,0.65)]">
-        <img src={logoImg} alt="" className="h-16 w-16 animate-spin object-contain" />
-      </div>
-    </Html>
-  );
+  return <Html center><div className="rounded-full bg-white/90 p-3 shadow-[0_0_30px_rgba(59,130,246,.65)]"><img src={logoImg} alt="" className="h-16 w-16 animate-spin object-contain" /></div></Html>;
 }
 
-/** ---- 3D Model ve Animasyon Oynatıcı ---- */
-function ActiveModel({ url, dracoBase, triggerAnim, modelScale, modelPosition }: { url: string; dracoBase: string; triggerAnim: {name: string | string[], id: number} | null; modelScale: number; modelPosition: number[] }) {
-  useMemo(() => {
-    useGLTF.setDecoderPath(dracoBase.endsWith("/") ? dracoBase : `${dracoBase}/`);
-  }, [dracoBase]);
-
+function ActiveModel({ url, dracoBase, triggerAnim, category }: {
+  url: string; dracoBase: string; triggerAnim: { name: string | string[]; id: number } | null; category: Category;
+}) {
+  useMemo(() => useGLTF.setDecoderPath(dracoBase.endsWith("/") ? dracoBase : `${dracoBase}/`), [dracoBase]);
   const { scene, animations } = useGLTF(url);
   const { actions } = useAnimations(animations, scene);
-  
-  const toggleStates = useRef<Record<string, boolean>>({});
-
+  const toggles = useRef<Record<string, boolean>>({});
   useEffect(() => {
     scene.traverse((o: any) => {
-      if (o?.isMesh && o.material) {
-        o.material.side = THREE.DoubleSide;
-        if (o.name.toLowerCase().includes("isik")) {
-          o.material = o.material.clone();
-          o.material.emissive = new THREE.Color("#ffffff");
-          o.material.emissiveIntensity = 0; 
-        }
+      if (!o?.isMesh || !o.material) return;
+      o.material.side = THREE.DoubleSide;
+      if (o.name.toLowerCase().includes("isik")) {
+        o.material = o.material.clone();
+        o.material.emissive = new THREE.Color("#fff");
+        o.material.emissiveIntensity = 0;
       }
     });
   }, [scene]);
-
   useEffect(() => {
-    if (triggerAnim) {
-      const names = Array.isArray(triggerAnim.name) ? triggerAnim.name : [triggerAnim.name];
-
-      if (names[0] === "FAR_YAK") {
-        const isCurrentlyOn = toggleStates.current["FAR_YAK"];
-        scene.traverse((o: any) => {
-          if (o?.isMesh && o.name.toLowerCase().includes("isik")) {
-            o.material.emissiveIntensity = isCurrentlyOn ? 0 : 5; 
-          }
-        });
-        toggleStates.current["FAR_YAK"] = !isCurrentlyOn;
-      } 
-      else {
-        const isOpening = !toggleStates.current[names[0]];
-
-        names.forEach((animName) => {
-          if (actions[animName]) {
-            const action = actions[animName];
-            action.paused = false;
-            action.setLoop(THREE.LoopOnce, 1);
-            action.clampWhenFinished = true;
-
-            if (isOpening) {
-              action.reset();
-              action.timeScale = 1;
-              action.play();
-            } else {
-              action.reset(); 
-              action.time = action.getClip().duration; 
-              action.timeScale = -1; 
-              action.play();
-            }
-            toggleStates.current[animName] = isOpening;
-          }
-        });
-      }
+    if (!triggerAnim) return;
+    const names = Array.isArray(triggerAnim.name) ? triggerAnim.name : [triggerAnim.name];
+    if (names[0] === "FAR_YAK") {
+      const on = toggles.current.FAR_YAK;
+      scene.traverse((o: any) => { if (o?.isMesh && o.name.toLowerCase().includes("isik")) o.material.emissiveIntensity = on ? 0 : 5; });
+      toggles.current.FAR_YAK = !on;
+      return;
     }
+    const opening = !toggles.current[names[0]];
+    names.forEach(name => {
+      const action = actions[name];
+      if (!action) return;
+      action.paused = false; action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; action.reset();
+      if (opening) action.timeScale = 1;
+      else { action.time = action.getClip().duration; action.timeScale = -1; }
+      action.play(); toggles.current[name] = opening;
+    });
   }, [triggerAnim, actions, scene]);
-
-  return (
-    // ❗ Modeli GAME_DATA'daki position değerine göre aşağı/yukarı kaydırıyoruz
-    <group scale={modelScale} position={modelPosition as [number, number, number]}>
-      <primitive object={scene} />
-    </group>
-  );
+  return <group scale={category.scale} position={category.position}><primitive object={scene} /></group>;
 }
 
-/** ==== ANA BİLEŞEN PROPLARI ==== */
-interface IfadeEdiciGame14Props {
-  studentId: string;
-  mode: 'assessment' | 'instruction';
-  onClose: () => void;
-  onComplete: (success: boolean) => void;
-}
+interface Props { studentId: string; mode: "assessment" | "instruction"; onClose: () => void; onComplete: (success: boolean) => void }
 
-export default function IfadeEdiciGame14({ studentId, mode, onClose, onComplete }: IfadeEdiciGame14Props) {
+export default function IfadeEdiciGame14({ mode, onClose, onComplete }: Props) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [triggerAnim, setTriggerAnim] = useState<{name: string | string[], id: number} | null>(null);
+  const [triggerAnim, setTriggerAnim] = useState<{ name: string | string[]; id: number } | null>(null);
   const [urls, setUrls] = useState({ model: "", draco: "" });
+  const [started, setStarted] = useState(false);
+  const [trials, setTrials] = useState<Trial[]>([]);
+  const [index, setIndex] = useState(0);
+  const [answers, setAnswers] = useState<Answer[]>([]);
+  const [locked, setLocked] = useState(true);
+  const [finished, setFinished] = useState(false);
+  const [seconds, setSeconds] = useState(5);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const delayRef = useRef<number | null>(null);
+  const timerRef = useRef<number | null>(null);
+
+  const trial = started ? trials[index] : null;
+  const categoryId = mode === "assessment" ? trial?.categoryId ?? null : selectedCategory;
+  const category = categoryId ? GAME_DATA[categoryId] : null;
 
   useEffect(() => {
-    if (selectedCategory) {
-      const base = new URL("/assets/public/", window.location.origin).toString();
-      const modelFile = GAME_DATA[selectedCategory as keyof typeof GAME_DATA].modelFile;
-      
-      setUrls({
-        model: new URL(`models/${modelFile}`, base).toString(),
-        draco: new URL("draco/", base).toString(),
-      });
-      setTriggerAnim(null);
-    }
-  }, [selectedCategory]);
+    if (!categoryId) return;
+    const base = new URL("/assets/public/", window.location.origin).toString();
+    setUrls({ model: new URL(`models/${GAME_DATA[categoryId].modelFile}`, base).toString(), draco: new URL("draco/", base).toString() });
+    setTriggerAnim(null);
+  }, [categoryId]);
 
-  // 1. EKRAN: KATEGORİ SEÇİM MENÜSÜ
-  if (!selectedCategory) {
+  const clearTimers = () => {
+    if (delayRef.current !== null) clearTimeout(delayRef.current);
+    if (timerRef.current !== null) clearInterval(timerRef.current);
+    delayRef.current = timerRef.current = null;
+  };
+  const beginWindow = () => {
+    setLocked(false); let left = 5; setSeconds(left);
+    timerRef.current = window.setInterval(() => {
+      left--; setSeconds(Math.max(0, left));
+      if (left <= 0) clearTimers();
+    }, 1000);
+  };
+  const playQuestion = (part: Part) => {
+    clearTimers(); setLocked(true); setSeconds(5);
+    setTriggerAnim({ name: part.animName, id: Date.now() });
+    const audio = new Audio(new URL("./burasine.mp3", import.meta.url).href);
+    audioRef.current = audio;
+    audio.addEventListener("ended", beginWindow, { once: true });
+    audio.play().catch(beginWindow);
+  };
+
+  useEffect(() => {
+    if (mode !== "assessment" || !started || finished || !trial) return;
+    clearTimers(); audioRef.current?.pause(); setLocked(true); setSeconds(5);
+    delayRef.current = window.setTimeout(() => playQuestion(trial.part), 700);
+    return () => { clearTimers(); audioRef.current?.pause(); };
+  }, [mode, started, finished, index, trial]);
+
+  const start = () => { setTrials(createTrials()); setIndex(0); setAnswers([]); setFinished(false); setStarted(true); };
+  const record = (correct: boolean) => {
+    if (!trial || locked) return;
+    clearTimers(); setLocked(true); setAnswers(a => [...a, { ...trial, correct }]);
+    if (index === trials.length - 1) setFinished(true); else setIndex(i => i + 1);
+  };
+
+  if (mode === "assessment" && !started) return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0b0f19] p-5 text-slate-100">
+      <button onClick={onClose} className="absolute right-5 top-5 rounded-full bg-white/5 p-3"><X /></button>
+      <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-white/[.04] p-7 text-center">
+        <Play className="mx-auto mb-4 text-blue-400" size={44} />
+        <h2 className="text-2xl font-black">Objenin Parçalarını Adlandırma</h2>
+        <p className="mt-3 text-sm text-slate-300">Dört modelde 16 parça sırayla hareket eder. “Burası ne?” sorusundan sonra çocuğun sözlü cevabını işaretleyin.</p>
+        <div className="mt-5 grid grid-cols-3 gap-2 text-xs font-bold">
+          <div className="rounded-xl bg-white/5 p-3"><b className="block text-lg">16</b>Deneme</div>
+          <div className="rounded-xl bg-white/5 p-3"><b className="block text-lg">5 sn</b>Süre</div>
+          <div className="rounded-xl bg-white/5 p-3"><b className="block text-lg">13+</b>Başarılı</div>
+        </div>
+        <button onClick={start} className="mt-6 w-full rounded-2xl bg-blue-500 p-4 font-black">Değerlendirmeyi Başlat</button>
+      </div>
+    </div>
+  );
+
+  if (mode === "assessment" && finished) {
+    const correct = answers.filter(a => a.correct).length, success = correct >= 13;
     return (
-      <div className="fixed inset-0 z-[100] bg-[#0b0f19] text-slate-100 flex flex-col font-sans select-none overflow-hidden touch-none overscroll-none min-h-screen">
-        <div className="flex-1 flex flex-col p-6 gap-4 max-w-2xl mx-auto w-full relative">
-          
-          <div className="p-4 flex justify-between items-center">
-            <button onClick={onClose} className="p-2 bg-white/5 border border-white/10 rounded-full hover:bg-white/10 transition-colors">
-              <XCircle className="text-white/60" />
-            </button>
-            <div className="text-xs font-bold text-white/70 bg-white/5 px-3 py-1 rounded-full border border-white/10">
-              {mode === 'assessment' ? 'Değerlendirme Modu' : 'Öğretim Modu'}
-            </div>
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0b0f19] p-5 text-slate-100">
+        <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-white/[.04] p-7 text-center">
+          {success ? <CheckCircle2 className="mx-auto text-emerald-400" size={60} /> : <XCircle className="mx-auto text-red-400" size={60} />}
+          <h2 className="mt-4 text-2xl font-black">{success ? "Set Başarılı" : "Set Tekrar Edilmeli"}</h2>
+          <div className="mt-3 text-4xl font-black">{correct} / 16</div>
+          <div className="mt-6 flex gap-3">
+            <button onClick={start} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white/10 p-3 font-bold"><RotateCcw size={18}/> Tekrarla</button>
+            <button onClick={() => onComplete(success)} className={twMerge("flex flex-1 items-center justify-center gap-2 rounded-2xl p-3 font-black", success ? "bg-emerald-500 text-black" : "bg-red-500")}><Check size={18}/> Sonucu Kaydet</button>
           </div>
-
-          <div className="text-center mt-2 mb-4">
-            <div className="text-2xl font-black text-white">Neyi İnceleyelim?</div>
-            <div className="text-xs text-white/60 mt-1">3 Boyutlu modeli görmek için birini seç.</div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mt-2">
-            {Object.values(GAME_DATA).map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={twMerge(
-                  "rounded-3xl border p-5 text-left min-h-[150px] flex flex-col justify-between shadow-lg transition-all hover:scale-[1.02] active:scale-95",
-                  cat.gradient,
-                  cat.border
-                )}
-              >
-                <div>
-                  <div className="font-black text-lg text-white">{cat.title}</div>
-                  <div className="text-[11px] text-white/70 mt-1">{cat.desc}</div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className={twMerge("text-[11px] font-black px-3 py-1 rounded-full w-fit text-white shadow-sm", cat.badge)}>
-                    Modele Git
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-
         </div>
       </div>
     );
   }
 
-  // 2. EKRAN: 3D MODEL VE PARÇALAR
-  const categoryData = GAME_DATA[selectedCategory as keyof typeof GAME_DATA];
-  const half = Math.ceil(categoryData.parts.length / 2);
-  const leftParts = categoryData.parts.slice(0, half);
-  const rightParts = categoryData.parts.slice(half);
-
-  return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-[#0b0f19] overflow-hidden font-sans select-none touch-none overscroll-none min-h-screen">
-      
-      {/* 3D KANVAS */}
-      <div className="absolute inset-0">
-        <Canvas camera={{ position: [0, 0, 15], fov: 45 }}>
-          
-          {/* ❗ IŞIKLANDIRMA GÜÇLENDİRİLDİ (Ortam daha aydınlık olacak) */}
-          <ambientLight intensity={4.5} />
-          <hemisphereLight skyColor={"#ffffff"} groundColor={"#888888"} intensity={3.5} />
-          <directionalLight position={[10, 15, 10]} intensity={5} />
-          <directionalLight position={[-10, 5, -10]} intensity={2.5} /> {/* Arka taraftan ekstra aydınlatma */}
-          
-          <OrbitControls enablePan={true} enableZoom={true} minDistance={1} maxDistance={200} />
-          
-          <Suspense fallback={<Loader3D />}>
-            {urls.model && (
-              <ActiveModel 
-                url={urls.model} 
-                dracoBase={urls.draco} 
-                triggerAnim={triggerAnim} 
-                modelScale={categoryData.scale} 
-                modelPosition={categoryData.position} // Konum verisi modele iletildi
-              />
-            )}
-          </Suspense>
-        </Canvas>
-      </div>
-
-      {/* ARAYÜZ (UI) */}
-      <div className="absolute inset-0 pointer-events-none flex flex-col z-10">
-        
-        {/* Üst Bar */}
-        <div className="p-4 flex items-center justify-between mt-2 shrink-0">
-          <button 
-            onClick={() => setSelectedCategory(null)}
-            className="pointer-events-auto flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl border border-white/10 backdrop-blur-md transition-all active:scale-95"
-          >
-            <ArrowLeft size={18} className="text-white/70" /> Menü
-          </button>
-
-          {mode === 'assessment' && (
-            <button 
-              onClick={() => onComplete(true)}
-              className="pointer-events-auto flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-400 text-black font-black rounded-xl shadow-[0_0_15px_rgba(34,197,94,0.3)] transition-all active:scale-95"
-            >
-              <CheckCircle2 size={18} /> Tamamla
-            </button>
-          )}
-        </div>
-
-        {/* Butonlar */}
-        <div className="flex-1 flex justify-between items-start px-4 md:px-8 pt-4">
-          
-          <div className="flex flex-col gap-2 w-24 md:w-32 pointer-events-auto">
-            {leftParts.map((part) => (
-              <button 
-                key={part.id} 
-                onClick={() => setTriggerAnim({ name: part.animName, id: Date.now() })}
-                className="w-full py-2 px-2 text-xs md:text-sm font-black rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/10 backdrop-blur-md active:scale-95 transition-all shadow-md"
-              >
-                {part.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-col gap-2 w-24 md:w-32 pointer-events-auto">
-            {rightParts.map((part) => (
-              <button 
-                key={part.id} 
-                onClick={() => setTriggerAnim({ name: part.animName, id: Date.now() })}
-                className="w-full py-2 px-2 text-xs md:text-sm font-black rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/10 backdrop-blur-md active:scale-95 transition-all shadow-md"
-              >
-                {part.label}
-              </button>
-            ))}
-          </div>
-
-        </div>
+  if (mode === "instruction" && !selectedCategory) return (
+    <div className="fixed inset-0 z-[100] bg-[#0b0f19] p-6 text-slate-100">
+      <div className="mx-auto max-w-2xl"><button onClick={onClose} className="rounded-full bg-white/5 p-2"><XCircle /></button>
+        <h2 className="mt-4 text-center text-2xl font-black">Neyi İnceleyelim?</h2>
+        <div className="mt-6 grid grid-cols-2 gap-4">{Object.values(GAME_DATA).map(c =>
+          <button key={c.id} onClick={() => setSelectedCategory(c.id)} className={twMerge("min-h-[150px] rounded-3xl border p-5 text-left", c.gradient, c.border)}>
+            <b className="text-lg">{c.title}</b><span className="mt-2 block text-xs text-white/70">{c.desc}</span><span className={twMerge("mt-8 block w-fit rounded-full px-3 py-1 text-xs font-bold", c.badge)}>Modele Git</span>
+          </button>)}</div>
       </div>
     </div>
   );
-    }
+
+  if (!category) return null;
+  const half = Math.ceil(category.parts.length / 2), groups = [category.parts.slice(0, half), category.parts.slice(half)];
+  return (
+    <div className="fixed inset-0 z-[100] touch-none overflow-hidden bg-[#0b0f19]">
+      <Canvas key={category.id} camera={{ position: [0, 0, category.cameraDistance], fov: 42 }}>
+        <ambientLight intensity={4.5}/><hemisphereLight skyColor="#fff" groundColor="#888" intensity={3.5}/>
+        <directionalLight position={[10,15,10]} intensity={5}/><directionalLight position={[-10,5,-10]} intensity={2.5}/>
+        <OrbitControls enablePan={false} minDistance={category.minDistance} maxDistance={category.maxDistance} minPolarAngle={Math.PI/2} maxPolarAngle={Math.PI/2} target={category.target} rotateSpeed={.65} zoomSpeed={.55}/>
+        <Suspense fallback={<Loader3D/>}>{urls.model && <ActiveModel url={urls.model} dracoBase={urls.draco} triggerAnim={triggerAnim} category={category}/>}</Suspense>
+      </Canvas>
+      <div className="pointer-events-none absolute inset-0 z-10 flex flex-col">
+        <div className="flex justify-between p-4">
+          <button onClick={mode === "instruction" ? () => setSelectedCategory(null) : onClose} className="pointer-events-auto flex items-center gap-2 rounded-xl bg-black/50 px-4 py-2 text-white"><ArrowLeft size={18}/>{mode === "instruction" ? "Menü" : "Çık"}</button>
+          {mode === "assessment" && <div className="rounded-full bg-black/50 px-4 py-2 font-black text-white">{index + 1} / 16</div>}
+        </div>
+        {mode === "instruction" ? <div className="flex flex-1 justify-between px-5 pt-4">{groups.map((g,n) =>
+          <div key={n} className="pointer-events-auto flex w-28 flex-col gap-2">{g.map(p => <button key={p.id} onClick={() => setTriggerAnim({name:p.animName,id:Date.now()})} className="rounded-xl border border-white/10 bg-black/50 p-2 text-sm font-black text-white">{p.label}</button>)}</div>)}</div>
+        : <div className="mt-auto p-4"><div className="pointer-events-auto mx-auto max-w-xl rounded-3xl bg-black/70 p-4 backdrop-blur-lg">
+            <div className="mb-3 flex items-center justify-between text-white"><div><small className="text-white/50">{category.title}</small><b className="block text-sm">Çocuğun sözlü cevabını işaretleyin</b></div>
+              <button onClick={() => trial && playQuestion(trial.part)} disabled={locked} className="flex gap-1 rounded-xl bg-white/10 p-2 text-xs disabled:opacity-40"><Volume2 size={16}/>Tekrar sor</button></div>
+            <div className="mb-3 h-1.5 rounded-full bg-white/10"><div className={twMerge("h-full rounded-full transition-all",seconds<=2?"bg-red-500":"bg-blue-500")} style={{width:`${seconds*20}%`}}/></div>
+            <div className="grid grid-cols-2 gap-3"><button onClick={() => record(false)} disabled={locked} className="rounded-2xl bg-red-500 p-4 font-black text-white disabled:opacity-40"><X className="inline"/> Yanlış / Söylemedi</button><button onClick={() => record(true)} disabled={locked || seconds === 0} className="rounded-2xl bg-emerald-500 p-4 font-black text-black disabled:opacity-40"><Check className="inline"/> Doğru Söyledi</button></div>
+          </div></div>}
+      </div>
+    </div>
+  );
+}
