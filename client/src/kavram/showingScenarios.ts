@@ -1,4 +1,18 @@
 import limbShowingImage from '@/limbs/elkolayak.jpg';
+import jobSoldierFarmerAstronaut from '@/jobs/asker-ciftci-astronot.mp4';
+import jobSoldierPoliceTailor from '@/jobs/asker-polis-terzi.mp4';
+import jobTeacherFirefighterChef from '@/jobs/ogretmen-itfaiye-asci.mp4';
+import jobPoliceBarberDoctor from '@/jobs/polis-berber-doktor.mp4';
+import showChef from '@/jobs/asciyigoster.mp3';
+import showSoldier from '@/jobs/askerigoster.mp3';
+import showAstronaut from '@/jobs/astronotugoster.mp3';
+import showBarber from '@/jobs/berberigoster.mp3';
+import showFarmer from '@/jobs/ciftciyigoster.mp3';
+import showDoctor from '@/jobs/doktorugoster.mp3';
+import showFirefighter from '@/jobs/itfaiyeciyigoster.mp3';
+import showTeacher from '@/jobs/ogretmenigoster.mp3';
+import showPolice from '@/jobs/polisigoster.mp3';
+import showTailor from '@/jobs/terziyigoster.mp3';
 
 export type ShowingPosition = 'left' | 'center' | 'right';
 export type ShowingPoint = readonly [x: number, y: number];
@@ -117,7 +131,43 @@ const home5 = 'utu-camasirmakina-masa.webp';
 const emotion1 = 'sasirmismutluuzgun.mp4';
 const emotion2 = 'sinirlikorkmus.mp4';
 
+// Meslek videoları 736 × 400: seçim alanları gerçek görüntü oranını izler.
+const jobTarget = (
+  targetName: string,
+  promptText: string,
+  audioSrc: string,
+  scenes: [src: string, correctPosition: ShowingPosition][],
+): ShowingTarget => ({
+  targetName,
+  promptText,
+  audioSrc,
+  variants: scenes.map(([src, correctPosition]) => ({
+    src,
+    correctPosition,
+    zoneCount: 3,
+    aspectRatio: 736 / 400,
+  })),
+});
+
 export const SHOWING_TARGETS: Record<string, ShowingTarget[]> = {
+  jobs: [
+    jobTarget('Aşçı', 'Aşçıyı göster.', showChef, [[jobTeacherFirefighterChef, 'right']]),
+    jobTarget('Asker', 'Askeri göster.', showSoldier, [
+      [jobSoldierFarmerAstronaut, 'left'],
+      [jobSoldierPoliceTailor, 'left'],
+    ]),
+    jobTarget('Astronot', 'Astronotu göster.', showAstronaut, [[jobSoldierFarmerAstronaut, 'right']]),
+    jobTarget('Berber', 'Berberi göster.', showBarber, [[jobPoliceBarberDoctor, 'center']]),
+    jobTarget('Çiftçi', 'Çiftçiyi göster.', showFarmer, [[jobSoldierFarmerAstronaut, 'center']]),
+    jobTarget('Doktor', 'Doktoru göster.', showDoctor, [[jobPoliceBarberDoctor, 'right']]),
+    jobTarget('İtfaiyeci', 'İtfaiyeciyi göster.', showFirefighter, [[jobTeacherFirefighterChef, 'center']]),
+    jobTarget('Öğretmen', 'Öğretmeni göster.', showTeacher, [[jobTeacherFirefighterChef, 'left']]),
+    jobTarget('Polis', 'Polisi göster.', showPolice, [
+      [jobPoliceBarberDoctor, 'left'],
+      [jobSoldierPoliceTailor, 'center'],
+    ]),
+    jobTarget('Terzi', 'Terziyi göster.', showTailor, [[jobSoldierPoliceTailor, 'right']]),
+  ],
   limbs: [
     target('El', 'Elini göster.', '', [
       coordinateVariant(limbShowingImage, [
