@@ -1400,7 +1400,10 @@ export default function KavramAssessmentPage() {
 
     const handleNaming = () => {
       setSelectedCategory(null);
-      setActiveEvaluation(selectedCategory);
+      // Sayıları oturum başında bir kez karıştır; asıl kategori listesini değiştirme.
+      setActiveEvaluation(selectedCategory.id === 'numbers'
+        ? { ...selectedCategory, data: shuffleArray([...selectedCategory.data]) }
+        : selectedCategory);
       setEvalIndex(0);
       lockPortrait();
     };
