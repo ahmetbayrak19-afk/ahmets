@@ -13,6 +13,25 @@ import showFirefighter from '@/jobs/itfaiyeciyigoster.mp3';
 import showTeacher from '@/jobs/ogretmenigoster.mp3';
 import showPolice from '@/jobs/polisigoster.mp3';
 import showTailor from '@/jobs/terziyigoster.mp3';
+import placePharmacyBankBakery from '@/mekanlar/eczane-banka-firin.mp4';
+import placeHospitalParkHome from '@/mekanlar/hastane-park-ev.mp4';
+import placeButcherAirportPolice from '@/mekanlar/kasap-havaalanı-karakol.mp4';
+import placeSchoolMosqueGreengrocer from '@/mekanlar/okul-cami-manav.mp4';
+import placeParkingMosqueMarket from '@/mekanlar/otopark-cami-market.mp4';
+import touchBank from '@/mekanlar/bankayadokun.mp3';
+import touchMosque from '@/mekanlar/camiyedokun.mp3';
+import touchPharmacy from '@/mekanlar/eczaneyedokun.mp3';
+import touchHome from '@/mekanlar/evedokun.mp3';
+import touchBakery from '@/mekanlar/firinadokun.mp3';
+import touchHospital from '@/mekanlar/hastaneyedokun.mp3';
+import touchAirport from '@/mekanlar/havaalanınadokun.mp3';
+import touchPoliceStation from '@/mekanlar/karakoladokun.mp3';
+import touchButcher from '@/mekanlar/kasapadokun.mp3';
+import touchGreengrocer from '@/mekanlar/manavadokun.mp3';
+import touchMarket from '@/mekanlar/marketedokun.mp3';
+import touchSchool from '@/mekanlar/okuladokun.mp3';
+import touchParking from '@/mekanlar/otoparkadokun.mp3';
+import touchPark from '@/mekanlar/parkadokun.mp3';
 
 export type ShowingPosition = 'left' | 'center' | 'right';
 export type ShowingPoint = readonly [x: number, y: number];
@@ -131,8 +150,8 @@ const home5 = 'utu-camasirmakina-masa.webp';
 const emotion1 = 'sasirmismutluuzgun.mp4';
 const emotion2 = 'sinirlikorkmus.mp4';
 
-// Meslek videoları 736 × 400: seçim alanları gerçek görüntü oranını izler.
-const jobTarget = (
+// Meslek ve mekan videoları 736 × 400: seçim alanları görüntü oranını izler.
+const threeZoneTarget = (
   targetName: string,
   promptText: string,
   audioSrc: string,
@@ -149,7 +168,25 @@ const jobTarget = (
   })),
 });
 
+const jobTarget = threeZoneTarget;
+
 export const SHOWING_TARGETS: Record<string, ShowingTarget[]> = {
+  places: [
+    threeZoneTarget('Banka', 'Bankaya dokun.', touchBank, [[placePharmacyBankBakery, 'center']]),
+    threeZoneTarget('Cami', 'Camiye dokun.', touchMosque, [[placeSchoolMosqueGreengrocer, 'center'], [placeParkingMosqueMarket, 'center']]),
+    threeZoneTarget('Eczane', 'Eczaneye dokun.', touchPharmacy, [[placePharmacyBankBakery, 'left']]),
+    threeZoneTarget('Ev', 'Eve dokun.', touchHome, [[placeHospitalParkHome, 'right']]),
+    threeZoneTarget('Fırın', 'Fırına dokun.', touchBakery, [[placePharmacyBankBakery, 'right']]),
+    threeZoneTarget('Hastane', 'Hastaneye dokun.', touchHospital, [[placeHospitalParkHome, 'left']]),
+    threeZoneTarget('Havalimanı', 'Havaalanına dokun.', touchAirport, [[placeButcherAirportPolice, 'center']]),
+    threeZoneTarget('Karakol', 'Karakola dokun.', touchPoliceStation, [[placeButcherAirportPolice, 'right']]),
+    threeZoneTarget('Kasap', 'Kasaba dokun.', touchButcher, [[placeButcherAirportPolice, 'left']]),
+    threeZoneTarget('Manav', 'Manava dokun.', touchGreengrocer, [[placeSchoolMosqueGreengrocer, 'right']]),
+    threeZoneTarget('Market', 'Markete dokun.', touchMarket, [[placeParkingMosqueMarket, 'right']]),
+    threeZoneTarget('Okul', 'Okula dokun.', touchSchool, [[placeSchoolMosqueGreengrocer, 'left']]),
+    threeZoneTarget('Otopark', 'Otoparka dokun.', touchParking, [[placeParkingMosqueMarket, 'left']]),
+    threeZoneTarget('Park', 'Parka dokun.', touchPark, [[placeHospitalParkHome, 'center']]),
+  ],
   jobs: [
     jobTarget('Aşçı', 'Aşçıyı göster.', showChef, [[jobTeacherFirefighterChef, 'right']]),
     jobTarget('Asker', 'Askeri göster.', showSoldier, [
