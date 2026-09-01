@@ -563,6 +563,8 @@ const SCENARIO_POOLS: Record<string, any[]> = {
   'Sıcak-Soğuk': [ { id: 'ss1', src: sicaksoguk1, fullSide: 'left' }, { id: 'ss2', src: sicaksoguk2, fullSide: 'left' }, { id: 'ss3', src: sicaksoguk3, fullSide: 'left' }, { id: 'ss4', src: sicaksoguk4, fullSide: 'left' }, { id: 'so1', src: soguksicak1, fullSide: 'right' }, { id: 'so2', src: soguksicak2, fullSide: 'right' }, { id: 'so3', src: soguksicak3, fullSide: 'right' }, { id: 'so4', src: soguksicak4, fullSide: 'right' } ]
 };
 
+const OPPOSITE_QUESTION_COUNT = 10;
+
 const CATEGORY_MAP = [
   { id: 'animals', title: 'Hayvanlar', icon: <PlayCircle />, data: ANIMALS_WITH_VIDEO, type: 'video' },
   { id: 'jobs', title: 'Meslekler', icon: <Briefcase />, data: JOBS_WITH_VIDEO, type: 'video' },
@@ -676,6 +678,10 @@ export default function KavramAssessmentPage() {
   const [questionCount, setQuestionCount] = useState(0); 
   const [correctCount, setCorrectCount] = useState(0); 
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [oppositeReady, setOppositeReady] = useState(false);
+  const [oppositeReplay, setOppositeReplay] = useState(0);
+  const oppositeLockedRef = useRef(true);
+  const oppositeTransitionRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Flashcard
   const [activeEvaluation, setActiveEvaluation] = useState<any | null>(null);
@@ -934,10 +940,47 @@ export default function KavramAssessmentPage() {
     else setLocation(`/assessment/${studentId}`);
   };
 
-  const playSound = (key: string) => {
-    const audio = audioRefs.current[key];
-    if (audio) { audio.currentTime = 0; audio.play().catch(e => console.error(e)); }
-  };
+  useEffect(() => {
+    oppositeLockedRef.current = true;
+    setOppositeReady(false);
+    if (!activeGame) return;
+    const keys: Record<string, [string, string]> = {
+      'Boş-Dolu': ['dolu', 'bos'], 'Az-Çok': ['cok', 'az'],
+      'Ağır-Hafif': ['agir', 'hafif'], 'Açık-Kapalı': ['acik', 'kapali'],
+      'Uzun-Kısa': ['uzun', 'kisa'], 'Büyük-Küçük': ['buyuk', 'kucuk'],
+      'Sıcak-Soğuk': ['sicak', 'soguk'],
+    };
+    const pair = keys[activeGame];
+    const audio = pair && audioRefs.current[pair[targetQuestion === 'full' ? 0 : 1]];
+    let cancelled = false;
+    const unlock = () => {
+      if (cancelled) return;
+      oppositeLockedRef.current = false;
+      setOppositeReady(true);
+    };
+    const reportError = () => {
+      if (!cancelled) toast.error('Yönerge sesi çalınamadı. Tekrar dinle düğmesine basın.');
+    };
+    audio?.addEventListener('ended', unlock);
+    audio?.addEventListener('error', reportError);
+    const timer = window.setTimeout(() => {
+      if (!audio) { reportError(); return; }
+      audio.currentTime = 0;
+      audio.play().catch(reportError);
+    }, 500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      oppositeLockedRef.current = true;
+      if (oppositeTransitionRef.current !== null) {
+        clearTimeout(oppositeTransitionRef.current);
+        oppositeTransitionRef.current = null;
+      }
+      audio?.removeEventListener('ended', unlock);
+      audio?.removeEventListener('error', reportError);
+      if (audio) { audio.pause(); audio.currentTime = 0; }
+    };
+  }, [activeGame, questionCount, targetQuestion, oppositeReplay]);
 
   // --- OYUN MOTORU ---
   const initGame = (concept: string) => {
@@ -950,6 +993,8 @@ export default function KavramAssessmentPage() {
 
   const loadNextQuestion = (currentStep: number, gameType: string | null = activeGame) => {
     if (!gameType) return;
+    oppositeLockedRef.current = true;
+    setOppositeReady(false);
     const pool = SCENARIO_POOLS[gameType];
     const selectedScenario = pool[Math.floor(Math.random() * pool.length)];
     setCurrentGameScenario(selectedScenario);
@@ -958,35 +1003,33 @@ export default function KavramAssessmentPage() {
     setQuestionCount(currentStep + 1);
     setIsTransitioning(false);
 
-    setTimeout(() => {
-      if (gameType === 'Boş-Dolu') isAskingFull ? playSound('dolu') : playSound('bos');
-      else if (gameType === 'Az-Çok') isAskingFull ? playSound('cok') : playSound('az');
-      else if (gameType === 'Ağır-Hafif') isAskingFull ? playSound('agir') : playSound('hafif');
-      else if (gameType === 'Açık-Kapalı') isAskingFull ? playSound('acik') : playSound('kapali');
-      else if (gameType === 'Uzun-Kısa') isAskingFull ? playSound('uzun') : playSound('kisa');
-      else if (gameType === 'Büyük-Küçük') isAskingFull ? playSound('buyuk') : playSound('kucuk');
-      else if (gameType === 'Sıcak-Soğuk') isAskingFull ? playSound('sicak') : playSound('soguk');
-    }, 500);
   };
 
   const handleGameSelection = (clickedSide: 'left' | 'right', e: any) => {
+    if (!currentGameScenario || isTransitioning || oppositeLockedRef.current) return;
+    oppositeLockedRef.current = true;
+    setOppositeReady(false);
     handleTouchEffect(e);
-    if (!currentGameScenario || isTransitioning) return;
     setIsTransitioning(true);
+    touchConfirmationAudioRef.current?.pause();
+    const confirmation = new Audio(dokunmaOnaySes);
+    touchConfirmationAudioRef.current = confirmation;
+    confirmation.play().catch(error => console.log('Dokunma onay sesi hatası:', error));
     let correctSide = targetQuestion === 'full' ? currentGameScenario.fullSide : (currentGameScenario.fullSide === 'left' ? 'right' : 'left');
     let newCorrect = clickedSide === correctSide ? correctCount + 1 : correctCount;
     setCorrectCount(newCorrect);
 
-    if (questionCount >= 5) {
-      setTimeout(() => {
-        setFormData(p => ({ ...p, [activeGame!]: newCorrect === 5 }));
+    if (questionCount >= OPPOSITE_QUESTION_COUNT) {
+      const percentage = Math.round((newCorrect / OPPOSITE_QUESTION_COUNT) * 100);
+      oppositeTransitionRef.current = setTimeout(() => {
+        setFormData(p => ({ ...p, [activeGame!]: percentage }));
         markUnsaved();
-        setCompletedSectionTitle(activeGame);
+        setCompletedSectionTitle(`${activeGame}: ${newCorrect}/${OPPOSITE_QUESTION_COUNT} doğru — %${percentage}`);
         setActiveGame(null);
         unlockOrientation();
       }, 500);
     } else {
-      setTimeout(() => loadNextQuestion(questionCount), 1000);
+      oppositeTransitionRef.current = setTimeout(() => loadNextQuestion(questionCount), 1000);
     }
   };
 
@@ -1169,6 +1212,7 @@ export default function KavramAssessmentPage() {
   const calculateScore = (category: any) => {
     if (category.isGame) {
       const val = formData[category.id];
+      if (typeof val === 'number' && Number.isFinite(val)) return Math.max(0, Math.min(100, val));
       if (val === true) return 100;
       if (val === false) return 0;
       return null; 
@@ -1235,13 +1279,20 @@ export default function KavramAssessmentPage() {
     const isVideo = currentGameScenario.src && currentGameScenario.src.endsWith('.mp4');
     return (
       <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center overflow-hidden">
-        <button onClick={() => { setActiveGame(null); unlockOrientation(); }} className="absolute top-8 right-8 z-[110] bg-white/20 text-white p-3 rounded-full hover:bg-white/30 backdrop-blur-md"><X size={32} /></button>
-        <div className="absolute top-4 left-4 z-[110] bg-black/50 px-4 py-2 rounded-full text-white font-bold text-sm border border-white/20">Soru: {questionCount} / 5</div>
+        <button onClick={() => { oppositeLockedRef.current = true; setActiveGame(null); unlockOrientation(); }} className="absolute top-8 right-8 z-[110] bg-white/20 text-white p-3 rounded-full hover:bg-white/30 backdrop-blur-md"><X size={32} /></button>
+        <button type="button" disabled={isTransitioning} onClick={() => {
+          oppositeLockedRef.current = true;
+          setOppositeReady(false);
+          setOppositeReplay(value => value + 1);
+        }} className="absolute top-16 left-4 z-[110] flex items-center gap-2 rounded-full bg-black/50 px-3 py-2 text-xs text-white disabled:opacity-40">
+          <Volume2 size={16} /> Tekrar dinle
+        </button>
+        <div className="absolute top-4 left-4 z-[110] bg-black/50 px-4 py-2 rounded-full text-white font-bold text-sm border border-white/20">Soru: {questionCount} / {OPPOSITE_QUESTION_COUNT}</div>
         <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden animate-in fade-in zoom-in duration-300" key={questionCount}>
           {isVideo ? <video src={currentGameScenario.src} autoPlay loop muted playsInline className="h-full w-auto max-w-none object-contain pointer-events-none select-none" /> : <img src={currentGameScenario.src} className="h-full w-auto max-w-none object-contain pointer-events-none select-none" />}
           <div className="absolute inset-0 z-20 flex">
-            <div onClick={(e) => handleGameSelection('left', e)} className="w-1/2 h-full cursor-pointer active:bg-white/5 transition-colors"></div>
-            <div onClick={(e) => handleGameSelection('right', e)} className="w-1/2 h-full cursor-pointer active:bg-white/5 transition-colors"></div>
+            <button type="button" aria-label="Sol alan" disabled={!oppositeReady || isTransitioning} onClick={(e) => handleGameSelection('left', e)} className="w-1/2 h-full cursor-pointer active:bg-white/5 transition-colors disabled:cursor-default" />
+            <button type="button" aria-label="Sağ alan" disabled={!oppositeReady || isTransitioning} onClick={(e) => handleGameSelection('right', e)} className="w-1/2 h-full cursor-pointer active:bg-white/5 transition-colors disabled:cursor-default" />
           </div>
         </div>
       </div>
