@@ -641,13 +641,22 @@ const CATEGORY_GROUPS: {
     id: 'eylemler',
     title: 'EYLEMLER VE DURUM KAVRAMLARI',
     children: [
-      {
-        title: 'Zıt Kavramlar',
-        gameIds: ['Boş-Dolu', 'Az-Çok', 'Ağır-Hafif', 'Açık-Kapalı', 'Uzun-Kısa', 'Büyük-Küçük', 'Sıcak-Soğuk'],
-      },
       { title: 'Temel Konumlar', empty: true },
       { title: 'Eylemler (Hareketler)', empty: true },
       { title: 'Duygular', contentId: 'emotions' },
+    ],
+  },
+  {
+    id: 'zit-kavramlar',
+    title: 'ZIT KAVRAMLAR',
+    children: [
+      { title: 'Boş-Dolu', contentId: 'Boş-Dolu' },
+      { title: 'Az-Çok', contentId: 'Az-Çok' },
+      { title: 'Ağır-Hafif', contentId: 'Ağır-Hafif' },
+      { title: 'Açık-Kapalı', contentId: 'Açık-Kapalı' },
+      { title: 'Uzun-Kısa', contentId: 'Uzun-Kısa' },
+      { title: 'Büyük-Küçük', contentId: 'Büyük-Küçük' },
+      { title: 'Sıcak-Soğuk', contentId: 'Sıcak-Soğuk' },
     ],
   },
 ];
