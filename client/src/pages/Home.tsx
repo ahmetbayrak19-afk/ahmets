@@ -33,9 +33,15 @@ export default function Home() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- EKSİK BİLGİ UYARISI İÇİN STATE ---
-  const [missingFieldsWarning, setMissingFieldsWarning] = useState(false);
-  const [missingMessage, setMissingMessage] = useState('');
+  const [registration, setRegistration] = useState<{
+    name: string; age: string; diagnosis: string; photoPreview: string | null;
+    photoFile: File | null;
+  } | null>(null);
+  const [isCheckingStudent, setIsCheckingStudent] = useState(false);
+  const [isSavingStudent, setIsSavingStudent] = useState(false);
+  const [savedStudentId, setSavedStudentId] = useState<string | null>(null);
+  const [studentSaveError, setStudentSaveError] = useState('');
+  const studentSaveLock = useRef(false);
 
   // --- DAHİLİ KAMERA (WEB RTC) STATE VE REFLERİ ---
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
@@ -183,7 +189,6 @@ export default function Home() {
     setDiagnosis('');
     setPhotoFile(null);
     setPhotoPreview(null);
-    setMissingFieldsWarning(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -302,12 +307,16 @@ export default function Home() {
   // --- KAYIT İŞLEMLERİ ---
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (studentSaveLock.current || registration) return;
 
     if(!name.trim() || !age.trim()) {
         toast.warning("İsim ve Yaş zorunludur!");
         return;
     }
 
+    studentSaveLock.current = true;
+    setIsCheckingStudent(true);
+    try {
     const normalizedName = normalizeNameForMatch(name);
     const isDuplicate = students.some(s => normalizeNameForMatch(s.name) === normalizedName);
     if (isDuplicate) {
@@ -332,45 +341,45 @@ export default function Home() {
       return;
     }
 
-    const isDiagnosisMissing = !diagnosis.trim();
-    const isPhotoMissing = !photoFile;
-
-    if (isDiagnosisMissing || isPhotoMissing) {
-        if (isDiagnosisMissing && isPhotoMissing) {
-            setMissingMessage("tanı ve fotoğraf");
-        } else if (isDiagnosisMissing) {
-            setMissingMessage("tanı");
-        } else {
-            setMissingMessage("fotoğraf");
-        }
-        setMissingFieldsWarning(true);
-        return;
+    setStudentSaveError('');
+    setSavedStudentId(null);
+    setRegistration({ name: name.trim(), age: age.trim(), diagnosis: diagnosis.trim(), photoPreview, photoFile });
+    } finally {
+      studentSaveLock.current = false;
+      setIsCheckingStudent(false);
     }
-
-    await proceedToSaveStudent();
   };
 
   const proceedToSaveStudent = async () => {
-    setMissingFieldsWarning(false);
-
-    const loadingToast = toast.loading("Öğrenci kaydediliyor...");
-    const result = await addStudent(name, age, diagnosis, photoFile);
-    toast.dismiss(loadingToast);
-
+    if (!registration || savedStudentId || studentSaveLock.current) return;
+    studentSaveLock.current = true;
+    setIsSavingStudent(true);
+    setStudentSaveError('');
+    try {
+    const result = await addStudent(registration.name, registration.age, registration.diagnosis, registration.photoFile);
     if (!result.success) {
       if ('reason' in result && result.reason === 'archived') {
         const archivedMatch = archivedStudents.find(student =>
-          normalizeNameForMatch(student.name || '') === normalizeNameForMatch(name),
+          normalizeNameForMatch(student.name || '') === normalizeNameForMatch(registration.name),
         );
-        setArchivedDuplicateStudent(archivedMatch || { name: name.trim() });
+        setRegistration(null);
+        setArchivedDuplicateStudent(archivedMatch || { name: registration.name });
       } else {
-        toast.error(result.message || 'Öğrenci kaydedilemedi.');
+        setStudentSaveError('Öğrenci kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin. Bilgileriniz korunuyor.');
       }
       return;
     }
 
+    setSavedStudentId(result.studentId!);
     clearStudentForm();
-    toast.success("Öğrenci başarıyla eklendi");
+    toast.success('Öğrenci kaydedildi.');
+    } catch (error) {
+      console.error('Öğrenci kaydı başarısız:', error);
+      setStudentSaveError('Öğrenci kaydedilemedi. Lütfen tekrar deneyin. Bilgileriniz korunuyor.');
+    } finally {
+      studentSaveLock.current = false;
+      setIsSavingStudent(false);
+    }
   };
 
   const openTeacherAssignment = (student: any) => {
@@ -911,19 +920,47 @@ export default function Home() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={missingFieldsWarning} onOpenChange={setMissingFieldsWarning}>
-        <AlertDialogContent className="bg-slate-900 border-slate-800 text-white">
+      <AlertDialog open={registration !== null} onOpenChange={(open) => {
+        if (!open && !studentSaveLock.current) setRegistration(null);
+      }}>
+        <AlertDialogContent className="bg-slate-900 border-slate-800 text-white max-w-md max-h-[90dvh] overflow-y-auto"
+          onEscapeKeyDown={(event) => { if (studentSaveLock.current) event.preventDefault(); }}>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-orange-400">
-              <AlertTriangle className="h-6 w-6" /> Eksik Bilgi
+            <AlertDialogTitle className="flex items-center gap-2">
+              {savedStudentId ? <CheckCircle className="h-6 w-6 text-green-400" /> : <UserCircle2 className="h-6 w-6 text-blue-400" />}
+              {savedStudentId ? 'Öğrenci kaydedildi' : 'Öğrenci bilgilerini onayla'}
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-300 text-base mt-2">
-              Öğrenciye ait <strong>{missingMessage}</strong> girmediniz. Bu şekilde devam edip kaydetmek istiyor musunuz?
+            <AlertDialogDescription className="text-slate-400">
+              {savedStudentId ? 'İsterseniz değerlendirmeye başlayabilir veya Tamam diyerek pencereyi kapatabilirsiniz.' : 'Bilgileri kontrol edin. Onayınızdan sonra öğrenci kaydedilecek.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-slate-800 text-white border-0 hover:bg-slate-700">Vazgeç</AlertDialogCancel>
-            <AlertDialogAction onClick={proceedToSaveStudent} className="bg-blue-600 hover:bg-blue-700 text-white border-0">Yine de Kaydet</AlertDialogAction>
+          {registration && <div className="space-y-4">
+            <div className="mx-auto h-28 w-28 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 flex items-center justify-center">
+              {registration.photoPreview ? <img src={registration.photoPreview} alt={registration.name} className="h-full w-full object-cover" /> : <UserCircle2 className="h-16 w-16 text-slate-500" />}
+            </div>
+            <dl className="space-y-2 rounded-xl bg-slate-950 p-4 text-sm">
+              <div><dt className="text-slate-400">Ad Soyad</dt><dd className="font-semibold break-words">{registration.name}</dd></div>
+              <div><dt className="text-slate-400">Yaş</dt><dd>{registration.age}</dd></div>
+              <div><dt className="text-slate-400">Tanı</dt><dd className="break-words">{registration.diagnosis || 'Belirtilmedi'}</dd></div>
+            </dl>
+            {!savedStudentId && (!registration.diagnosis || !registration.photoFile) && <p className="text-xs text-amber-300">{!registration.diagnosis && !registration.photoFile ? 'Tanı ve fotoğraf' : !registration.diagnosis ? 'Tanı' : 'Fotoğraf'} eklenmedi. İsterseniz bu şekilde kaydedebilirsiniz.</p>}
+            {studentSaveError && <p role="alert" className="text-sm text-red-300">{studentSaveError}</p>}
+            {isSavingStudent && <p role="status" className="text-sm text-blue-300">Öğrenci kaydediliyor, lütfen bekleyin…</p>}
+            {savedStudentId && <p role="status" className="text-sm text-green-400">Kayıt başarıyla tamamlandı.</p>}
+          </div>}
+          <AlertDialogFooter className="gap-2">
+            {savedStudentId ? <>
+              <AlertDialogCancel asChild><Button type="button" variant="outline" className="bg-slate-800 border-slate-700">Tamam</Button></AlertDialogCancel>
+              <Button type="button" className="bg-green-600 hover:bg-green-700" onClick={() => {
+                setRegistration(null);
+                setLocation(`/assessment/${savedStudentId}`);
+              }}><ClipboardCheck className="mr-2 h-4 w-4" />Değerlendirmeye git</Button>
+            </> : <>
+              <AlertDialogCancel asChild><Button type="button" variant="outline" disabled={isSavingStudent} className="bg-slate-800 border-slate-700" onClick={(event) => { if (studentSaveLock.current) event.preventDefault(); }}>Düzenle / Vazgeç</Button></AlertDialogCancel>
+              <Button type="button" disabled={isSavingStudent} aria-busy={isSavingStudent} onClick={proceedToSaveStudent} className="bg-blue-600 hover:bg-blue-700">
+                {isSavingStudent && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isSavingStudent ? 'Kaydediliyor…' : 'Onayla ve kaydet'}
+              </Button>
+            </>}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1259,10 +1296,11 @@ export default function Home() {
             <CardHeader><CardTitle className="text-lg">Öğrenci Ekle</CardTitle></CardHeader>
             <CardContent>
               <form onSubmit={handleAddStudent} className="space-y-3">
+                <fieldset disabled={isCheckingStudent || isSavingStudent || registration !== null} className="space-y-3 min-w-0">
                 <div className="flex gap-2 items-center">
 
                   <div
-                    onClick={startCamera}
+                    onClick={() => { if (!studentSaveLock.current && !registration) startCamera(); }}
                     className="h-10 w-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center cursor-pointer shrink-0 overflow-hidden hover:bg-slate-700 transition-colors relative group"
                     title="Kamerayı Aç"
                   >
@@ -1287,7 +1325,11 @@ export default function Home() {
                   <Input placeholder="Yaş" type="number" value={age} onChange={(e) => setAge(e.target.value)} className="bg-slate-950 border-slate-800 w-20" />
                   <Input placeholder="Tanı" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} className="bg-slate-950 border-slate-800 flex-1" />
                 </div>
-                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">Kaydet</Button>
+                <Button type="submit" disabled={isCheckingStudent || isSavingStudent || registration !== null} aria-busy={isCheckingStudent || isSavingStudent} className="w-full bg-blue-600 hover:bg-blue-700">
+                  {(isCheckingStudent || isSavingStudent) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isSavingStudent ? 'Kaydediliyor…' : isCheckingStudent ? 'Kontrol ediliyor…' : 'Kaydet'}
+                </Button>
+                </fieldset>
               </form>
             </CardContent>
           </Card>
