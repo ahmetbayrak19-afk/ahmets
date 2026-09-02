@@ -32,6 +32,20 @@ import touchMarket from '@/mekanlar/marketedokun.mp3';
 import touchSchool from '@/mekanlar/okuladokun.mp3';
 import touchParking from '@/mekanlar/otoparkadokun.mp3';
 import touchPark from '@/mekanlar/parkadokun.mp3';
+import drinkAyranTeaJuice from '@/icecekler/ayran-cay-meyvesuyu.mp4';
+import drinkCoffeeColaSoda from '@/icecekler/kahve-kola-soda.mp4';
+import drinkColaLemonadeWater from '@/icecekler/kola-limonata-su.mp4';
+import drinkPickleTeaMilk from '@/icecekler/tursusuyu-cay-sut.mp4';
+import showAyran from '@/icecekler/ayranigoster.mp3';
+import showTea from '@/icecekler/cayigoster.mp3';
+import showCoffee from '@/icecekler/kahveyigoster.mp3';
+import showCola from '@/icecekler/kolayigoster.mp3';
+import showLemonade from '@/icecekler/limonatagoster.mp3';
+import showJuice from '@/icecekler/meyvesuyugoster.mp3';
+import showSoda from '@/icecekler/sodayigoster.mp3';
+import showWater from '@/icecekler/suyugoster.mp3';
+import showMilk from '@/icecekler/sutugoster.mp3';
+import showPickleJuice from '@/icecekler/tursusuyunugoster.mp3';
 
 export type ShowingPosition = 'left' | 'center' | 'right';
 export type ShowingPoint = readonly [x: number, y: number];
@@ -171,6 +185,18 @@ const threeZoneTarget = (
 const jobTarget = threeZoneTarget;
 
 export const SHOWING_TARGETS: Record<string, ShowingTarget[]> = {
+  drinks: [
+    threeZoneTarget('Ayran', 'Ayranı göster.', showAyran, [[drinkAyranTeaJuice, 'left']]),
+    threeZoneTarget('Çay', 'Çayı göster.', showTea, [[drinkAyranTeaJuice, 'center'], [drinkPickleTeaMilk, 'center']]),
+    threeZoneTarget('Kahve', 'Kahveyi göster.', showCoffee, [[drinkCoffeeColaSoda, 'left']]),
+    threeZoneTarget('Kola', 'Kolayı göster.', showCola, [[drinkCoffeeColaSoda, 'center'], [drinkColaLemonadeWater, 'left']]),
+    threeZoneTarget('Limonata', 'Limonatayı göster.', showLemonade, [[drinkColaLemonadeWater, 'center']]),
+    threeZoneTarget('Meyve suyu', 'Meyve suyunu göster.', showJuice, [[drinkAyranTeaJuice, 'right']]),
+    threeZoneTarget('Soda', 'Sodayı göster.', showSoda, [[drinkCoffeeColaSoda, 'right']]),
+    threeZoneTarget('Su', 'Suyu göster.', showWater, [[drinkColaLemonadeWater, 'right']]),
+    threeZoneTarget('Süt', 'Sütü göster.', showMilk, [[drinkPickleTeaMilk, 'right']]),
+    threeZoneTarget('Turşu suyu', 'Turşu suyunu göster.', showPickleJuice, [[drinkPickleTeaMilk, 'left']]),
+  ],
   places: [
     threeZoneTarget('Banka', 'Bankaya dokun.', touchBank, [[placePharmacyBankBakery, 'center']]),
     threeZoneTarget('Cami', 'Camiye dokun.', touchMosque, [[placeSchoolMosqueGreengrocer, 'center'], [placeParkingMosqueMarket, 'center']]),
