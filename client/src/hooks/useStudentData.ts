@@ -131,7 +131,7 @@ export function useStudentData() {
         photoUrl = await getDownloadURL(storageRef); 
       }
 
-      await addDoc(collection(db, "institutions", instId, "students"), {
+      const studentRef = await addDoc(collection(db, "institutions", instId, "students"), {
         name: name.trim(),
         normalizedName,
         age: age.trim(),
@@ -141,7 +141,7 @@ export function useStudentData() {
         associatedTeacherIds: [tName],
         createdAt: new Date().toISOString()
       });
-      return { success: true, message: "Öğrenci eklendi" };
+      return { success: true, message: "Öğrenci eklendi", studentId: studentRef.id };
     } catch (e) { 
       console.error(e);
       return { success: false, message: "Başarısız" }; 
