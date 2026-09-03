@@ -1,4 +1,22 @@
 import limbShowingImage from '@/limbs/elkolayak.jpg';
+import schoolBagBookUniform from '@/okulmalzemeleri/canta-kitap-kiyafet.webp';
+import schoolRulerNotebookPen from '@/okulmalzemeleri/cetvel-defter-kalem.webp';
+import schoolEraserSharpenerPaint from '@/okulmalzemeleri/silgi-kalemtras-suluboya.webp';
+import schoolBottlePenEraser from '@/okulmalzemeleri/suluk-kalem-silgi.webp';
+import schoolBoardDeskNotice from '@/okulmalzemeleri/tahta-sıra-pano.webp';
+import showSchoolBag from '@/okulmalzemeleri/hangisicanta.mp3';
+import showRuler from '@/okulmalzemeleri/hangisicetvel.mp3';
+import showNotebook from '@/okulmalzemeleri/hangisidefter.mp3';
+import showPen from '@/okulmalzemeleri/hangisikalem.mp3';
+import showSharpener from '@/okulmalzemeleri/hangisikalemtras.mp3';
+import showBook from '@/okulmalzemeleri/hangisikitap.mp3';
+import showUniform from '@/okulmalzemeleri/hangisiokulkiyafeti.mp3';
+import showNoticeBoard from '@/okulmalzemeleri/hangisipano.mp3';
+import showEraser from '@/okulmalzemeleri/hangisisilgi.mp3';
+import showDesk from '@/okulmalzemeleri/hangisisira.mp3';
+import showPaint from '@/okulmalzemeleri/hangisisuluboya.mp3';
+import showBottle from '@/okulmalzemeleri/hangisisuluk.mp3';
+import showBlackboard from '@/okulmalzemeleri/hangisiyazitahtasi.mp3';
 import jobSoldierFarmerAstronaut from '@/jobs/asker-ciftci-astronot.mp4';
 import jobSoldierPoliceTailor from '@/jobs/asker-polis-terzi.mp4';
 import jobTeacherFirefighterChef from '@/jobs/ogretmen-itfaiye-asci.mp4';
@@ -184,7 +202,28 @@ const threeZoneTarget = (
 
 const jobTarget = threeZoneTarget;
 
+const schoolTarget = (targetName: string, promptText: string, audioSrc: string,
+  scenes: [string, ShowingPosition, number][]): ShowingTarget => ({
+  targetName, promptText, audioSrc,
+  variants: scenes.map(([src, correctPosition, aspectRatio]) => ({ src, correctPosition, aspectRatio, zoneCount: 3 })),
+});
+
 export const SHOWING_TARGETS: Record<string, ShowingTarget[]> = {
+  school: [
+    schoolTarget('Cetvel', 'Hangisi cetvel?', showRuler, [[schoolRulerNotebookPen, 'left', 1220 / 686]]),
+    schoolTarget('Ders kitabı', 'Hangisi kitap?', showBook, [[schoolBagBookUniform, 'center', 1792 / 1008]]),
+    schoolTarget('Kalem', 'Hangisi kalem?', showPen, [[schoolRulerNotebookPen, 'right', 1220 / 686], [schoolBottlePenEraser, 'center', 1672 / 941]]),
+    schoolTarget('Kalemtıraş', 'Hangisi kalemtıraş?', showSharpener, [[schoolEraserSharpenerPaint, 'center', 1672 / 941]]),
+    schoolTarget('Okul çantası', 'Hangisi çanta?', showSchoolBag, [[schoolBagBookUniform, 'left', 1792 / 1008]]),
+    schoolTarget('Okul defteri', 'Hangisi defter?', showNotebook, [[schoolRulerNotebookPen, 'center', 1220 / 686]]),
+    schoolTarget('Okul kıyafeti', 'Hangisi okul kıyafeti?', showUniform, [[schoolBagBookUniform, 'right', 1792 / 1008]]),
+    schoolTarget('Pano', 'Hangisi pano?', showNoticeBoard, [[schoolBoardDeskNotice, 'right', 1672 / 941]]),
+    schoolTarget('Silgi', 'Hangisi silgi?', showEraser, [[schoolEraserSharpenerPaint, 'left', 1672 / 941], [schoolBottlePenEraser, 'right', 1672 / 941]]),
+    schoolTarget('Sınıf sırası', 'Hangisi sıra?', showDesk, [[schoolBoardDeskNotice, 'center', 1672 / 941]]),
+    schoolTarget('Sınıf tahtası', 'Hangisi yazı tahtası?', showBlackboard, [[schoolBoardDeskNotice, 'left', 1672 / 941]]),
+    schoolTarget('Sulu boya', 'Hangisi sulu boya?', showPaint, [[schoolEraserSharpenerPaint, 'right', 1672 / 941]]),
+    schoolTarget('Suluk', 'Hangisi suluk?', showBottle, [[schoolBottlePenEraser, 'left', 1672 / 941]]),
+  ],
   drinks: [
     threeZoneTarget('Ayran', 'Ayranı göster.', showAyran, [[drinkAyranTeaJuice, 'left']]),
     threeZoneTarget('Çay', 'Çayı göster.', showTea, [[drinkAyranTeaJuice, 'center'], [drinkPickleTeaMilk, 'center']]),
