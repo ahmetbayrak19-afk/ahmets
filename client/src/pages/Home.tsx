@@ -4,10 +4,10 @@ import { useLocation } from 'wouter';
 import { useStudentData } from '@/hooks/useStudentData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, LogOut, Trash2, UserCircle2, ShieldCheck, Loader2, Users, AlertTriangle, Baby, Stethoscope, ClipboardCheck, BookOpen, AlertCircle, Lock, CheckCircle, UserX, ShieldAlert, Camera, X, BellRing, Archive, RotateCcw, Menu, ChevronRight } from 'lucide-react';
+import { Search, LogOut, Trash2, UserCircle2, ShieldCheck, Loader2, Users, AlertTriangle, Baby, Stethoscope, ClipboardCheck, BookOpen, AlertCircle, Lock, CheckCircle, UserX, ShieldAlert, Camera, X, BellRing, Archive, RotateCcw, Menu, ChevronRight, NotebookPen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -19,10 +19,12 @@ import {
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import LogoLoader from '@/components/LogoLoader';
-import { Pencil } from 'lucide-react';
+import { Pencil, UserPlus, ChevronDown } from 'lucide-react';
 import { getStudentAge } from '@/lib/studentAge';
+import StudentNotesDialog from '@/components/StudentNotesDialog';
 
 export default function Home() {
+  const [isStudentFormOpen, setIsStudentFormOpen] = useState(false);
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
@@ -62,6 +64,7 @@ export default function Home() {
 
   // --- INSTAGRAM TARZI BÜYÜK FOTOĞRAF GÖSTERİCİ STATE'İ ---
   const [viewingStudentPhoto, setViewingStudentPhoto] = useState<{url: string, name: string} | null>(null);
+  const [notesStudent, setNotesStudent] = useState<{id: string, name: string} | null>(null);
 
   // --- ÖĞRENCİ KADROSU VE SİLME ONAYI STATE'LERİ ---
   const [teacherAssignmentStudent, setTeacherAssignmentStudent] = useState<any | null>(null);
@@ -376,6 +379,7 @@ export default function Home() {
 
     setSavedStudentId(result.studentId!);
     clearStudentForm();
+    setIsStudentFormOpen(false);
     toast.success('Öğrenci kaydedildi.');
     } catch (error) {
       console.error('Öğrenci kaydı başarısız:', error);
@@ -652,12 +656,23 @@ export default function Home() {
             )}
 
             <div className="flex items-center gap-2 mt-1">
-                <Button disabled={isDeletionPending} variant="outline" className="flex-1 border-slate-700 bg-slate-950 hover:bg-slate-800 text-slate-300 h-10 text-xs font-semibold px-2 disabled:cursor-not-allowed" onClick={() => setLocation(`/assessment/${student.id}`)}>
-                    <ClipboardCheck size={16} className="mr-2 text-orange-500"/> Değerlendirme
+                <Button disabled={isDeletionPending} variant="outline" className="h-9 flex-1 border-slate-700 bg-slate-950 px-1.5 text-[11px] font-semibold text-slate-300 hover:bg-slate-800 disabled:cursor-not-allowed" onClick={() => setLocation(`/assessment/${student.id}`)}>
+                    <ClipboardCheck size={15} className="mr-1.5 text-orange-500"/> Değerlendirme
                 </Button>
-                <Button disabled={isDeletionPending} className="flex-1 bg-blue-600 hover:bg-blue-700 h-10 text-xs font-semibold text-white px-2 disabled:cursor-not-allowed" onClick={() => setLocation(`/student/${student.id}`)}>
-                    <BookOpen size={16} className="mr-2"/> Çalışma
+                <Button disabled={isDeletionPending} className="h-9 flex-1 bg-blue-600 px-1.5 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed" onClick={() => setLocation(`/student/${student.id}`)}>
+                    <BookOpen size={15} className="mr-1.5"/> Çalışma
                 </Button>
+                {!isDeletionPending && (isAdmin || isMyStudent) && <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`${student.name} öğrenci notları`}
+                  title="Öğrenci notları"
+                  className="h-10 w-10 shrink-0 border border-white/5 bg-slate-900 text-slate-400 hover:bg-amber-500/10 hover:text-amber-400"
+                  onClick={() => setNotesStudent({ id: student.id, name: student.name })}
+                >
+                  <NotebookPen className="h-5 w-5" />
+                </Button>}
                 {!isDeletionPending && (isAdmin || isMyStudent) && <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-500 hover:text-red-500 hover:bg-red-500/10 border border-white/5 bg-slate-900 shrink-0">
@@ -737,7 +752,7 @@ export default function Home() {
               <div className="w-64 h-64 sm:w-80 sm:h-80 rounded-full border-4 border-slate-700 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.6)]">
                 <img src={viewingStudentPhoto.url} alt={viewingStudentPhoto.name} className="w-full h-full object-cover" />
               </div>
-              <h2 className="text-white text-3xl font-bold mt-8 text-center">{formatName(viewingStudentPhoto.name)}</h2>
+              <h2 className="text-white text-3xl font-bold mt-8 text-center">{normalizeStudentFullName(viewingStudentPhoto.name)}</h2>
 
               <button
                 data-android-back
@@ -750,6 +765,12 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <StudentNotesDialog
+        student={notesStudent}
+        teacherName={currentTeacher?.name || ''}
+        onClose={() => setNotesStudent(null)}
+      />
 
       <AnimatePresence>
         {exitWarningVisible && (
@@ -1336,9 +1357,9 @@ export default function Home() {
         <header className="border-b border-white/5 py-2">
           {isAdmin ? (
             <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5 sm:gap-3">
-              <p className="min-w-0 text-[11px] leading-tight text-slate-400 sm:text-sm">
-                <span className="block text-[9px] text-slate-500 sm:inline sm:text-sm">Hoş geldin<span className="hidden sm:inline">, </span></span>
-                <span className="block break-words font-semibold text-slate-300 sm:inline">{currentTeacher.name}</span>
+              <p className="flex min-w-0 items-center gap-1 whitespace-nowrap text-[11px] leading-tight text-slate-400 sm:text-sm">
+                <span className="shrink-0">Hoş geldin,</span>
+                <span className="truncate font-semibold text-slate-300">Admin</span>
               </p>
               <Button
                 variant="outline"
@@ -1366,7 +1387,7 @@ export default function Home() {
             <div className="flex min-w-0 items-center gap-2">
               <p className="min-w-0 truncate text-sm text-slate-400">
                 <UserCircle2 className="mr-1.5 inline h-4 w-4 text-blue-500" />
-                Hoş geldin, {currentTeacher.name}
+                Hoş geldin, {formatName(currentTeacher.name)}
               </p>
               <Button
                 variant="ghost"
@@ -1379,9 +1400,29 @@ export default function Home() {
           )}
         </header>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid items-start md:grid-cols-3 gap-6">
           <Card className="md:col-span-1 bg-slate-900 border-white/10">
-            <CardHeader><CardTitle className="text-lg">Öğrenci Ekle</CardTitle></CardHeader>
+            <button
+              type="button"
+              aria-expanded={isStudentFormOpen}
+              aria-controls="student-registration-panel"
+              disabled={isCheckingStudent || isSavingStudent || registration !== null}
+              onClick={() => setIsStudentFormOpen(open => !open)}
+              className="flex min-h-14 w-full items-center gap-2 rounded-xl px-4 py-3 text-left text-sm font-semibold text-blue-300 transition-colors hover:bg-blue-500/10 disabled:opacity-60"
+            >
+              <UserPlus className="h-5 w-5" /> Öğrenci Ekle
+              <ChevronDown className={`ml-auto h-4 w-4 transition-transform duration-200 ${isStudentFormOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <AnimatePresence initial={false}>
+            {isStudentFormOpen && <motion.div
+              id="student-registration-panel"
+              key="student-registration-panel"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22 }}
+              className="overflow-hidden"
+            >
             <CardContent>
               <form onSubmit={handleAddStudent} className="space-y-3">
                 <fieldset disabled={isCheckingStudent || isSavingStudent || registration !== null} className="space-y-3 min-w-0">
@@ -1420,8 +1461,10 @@ export default function Home() {
                 </fieldset>
               </form>
             </CardContent>
+            </motion.div>}
+            </AnimatePresence>
           </Card>
-          <Card className="md:col-span-2 bg-slate-900 border-white/10 flex items-center px-6">
+          <Card className="md:col-span-2 min-h-14 bg-slate-900 border-white/10 flex items-center px-6">
             <Search className="mr-3 text-slate-500" />
             <Input placeholder="Öğrenci, tanı veya yaş ara..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="bg-slate-950 border-slate-800" />
           </Card>
