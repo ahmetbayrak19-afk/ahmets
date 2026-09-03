@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { formatStudentName } from '@/lib/studentName';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { ArrowLeft, CheckCircle2, Lock, Search, Sparkles, Trophy } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -333,7 +334,7 @@ export default function AliciGame7({ studentId, onClose, onComplete }: AliciGame
               </div>
               <div className="mt-3 w-full rounded-xl bg-slate-950/80 px-2 py-2 text-center backdrop-blur-sm">
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-300">Baş Dedektif</p>
-                <p className="truncate text-base font-black">{studentName}</p>
+                <p className="truncate text-base font-black">{formatStudentName(studentName)}</p>
               </div>
             </section>
             <section>
