@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { formatStudentName } from '@/lib/studentName';
 import { useLocation, useRoute } from 'wouter';
 import { useStudentData } from '@/hooks/useStudentData';
 import { db } from '../firebase';
@@ -1684,7 +1685,7 @@ export default function KavramAssessmentPage() {
           <Button variant="ghost" size="icon" onClick={requestPageExit} className="text-slate-400 hover:bg-slate-800"><ArrowLeft /></Button>
           <div>
             <h1 className="text-lg font-bold">Kavram Değerlendirme</h1>
-            <p className="text-xs text-slate-400">{student.name}</p>
+            <p className="text-xs text-slate-400">{formatStudentName(student.name)}</p>
           </div>
         </div>
         <div className="flex min-w-[7.25rem] flex-col items-end gap-1">

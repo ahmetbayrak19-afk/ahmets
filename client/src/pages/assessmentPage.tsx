@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatStudentName } from '@/lib/studentName';
 import { useLocation, useRoute } from 'wouter';
 import { useStudentData } from '@/hooks/useStudentData';
 import { Button } from '@/components/ui/button';
@@ -99,7 +100,7 @@ export default function AssessmentPage() {
             {step === 'select' ? 'Program Seçimi' : 'Başlangıç'}
           </h1>
           <p className="text-xs text-slate-400">
-            {step === 'select' ? student.name : 'Hangisiyle başlamak istersin?'}
+            {step === 'select' ? formatStudentName(student.name) : 'Hangisiyle başlamak istersin?'}
           </p>
         </div>
       </header>

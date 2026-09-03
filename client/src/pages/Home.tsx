@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { formatStudentName, normalizeStudentFullName } from '@/lib/studentName';
 import { useLocation } from 'wouter';
 import { useStudentData } from '@/hooks/useStudentData';
 import { Button } from '@/components/ui/button';
@@ -181,16 +182,7 @@ export default function Home() {
     setLocation('/login');
   };
 
-  const formatName = (fullName: string) => {
-    if (!fullName) return "";
-    const parts = fullName.trim().split(/\s+/);
-    if (parts.length >= 3) {
-      const firstInitial = parts[0].charAt(0).toUpperCase() + '.';
-      const rest = parts.slice(1).join(' ');
-      return `${firstInitial} ${rest}`;
-    }
-    return fullName;
-  };
+  const formatName = formatStudentName;
 
   const normalizeNameForMatch = (value: string) =>
     value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('tr-TR');
@@ -403,7 +395,7 @@ export default function Home() {
     editPhotoVersion.current++;
     setEditPhotoLoading(false);
     setEditStudentError('');
-    setEditingStudent({ id: student.id, name: student.name || '', age: getStudentAge(student),
+    setEditingStudent({ id: student.id, name: normalizeStudentFullName(student.name || ''), age: getStudentAge(student),
       diagnosis: student.diagnosis || '', photoPreview: student.photoUrl || null,
       photoFile: null, removePhoto: false });
   };
@@ -745,7 +737,7 @@ export default function Home() {
               <div className="w-64 h-64 sm:w-80 sm:h-80 rounded-full border-4 border-slate-700 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.6)]">
                 <img src={viewingStudentPhoto.url} alt={viewingStudentPhoto.name} className="w-full h-full object-cover" />
               </div>
-              <h2 className="text-white text-3xl font-bold mt-8 text-center">{viewingStudentPhoto.name}</h2>
+              <h2 className="text-white text-3xl font-bold mt-8 text-center">{formatName(viewingStudentPhoto.name)}</h2>
 
               <button
                 data-android-back
@@ -1035,7 +1027,7 @@ export default function Home() {
               {registration.photoPreview ? <img src={registration.photoPreview} alt={registration.name} className="h-full w-full object-cover" /> : <UserCircle2 className="h-16 w-16 text-slate-500" />}
             </div>
             <dl className="space-y-2 rounded-xl bg-slate-950 p-4 text-sm">
-              <div><dt className="text-slate-400">Ad Soyad</dt><dd className="font-semibold break-words">{registration.name}</dd></div>
+              <div><dt className="text-slate-400">Ad Soyad</dt><dd className="font-semibold break-words">{normalizeStudentFullName(registration.name)}</dd></div>
               <div><dt className="text-slate-400">Yaş</dt><dd>{registration.age}</dd></div>
               <div><dt className="text-slate-400">Tanı</dt><dd className="break-words">{registration.diagnosis || 'Belirtilmedi'}</dd></div>
             </dl>
@@ -1267,7 +1259,7 @@ export default function Home() {
                         String(student.name || '?').charAt(0).toUpperCase()
                       )}
                     </div>
-                    <p className="min-w-0 flex-1 truncate font-semibold text-white">{student.name}</p>
+                    <p className="min-w-0 flex-1 truncate font-semibold text-white">{formatName(student.name)}</p>
                     <Button
                       className="h-9 shrink-0 bg-green-600 px-3 text-xs text-white hover:bg-green-700"
                       onClick={() => handleRestoreArchivedStudent(student)}
@@ -1310,7 +1302,7 @@ export default function Home() {
               return (
                 <div key={student.id} className="rounded-xl border border-orange-500/20 bg-orange-950/10 p-4">
                   <div className="mb-3">
-                    <p className="font-semibold text-white">{student.name}</p>
+                    <p className="font-semibold text-white">{formatName(student.name)}</p>
                     <p className="mt-1 text-xs text-slate-400">
                       Talep eden: <span className="text-orange-300">{student.deletionRequestedBy || 'Bilinmiyor'}</span>
                     </p>

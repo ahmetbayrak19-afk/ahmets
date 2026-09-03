@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { formatStudentName } from '@/lib/studentName';
 import { useLocation, useRoute } from 'wouter';
 import { useStudentData } from '@/hooks/useStudentData';
 import { db } from '../firebase';
@@ -256,7 +257,7 @@ export default function AbaAssessmentPage() {
             </Button>
             <div>
                 <h1 className="text-lg font-bold tracking-tight">ABA Değerlendirme</h1>
-                <p className="text-xs text-slate-400 font-medium">{student?.name}</p>
+                <p className="text-xs text-slate-400 font-medium">{formatStudentName(student?.name)}</p>
             </div>
             </div>
         </header>

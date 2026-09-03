@@ -11,6 +11,7 @@ import { clsx } from 'clsx';
 import { getCurrentTeacherAssociationUpdate } from '@/lib/studentTeacherAssociation';
 import LogoLoader from '@/components/LogoLoader';
 import { getStudentAge } from '@/lib/studentAge';
+import { formatStudentName } from '@/lib/studentName';
 
 const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
@@ -133,7 +134,7 @@ export default function StudentDashboard() {
             <ArrowLeft />
           </Button>
           <div>
-            <h1 className="text-lg font-bold">{student?.name}</h1>
+            <h1 className="text-lg font-bold">{formatStudentName(student?.name)}</h1>
             <p className="text-xs text-slate-400">{getStudentAge(student) !== '' ? `${getStudentAge(student)} Yaş` : ''} {student?.diagnosis ? `- ${student.diagnosis}` : ''}</p>
           </div>
         </div>
