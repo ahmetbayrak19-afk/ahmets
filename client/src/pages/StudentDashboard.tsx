@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { clsx } from 'clsx';
 import { getCurrentTeacherAssociationUpdate } from '@/lib/studentTeacherAssociation';
 import LogoLoader from '@/components/LogoLoader';
+import { getStudentAge } from '@/lib/studentAge';
 
 const MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
@@ -133,7 +134,7 @@ export default function StudentDashboard() {
           </Button>
           <div>
             <h1 className="text-lg font-bold">{student?.name}</h1>
-            <p className="text-xs text-slate-400">{student?.age ? `${student.age} Yaş` : ''} {student?.diagnosis ? `- ${student.diagnosis}` : ''}</p>
+            <p className="text-xs text-slate-400">{getStudentAge(student) !== '' ? `${getStudentAge(student)} Yaş` : ''} {student?.diagnosis ? `- ${student.diagnosis}` : ''}</p>
           </div>
         </div>
         <Select value={selectedMonth} onValueChange={setSelectedMonth}>

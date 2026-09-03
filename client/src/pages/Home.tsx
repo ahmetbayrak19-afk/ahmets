@@ -18,11 +18,22 @@ import {
 import { toast } from 'sonner';
 import { twMerge } from 'tailwind-merge';
 import LogoLoader from '@/components/LogoLoader';
+import { Pencil } from 'lucide-react';
+import { getStudentAge } from '@/lib/studentAge';
 
 export default function Home() {
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
+  const [editingStudent, setEditingStudent] = useState<{
+    id: string; name: string; age: string; diagnosis: string;
+    photoPreview: string | null; photoFile: File | null; removePhoto: boolean;
+  } | null>(null);
+  const [isUpdatingStudent, setIsUpdatingStudent] = useState(false);
+  const [editPhotoLoading, setEditPhotoLoading] = useState(false);
+  const [editStudentError, setEditStudentError] = useState('');
+  const editStudentLock = useRef(false);
+  const editPhotoVersion = useRef(0);
   const [searchTerm, setSearchTerm] = useState('');
 
   const [duplicateError, setDuplicateError] = useState(false);
@@ -76,6 +87,7 @@ export default function Home() {
     archivedStudents,
     teachers,
     addStudent,
+    updateStudentProfile,
     findArchivedStudentByName,
     deleteStudent,
     approveStudentDeletion,
@@ -387,6 +399,35 @@ export default function Home() {
     setSelectedTeacherNames(Array.from(new Set(student.associatedTeacherIds || [])) as string[]);
   };
 
+  const openStudentEditor = (student: any) => {
+    editPhotoVersion.current++;
+    setEditPhotoLoading(false);
+    setEditStudentError('');
+    setEditingStudent({ id: student.id, name: student.name || '', age: getStudentAge(student),
+      diagnosis: student.diagnosis || '', photoPreview: student.photoUrl || null,
+      photoFile: null, removePhoto: false });
+  };
+
+  const saveStudentEdits = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editingStudent || editStudentLock.current || editPhotoLoading) return;
+    editStudentLock.current = true;
+    setIsUpdatingStudent(true);
+    setEditStudentError('');
+    try {
+      const result = await updateStudentProfile(editingStudent.id, editingStudent);
+      if (result.success) {
+        setEditingStudent(null);
+        toast.success(result.message);
+      } else setEditStudentError(result.message);
+    } catch {
+      setEditStudentError('Bilgiler kaydedilemedi. Lütfen tekrar deneyin.');
+    } finally {
+      editStudentLock.current = false;
+      setIsUpdatingStudent(false);
+    }
+  };
+
   const toggleTeacherSelection = (teacherName: string) => {
     setSelectedTeacherNames(current => current.includes(teacherName)
       ? current.filter(name => name !== teacherName)
@@ -464,7 +505,7 @@ export default function Home() {
   const searchedStudents = students.filter(student => {
     if (!normalizedSearchTerm) return true;
 
-    return [student.name, student.diagnosis, student.age].some(value =>
+    return [student.name, student.diagnosis, getStudentAge(student)].some(value =>
       String(value ?? '').toLocaleLowerCase('tr-TR').includes(normalizedSearchTerm),
     );
   });
@@ -538,6 +579,12 @@ export default function Home() {
                       <h3 className="font-bold text-base text-white leading-tight line-clamp-2 break-words" title={student.name}>
                         {displayName}
                       </h3>
+                      {!isDeletionPending && (isAdmin || isMyStudent) && <button
+                        type="button" aria-label={`${student.name} bilgilerini düzenle`} title="Bilgileri düzenle"
+                        onClick={() => openStudentEditor(student)}
+                        className="mt-1 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-slate-400 hover:bg-slate-800 hover:text-white">
+                        <Pencil size={12} /> Düzenle
+                      </button>}
                       {isDeletionPending && (
                         <p className="mt-1 text-[10px] font-semibold text-orange-300">Silme onayı bekliyor</p>
                       )}
@@ -553,7 +600,7 @@ export default function Home() {
                     </div>
                     <div className="flex items-center gap-1 bg-slate-900/50 px-2 py-0.5 rounded border border-white/5">
                         <Baby size={11} className="text-purple-400 shrink-0" />
-                        <span className="text-[10px] text-slate-300 font-medium">{student.age || "-"} Yaş</span>
+                        <span className="text-[10px] text-slate-300 font-medium">{getStudentAge(student) || "-"} Yaş</span>
                     </div>
                 </div>
             </div>
@@ -864,6 +911,55 @@ export default function Home() {
             </motion.div>
         )}
       </AnimatePresence>
+
+      <Dialog open={editingStudent !== null} onOpenChange={(open) => {
+        if (!open && !editStudentLock.current) { editPhotoVersion.current++; setEditingStudent(null); }
+      }}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md max-h-[90dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Öğrenci bilgilerini düzenle</DialogTitle>
+            <DialogDescription className="text-slate-400">Güncel yaşını girin. Sonraki takvim yıllarında yaşı otomatik artar. Değerlendirme kayıtları korunur.</DialogDescription>
+          </DialogHeader>
+          {editingStudent && <form onSubmit={saveStudentEdits} className="space-y-4">
+            <fieldset disabled={isUpdatingStudent} className="space-y-3">
+              <div className="flex items-center gap-3">
+                {editingStudent.photoPreview ? <img src={editingStudent.photoPreview} alt="Öğrenci fotoğrafı" className="h-20 w-20 rounded-xl object-cover" /> : <UserCircle2 className="h-20 w-20 text-slate-500" />}
+                <label className="text-sm flex-1">Fotoğraf değiştir
+                  <input type="file" accept="image/*" className="mt-1 block w-full text-xs" onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    if (!file.type.startsWith('image/')) { setEditStudentError('Bir görsel dosyası seçin.'); return; }
+                    const version = ++editPhotoVersion.current;
+                    setEditPhotoLoading(true);
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      if (version !== editPhotoVersion.current) return;
+                      setEditingStudent(prev => prev && ({ ...prev, photoFile: file, photoPreview: String(reader.result), removePhoto: false }));
+                      setEditPhotoLoading(false);
+                    };
+                    reader.onerror = () => { if (version === editPhotoVersion.current) { setEditPhotoLoading(false); setEditStudentError('Fotoğraf okunamadı.'); } };
+                    reader.readAsDataURL(file);
+                  }} />
+                </label>
+              </div>
+              <button type="button" className="text-xs text-slate-400 hover:text-white" onClick={() => {
+                editPhotoVersion.current++; setEditPhotoLoading(false);
+                setEditingStudent(prev => prev && ({ ...prev, photoPreview: null, photoFile: null, removePhoto: true }));
+              }}>Fotoğrafı kaldır</button>
+              <label className="block text-sm">Ad Soyad<Input required value={editingStudent.name} onChange={e => setEditingStudent(prev => prev && ({ ...prev, name: e.target.value }))} className="mt-1 bg-slate-950 border-slate-700" /></label>
+              <label className="block text-sm">Güncel yaş<Input required type="number" min="0" step="1" value={editingStudent.age} onChange={e => setEditingStudent(prev => prev && ({ ...prev, age: e.target.value }))} className="mt-1 bg-slate-950 border-slate-700" /></label>
+              <label className="block text-sm">Tanı<Input value={editingStudent.diagnosis} onChange={e => setEditingStudent(prev => prev && ({ ...prev, diagnosis: e.target.value }))} className="mt-1 bg-slate-950 border-slate-700" /></label>
+            </fieldset>
+            {editStudentError && <p role="alert" className="text-sm text-red-300">{editStudentError}</p>}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" disabled={isUpdatingStudent} className="bg-slate-800 border-slate-700" onClick={() => { editPhotoVersion.current++; setEditingStudent(null); }}>Vazgeç</Button>
+              <Button type="submit" disabled={isUpdatingStudent || editPhotoLoading} aria-busy={isUpdatingStudent} className="bg-blue-600 hover:bg-blue-700">
+                {(isUpdatingStudent || editPhotoLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isUpdatingStudent ? 'Kaydediliyor…' : editPhotoLoading ? 'Fotoğraf hazırlanıyor…' : 'Değişiklikleri kaydet'}
+              </Button>
+            </div>
+          </form>}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={duplicateError} onOpenChange={setDuplicateError}>
         <AlertDialogContent className="bg-red-950 border-red-800 text-white">

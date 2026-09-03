@@ -591,6 +591,15 @@ const CATEGORY_MAP = [
   { id: 'Sıcak-Soğuk', title: 'Sıcak-Soğuk', icon: <ThermometerSun />, isGame: true },
 ];
 
+const getNamingResultKey = (categoryId: string, name: string) => `${categoryId}_${name}_Isimlendirme`;
+const readNamingResult = (data: Record<string, any>, categoryId: string, name: string) => {
+  const key = getNamingResultKey(categoryId, name);
+  if (Object.prototype.hasOwnProperty.call(data, key)) return data[key];
+  // Old shared keys cannot tell which category was actually assessed.
+  const owners = CATEGORY_MAP.filter(category => category.data?.some(item => item.name === name));
+  return owners.length === 1 && Object.prototype.hasOwnProperty.call(data, name) ? data[name] : undefined;
+};
+
 /** Ana başlıklar ve alt kategoriler. contentId → CATEGORY_MAP.id; empty → henüz içerik yok */
 const CATEGORY_GROUPS: {
   id: string;
@@ -695,6 +704,8 @@ export default function KavramAssessmentPage() {
   // Flashcard
   const [activeEvaluation, setActiveEvaluation] = useState<any | null>(null);
   const [evalIndex, setEvalIndex] = useState(0);
+  const namingInputAfterRef = useRef(0);
+  const [resultsLoadError, setResultsLoadError] = useState(false);
 
   // Ayırt etme
   const [isDiscriminationMode, setIsDiscriminationMode] = useState(false);
@@ -783,16 +794,31 @@ export default function KavramAssessmentPage() {
       buyuk: new Audio(buyukSes), kucuk: new Audio(kucukSes)
     };
 
+    let cancelled = false;
     const loadData = async () => {
       if (!studentId) return;
       setLoading(true);
+      setFormData({});
+      setResultsLoadError(false);
+      setActiveEvaluation(null);
+      setActiveGame(null);
+      setIsDiscriminationMode(false);
+      setCompletedSectionTitle(null);
+      setSelectedCategory(null);
+      setSelectedGroupId(null);
       const instId = localStorage.getItem("kazanim-takip-institution-id");
+      try {
+      if (!instId) throw new Error('Kurum bilgisi bulunamadı.');
       const docSnap = await getDoc(doc(db, "institutions", instId!, "students", studentId, "assessments", "kavram"));
-      if (docSnap.exists()) setFormData(docSnap.data());
+      if (cancelled) return;
+      setFormData(docSnap.exists() ? docSnap.data() : {});
       setDirty(false);
-      setLoading(false);
+      } catch (error) {
+        if (!cancelled) { setResultsLoadError(true); toast.error('Sonuçlar yüklenemedi. Sayfayı yeniden açın.'); }
+      } finally { if (!cancelled) setLoading(false); }
     };
     loadData();
+    return () => { cancelled = true; };
   }, [studentId]);
 
   useEffect(() => {
@@ -916,6 +942,7 @@ export default function KavramAssessmentPage() {
   };
 
   const handleSave = async (showMessage = true) => {
+    if (loading || resultsLoadError) { toast.error('Sonuçlar yüklenmeden kayıt yapılamaz.'); return false; }
     setIsSaving(true);
     setSaveBanner(null);
     try {
@@ -1052,8 +1079,11 @@ export default function KavramAssessmentPage() {
   };
 
   const handleEvalResponse = (status: boolean) => {
+    if (!activeEvaluation || Date.now() < namingInputAfterRef.current) return;
     const currentItem = activeEvaluation.data[evalIndex];
-    setFormData(prev => ({ ...prev, [currentItem.name]: status }));
+    if (!currentItem) return;
+    namingInputAfterRef.current = Date.now() + 600;
+    setFormData(prev => ({ ...prev, [getNamingResultKey(activeEvaluation.id, currentItem.name)]: status }));
     markUnsaved();
     
     if (evalIndex < activeEvaluation.data.length - 1) {
@@ -1190,8 +1220,8 @@ export default function KavramAssessmentPage() {
     let correct = 0;
     let attempted = 0;
     items.forEach((item: any) => {
-      const val = formData[item.name];
-      if (val !== undefined && val !== null) {
+      const val = readNamingResult(formData, category.id, item.name);
+      if (typeof val === 'boolean') {
         attempted++;
         if (val === true) correct++;
       }
@@ -1315,7 +1345,7 @@ export default function KavramAssessmentPage() {
     const progress = Math.round(((evalIndex) / activeEvaluation.data.length) * 100);
 
     return (
-      <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-4">
+      <div className={twMerge("fixed inset-0 z-[100] flex flex-col items-center justify-center p-4", activeEvaluation.id === 'clothes' ? 'bg-slate-700' : 'bg-black')}>
         <div className="w-full max-w-4xl flex items-center justify-between mb-4 z-50">
           <div className="flex items-center gap-3">
             <span className="text-white/70 text-sm font-medium">{activeEvaluation.title} - İsimlendirme</span>
@@ -1327,7 +1357,7 @@ export default function KavramAssessmentPage() {
           <button onClick={() => { setActiveEvaluation(null); unlockOrientation(); }} className="bg-white/10 hover:bg-white/20 p-2 rounded-full text-white transition-colors"><X size={24} /></button>
         </div>
 
-        <div className="relative flex-1 w-full max-w-4xl bg-black rounded-3xl overflow-hidden border border-white/10 mb-6 flex items-center justify-center animate-pop-in" key={evalIndex}>
+        <div className={twMerge("relative flex-1 w-full max-w-4xl rounded-3xl overflow-hidden border border-white/10 mb-6 flex items-center justify-center animate-pop-in", activeEvaluation.id === 'clothes' ? 'bg-slate-500' : 'bg-black')} key={evalIndex}>
           {isVideo ? (
             <video src={item.src} autoPlay loop playsInline muted={true} className="w-full h-full object-contain" />
           ) : (
@@ -1459,6 +1489,7 @@ export default function KavramAssessmentPage() {
     const showingScore = calculateShowingScore(selectedCategory);
 
     const handleNaming = () => {
+      namingInputAfterRef.current = Date.now() + 600;
       setSelectedCategory(null);
       // Sayıları oturum başında bir kez karıştır; asıl kategori listesini değiştirme.
       setActiveEvaluation(selectedCategory.id === 'numbers'
@@ -1668,7 +1699,7 @@ export default function KavramAssessmentPage() {
       </header>
 
       <main className="max-w-4xl mx-auto">
-        {loading ? <LogoLoader /> : (
+        {loading ? <LogoLoader /> : resultsLoadError ? <p role="alert" className="p-6 text-center text-red-300">Sonuçlar yüklenemedi. Kayıtlarınızı korumak için değerlendirme kapatıldı; sayfayı yeniden açın.</p> : (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
             {/* Ana kategoriler — 2 sütun */}
             <div className="grid grid-cols-2 gap-3">
