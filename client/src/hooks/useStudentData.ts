@@ -329,7 +329,7 @@ export function useStudentData() {
       });
       archiveCreated = true;
 
-      const childCollectionNames = ['assessments', 'profiles', 'knownPeople', 'talk_cards', 'ifade'];
+      const childCollectionNames = ['assessments', 'profiles', 'knownPeople', 'talk_cards', 'ifade', 'notes'];
 
       for (const collectionName of childCollectionNames) {
         const childSnapshot = await getDocs(collection(studentDocRef, collectionName));
