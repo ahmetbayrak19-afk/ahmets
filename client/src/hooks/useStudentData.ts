@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { normalizeStudentFullName } from '@/lib/studentName';
 import { db, auth, storage } from '../firebase'; 
 import {
   collection,
@@ -132,7 +133,7 @@ export function useStudentData() {
       }
 
       const studentRef = await addDoc(collection(db, "institutions", instId, "students"), {
-        name: name.trim(),
+        name: normalizeStudentFullName(name),
         normalizedName,
         age: age.trim(),
         ageReferenceYear: new Date().getFullYear(),
@@ -188,7 +189,7 @@ export function useStudentData() {
         photoUrl = await getDownloadURL(photoRef);
       }
       await updateDoc(studentRef, {
-        name: values.name.trim(), normalizedName, age: values.age.trim(),
+        name: normalizeStudentFullName(values.name), normalizedName, age: values.age.trim(),
         ageReferenceYear: new Date().getFullYear(), diagnosis: values.diagnosis.trim(), photoUrl,
         lastUpdatedBy: teacherName, lastUpdatedAt: serverTimestamp(),
       });
