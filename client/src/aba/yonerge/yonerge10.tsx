@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { formatStudentName } from '@/lib/studentName';
 import {
   XCircle, Check, X, Trophy, PlayCircle, RefreshCw, Filter, Box,
 } from 'lucide-react';
@@ -241,7 +242,7 @@ export default function Yonerge10({
                 {studentName.trim() ? (
                   <>
                     {' '}İsimli yönergelerde öğrenci adı otomatik yazılır:{' '}
-                    <span className="text-teal-300 font-medium">{studentName.trim()}</span>.
+                    <span className="text-teal-300 font-medium">{formatStudentName(studentName)}</span>.
                   </>
                 ) : null}{' '}
                 İstemediğin yönergeye dokunarak değiştirebilirsin.
