@@ -135,6 +135,7 @@ export function useStudentData() {
         name: name.trim(),
         normalizedName,
         age: age.trim(),
+        ageReferenceYear: new Date().getFullYear(),
         diagnosis: diagnosis.trim(),
         photoUrl: photoUrl, 
         createdBy: tName,
@@ -155,6 +156,48 @@ export function useStudentData() {
 
   const getStudentRef = (instId: string, studentId: string) =>
     doc(db, "institutions", instId, "students", studentId);
+
+  const updateStudentProfile = async (id: string, values: {
+    name: string; age: string; diagnosis: string; photoFile: File | null; removePhoto: boolean;
+  }) => {
+    const { instId, teacherName } = getSession();
+    if (!instId || !teacherName) return { success: false, message: 'Oturum bulunamadı.' };
+    if (!values.name.trim() || !values.age.trim() || !Number.isInteger(Number(values.age)) || Number(values.age) < 0) {
+      return { success: false, message: 'İsim ve geçerli bir yaş girin.' };
+    }
+    try {
+      const studentRef = getStudentRef(instId, id);
+      const snapshot = await getDoc(studentRef);
+      if (!snapshot.exists()) return { success: false, message: 'Öğrenci bulunamadı.' };
+      const data = snapshot.data();
+      const allowed = teacherName.toLocaleLowerCase('tr-TR') === 'admin'
+        || data.createdBy === teacherName || (data.associatedTeacherIds || []).includes(teacherName);
+      if (!allowed || data.deletionStatus === 'pending') return { success: false, message: 'Bu öğrenciyi düzenleme yetkiniz yok veya silme talebi bekliyor.' };
+      const normalizedName = normalizeStudentName(values.name);
+      if (normalizedName !== normalizeStudentName(data.name || '')) {
+        const matches = await getDocs(collection(db, 'institutions', instId, 'students'));
+        if (matches.docs.some(item => item.id !== id && normalizeStudentName(item.data().name || '') === normalizedName)
+          || await findArchivedStudentByName(values.name)) {
+          return { success: false, message: 'Bu isimde aktif veya arşivlenmiş öğrenci var.' };
+        }
+      }
+      let photoUrl = values.removePhoto ? null : (data.photoUrl || null);
+      if (values.photoFile) {
+        const photoRef = ref(storage, `institutions/${instId}/students/${id}_${Date.now()}_${values.photoFile.name}`);
+        await uploadBytes(photoRef, values.photoFile);
+        photoUrl = await getDownloadURL(photoRef);
+      }
+      await updateDoc(studentRef, {
+        name: values.name.trim(), normalizedName, age: values.age.trim(),
+        ageReferenceYear: new Date().getFullYear(), diagnosis: values.diagnosis.trim(), photoUrl,
+        lastUpdatedBy: teacherName, lastUpdatedAt: serverTimestamp(),
+      });
+      return { success: true, message: 'Öğrenci bilgileri güncellendi.' };
+    } catch (error) {
+      console.error('Öğrenci bilgileri güncellenemedi:', error);
+      return { success: false, message: 'Kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin.' };
+    }
+  };
 
   const updateStudentTeachers = async (studentId: string, teacherNames: string[]) => {
     const { instId, teacherName } = getSession();
@@ -421,7 +464,8 @@ export function useStudentData() {
     currentTeacher, 
     currentInstitution, 
     isLoading, 
-    addStudent, 
+    addStudent,
+    updateStudentProfile,
     findArchivedStudentByName,
     deleteStudent, 
     approveStudentDeletion,
