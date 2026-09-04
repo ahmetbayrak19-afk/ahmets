@@ -64,6 +64,26 @@ import showSoda from '@/icecekler/sodayigoster.mp3';
 import showWater from '@/icecekler/suyugoster.mp3';
 import showMilk from '@/icecekler/sutugoster.mp3';
 import showPickleJuice from '@/icecekler/tursusuyunugoster.mp3';
+import foodFishPastaSoup from '@/temelgidalar/balik-makarna-corba.mp4';
+import foodBreadRiceChicken from '@/temelgidalar/ekmek-pilav-tavuk.mp4';
+import foodMeatHoneyCheese from '@/temelgidalar/et-bal-peynir.mp4';
+import foodJamYogurtEgg from '@/temelgidalar/recel-yogurt-yumurta.mp4';
+import foodOliveNutsOil from '@/temelgidalar/zeytin-kuruyemis-sıvıyag.mp4';
+import showHoney from '@/temelgidalar/hangisibal.mp3';
+import showFish from '@/temelgidalar/hangisibalik.mp3';
+import showSoup from '@/temelgidalar/hangisicorba.mp3';
+import showBread from '@/temelgidalar/hangisiekmek.mp3';
+import showMeat from '@/temelgidalar/hangisiet.mp3';
+import showNuts from '@/temelgidalar/hangisikuruyemis.mp3';
+import showPasta from '@/temelgidalar/hangisimakarna.mp3';
+import showCheese from '@/temelgidalar/hangisipeynir.mp3';
+import showRice from '@/temelgidalar/hangisipilav.mp3';
+import showJam from '@/temelgidalar/hangisirecel.mp3';
+import showOil from '@/temelgidalar/hangisisiviyag.mp3';
+import showChicken from '@/temelgidalar/hangisitavuk.mp3';
+import showYogurt from '@/temelgidalar/hangisiyogurt.mp3';
+import showEgg from '@/temelgidalar/hangisiyumurta.mp3';
+import showOlive from '@/temelgidalar/hangisizeytin.mp3';
 
 export type ShowingPosition = 'left' | 'center' | 'right';
 export type ShowingPoint = readonly [x: number, y: number];
@@ -235,6 +255,23 @@ export const SHOWING_TARGETS: Record<string, ShowingTarget[]> = {
     threeZoneTarget('Su', 'Suyu göster.', showWater, [[drinkColaLemonadeWater, 'right']]),
     threeZoneTarget('Süt', 'Sütü göster.', showMilk, [[drinkPickleTeaMilk, 'right']]),
     threeZoneTarget('Turşu suyu', 'Turşu suyunu göster.', showPickleJuice, [[drinkPickleTeaMilk, 'left']]),
+  ],
+  foods: [
+    schoolTarget('Bal', 'Hangisi bal?', showHoney, [[foodMeatHoneyCheese, 'center', 736 / 400]]),
+    schoolTarget('Balık', 'Hangisi balık?', showFish, [[foodFishPastaSoup, 'left', 736 / 400]]),
+    schoolTarget('Çorba', 'Hangisi çorba?', showSoup, [[foodFishPastaSoup, 'right', 736 / 400]]),
+    schoolTarget('Ekmek', 'Hangisi ekmek?', showBread, [[foodBreadRiceChicken, 'left', 848 / 464]]),
+    schoolTarget('Et', 'Hangisi et?', showMeat, [[foodMeatHoneyCheese, 'left', 736 / 400]]),
+    schoolTarget('Kuruyemiş', 'Hangisi kuruyemiş?', showNuts, [[foodOliveNutsOil, 'center', 848 / 464]]),
+    schoolTarget('Makarna', 'Hangisi makarna?', showPasta, [[foodFishPastaSoup, 'center', 736 / 400]]),
+    schoolTarget('Peynir', 'Hangisi peynir?', showCheese, [[foodMeatHoneyCheese, 'right', 736 / 400]]),
+    schoolTarget('Pilav', 'Hangisi pilav?', showRice, [[foodBreadRiceChicken, 'center', 848 / 464]]),
+    schoolTarget('Reçel', 'Hangisi reçel?', showJam, [[foodJamYogurtEgg, 'left', 736 / 400]]),
+    schoolTarget('Sıvı yağ', 'Hangisi sıvı yağ?', showOil, [[foodOliveNutsOil, 'right', 848 / 464]]),
+    schoolTarget('Tavuk', 'Hangisi tavuk?', showChicken, [[foodBreadRiceChicken, 'right', 848 / 464]]),
+    schoolTarget('Yoğurt', 'Hangisi yoğurt?', showYogurt, [[foodJamYogurtEgg, 'center', 736 / 400]]),
+    schoolTarget('Yumurta', 'Hangisi yumurta?', showEgg, [[foodJamYogurtEgg, 'right', 736 / 400]]),
+    schoolTarget('Zeytin', 'Hangisi zeytin?', showOlive, [[foodOliveNutsOil, 'left', 848 / 464]]),
   ],
   places: [
     threeZoneTarget('Banka', 'Bankaya dokun.', touchBank, [[placePharmacyBankBakery, 'center']]),
