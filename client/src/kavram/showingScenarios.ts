@@ -96,6 +96,13 @@ import showSix from '@/kavram/sayi/altiyigoster.mp3';
 import showSeven from '@/kavram/sayi/yediyigoster.mp3';
 import showEight from '@/kavram/sayi/sekizigoster.mp3';
 import showNine from '@/kavram/sayi/dokuzugoster.mp3';
+import shapeCircleTriangleSquare from '@/shapes/daire-ucgen-kare.mp4';
+import shapeRectangleCirclePentagon from '@/shapes/dikdortgen-daire-besgen.mp4';
+import showPentagon from '@/shapes/besgenhangisi.mp3';
+import showCircle from '@/shapes/dairehangisi.mp3';
+import showRectangle from '@/shapes/dikdortgenhangisi.mp3';
+import showSquare from '@/shapes/karehangisi.mp3';
+import showTriangle from '@/shapes/ucgenhangisi.mp3';
 
 export type ShowingPosition = 'left' | 'center' | 'right';
 export type ShowingPoint = readonly [x: number, y: number];
@@ -295,6 +302,16 @@ export const SHOWING_TARGETS: Record<string, ShowingTarget[]> = {
     schoolTarget('Yedi', 'Yediyi göster.', showSeven, [[numberFourSevenThree, 'center', 736 / 400]]),
     schoolTarget('Sekiz', 'Sekizi göster.', showEight, [[numberFiveEightTwo, 'center', 736 / 400]]),
     schoolTarget('Dokuz', 'Dokuzu göster.', showNine, [[numberSixOneNine, 'right', 736 / 400]]),
+  ],
+  shapes: [
+    schoolTarget('Beşgen', 'Beşgen hangisi?', showPentagon, [[shapeRectangleCirclePentagon, 'right', 736 / 400]]),
+    schoolTarget('Daire', 'Daire hangisi?', showCircle, [
+      [shapeCircleTriangleSquare, 'left', 736 / 400],
+      [shapeRectangleCirclePentagon, 'center', 736 / 400],
+    ]),
+    schoolTarget('Dikdörtgen', 'Dikdörtgen hangisi?', showRectangle, [[shapeRectangleCirclePentagon, 'left', 736 / 400]]),
+    schoolTarget('Kare', 'Kare hangisi?', showSquare, [[shapeCircleTriangleSquare, 'right', 736 / 400]]),
+    schoolTarget('Üçgen', 'Üçgen hangisi?', showTriangle, [[shapeCircleTriangleSquare, 'center', 736 / 400]]),
   ],
   places: [
     threeZoneTarget('Banka', 'Bankaya dokun.', touchBank, [[placePharmacyBankBakery, 'center']]),
