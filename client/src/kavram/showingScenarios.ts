@@ -84,6 +84,18 @@ import showChicken from '@/temelgidalar/hangisitavuk.mp3';
 import showYogurt from '@/temelgidalar/hangisiyogurt.mp3';
 import showEgg from '@/temelgidalar/hangisiyumurta.mp3';
 import showOlive from '@/temelgidalar/hangisizeytin.mp3';
+import numberFourSevenThree from '@/kavram/sayi/4-7-3.mp4';
+import numberFiveEightTwo from '@/kavram/sayi/5-8-2.mp4';
+import numberSixOneNine from '@/kavram/sayi/6-1-9.mp4';
+import showOne from '@/kavram/sayi/birigoster.mp3';
+import showTwo from '@/kavram/sayi/ikiyigoster.mp3';
+import showThree from '@/kavram/sayi/ucugoster.mp3';
+import showFour from '@/kavram/sayi/dordugoster.mp3';
+import showFive from '@/kavram/sayi/besigoster.mp3';
+import showSix from '@/kavram/sayi/altiyigoster.mp3';
+import showSeven from '@/kavram/sayi/yediyigoster.mp3';
+import showEight from '@/kavram/sayi/sekizigoster.mp3';
+import showNine from '@/kavram/sayi/dokuzugoster.mp3';
 
 export type ShowingPosition = 'left' | 'center' | 'right';
 export type ShowingPoint = readonly [x: number, y: number];
@@ -272,6 +284,17 @@ export const SHOWING_TARGETS: Record<string, ShowingTarget[]> = {
     schoolTarget('Yoğurt', 'Hangisi yoğurt?', showYogurt, [[foodJamYogurtEgg, 'center', 736 / 400]]),
     schoolTarget('Yumurta', 'Hangisi yumurta?', showEgg, [[foodJamYogurtEgg, 'right', 736 / 400]]),
     schoolTarget('Zeytin', 'Hangisi zeytin?', showOlive, [[foodOliveNutsOil, 'left', 848 / 464]]),
+  ],
+  numbers: [
+    schoolTarget('Bir', 'Biri göster.', showOne, [[numberSixOneNine, 'center', 736 / 400]]),
+    schoolTarget('İki', 'İkiyi göster.', showTwo, [[numberFiveEightTwo, 'right', 736 / 400]]),
+    schoolTarget('Üç', 'Üçü göster.', showThree, [[numberFourSevenThree, 'right', 736 / 400]]),
+    schoolTarget('Dört', 'Dördü göster.', showFour, [[numberFourSevenThree, 'left', 736 / 400]]),
+    schoolTarget('Beş', 'Beşi göster.', showFive, [[numberFiveEightTwo, 'left', 736 / 400]]),
+    schoolTarget('Altı', 'Altıyı göster.', showSix, [[numberSixOneNine, 'left', 736 / 400]]),
+    schoolTarget('Yedi', 'Yediyi göster.', showSeven, [[numberFourSevenThree, 'center', 736 / 400]]),
+    schoolTarget('Sekiz', 'Sekizi göster.', showEight, [[numberFiveEightTwo, 'center', 736 / 400]]),
+    schoolTarget('Dokuz', 'Dokuzu göster.', showNine, [[numberSixOneNine, 'right', 736 / 400]]),
   ],
   places: [
     threeZoneTarget('Banka', 'Bankaya dokun.', touchBank, [[placePharmacyBankBakery, 'center']]),
