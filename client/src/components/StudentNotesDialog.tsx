@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
-import { CalendarDays, Loader2, NotebookPen, Send, UserRound } from 'lucide-react';
+import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
+import { CalendarDays, Loader2, NotebookPen, Send, UserRound, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { db } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { formatStudentName } from '@/lib/studentName';
 import LogoLoader from '@/components/LogoLoader';
 
@@ -52,6 +56,8 @@ export default function StudentNotesDialog({ student, teacherName, onClose }: {
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [now, setNow] = useState(Date.now());
+  const [noteToDelete, setNoteToDelete] = useState<StudentNote | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const saveLock = useRef(false);
 
   useEffect(() => {
@@ -66,6 +72,7 @@ export default function StudentNotesDialog({ student, teacherName, onClose }: {
     setText('');
     setLoadError('');
     setIsLoading(false);
+    setNoteToDelete(null);
     if (!student) return;
     const institutionId = localStorage.getItem('kazanim-takip-institution-id');
     if (!institutionId) {
@@ -122,19 +129,38 @@ export default function StudentNotesDialog({ student, teacherName, onClose }: {
 
   const visibleNotes = notes.filter(note => isCurrentNote(note, now));
 
+  const deleteOwnNote = async () => {
+    if (!student || !noteToDelete || noteToDelete.teacherName !== teacherName || isDeleting) return;
+    const institutionId = localStorage.getItem('kazanim-takip-institution-id');
+    if (!institutionId) {
+      toast.error('Kurum oturumu bulunamadı.');
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'institutions', institutionId, 'students', student.id, 'notes', noteToDelete.id));
+      setNoteToDelete(null);
+      toast.success('Not silindi.');
+    } catch (error) {
+      console.error('Öğrenci notu silinemedi:', error);
+      toast.error('Not silinemedi. Bağlantınızı kontrol edin.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
-    <Dialog open={Boolean(student)} onOpenChange={open => { if (!open && !saveLock.current) onClose(); }}>
+    <Dialog open={Boolean(student)} onOpenChange={open => { if (!open && !saveLock.current && !isDeleting) onClose(); }}>
       <DialogContent className="flex max-h-[88vh] max-w-xl flex-col border-slate-700 bg-slate-950 text-white">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl"><NotebookPen className="h-5 w-5 text-amber-400" /> Öğrenci Notları</DialogTitle>
-          <DialogDescription className="text-slate-400">{formatStudentName(student?.name || '')} hakkında öğretmen notları · Son 365 gün</DialogDescription>
+          <DialogDescription className="text-slate-400">{formatStudentName(student?.name || '')} hakkında öğretmen notları</DialogDescription>
         </DialogHeader>
 
         <div className="rounded-xl border border-slate-700 bg-slate-900/70 p-3">
           <div className="mb-2 flex items-center gap-2 text-xs text-slate-400">
             <UserRound className="h-4 w-4 text-blue-400" />
             <span>Notu yazan: <strong className="text-slate-200">{teacherName}</strong></span>
-            <span className="ml-auto">Tarih otomatik eklenir</span>
           </div>
           <textarea
             aria-label="Öğrenci notu"
@@ -158,10 +184,19 @@ export default function StudentNotesDialog({ student, teacherName, onClose }: {
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
           {isLoading && <LogoLoader />}
           {loadError && <p role="alert" className="py-4 text-sm text-red-300">{loadError}</p>}
-          {!isLoading && !loadError && visibleNotes.length === 0 && <div className="rounded-xl border border-dashed border-slate-700 py-10 text-center text-sm text-slate-500">Son 365 gün içinde kaydedilmiş not yok.</div>}
+          {!isLoading && !loadError && visibleNotes.length === 0 && <div className="rounded-xl border border-dashed border-slate-700 py-10 text-center text-sm text-slate-500">Bu öğrenci için henüz not yok.</div>}
           {!isLoading && !loadError && visibleNotes.map(note => (
-            <article key={note.id} className="rounded-xl border border-slate-800 bg-slate-900 p-3 shadow-sm">
-              <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <article key={note.id} className="relative rounded-xl border border-slate-800 bg-slate-900 p-3 shadow-sm">
+              {note.teacherName === teacherName && <button
+                type="button"
+                aria-label="Kendi notumu sil"
+                title="Notu sil"
+                onClick={() => setNoteToDelete(note)}
+                className="absolute right-2 top-2 rounded-full p-1 text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+              >
+                <X className="h-4 w-4" />
+              </button>}
+              <div className={`mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs ${note.teacherName === teacherName ? 'pr-7' : ''}`}>
                 <span className="flex items-center gap-1.5 font-semibold text-blue-300"><UserRound className="h-3.5 w-3.5" />{note.teacherName || 'Öğretmen'}</span>
                 <span className="flex items-center gap-1.5 text-slate-500"><CalendarDays className="h-3.5 w-3.5" />{formatNoteDate(note.createdAt)}</span>
               </div>
@@ -169,6 +204,22 @@ export default function StudentNotesDialog({ student, teacherName, onClose }: {
             </article>
           ))}
         </div>
+
+        <AlertDialog open={Boolean(noteToDelete)} onOpenChange={open => { if (!open && !isDeleting) setNoteToDelete(null); }}>
+          <AlertDialogContent className="border-slate-700 bg-slate-900 text-white">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Not silinsin mi?</AlertDialogTitle>
+              <AlertDialogDescription className="text-slate-400">Bu işlem geri alınamaz. Yalnızca kendi yazdığınız notu silebilirsiniz.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting} className="border-slate-700 bg-slate-800 text-white">Vazgeç</AlertDialogCancel>
+              <AlertDialogAction disabled={isDeleting} onClick={deleteOwnNote} className="bg-red-600 hover:bg-red-700">
+                {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isDeleting ? 'Siliniyor…' : 'Notu Sil'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );
